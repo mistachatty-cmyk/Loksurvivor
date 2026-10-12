@@ -1,3 +1,5 @@
+import { SupporterBar } from './SupporterBar';
+import { LokWalletStrip } from './LokWalletStrip';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, CloudRain, Gem, Flame, LayoutGrid, Lock, Palette, Radar, ScanLine, Sparkles, Star } from 'lucide-react';
 
@@ -75,7 +77,7 @@ const TIER_BADGE_CLASS = {
 
 type ShopCategory = 'palettes' | 'auras' | 'hats' | 'celebrations' | 'drops' | 'unlocks';
 
-interface Props { onBack: () => void }
+interface Props { onBack: () => void; onSignIn?: () => void }
 
 function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (category: ShopCategory) => void }) {
   return (
@@ -104,8 +106,8 @@ function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (categ
   );
 }
 
-export function PaletteGalleryPanel({ onBack }: Props) {
-  const { meta, buyPalette, grantPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, grantDropPack, equipDropPack, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantFactionRacesUnlock, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
+export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
+  const { meta, buyPalette, grantPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, grantDropPack, equipDropPack, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer, grantFactionRacesUnlock, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const { signedIn, balance: lokBalance, ownedSkus, priceOf, spend } = useLokEconomy();
   // LokToken-only applies per palette, and only once the live catalog actually lists it. Until then
@@ -158,7 +160,8 @@ export function PaletteGalleryPanel({ onBack }: Props) {
     if (ownedSkus.has(catalogSku('fieldGuideUnlock', 'field-guide')) && !meta.lokPetFieldGuideUnlocked) grantLokPetFieldGuide();
     if (ownedSkus.has(catalogSku('collectorAccess', 'collector-access')) && !meta.lokPetCollectorAccessUnlocked) grantLokPetCollectorAccess();
     if (ownedSkus.has(catalogSku('factionRacesUnlock', 'faction-races')) && !meta.factionRacesUnlocked) grantFactionRacesUnlock();
-  }, [ownedSkus, meta.lokPetFieldGuideUnlocked, meta.lokPetCollectorAccessUnlocked, meta.factionRacesUnlocked, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantFactionRacesUnlock]);
+    if (ownedSkus.has(catalogSku('packVisualizerUnlock', 'lokpack-visualizer')) && !meta.lokPackVisualizerUnlocked) grantLokPackVisualizer();
+  }, [ownedSkus, meta.lokPetFieldGuideUnlocked, meta.lokPetCollectorAccessUnlocked, meta.factionRacesUnlocked, meta.lokPackVisualizerUnlocked, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantFactionRacesUnlock, grantLokPackVisualizer]);
 
   const primeShowing = takeoverActive || flickerActive;
   const vendorRig = primeShowing ? PRIME.rig : ARTISAN_VALOR_RIG;
@@ -238,11 +241,13 @@ export function PaletteGalleryPanel({ onBack }: Props) {
     'field-guide': meta.lokPetFieldGuideUnlocked,
     'collector-access': meta.lokPetCollectorAccessUnlocked,
     'faction-races': meta.factionRacesUnlocked,
+    'lokpack-visualizer': meta.lokPackVisualizerUnlocked,
   };
   const UNLOCK_GRANT_BY_ID: Record<string, () => void> = {
     'field-guide': grantLokPetFieldGuide,
     'collector-access': grantLokPetCollectorAccess,
     'faction-races': grantFactionRacesUnlock,
+    'lokpack-visualizer': grantLokPackVisualizer,
   };
   const unlockOwned = (unlock: (typeof LOK_SHOP_UNLOCKS)[number]) => UNLOCK_OWNED_BY_ID[unlock.id] ?? false;
   const unlockPrice = (unlock: (typeof LOK_SHOP_UNLOCKS)[number]) =>
@@ -317,6 +322,8 @@ export function PaletteGalleryPanel({ onBack }: Props) {
 
   return (
     <ScreenLayout title="Customization Shop" subtitle={`${vendorName} — Paint Gallery`} onBack={onBack}>
+      <SupporterBar variant="inline" />
+      <LokWalletStrip onSignIn={onSignIn} />
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <aside className="flex shrink-0 flex-col items-center gap-3 border border-border bg-card px-6 py-5 lg:sticky lg:top-4 lg:w-72">
           <div className={flickerActive ? 'palette-preview-flicker' : ''}>

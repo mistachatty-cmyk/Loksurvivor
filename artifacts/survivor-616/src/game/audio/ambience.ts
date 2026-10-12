@@ -13,6 +13,7 @@
  */
 
 import type { HideoutSceneDef } from '@/game/types';
+import { ambienceVolumeGain } from '@/game/state/audioLevelSettings';
 
 export interface AmbienceHandle {
   /** 0..1, applied to the whole bed. */
@@ -182,7 +183,7 @@ export function startHideoutAmbience(
     scheduleMelody();
 
     const setLevel = (next: number) => {
-      const clamped = Math.max(0, Math.min(1, next));
+      const clamped = Math.max(0, Math.min(1, next)) * ambienceVolumeGain();
       try {
         master.gain.setTargetAtTime(clamped, context.currentTime, 0.4);
       } catch {

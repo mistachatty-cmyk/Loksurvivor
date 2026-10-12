@@ -10,8 +10,8 @@ import { CHARACTERS } from '@/game/data/characters';
 import { FORGE_ID_PREFIX, generateForgedOperator } from '@/game/data/operatorForge';
 import { registerForgedOperators, isForgeKit } from '@/game/data/forgedOperators';
 import {
-  FORGE_STORAGE_KEY, earnedSlotCount, freeSlotCount, isFeatureAvailable, isFeatureEnabled, loadRosterForgedOperators,
-  recordEarnedEndgame, saveForgedOperator, setFeatureEnabled,
+  FORGE_STORAGE_KEY, earnedSlotCount, freeSlotCount, isFeatureAvailable, isFeatureEnabled, loadForgedOperators, loadRosterForgedOperators,
+  recordEarnedEndgame, saveForgedOperator, setFeatureEnabled, setForgeSupporterTier,
 } from '@/game/state/operatorForgeStore';
 
 function installStorage(): Map<string, string> {
@@ -92,7 +92,7 @@ describe('end-game unlock rules', () => {
 });
 
 describe('end-game store: toggles, slots and the roster', () => {
-  beforeEach(() => { installStorage(); });
+  beforeEach(() => { installStorage(); setForgeSupporterTier(null); });
 
   const kit = CHARACTERS.find((c) => isForgeKit(c) && c.unlock.kind === 'default')!;
   const makeOp = (seed: string) => generateForgedOperator(seed, kit.id, new Set(), 1000);
@@ -135,6 +135,21 @@ describe('end-game store: toggles, slots and the roster', () => {
     recordEarnedEndgame([CUSTOM_SLOTS[2]!.id, CUSTOM_SLOTS[3]!.id, CUSTOM_SLOTS[4]!.id]);
     assert.equal(earnedSlotCount(), 5);
     assert.equal(freeSlotCount(), 3);
+  });
+
+  it('uses the verified supporter tier for extra milestone slots and retains saved designs when it lapses', () => {
+    recordEarnedEndgame(ALL_CUSTOM_SLOTS.map((slot) => slot.id));
+    assert.equal(earnedSlotCount(), 8);
+    setForgeSupporterTier('pass');
+    assert.equal(earnedSlotCount(), 14);
+    setForgeSupporterTier('passport');
+    assert.equal(earnedSlotCount(), 24);
+    setForgeSupporterTier('lifetime');
+    assert.equal(earnedSlotCount(), ALL_CUSTOM_SLOTS.length);
+    assert.equal(saveForgedOperator(makeOp('supporter')), true);
+    setForgeSupporterTier(null);
+    assert.equal(earnedSlotCount(), 8);
+    assert.equal(loadForgedOperators().length, 1);
   });
 
   it('adds custom operators to the roster only while the Forge is on, and never replaces a premade one', () => {

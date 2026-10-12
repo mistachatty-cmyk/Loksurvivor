@@ -92,6 +92,7 @@ import { BOND_RANK_BY_ID, TRAVEL_WIN_EXP_BASE, TREAT_EXP_BASE, applyBond, bondDa
 import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS, LOKPET_CARDS } from '@/game/data/cards';
 import { CARD_COSMETICS_BY_ID, equipCardCosmetic, grantCardCosmetic, isCardCosmeticOwned, normalizeCardCosmetics } from '@/game/data/cardCosmetics';
+import { BOOSTER_PRODUCTS_BY_ID, applyBoosterToPlayerStats, boosterUnits, rollBoosterCard } from '@/game/data/boosterCards';
 import { CARD_SHOP_PACKS_BY_ID, CARD_VARIANT_VALUE, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
 import { BATTLE_DECK_SLOTS, CARD_SALVAGE_COST, CARD_SALVAGE_EARN_RUNS } from '@/game/data/travelEncounters';
 import type { TravelEncounterResult } from '@/game/travelEncounter';
@@ -280,9 +281,6 @@ export function createInitialMeta(): MetaState {
     version: META_VERSION,
     devModeAccessUnlocked: false,
     devModeAllUnlocks: false,
-    lokPassOwned: false,
-    lokPassportActive: false,
-    lokPassportLifetime: false,
     physicsObjectClicksEnabled: true,
     levelUpPausesEnabled: true,
     liveModeEnabled: false,
@@ -295,6 +293,14 @@ export function createInitialMeta(): MetaState {
     lokPetFieldGuideUnlocked: false,
     lokPetCollectorAccessUnlocked: false,
     factionRacesUnlocked: false,
+    lokPackVisualizerUnlocked: false,
+    lokShopPerks: [],
+    lokShopRapport: 0,
+    lokShopStamps: 0,
+    lokShopLastVisit: '',
+    lokShopCharms: [],
+    lokShopHaggleDay: '',
+    lokShopHaggleCount: 0,
     damageNumberStyle: 'classic',
     companionRevealStyle: 'ambush',
     frameRateMode: 60,
@@ -384,6 +390,7 @@ export function createInitialMeta(): MetaState {
     lootTokens: 0,
     cardCredits: 0,
     cardCollection: [],
+    boosterCards: [],
     unopenedCardPacks: {},
     autoOpenPacksEnabled: true,
     activePassiveCardIds: [],
@@ -534,6 +541,11 @@ function cleanCounts(value: unknown): Record<string, number> {
     for (const [key, count] of Object.entries(value as Record<string, unknown>)) out[key] = counter(count);
   }
   return out;
+}
+
+function normalizeBoosterCards(value: unknown): MetaState['boosterCards'] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((card): card is MetaState['boosterCards'][number] => !!card && typeof card.id === 'string' && typeof card.characterId === 'string' && typeof card.stat === 'string' && typeof card.group === 'string' && typeof card.productId === 'string' && Number.isInteger(card.units) && card.units >= 1);
 }
 
 function normalizeCardCollection(value: unknown): MetaState['cardCollection'] {
@@ -1268,9 +1280,6 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     version: META_VERSION,
     devModeAccessUnlocked: parsed.devModeAccessUnlocked === true,
     devModeAllUnlocks: parsed.devModeAccessUnlocked === true && parsed.devModeAllUnlocks === true,
-    lokPassOwned: parsed.lokPassOwned === true,
-    lokPassportActive: parsed.lokPassportActive === true,
-    lokPassportLifetime: parsed.lokPassportLifetime === true,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
     levelUpPausesEnabled: !liveModeEnabled && parsed.levelUpPausesEnabled !== false,
     liveModeEnabled,
@@ -1336,6 +1345,14 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     lokPetFieldGuideUnlocked: parsed.lokPetFieldGuideUnlocked === true,
     lokPetCollectorAccessUnlocked: parsed.lokPetCollectorAccessUnlocked === true,
     factionRacesUnlocked: parsed.factionRacesUnlocked === true,
+    lokPackVisualizerUnlocked: parsed.lokPackVisualizerUnlocked === true,
+    lokShopPerks: Array.isArray(parsed.lokShopPerks) ? parsed.lokShopPerks.filter((v): v is string => typeof v === 'string') : [],
+    lokShopRapport: typeof parsed.lokShopRapport === 'number' && parsed.lokShopRapport >= 0 ? Math.floor(parsed.lokShopRapport) : 0,
+    lokShopStamps: typeof parsed.lokShopStamps === 'number' && parsed.lokShopStamps >= 0 ? Math.floor(parsed.lokShopStamps) : 0,
+    lokShopLastVisit: typeof parsed.lokShopLastVisit === 'string' ? parsed.lokShopLastVisit : '',
+    lokShopCharms: Array.isArray(parsed.lokShopCharms) ? parsed.lokShopCharms.filter((v): v is string => typeof v === 'string') : [],
+    lokShopHaggleDay: typeof parsed.lokShopHaggleDay === 'string' ? parsed.lokShopHaggleDay : '',
+    lokShopHaggleCount: typeof parsed.lokShopHaggleCount === 'number' && parsed.lokShopHaggleCount >= 0 ? Math.floor(parsed.lokShopHaggleCount) : 0,
     // Falls back to the pre-existing standalone localStorage toggle
     // (AttractMode.tsx's old component-local key) so a player who already
     // turned the background sim off doesn't see it silently re-enabled.
@@ -1419,6 +1436,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     lootTokens: counter(parsed.lootTokens),
     cardCredits: counter(parsed.cardCredits),
     cardCollection,
+    boosterCards: normalizeBoosterCards(parsed.boosterCards),
     unopenedCardPacks: normalizeUnopenedCardPacks(parsed.unopenedCardPacks),
     autoOpenPacksEnabled: parsed.autoOpenPacksEnabled !== false,
     activePassiveCardIds: Array.isArray(parsed.activePassiveCardIds) ? [...new Set(parsed.activePassiveCardIds.filter((id): id is string => typeof id === 'string' && ownedPassiveIds.has(id)))].slice(0, 5) : [],
@@ -1735,6 +1753,8 @@ export function effectiveStats(character: CharacterDef, meta: MetaState, ignoreF
   for (const [key, value] of Object.entries(boosts) as Array<[keyof BaseStats, number]>) {
     stats[key] = stats[key] + value;
   }
+  // Booster cards add to the played character (character, operatives and crew groups).
+  Object.assign(stats, applyBoosterToPlayerStats(stats, boosterUnits(meta.boosterCards ?? [])));
   for (const effect of crewActivityEffects(meta)) {
     if (effect.add) stats[effect.stat] += effect.add;
     if (effect.mult) stats[effect.stat] *= effect.mult;
@@ -1999,6 +2019,7 @@ type Action =
   | { type: 'enterHideout'; now: number }
   | { type: 'completeRun'; result: RunResult }
   | { type: 'buyCardPack'; packId: CardPackId; now: number }
+  | { type: 'buyBoosterProduct'; productId: string; now: number }
   | { type: 'buySingleCard'; cardId: string; cost: number; variant?: CardVariant }
   | { type: 'recycleCard'; cardId: string; rewardCC: number }
   | { type: 'recycleAllDuplicates' }
@@ -2067,7 +2088,6 @@ type Action =
   | { type: 'checkHiddenThemeReload' }
   | { type: 'unlockDevModeAccess' }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
-  | { type: 'setLokPassportTier'; tier: 'lokPassOwned' | 'lokPassportActive' | 'lokPassportLifetime'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
   | { type: 'setLiveMode'; enabled: boolean }
@@ -2079,6 +2099,10 @@ type Action =
   | { type: 'grantLokPetFieldGuide' }
   | { type: 'grantLokPetCollectorAccess' }
   | { type: 'grantFactionRacesUnlock' }
+  | { type: 'grantLokPackVisualizer' }
+  | { type: 'grantLokShopPerk'; id: string }
+  | { type: 'lokShopVisit'; day: string; stamped: boolean }
+  | { type: 'lokShopHaggle'; day: string; rapport: number; charmId: string | null }
   | { type: 'equipDropPack'; id: string }
   | { type: 'setDamageNumberStyle'; style: MetaState['damageNumberStyle'] }
   | { type: 'setCompanionRevealStyle'; style: MetaState['companionRevealStyle'] }
@@ -2260,6 +2284,14 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...state.meta, selectedLokPetIds } };
     }
 
+    case 'buyBoosterProduct': {
+      const product = BOOSTER_PRODUCTS_BY_ID[action.productId];
+      if (!product || state.meta.cardCredits < product.cost) return state;
+      const seed = (action.now ^ state.meta.totalRuns ^ state.meta.boosterCards.length ^ product.cost) >>> 0;
+      const rng = createRng(seed);
+      const cards = Array.from({ length: product.cards }, (_, index) => rollBoosterCard(rng, product.id, action.now, index));
+      return { ...state, meta: { ...state.meta, cardCredits: state.meta.cardCredits - product.cost, boosterCards: [...state.meta.boosterCards, ...cards] } };
+    }
     case 'buyCardPack': {
       const pack = CARD_SHOP_PACKS_BY_ID[action.packId];
       if (!pack || state.meta.cardCredits < pack.cost) return state;
@@ -3322,12 +3354,6 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'unlockDevModeAccess':
       return { ...state, meta: { ...state.meta, devModeAccessUnlocked: true } };
 
-    case 'setLokPassportTier':
-      // Granted either by a real LokToken purchase (LokShopScreen) or, for
-      // testing, by the Dev Mode panel -- both call sites gate themselves;
-      // this reducer just records the grant.
-      return { ...state, meta: { ...state.meta, [action.tier]: action.enabled } };
-
     case 'setDevModeAllUnlocks':
       if (!state.meta.devModeAccessUnlocked) return state;
       return {
@@ -3395,6 +3421,22 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'grantFactionRacesUnlock':
       if (state.meta.factionRacesUnlocked) return state;
       return { ...state, meta: { ...state.meta, factionRacesUnlocked: true } };
+    case 'grantLokPackVisualizer':
+      if (state.meta.lokPackVisualizerUnlocked) return state;
+      return { ...state, meta: { ...state.meta, lokPackVisualizerUnlocked: true } };
+    case 'grantLokShopPerk': {
+      if (state.meta.lokShopPerks.includes(action.id)) return state;
+      return { ...state, meta: { ...state.meta, lokShopPerks: [...state.meta.lokShopPerks, action.id], ...(action.id === 'ball' ? { ownsBall: true } : {}) } };
+    }
+    case 'lokShopVisit': {
+      if (state.meta.lokShopLastVisit === action.day) return state;
+      return { ...state, meta: { ...state.meta, lokShopLastVisit: action.day, lokShopRapport: state.meta.lokShopRapport + 1, lokShopStamps: state.meta.lokShopStamps + (action.stamped ? 1 : 0) } };
+    }
+    case 'lokShopHaggle': {
+      const sameDay = state.meta.lokShopHaggleDay === action.day;
+      const charms = action.charmId && !state.meta.lokShopCharms.includes(action.charmId) ? [...state.meta.lokShopCharms, action.charmId] : state.meta.lokShopCharms;
+      return { ...state, meta: { ...state.meta, lokShopHaggleDay: action.day, lokShopHaggleCount: (sameDay ? state.meta.lokShopHaggleCount : 0) + 1, lokShopRapport: state.meta.lokShopRapport + action.rapport, lokShopCharms: charms } };
+    }
     case 'setGraphicsQuality':
       return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
     case 'setCompanionRevealStyle':
@@ -3659,6 +3701,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'buyCardCosmetic': {
       const item = CARD_COSMETICS_BY_ID[action.id];
       if (!item || item.cost <= 0 || isCardCosmeticOwned(state.meta, item) || state.meta.cardCredits < item.cost) return state;
+      if (item.requiresUnlock === 'lokPackVisualizer' && !state.meta.lokPackVisualizerUnlocked) return state;
       return { ...state, meta: { ...grantCardCosmetic(state.meta, item), cardCredits: state.meta.cardCredits - item.cost } };
     }
     case 'equipCardCosmetic': {
@@ -4219,6 +4262,7 @@ export interface MetaContextValue {
   completeRun: (result: RunResult) => void;
   resolveTravelEncounter: (result: TravelEncounterResult) => void;
   buyCardPack: (packId: CardPackId) => void;
+  buyBoosterProduct: (productId: string) => void;
   craftRelic: (relicId: string) => void;
   buyKeyItemAction: (keyItemId: string, credCost: number) => void;
   buySingleCard: (cardId: string, cost: number, variant?: CardVariant) => void;
@@ -4283,7 +4327,6 @@ export interface MetaContextValue {
   checkHiddenThemeReload: () => void;
   unlockDevModeAccess: () => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
-  setLokPassportTier: (tier: 'lokPassOwned' | 'lokPassportActive' | 'lokPassportLifetime', enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
   setLiveMode: (enabled: boolean) => void;
@@ -4295,6 +4338,10 @@ export interface MetaContextValue {
   grantLokPetFieldGuide: () => void;
   grantLokPetCollectorAccess: () => void;
   grantFactionRacesUnlock: () => void;
+  grantLokPackVisualizer: () => void;
+  grantLokShopPerk: (id: string) => void;
+  lokShopVisit: (day: string, stamped: boolean) => void;
+  lokShopHaggle: (day: string, rapport: number, charmId: string | null) => void;
   equipDropPack: (id: string) => void;
   setDamageNumberStyle: (style: MetaState['damageNumberStyle']) => void;
   setCompanionRevealStyle: (style: MetaState['companionRevealStyle']) => void;
@@ -4424,6 +4471,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const enterHideout = useCallback(() => dispatch({ type: 'enterHideout', now: Date.now() }), []);
   const completeRun = useCallback((result: RunResult) => dispatch({ type: 'completeRun', result }), []);
   const buyCardPack = useCallback((packId: CardPackId) => dispatch({ type: 'buyCardPack', packId, now: Date.now() }), []);
+  const buyBoosterProduct = useCallback((productId: string) => dispatch({ type: 'buyBoosterProduct', productId, now: Date.now() }), []);
   const buySingleCard = useCallback((cardId: string, cost: number, variant?: CardVariant) => dispatch({ type: 'buySingleCard', cardId, cost, variant }), []);
   const recycleCard = useCallback((cardId: string, rewardCC: number) => dispatch({ type: 'recycleCard', cardId, rewardCC }), []);
   const recycleAllDuplicates = useCallback(() => dispatch({ type: 'recycleAllDuplicates' }), []);
@@ -4504,10 +4552,6 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
     [],
   );
-  const setLokPassportTier = useCallback(
-    (tier: 'lokPassOwned' | 'lokPassportActive' | 'lokPassportLifetime', enabled: boolean) => dispatch({ type: 'setLokPassportTier', tier, enabled }),
-    [],
-  );
   const setPhysicsObjectClicks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setPhysicsObjectClicks', enabled }),
     [],
@@ -4524,6 +4568,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const grantLokPetFieldGuide = useCallback(() => dispatch({ type: 'grantLokPetFieldGuide' }), []);
   const grantLokPetCollectorAccess = useCallback(() => dispatch({ type: 'grantLokPetCollectorAccess' }), []);
   const grantFactionRacesUnlock = useCallback(() => dispatch({ type: 'grantFactionRacesUnlock' }), []);
+  const grantLokPackVisualizer = useCallback(() => dispatch({ type: 'grantLokPackVisualizer' }), []);
+  const grantLokShopPerk = useCallback((id: string) => dispatch({ type: 'grantLokShopPerk', id }), []);
+  const lokShopVisit = useCallback((day: string, stamped: boolean) => dispatch({ type: 'lokShopVisit', day, stamped }), []);
+  const lokShopHaggle = useCallback((day: string, rapport: number, charmId: string | null) => dispatch({ type: 'lokShopHaggle', day, rapport, charmId }), []);
   const equipDropPack = useCallback((id: string) => dispatch({ type: 'equipDropPack', id }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
   const setDamageNumberStyle = useCallback((style: MetaState['damageNumberStyle']) => dispatch({ type: 'setDamageNumberStyle', style }), []);
@@ -4754,6 +4802,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       completeRun,
       resolveTravelEncounter,
       buyCardPack,
+      buyBoosterProduct,
       buySingleCard,
       recycleCard,
       recycleAllDuplicates,
@@ -4817,7 +4866,6 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       checkHiddenThemeReload,
       unlockDevModeAccess,
       setDevModeAllUnlocks,
-      setLokPassportTier,
       setPhysicsObjectClicks,
       setLevelUpPauses,
       setLiveMode,
@@ -4829,6 +4877,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       grantLokPetFieldGuide,
       grantLokPetCollectorAccess,
       grantFactionRacesUnlock,
+      grantLokPackVisualizer,
+      grantLokShopPerk,
+      lokShopVisit,
+      lokShopHaggle,
       equipDropPack,
       setDamageNumberStyle,
       setCompanionRevealStyle,
@@ -4933,6 +4985,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     completeRun,
     resolveTravelEncounter,
     buyCardPack,
+    buyBoosterProduct,
     buySingleCard,
     recycleCard,
     recycleAllDuplicates,
@@ -4992,7 +5045,6 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     checkHiddenThemeReload,
     unlockDevModeAccess,
     setDevModeAllUnlocks,
-    setLokPassportTier,
     setPhysicsObjectClicks,
     setLevelUpPauses,
     setLiveMode,
@@ -5004,6 +5056,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     grantLokPetFieldGuide,
     grantLokPetCollectorAccess,
     grantFactionRacesUnlock,
+    grantLokPackVisualizer,
+    grantLokShopPerk,
+    lokShopVisit,
+    lokShopHaggle,
     equipDropPack,
     setDamageNumberStyle,
     setCompanionRevealStyle,

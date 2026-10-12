@@ -1,4 +1,5 @@
 import type { BaseStats, CardPackId, CardVariant, MetaState, OwnedCardRecord } from '@/game/types';
+import { boosterMultipliers, boosterUnits } from '@/game/data/boosterCards';
 
 export type PassiveCardType = 'scenario' | 'lokpet';
 export type PassiveCardRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
@@ -100,10 +101,14 @@ export function passiveDeckSlots(meta: Pick<MetaState, 'lokCollectorRuns' | 'lok
   if (meta.lokCollectorRuns >= 8 || meta.lokCollectorPetsFound >= 6) return 4;
   return 3;
 }
-export interface ActiveCardEffects { statMults: Partial<Record<keyof BaseStats, number>>; lokPetDamageMult: number; lokPetHasteMult: number; magnetMult: number; creditMult: number; packDropBonus: number; propBounceMult: number; unbreakableProps: boolean; allElementLokPets: boolean; clockworkSlow: boolean }
-export function activeCardEffects(meta: Pick<MetaState, 'activePassiveCardIds' | 'cardCollection' | 'lokCollectorRuns' | 'lokCollectorPetsFound'>): ActiveCardEffects {
+export interface ActiveCardEffects { statMults: Partial<Record<keyof BaseStats, number>>; lokPetDamageMult: number; lokPetHasteMult: number; magnetMult: number; creditMult: number; packDropBonus: number; propBounceMult: number; unbreakableProps: boolean; allElementLokPets: boolean; clockworkSlow: boolean; /** Booster cards: multiplies every enemy's max HP. */ enemyHpMult: number }
+export function activeCardEffects(meta: Pick<MetaState, 'activePassiveCardIds' | 'cardCollection' | 'lokCollectorRuns' | 'lokCollectorPetsFound' | 'boosterCards'>): ActiveCardEffects {
   const owned = new Set(meta.cardCollection.filter((record) => record.copies > 0).map((record) => record.cardId)); const ids = meta.activePassiveCardIds.filter((id) => owned.has(id)).slice(0, passiveDeckSlots(meta));
-  const result: ActiveCardEffects = { statMults: {}, lokPetDamageMult: 1, lokPetHasteMult: 1, magnetMult: 1, creditMult: 1, packDropBonus: 0, propBounceMult: 1, unbreakableProps: false, allElementLokPets: false, clockworkSlow: false };
+  const result: ActiveCardEffects = { statMults: {}, lokPetDamageMult: 1, lokPetHasteMult: 1, magnetMult: 1, creditMult: 1, packDropBonus: 0, propBounceMult: 1, unbreakableProps: false, allElementLokPets: false, clockworkSlow: false, enemyHpMult: 1 };
   for (const id of ids) { const effect = PASSIVE_CARDS_BY_ID[id]?.effect; if (!effect) continue; if (effect.stat && effect.statMult) result.statMults[effect.stat] = (result.statMults[effect.stat] ?? 1) * effect.statMult; result.lokPetDamageMult *= effect.lokPetDamageMult ?? 1; result.lokPetHasteMult *= effect.lokPetHasteMult ?? 1; result.magnetMult *= effect.magnetMult ?? 1; result.creditMult *= effect.creditMult ?? 1; result.packDropBonus += effect.packDropBonus ?? 0; result.propBounceMult *= effect.propBounceMult ?? 1; result.unbreakableProps ||= effect.unbreakableProps === true; result.allElementLokPets ||= effect.allElementLokPets === true; result.clockworkSlow ||= effect.clockworkSlow === true; }
+  const boosters = boosterMultipliers(boosterUnits(meta.boosterCards ?? []));
+  result.lokPetDamageMult *= boosters.lokPetDamageMult;
+  result.lokPetHasteMult *= boosters.lokPetHasteMult;
+  result.enemyHpMult *= boosters.enemyHpMult;
   return result;
 }

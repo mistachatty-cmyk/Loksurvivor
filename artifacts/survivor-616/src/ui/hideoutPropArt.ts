@@ -22,6 +22,8 @@ export interface PropDrawOptions {
   near: boolean;
   now: number;
   reduceMotion: boolean;
+  /** Progress 0..1 through the "just used" reaction; undefined when idle. */
+  useAge?: number;
 }
 
 /** The rough half-width of a prop in prop units, so taps and the reach check agree with the art. */
@@ -38,6 +40,10 @@ const GLASS = 'rgba(190, 235, 255, 0.22)';
 export function drawProp(ctx: CanvasRenderingContext2D, o: PropDrawOptions): void {
   const { art, x, groundY, s, accent, now, reduceMotion } = o;
   const t = reduceMotion ? 0 : now;
+  const reacting = o.useAge !== undefined && !reduceMotion;
+  const fx = reacting ? o.useAge! : 0;
+  // Peaks mid-reaction, so lids, doors and glows ease out and back.
+  const burst = reacting ? Math.sin(Math.min(1, fx) * Math.PI) : 0;
   ctx.save();
   ctx.translate(x, groundY);
 
@@ -57,7 +63,8 @@ export function drawProp(ctx: CanvasRenderingContext2D, o: PropDrawOptions): voi
   switch (art) {
     case 'crate':
       box(-12, 0, 24, 18, WOOD);
-      box(-12, 14, 24, 4, WOOD_LIGHT);
+      // The lid pops up when it is opened.
+      box(-12, 14 + burst * 7, 24, 4, WOOD_LIGHT);
       box(-12, 0, 24, 2, INK);
       box(-2, 4, 4, 9, accent);
       box(-12, 7, 24, 1.5, INK);
@@ -65,7 +72,7 @@ export function drawProp(ctx: CanvasRenderingContext2D, o: PropDrawOptions): voi
     case 'bell': {
       box(-1.5, 0, 3, 28, WOOD_LIGHT);
       box(-9, 25, 18, 3, WOOD);
-      const swing = Math.sin(t / 420) * (o.ready ? 0.12 : 0.03);
+      const swing = Math.sin(t / 420) * (o.ready ? 0.12 : 0.03) + (reacting ? Math.sin(t / 55) * 0.55 * (1 - fx) * (1 - fx) : 0);
       ctx.save();
       ctx.translate(0, -22 * s);
       ctx.rotate(swing);
@@ -87,7 +94,7 @@ export function drawProp(ctx: CanvasRenderingContext2D, o: PropDrawOptions): voi
       const glow = ctx.createRadialGradient(0, -27 * s, 1 * s, 0, -27 * s, 20 * s);
       glow.addColorStop(0, accent);
       glow.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.globalAlpha = 0.5 * flicker;
+      ctx.globalAlpha = Math.min(1, 0.5 * flicker + burst * 0.5);
       ctx.fillStyle = glow;
       ctx.beginPath();
       ctx.arc(0, -27 * s, 20 * s, 0, Math.PI * 2);
@@ -131,6 +138,28 @@ export function drawProp(ctx: CanvasRenderingContext2D, o: PropDrawOptions): voi
       }
       break;
     }
+    case 'chest': {
+      // The Lucky Chest: dark wood with gold bands and a lid that swings up when it is opened.
+      box(-12, 0, 24, 11, '#4a2f1d');
+      box(-12, 0, 24, 2, INK);
+      box(-12, 5, 24, 2, accent);
+      const lid = burst * 9;
+      if (burst > 0.05) {
+        const glow = ctx.createRadialGradient(0, -12 * s, 1 * s, 0, -12 * s, 24 * s);
+        glow.addColorStop(0, accent);
+        glow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.globalAlpha = burst * 0.8;
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(0, -12 * s, 24 * s, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      box(-12, 11 + lid, 24, 6, '#5a3a22');
+      box(-12, 14 + lid, 24, 2, accent);
+      box(-2.5, 7, 5, 5, accent);
+      break;
+    }
     case 'stash':
       box(-12, 0, 24, 3, METAL);
       for (let i = 0; i < 5; i += 1) box(-10 + i * 5, 3, 1.4, 9, METAL);
@@ -150,7 +179,7 @@ export function drawProp(ctx: CanvasRenderingContext2D, o: PropDrawOptions): voi
       ctx.beginPath();
       ctx.arc(0, -26 * s, 10 * s, Math.PI, 0);
       ctx.fill();
-      const pulse = reduceMotion ? 0.7 : 0.55 + Math.abs(Math.sin(t / 380)) * 0.4;
+      const pulse = reduceMotion ? 0.7 : Math.min(1, 0.55 + Math.abs(Math.sin(t / 380)) * 0.4 + burst * 0.4);
       ctx.globalAlpha = pulse;
       box(-7, 10, 14, 12, accent);
       ctx.globalAlpha = 1;
@@ -187,8 +216,9 @@ export function drawProp(ctx: CanvasRenderingContext2D, o: PropDrawOptions): voi
     }
     case 'door':
       box(-8, 0, 16, 30, '#1d2230');
-      box(-6.5, 1.5, 13, 27, '#2b3347');
-      box(3, 13, 2, 3, accent);
+      // The panel swings away from you as it opens.
+      box(-6.5, 1.5, 13 * (1 - burst * 0.7), 27, '#2b3347');
+      box(3 * (1 - burst * 0.7), 13, 2, 3, accent);
       ctx.strokeStyle = accent;
       ctx.lineWidth = 1.6 * s;
       ctx.beginPath();
@@ -198,6 +228,27 @@ export function drawProp(ctx: CanvasRenderingContext2D, o: PropDrawOptions): voi
     case 'npc':
       // The character is drawn by the strip with `drawRig`; this only keeps the ground shadow.
       break;
+  }
+
+  // Just used: a ring that spreads, and a little glyph that floats up (music from the
+  // jukebox, a heart from the cat, a spark from anything else).
+  if (reacting && fx < 1) {
+    ctx.save();
+    ctx.globalAlpha = (1 - fx) * 0.7;
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1.6 * s;
+    ctx.beginPath();
+    ctx.ellipse(0, -6 * s, (8 + fx * 22) * s, (5 + fx * 12) * s, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1 - fx;
+    ctx.fillStyle = accent;
+    ctx.font = `bold ${Math.round(9 * s)}px ui-monospace, monospace`;
+    ctx.textAlign = 'center';
+    const glyph = art === 'jukebox' || art === 'bell' ? '♪' : art === 'cat' ? '♥' : '✦';
+    for (let i = 0; i < 3; i += 1) {
+      ctx.fillText(glyph, (i - 1) * 9 * s + Math.sin(fx * 6 + i * 2) * 3 * s, -(PROP_HEIGHT_UNITS * 0.6 + fx * 22 + i * 4) * s);
+    }
+    ctx.restore();
   }
 
   // "Ready" marker: a small pulsing diamond above anything that would pay out right now.

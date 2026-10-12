@@ -20,6 +20,7 @@ import {
 import { bumpForgeStat, deleteForgedOperator, isCustomActive, isSlotTierUnlocked, recordForgeTab, setCustomActive, earnedEndgameIds, earnedSlotCount, isFeatureEnabled, loadForgedOperators, saveForgedOperator } from '@/game/state/operatorForgeStore';
 import { ALL_CUSTOM_SLOTS, endgameReached } from '@/game/data/endgameUnlocks';
 import { useMeta } from '@/game/state/metaStore';
+import { useLokEconomy } from '@/state/lokEconomyStore';
 import type { AnimName } from '@/game/types';
 import { RigPortrait } from './RigPortrait';
 import { OperatorRoster } from './OperatorRoster';
@@ -63,6 +64,7 @@ export interface OperatorForgePanelProps {
 
 export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
   const { meta } = useMeta();
+  const { activeSupporterTier } = useLokEconomy();
 
   const kits = useMemo(
     () => CHARACTERS.filter((c) => isForgeKit(c) && (c.unlock.kind === 'default' || meta.unlockedCharacterIds.includes(c.id) || meta.devModeAllUnlocks)),
@@ -367,9 +369,9 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
 
   const species = speciesById(design.species);
   const earnedIds = earnedEndgameIds();
-  const slotsEarned = earnedSlotCount();
+  const slotsEarned = earnedSlotCount(activeSupporterTier);
   const slotAvailable = (slot: (typeof ALL_CUSTOM_SLOTS)[number]) =>
-    (meta.devModeAccessUnlocked && meta.devModeAllUnlocks) || (earnedIds.includes(slot.id) && isSlotTierUnlocked(slot.tier));
+    (meta.devModeAccessUnlocked && meta.devModeAllUnlocks) || (earnedIds.includes(slot.id) && isSlotTierUnlocked(slot.tier, activeSupporterTier));
   const freeSlots = Math.max(0, slotsEarned - saved.length);
 
   return createPortal(
@@ -716,7 +718,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
                           <p className="text-xs text-muted-foreground">
                             {slot.how}
                             {endgameReached(meta) ? '' : ' Clear every standard map first.'}
-                            {slot.tier !== 'free' && !isSlotTierUnlocked(slot.tier) ? ` Visit the Lok Shop to unlock ${slot.tier === 'lokpass' ? 'LokPass' : slot.tier === 'passport' ? 'Lok Passport' : 'Lifetime Lok Passport'}.` : ''}
+                            {slot.tier !== 'free' && !isSlotTierUnlocked(slot.tier, activeSupporterTier) ? ` This slot requires an active ${slot.tier === 'lokpass' ? 'Lok Pass' : slot.tier === 'passport' ? 'Lok Passport' : 'Lifetime Lok Passport'} supporter tier.` : ''}
                           </p>
                         </li>
                       );

@@ -27,6 +27,7 @@ const TIER_STYLE: Record<CardCosmeticDef['tier'], string> = {
   uncommon: 'text-emerald-200 border-emerald-300/40',
   rare: 'text-sky-200 border-sky-300/40',
   legendary: 'text-amber-200 border-amber-300/50',
+  animated: 'text-fuchsia-200 border-fuchsia-300/60 bg-fuchsia-300/10',
 };
 
 /** A card to show the frames on: the first card of the first pack set. */
@@ -97,6 +98,7 @@ export function SleeveCounter({ onPlay }: { onPlay?: (sound: 'purchase' | 'uiCli
               const owned = isCardCosmeticOwned(meta, item);
               const equipped = selectedCardCosmeticId(meta, kind) === item.id;
               const affordable = meta.cardCredits >= item.cost;
+              const locked = item.requiresUnlock === 'lokPackVisualizer' && !meta.lokPackVisualizerUnlocked;
               return (
                 <article
                   key={item.id}
@@ -127,6 +129,15 @@ export function SleeveCounter({ onPlay }: { onPlay?: (sound: 'purchase' | 'uiCli
                         data-testid={`button-equip-${item.id}`}
                       >
                         {t('sleeve.equip')}
+                      </button>
+                    ) : locked ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full cursor-not-allowed border border-white/20 px-3 py-2 font-mono text-[10px] font-black uppercase text-white/50"
+                        data-testid={`button-locked-${item.id}`}
+                      >
+                        {t('sleeve.locked.visualizer')}
                       </button>
                     ) : (
                       <button

@@ -12,6 +12,7 @@ import {
   HEX, MAX_FORGED_OPERATORS, PALETTE_KEYS, normalizeForgedOperator, type ForgedOperator,
 } from '@/game/data/operatorForge';
 import type { SpritePalette } from '@/game/types';
+import type { ActiveSupporterTier } from '@/game/data/lokShopPerks';
 import { ALL_CUSTOM_SLOT_IDS, ALL_CUSTOM_SLOTS, ENDGAME_FEATURE_IDS, type EndgameFeatureId, type SlotTier } from '@/game/data/endgameUnlocks';
 
 export const FORGE_STORAGE_KEY = 'survivor616.forge.v1';
@@ -135,9 +136,6 @@ const KNOWN_EARNED = new Set<string>([...ENDGAME_FEATURE_IDS, ...ALL_CUSTOM_SLOT
 interface StoredMetaFlags {
   devModeAccessUnlocked?: unknown;
   devModeAllUnlocks?: unknown;
-  lokPassOwned?: unknown;
-  lokPassportActive?: unknown;
-  lokPassportLifetime?: unknown;
   factionRacesUnlocked?: unknown;
 }
 
@@ -161,22 +159,22 @@ function factionRacesPurchased(): boolean {
   return devModeForgeAccess() || readMetaFlags().factionRacesUnlocked === true;
 }
 
-/**
- * Which paid slot tiers are unlocked right now. No real payment processing
- * lives in this repo -- these three flags are the Lok platform's contract
- * (see `.agents/memory/lok-passport-slots.md`); Dev Mode's "all unlocks" also
- * grants every tier, same as it does for everything else in the Forge.
- */
-function unlockedSlotTiers(): ReadonlySet<SlotTier> {
+let confirmedSupporterTier: ActiveSupporterTier = null;
+
+/** Keep the Forge's plain storage module in sync with the verified account tier. */
+export function setForgeSupporterTier(tier: ActiveSupporterTier): void {
+  confirmedSupporterTier = tier;
+}
+
+function unlockedSlotTiers(activeTier: ActiveSupporterTier = confirmedSupporterTier): ReadonlySet<SlotTier> {
   const tiers = new Set<SlotTier>(['free']);
   if (devModeForgeAccess()) {
     tiers.add('lokpass'); tiers.add('passport'); tiers.add('lifetime');
     return tiers;
   }
-  const meta = readMetaFlags();
-  if (meta.lokPassOwned === true) tiers.add('lokpass');
-  if (meta.lokPassportActive === true) tiers.add('passport');
-  if (meta.lokPassportLifetime === true) tiers.add('lifetime');
+  if (activeTier) tiers.add('lokpass');
+  if (activeTier === 'passport' || activeTier === 'lifetime') tiers.add('passport');
+  if (activeTier === 'lifetime') tiers.add('lifetime');
   return tiers;
 }
 
@@ -270,21 +268,21 @@ export function earnedEndgameIds(): string[] {
 }
 
 /** Every slot earned by milestone AND whose tier is currently unlocked, in order. */
-export function earnedSlots() {
+export function earnedSlots(activeTier: ActiveSupporterTier = confirmedSupporterTier) {
   if (devModeForgeAccess()) return ALL_CUSTOM_SLOTS;
-  const tiers = unlockedSlotTiers();
+  const tiers = unlockedSlotTiers(activeTier);
   const earned = read().earned;
   return ALL_CUSTOM_SLOTS.filter((slot) => tiers.has(slot.tier) && earned.includes(slot.id));
 }
 
 /** How many custom slots have been earned (milestone reached AND tier unlocked). */
-export function earnedSlotCount(): number {
-  return earnedSlots().length;
+export function earnedSlotCount(activeTier: ActiveSupporterTier = confirmedSupporterTier): number {
+  return earnedSlots(activeTier).length;
 }
 
 /** Whether a given tier's slots are currently unlocked (owned/subscribed, or Dev Mode). */
-export function isSlotTierUnlocked(tier: SlotTier): boolean {
-  return unlockedSlotTiers().has(tier);
+export function isSlotTierUnlocked(tier: SlotTier, activeTier: ActiveSupporterTier = confirmedSupporterTier): boolean {
+  return unlockedSlotTiers(activeTier).has(tier);
 }
 
 /** Whether a feature has been earned (or, for the Forge, was already found before it became an unlock). */

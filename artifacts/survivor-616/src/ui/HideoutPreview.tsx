@@ -36,7 +36,9 @@ import {
 import type { PropArt } from '@/game/data/hideoutProps';
 import { lokPetSpritePalette } from '@/game/data/lokPets';
 import { evolvedRig } from '@/game/engine/petEvolution';
-import { createCrewWanderState, crewWanderFacing, stepCrewWander } from '@/game/engine/hideoutCrewWander';
+import { crewTemperamentFor } from '@/game/data/crewTemperaments';
+import { crewPose, reactToProp, stepCrew, syncCrew, talkTo, type CrewActor, type CrewEvent } from '@/game/engine/hideoutCrewLife';
+import { drawBubble, measureBubble, rectsOverlap, type BubbleRect } from '@/ui/hideoutBubble';
 import {
   callPets,
   createHideoutPetState,
@@ -49,13 +51,17 @@ import {
   type HideoutPetState,
 } from '@/game/engine/hideoutPets';
 import {
+  DASH_DOUBLE_TAP_MS,
+  DASH_DOUBLE_TAP_PX,
   createOperatorControl,
   nearestProp,
   nudgeOperator,
   setGoal,
   standingSpot,
+  startDash,
   stepOperatorControl,
 } from '@/game/engine/hideoutWalk';
+import { getControls } from '@/game/input/controls';
 import type { BondRankId } from '@/game/engine/petGrowth';
 import { BOND_RANK_BY_ID } from '@/game/engine/petGrowth';
 import {
@@ -146,6 +152,11 @@ export interface StripNotice {
   seq: number;
   title: string;
   line: string;
+  /**
+   * Who or what the note is about: `operator`, a prop id, or `pet:<id>`. Anchored notes are drawn as a
+   * speech bubble beside that thing instead of in a box over the bottom of the strip.
+   */
+  anchor?: string;
 }
 
 export interface HideoutPreviewProps {
@@ -177,6 +188,10 @@ export interface HideoutPreviewProps {
   keyboardActive?: boolean;
   cue?: PlayCue;
   notice?: StripNotice;
+  /** A line for a crew member to say; used when two of them stop to chat. */
+  crewSpeak?: (allyId: string) => string | undefined;
+  /** The player talked to a crew member (prop id `ally:<id>`): a new `seq` makes them say `line`. */
+  say?: { seq: number; propId: string; line: string };
   onPropUse?: (propId: string) => void;
   onFocusPet?: (petId: string) => void;
   /** The operator has walked this many pixels under your control (reported each time it adds up to a stroll). */
@@ -210,10 +225,12 @@ interface Ripple { x: number; born: number }
 
 const MAX_PETS = 4;
 
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
 export function HideoutPreview({
   rig, palette, height = 176, className = '', pets = [], weather = 'clear', biome = 'sanctum', accent = '#f59e0b', eventsMode = 'on',
   onPetCare, onPetEvent, firstEventDelayMs = 9000,
-  props: roomProps = [], interactive = false, keyboardActive = true, cue, notice,
+  props: roomProps = [], interactive = false, keyboardActive = true, cue, notice, crewSpeak, say,
   onPropUse, onFocusPet, onWalkBeat, eventChip = null, onEventChip, ball: ballProp, summonSeq, onPickup,
 }: HideoutPreviewProps) {
   const t = useT();
@@ -221,24 +238,42 @@ export function HideoutPreview({
   const rootRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ key: number; title: string; line: string } | null>(null);
   const [nearProp, setNearProp] = useState<{ id: string; label: string; ready: boolean } | null>(null);
+  // Speech drawn on the canvas is mirrored here so it is still announced to screen readers.
+  const [spoken, setSpoken] = useState('');
+  const bubbleQueue = useRef<Array<{ anchor: string; title: string; text: string }>>([]);
+  const sayQueue = useRef<Array<{ propId: string; line: string }>>([]);
 
   // The effect below keeps one canvas loop alive for as long as the operator's look is
   // unchanged, so everything else reaches it through this ref instead of restarting it.
   const live = useRef({
     pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
-    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup, biome, accent,
+    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup, biome, accent, crewSpeak,
   });
   live.current = {
     pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
-    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup, biome, accent,
+    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup, biome, accent, crewSpeak,
   };
 
   // Keyed on `seq` so a parent re-render that rebuilds the object does not restart the toast.
   const noticeSeq = notice?.seq;
   useEffect(() => {
-    if (notice) setToast({ key: notice.seq, title: notice.title, line: notice.line });
+    if (!notice) return;
+    if (notice.anchor) {
+      bubbleQueue.current.push({ anchor: notice.anchor, title: notice.title, text: notice.line });
+      setSpoken(`${notice.title}. ${notice.line}`);
+    } else {
+      setToast({ key: notice.seq, title: notice.title, line: notice.line });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noticeSeq]);
+
+  const saySeq = say?.seq;
+  useEffect(() => {
+    if (!say) return;
+    sayQueue.current.push({ propId: say.propId, line: say.line });
+    setSpoken(say.line);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saySeq]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -323,16 +358,37 @@ export function HideoutPreview({
       const def = pickVisitor(rng, lastVisitorKind);
       lastVisitorKind = def.id;
       actors.push(spawnVisitor(uid += 1, def, r, rng, now));
-      setToast({ key: Date.now(), title: t('hideout.ambient.title'), line: t(def.lineKey as never) });
+      bubbleQueue.current.push({ anchor: 'operator', title: t('hideout.ambient.title'), text: t(def.lineKey as never) });
+      setSpoken(t(def.lineKey as never));
     };
     // Props are about 32 units tall; one unit is this many pixels on a strip of this height.
     const propUnit = cssH * 0.0105;
     const reachPx = unit * 0.6;
     const propPositions = () => {
       const r = range();
-      return live.current.roomProps.map((info) => ({ info, x: r.min + info.x * (r.max - r.min) }));
+      // Crew are placed where they are standing right now, not at their spot.
+      return live.current.roomProps.map((info) => ({ info, x: crewActors.get(info.id)?.x ?? r.min + info.x * (r.max - r.min) }));
     };
-    const crewWander = createCrewWanderState(0, rng);
+    // Crew on the strip: each one stands, paces, fiddles, visits props, chats and greets in
+    // their own way (see engine/hideoutCrewLife.ts and data/crewTemperaments.ts).
+    const crewActors = new Map<string, CrewActor>();
+    let crewRangePrev: { min: number; max: number } | null = null;
+    const crewEvents: CrewEvent[] = [];
+    const crewIdOf = (id: string) => (id.startsWith('ally:') ? id.slice(5) : id);
+    /** Prop id -> strip time it was last used, for its reaction animation. */
+    const propFx = new Map<string, number>();
+    const PROP_FX_MS = 900;
+    let operatorHopAt = -1e9;
+    /** Sitting on the window seat: the operator settles until they walk off. */
+    let operatorSitUntil = 0;
+    /** Afterimages left behind while the operator dashes, newest last. */
+    const dashTrail: Array<{ x: number; dir: 1 | -1; born: number }> = [];
+    let lastTrailX = Number.NEGATIVE_INFINITY;
+    let lastDashing = false;
+    let lastTap: { x: number; y: number; at: number } | null = null;
+    const OPERATOR_HOP_MS = 420;
+    /** Notes shown as bubbles beside what they are about. */
+    const notes: Array<{ anchor: string; title: string; text: string; born: number; until: number }> = [];
     const states = new Map<string, HideoutPetState>();
     const looks = new Map<string, { rig: SpriteRig; pal: SpritePalette; scale: number; height: number }>();
     const localHistory = new Map<string, Record<string, number>>();
@@ -349,6 +405,21 @@ export function HideoutPreview({
         const speed = 0.03 + rng() * 0.05;
         sparks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, born: now, life: 600 + rng() * 400, color });
       }
+    };
+
+    /** The operator uses a prop: it reacts, the operator hops, nearby crew look over (or dance), then the parent pays out. */
+    const triggerUse = (id: string) => {
+      const now = performance.now() - start;
+      const prop = propPositions().find((p) => p.info.id === id);
+      if (prop && prop.info.art !== 'npc') {
+        propFx.set(id, now);
+        operatorHopAt = now;
+        if (prop.info.art === 'seat') operatorSitUntil = now + 3600;
+        operator.dir = prop.x >= operator.x ? 1 : -1;
+        burst(prop.x, groundY - PROP_HEIGHT_UNITS * propUnit * 0.6, prop.info.accent, 7, now);
+        reactToProp([...crewActors.values()], { x: prop.x, art: prop.info.art }, now, rng, unit * 1.7);
+      }
+      live.current.onPropUse?.(id);
     };
 
     const petLook = (info: HideoutPetInfo) => {
@@ -406,7 +477,15 @@ export function HideoutPreview({
         if (walk.arrived && pendingProp) {
           const id = pendingProp;
           pendingProp = null;
-          settings.onPropUse?.(id);
+          triggerUse(id);
+        }
+        // A crew member you set off toward may have wandered; keep heading to where they are now.
+        if (pendingProp) {
+          const target = crewActors.get(pendingProp);
+          if (target) {
+            const spot = standingSpot(operator.x, target.x, unit * 0.35);
+            if (Math.abs(spot - control.goalX) > 6) setGoal(operator, control, spot, now, r, false);
+          }
         }
         if (control.strollPx >= 900) {
           const px = control.strollPx;
@@ -564,29 +643,65 @@ export function HideoutPreview({
         nearId = closeId;
         setNearProp(close ? { id: close.info.id, label: close.info.label, ready: close.info.ready } : null);
       }
-      // A single static NPC (rescued crew, or a cameo) rarely steps out from its spot,
-      // pauses as if looking at something, then returns -- see hideoutCrewWander.ts.
-      if (!reduceMotion) {
-        const npcEligible = placed.filter((p) => p.info.art === 'npc' && p.info.npc).map((p) => ({ id: p.info.id, x: p.x }));
-        stepCrewWander(crewWander, { now, dt, eligible: npcEligible, range: r, rng });
+      // Crew life: who is on the strip, what they say, and what they are up to this frame.
+      {
+        const npcInfos = settings.roomProps.filter((info) => info.art === 'npc' && info.npc);
+        syncCrew(crewActors, npcInfos.map((info) => ({ id: info.id, homeFrac: info.x, t: crewTemperamentFor(crewIdOf(info.id)) })), r, now, rng, crewRangePrev);
+        crewRangePrev = { min: r.min, max: r.max };
+        const crewList = [...crewActors.values()];
+        for (const queued of sayQueue.current.splice(0)) {
+          const actor = crewActors.get(queued.propId);
+          if (actor) talkTo(actor, crewList, queued.line, now, operator.x, rng);
+          else setToast({ key: Date.now(), title: '', line: queued.line });
+        }
+        const visitable = placed.filter((p) => p.info.art !== 'npc').map((p) => ({ id: p.info.id, x: p.x, art: p.info.art }));
+        stepCrew(crewList, {
+          now, dt, range: r, operatorX: operator.x, props: visitable, rng,
+          speak: (id) => live.current.crewSpeak?.(crewIdOf(id)), still: reduceMotion,
+          quiet: notes.length > 0 || crewList.some((c) => c.behavior === 'talk'),
+        }, crewEvents);
+        for (const event of crewEvents) if (event.kind === 'visit') propFx.set(event.propId, now);
+        crewEvents.length = 0;
       }
       for (const prop of placed) {
-        const wandering = prop.info.art === 'npc' && prop.info.id === crewWander.activeId;
-        const drawX = wandering ? crewWander.x : prop.x;
-        if (prop.info.art === 'npc' && prop.info.npc) {
-          const facing = wandering ? crewWanderFacing(crewWander, operator.x >= drawX ? 1 : -1) : (operator.x >= drawX ? 1 : -1);
+        const fxAt = propFx.get(prop.info.id);
+        const useAge = fxAt !== undefined && now - fxAt < PROP_FX_MS ? (now - fxAt) / PROP_FX_MS : undefined;
+        const actor = prop.info.art === 'npc' && prop.info.npc ? crewActors.get(prop.info.id) : undefined;
+        if (actor && prop.info.npc) {
+          const pose = crewPose(actor, now, reduceMotion);
+          const npcScale = scale * 0.9;
+          const height = prop.info.npc.rig.pixelHeight * npcScale;
           ctx.save();
           ctx.globalAlpha = 0.3;
           ctx.fillStyle = '#000000';
           ctx.beginPath();
-          ctx.ellipse(drawX, groundY, 13 * propUnit, 3, 0, 0, Math.PI * 2);
+          ctx.ellipse(actor.x, groundY, 13 * propUnit * (1 - Math.min(0.35, pose.lift / 30)), 3, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
-          drawRig(ctx, prop.info.npc.rig, prop.info.npc.palette, 'idle', reduceMotion ? 0 : now, drawX, groundY, facing, scale * 0.9, { outline: true });
+          ctx.save();
+          ctx.translate(actor.x, groundY - pose.lift);
+          ctx.scale(pose.scaleX, pose.scaleY);
+          drawRig(ctx, prop.info.npc.rig, prop.info.npc.palette, pose.anim, reduceMotion ? 0 : now, 0, 0, actor.facing, npcScale, { outline: true });
+          ctx.restore();
+          if (actor.emote) {
+            const age = (now - actor.emote.born) / Math.max(1, actor.emote.until - actor.emote.born);
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, 1 - age * age);
+            ctx.font = 'bold 15px ui-monospace, monospace';
+            ctx.textAlign = 'center';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+            ctx.fillStyle = actor.emote.glyph === 'heart' ? '#ff6fa8' : prop.info.npc.palette.accent;
+            const ex = actor.x + (actor.emote.glyph === 'zzz' ? 8 + Math.sin(now / 300) * 3 : 0);
+            const ey = groundY - height - 6 - age * 10 - Math.max(0, pose.lift);
+            ctx.strokeText(EMOTE_GLYPHS[actor.emote.glyph], ex, ey);
+            ctx.fillText(EMOTE_GLYPHS[actor.emote.glyph], ex, ey);
+            ctx.restore();
+          }
         }
         drawProp(ctx, {
-          art: prop.info.art, x: drawX, groundY, s: propUnit, accent: prop.info.accent,
-          ready: prop.info.ready, near: prop.info.id === closeId, now, reduceMotion,
+          art: prop.info.art, x: prop.x, groundY, s: propUnit, accent: prop.info.accent,
+          ready: prop.info.ready, near: prop.info.id === closeId, now, reduceMotion, useAge,
         });
       }
 
@@ -707,7 +822,58 @@ export function HideoutPreview({
       ctx.ellipse(operator.x, groundY, rig.pixelHeight * scale * 0.32, 6, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
-      drawRig(ctx, rig, palette, operatorAnim, reduceMotion ? 0 : now, operator.x, groundY, operatorFacing, scale, { outline: true });
+      const hopAge = (now - operatorHopAt) / OPERATOR_HOP_MS;
+      const hopLift = !reduceMotion && hopAge >= 0 && hopAge < 1 ? Math.sin(hopAge * Math.PI) * 9 : 0;
+      const sitting = !reduceMotion && now < operatorSitUntil && operator.mode === 'rest';
+      if (operator.mode !== 'rest') operatorSitUntil = 0;
+      const dashing = !reduceMotion && control.dashing;
+
+      // Dash: afterimages every few pixels, a burst of dust as it kicks off, and speed lines behind.
+      if (dashing) {
+        if (!lastDashing) {
+          lastTrailX = Number.NEGATIVE_INFINITY;
+          for (let n = 0; n < 6; n += 1) {
+            sparks.push({ x: operator.x - operator.dir * 8, y: groundY - 1, vx: -operator.dir * (0.03 + rng() * 0.05), vy: -0.015 - rng() * 0.02, born: now, life: 420 + rng() * 240, color: dustColorFor(settings.biome) });
+          }
+        }
+        if (Math.abs(operator.x - lastTrailX) >= 16) {
+          dashTrail.push({ x: operator.x, dir: operator.dir, born: now });
+          lastTrailX = operator.x;
+          if (dashTrail.length > 8) dashTrail.shift();
+        }
+      }
+      lastDashing = dashing;
+      const GHOST_MS = 260;
+      for (let i = dashTrail.length - 1; i >= 0; i -= 1) {
+        const ghost = dashTrail[i]!;
+        const age = (now - ghost.born) / GHOST_MS;
+        if (age >= 1) { dashTrail.splice(i, 1); continue; }
+        drawRig(ctx, rig, palette, 'walk', now * 2.4, ghost.x, groundY, ghost.dir, scale, { outline: false, alpha: 0.4 * (1 - age), tint: { color: palette.accent, alpha: 0.55 } });
+      }
+      if (dashing) {
+        ctx.save();
+        ctx.strokeStyle = palette.accent;
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        for (let n = 0; n < 4; n += 1) {
+          const y = groundY - (8 + n * 15) * (scale / 3);
+          const len = 26 + ((n * 17 + Math.floor(now / 40) * 7) % 22);
+          ctx.globalAlpha = 0.45 - n * 0.07;
+          ctx.beginPath();
+          ctx.moveTo(operator.x - operator.dir * 14, y);
+          ctx.lineTo(operator.x - operator.dir * (14 + len), y);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.translate(operator.x, groundY - hopLift + (sitting ? 2 : 0));
+      if (sitting) ctx.scale(1, 0.9);
+      // Leaning into the dash.
+      if (dashing) ctx.scale(1.07, 0.95);
+      drawRig(ctx, rig, palette, operatorAnim, reduceMotion ? 0 : dashing ? now * 2.4 : now, 0, 0, operatorFacing, scale, { outline: true });
+      ctx.restore();
 
       // The ball, over the operator so a carried one stays visible.
       if (ball) {
@@ -759,6 +925,57 @@ export function HideoutPreview({
         ctx.restore();
       }
       drawSceneryFront(ctx, sceneryOpts);
+
+      // Speech bubbles, last so they sit over everything: crew talk (their own bubble), and
+      // anchored notes about a prop, the operator or a pet.
+      for (const queued of bubbleQueue.current.splice(0)) {
+        const life = clamp(hideoutNoticeMs(), 3500, 9000);
+        notes.push({ anchor: queued.anchor, title: queued.title, text: queued.text, born: now, until: now + life });
+        // Newer notes about the same thing replace older ones.
+        for (let i = notes.length - 2; i >= 0; i -= 1) if (notes[i]!.anchor === queued.anchor) notes.splice(i, 1);
+      }
+      const operatorHeadY = groundY - rig.pixelHeight * scale;
+      const anchorOf = (anchor: string): { x: number; headY: number; accent: string } | null => {
+        if (anchor === 'operator') return { x: operator.x, headY: operatorHeadY, accent: palette.accent };
+        if (anchor.startsWith('pet:')) {
+          const id = anchor.slice(4);
+          const info = wanted.find((candidate) => candidate.id === id);
+          const state = states.get(id);
+          return info && state ? { x: state.x, headY: groundY - petLook(info).height, accent: info.palette.glow } : null;
+        }
+        const placedProp = placed.find((p) => p.info.id === anchor);
+        if (!placedProp) return null;
+        const npcRig = placedProp.info.npc?.rig;
+        return { x: placedProp.x, headY: groundY - (npcRig ? npcRig.pixelHeight * scale * 0.9 : PROP_HEIGHT_UNITS * propUnit), accent: placedProp.info.accent };
+      };
+      // What the player asked for goes first; crew chatter is hidden rather than piled on top.
+      const taken: BubbleRect[] = [];
+      for (let i = notes.length - 1; i >= 0; i -= 1) {
+        const note = notes[i]!;
+        if (now >= note.until) { notes.splice(i, 1); continue; }
+        const at = anchorOf(note.anchor);
+        if (!at) { notes.splice(i, 1); setToast({ key: Date.now(), title: note.title, line: note.text }); continue; }
+        taken.push(drawBubble(ctx, {
+          text: note.text, title: note.title, anchorX: at.x, headY: at.headY, cssW, cssH, accent: at.accent, avoid: taken,
+          age: (now - note.born) / (note.until - note.born), sinceMs: now - note.born,
+        }));
+      }
+      const spoken = [...placed].filter((p) => crewActors.get(p.info.id)?.bubble && p.info.npc)
+        .sort((p, q) => Number(crewActors.get(q.info.id)!.behavior === 'talk') - Number(crewActors.get(p.info.id)!.behavior === 'talk'));
+      for (const prop of spoken) {
+        const actor = crewActors.get(prop.info.id)!;
+        const bubble = actor.bubble!;
+        const input = {
+          text: bubble.text, title: prop.info.label, anchorX: actor.x, headY: groundY - prop.info.npc!.rig.pixelHeight * scale * 0.9,
+          cssW, cssH, accent: prop.info.npc!.palette.accent, avoid: taken,
+        };
+        // Chatter between crew only shows where it does not land on something already up.
+        if (actor.behavior !== 'talk') {
+          const natural = measureBubble(ctx, { ...input, avoid: [] });
+          if (taken.some((r) => rectsOverlap(natural, r))) continue;
+        }
+        taken.push(drawBubble(ctx, { ...input, age: (now - bubble.born) / (bubble.until - bubble.born), sinceMs: now - bubble.born }));
+      }
     };
     raf = requestAnimationFrame(frame);
 
@@ -768,7 +985,7 @@ export function HideoutPreview({
     let down: { x: number; y: number; at: number; id: number } | null = null;
     const useProp = (id: string) => {
       pendingProp = null;
-      live.current.onPropUse?.(id);
+      triggerUse(id);
     };
     const walkToProp = (id: string, propX: number, now: number) => {
       const r = range();
@@ -777,9 +994,19 @@ export function HideoutPreview({
       setGoal(operator, control, spot, now, r, reduceMotion);
       if (reduceMotion) useProp(id);
     };
-    const handleTap = (px: number, py: number) => {
+    const handleTap = (px: number, py: number, pointerType: string) => {
       const now = performance.now() - start;
       const settings = live.current;
+      // A second tap right beside the first turns the walk into a dash (same setting as the in-run
+      // double-click / double-tap dash).
+      const dashAllowed = pointerType === 'mouse' ? getControls().mouse.doubleClickDash : getControls().touch.doubleTapDash;
+      const isDouble = Boolean(lastTap) && now - lastTap!.at <= DASH_DOUBLE_TAP_MS
+        && Math.hypot(px - lastTap!.x, py - lastTap!.y) <= DASH_DOUBLE_TAP_PX;
+      lastTap = isDouble ? null : { x: px, y: py, at: now };
+      const dashTo = (x: number) => {
+        if (!isDouble || !dashAllowed || !settings.interactive || reduceMotion) return;
+        startDash(operator, control, x, now, range(), false);
+      };
       if (!reduceMotion) {
         for (const actor of actors) {
           const def = AMBIENT_VISITORS_BY_ID[actor.kindId];
@@ -787,7 +1014,7 @@ export function HideoutPreview({
           const half = Math.max(16, cssH * def.size * 0.6 * 0.7);
           if (Math.abs(px - actor.x) <= half && py >= groundY - half - 8 && py <= groundY + 10 && squashActor(actor, now)) {
             burst(actor.x, groundY - 6, def.accent, 8, now);
-            setToast({ key: Date.now(), title: t('hideout.ambient.title'), line: t('hideout.ambient.squash') });
+            bubbleQueue.current.push({ anchor: 'operator', title: t('hideout.ambient.title'), text: t('hideout.ambient.squash') });
             return;
           }
         }
@@ -844,12 +1071,14 @@ export function HideoutPreview({
           if (Math.abs(px - prop.x) <= half && py >= groundY - (PROP_HEIGHT_UNITS + 10) * propUnit && py <= groundY + 10) {
             burst(prop.x, groundY - PROP_HEIGHT_UNITS * propUnit, prop.info.accent, 4, now);
             walkToProp(prop.info.id, prop.x, now);
+            dashTo(control.goalX);
             return;
           }
         }
         pendingProp = null;
         const r = range();
         setGoal(operator, control, px, now, r, reduceMotion);
+        dashTo(px);
         ripples.push({ x: Math.max(r.min, Math.min(r.max, px)), born: now });
         return;
       }
@@ -868,7 +1097,7 @@ export function HideoutPreview({
       if (!started || started.id !== event.pointerId) return;
       if (Math.hypot(event.clientX - started.x, event.clientY - started.y) > 10 || performance.now() - started.at > 450) return;
       const rect = canvas.getBoundingClientRect();
-      handleTap(event.clientX - rect.left, event.clientY - rect.top);
+      handleTap(event.clientX - rect.left, event.clientY - rect.top, event.pointerType);
     };
     const onPointerCancel = () => { down = null; };
     canvas.addEventListener('pointerdown', onPointerDown);
@@ -991,15 +1220,18 @@ export function HideoutPreview({
           ) : null}
         </div>
       ) : null}
+      {/* Speech drawn on the canvas, repeated for screen readers. */}
+      <p className="sr-only" role="status" aria-live="polite" data-testid="hideout-spoken">{spoken}</p>
       {toast ? (
         <div
           key={toast.key}
           role="status"
           aria-live="polite"
-          className={`pointer-events-none absolute left-3 z-30 max-w-[calc(100%-1.5rem)] border border-white/15 bg-black/85 px-3 py-1.5 text-white backdrop-blur-sm ${(interactive && nearProp) || eventChip ? 'bottom-16' : 'bottom-2'}`}
+          // Up in the sky, not over the bottom of the strip where everyone's feet are.
+          className="pointer-events-none absolute left-3 top-2 z-30 max-w-[min(22rem,calc(100%-1.5rem))] border border-white/15 bg-black/80 px-3 py-1.5 text-white backdrop-blur-sm"
           data-testid="hideout-pet-event"
         >
-          <p className="font-mono text-[9px] font-bold uppercase tracking-[.2em] text-pink-200">{toast.title}</p>
+          {toast.title ? <p className="font-mono text-[9px] font-bold uppercase tracking-[.2em] text-pink-200">{toast.title}</p> : null}
           <p className="mt-0.5 text-xs leading-snug text-white/85">{toast.line}</p>
         </div>
       ) : null}

@@ -2030,7 +2030,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'director-terminal'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'director-terminal' | 'lok-shop'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -2288,15 +2288,6 @@ export interface MetaState {
   devModeAccessUnlocked: boolean;
   /** Settings toggle for exposing every unlockable surface regardless of progress. */
   devModeAllUnlocks: boolean;
-  /**
-   * Lok ecosystem purchase entitlements gating the upper Operator Forge custom-slot
-   * tiers. No real payment processing lives in this repo yet -- these flags are the
-   * contract the Lok platform flips once a purchase completes (see
-   * .agents/memory/lok-passport-slots.md); today they're only settable via Dev Mode.
-   */
-  lokPassOwned: boolean;
-  lokPassportActive: boolean;
-  lokPassportLifetime: boolean;
   /** Enables tapping/clicking a movable prop to prime its next player impact. */
   physicsObjectClicksEnabled: boolean;
   /** When true, level-up choices pause the run; when false, the run keeps moving. */
@@ -2502,6 +2493,8 @@ export interface MetaState {
   /** Currency earned from blue loot boxes and spent at the LokPet card shop. */
   cardCredits: number;
   cardCollection: OwnedCardRecord[];
+  /** Owned booster cards. Each adds its units to a stat for every run, the way crew boosts do. */
+  boosterCards: BoosterCardRecord[];
   /** Purchased or found packs not yet opened, keyed by pack id. Opened via `openStoredCardPack`. */
   unopenedCardPacks: Partial<Record<CardPackId, number>>;
   /** When true (default), buying or finding a pack opens it immediately. When false, packs are stored sealed in `unopenedCardPacks` for the player to open later. */
@@ -2640,6 +2633,21 @@ export interface MetaState {
   lokPetCollectorAccessUnlocked: boolean;
   /** LokToken purchase (Lok Shop): unlocks the Operator Forge's faction races list before Victory Lap would otherwise earn it. */
   factionRacesUnlocked: boolean;
+  /** LOK Shop unlock: lets the Sleeve Counter sell the animated Live pack wraps. */
+  lokPackVisualizerUnlocked: boolean;
+  /** LokShop perks owned (ids from `lokShopPerks.ts`): ball, Lok Pass, Passports. */
+  lokShopPerks: string[];
+  /** How well LokServer knows you; raised by daily visits and the feather game. */
+  lokShopRapport: number;
+  /** Passport stamps: one per local day visited while holding a Passport. */
+  lokShopStamps: number;
+  /** Local-day key of the last visit. */
+  lokShopLastVisit: string;
+  /** Feather Charm ids collected. */
+  lokShopCharms: string[];
+  /** Local-day key and count of feather-game tries used. */
+  lokShopHaggleDay: string;
+  lokShopHaggleCount: number;
   /** Local-date key for the currently active Broadcast contract board. */
   dailyContractDayKey: string;
   /** Progress accumulated against today's Broadcast contracts. */
@@ -3193,4 +3201,19 @@ export interface SectorResourceDef {
   description: string;
   /** Gained per enemy killed while the tier is active. */
   perKill: number;
+}
+
+/** Who a booster card's stat applies to. Character, operatives and crew all feed the played character's stats. */
+export type BoosterGroup = 'character' | 'operatives' | 'crew' | 'lokpets' | 'enemies';
+export type BoosterStat = 'maxHp' | 'speed' | 'power' | 'area' | 'haste' | 'magnet' | 'armor' | 'lokPetDamage' | 'lokPetHaste' | 'enemyHp';
+export interface BoosterCardRecord {
+  id: string;
+  group: BoosterGroup;
+  stat: BoosterStat;
+  /** Whole units, 1 or more. What one unit means per stat lives in data/boosterCards.ts. */
+  units: number;
+  /** The character drawn as a ghosted copy on the card. */
+  characterId: string;
+  productId: string;
+  acquiredAt: number;
 }

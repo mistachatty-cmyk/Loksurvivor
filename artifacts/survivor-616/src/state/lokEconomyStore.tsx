@@ -23,15 +23,21 @@ import {
 import {
   earnLokTokens,
   fetchCatalog,
+  fetchActiveSupporterTier,
+  fetchMySupporter,
   fetchOwnedSkus,
+  setSupporterPublic,
   getLokProfile,
   spendLokTokens,
   type LokProfileRank,
+  type MySupporter,
+  type SupporterTier,
   type SpendResult,
 } from '@workspace/lok-client';
 
 import { useAuth } from '@/state/authStore';
 import { lokClient } from '@/lib/lokClient';
+import { setForgeSupporterTier } from '@/game/state/operatorForgeStore';
 
 /** This app's `lok_apps.app_key`. */
 const APP_KEY = 'survivor616';
@@ -54,6 +60,12 @@ interface LokEconomyContextValue {
   priceOf: (sku: string) => number | undefined;
   /** Buy a catalog SKU. Resolves with the server's verdict; refreshes balance and inventory on success. */
   spend: (sku: string) => Promise<SpendResult>;
+  /** Highest supporter tier with a live entitlement right now (perks apply). */
+  activeSupporterTier: SupporterTier | null;
+  /** Permanent supporter record: highest tier ever held, founder mark, bar visibility. */
+  supporter: MySupporter | null;
+  /** Opt in/out of the public supporter bar. Resolves true when saved. */
+  setSupporterVisible: (show: boolean) => Promise<boolean>;
 }
 
 const LokEconomyContext = createContext<LokEconomyContextValue>({
@@ -65,6 +77,9 @@ const LokEconomyContext = createContext<LokEconomyContextValue>({
   ownedSkus: new Set<string>(),
   priceOf: () => undefined,
   spend: async () => ({ ok: false, error: 'not_signed_in' }),
+  activeSupporterTier: null,
+  supporter: null,
+  setSupporterVisible: async () => false,
 });
 
 export function LokEconomyProvider({ children }: { children: ReactNode }) {
@@ -73,8 +88,11 @@ export function LokEconomyProvider({ children }: { children: ReactNode }) {
   const [lifetimeEarned, setLifetimeEarned] = useState<number | null>(null);
   const [rank, setRank] = useState<LokProfileRank | null>(null);
   const [ownedSkus, setOwnedSkus] = useState<ReadonlySet<string>>(() => new Set());
+  const [activeSupporterTier, setActiveSupporterTier] = useState<SupporterTier | null>(null);
+  const [supporter, setSupporter] = useState<MySupporter | null>(null);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const refreshedForUserId = useRef<string | null>(null);
+  const supporterFetchEpoch = useRef(0);
 
   // The catalog is public-read, so prices load even for signed-out players.
   useEffect(() => {
@@ -85,13 +103,23 @@ export function LokEconomyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refresh = useCallback(async () => {
+    const epoch = ++supporterFetchEpoch.current;
+    setForgeSupporterTier(null);
+    setActiveSupporterTier(null);
     if (!lokClient || !session) {
       setBalance(null);
       setLifetimeEarned(null);
       setRank(null);
       setOwnedSkus(new Set());
+      setSupporter(null);
       return;
     }
+    void fetchActiveSupporterTier(lokClient).then((r) => {
+      if (epoch !== supporterFetchEpoch.current || !r.ok) return;
+      setForgeSupporterTier(r.tier);
+      setActiveSupporterTier(r.tier);
+    });
+    void fetchMySupporter(lokClient).then((r) => { if (r.ok) setSupporter(r.supporter); });
     void fetchOwnedSkus(lokClient).then((owned) => {
       if (owned.ok) setOwnedSkus(new Set(owned.skus));
     });
@@ -140,6 +168,12 @@ export function LokEconomyProvider({ children }: { children: ReactNode }) {
     },
     [session, refresh],
   );
+  const setSupporterVisible = useCallback(async (show: boolean) => {
+    if (!lokClient || !session) return false;
+    const ok = await setSupporterPublic(lokClient, show);
+    if (ok) setSupporter((current) => (current ? { ...current, showPublic: show } : current));
+    return ok;
+  }, [session]);
   const priceOf = useCallback((sku: string) => prices[sku], [prices]);
 
   const value: LokEconomyContextValue = {
@@ -151,6 +185,9 @@ export function LokEconomyProvider({ children }: { children: ReactNode }) {
     ownedSkus,
     priceOf,
     spend,
+    activeSupporterTier,
+    supporter,
+    setSupporterVisible,
   };
   return <LokEconomyContext.Provider value={value}>{children}</LokEconomyContext.Provider>;
 }

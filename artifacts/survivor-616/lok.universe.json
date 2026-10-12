@@ -17,5 +17,7 @@
     "script": "scripts/export-public-lore.ts",
     "hubKey": "survivor616"
   },
-  "sdkVersion": "1.0.0"
+  "supporterBar": { "mount": ["shell", "shop"], "theme": "hologram" },
+  "walletStrip": { "mount": ["shop"] },
+  "sdkVersion": "1.2.0"
 }
