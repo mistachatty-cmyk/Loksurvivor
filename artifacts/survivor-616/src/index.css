@@ -713,8 +713,11 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   62% { transform: translateY(-3px) scale(1.24); }
   100% { transform: translateY(0) scale(1); }
 }
+.training-rack-nav-indicator { position: absolute; inset: 0; pointer-events: none; border-bottom: 1px solid hsl(var(--primary)); background: hsl(var(--primary) / .12); animation: training-rack-nav-in 180ms cubic-bezier(.2,.8,.2,1) both; transform-origin: left center; }
+.training-rack-nav-indicator--evolution { transform-origin: right center; }
+@keyframes training-rack-nav-in { from { opacity: .4; transform: scaleX(.55); } to { opacity: 1; transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) {
-  .training-tier-pop, .training-favorite-pop { animation: none; }
+  .training-tier-pop, .training-favorite-pop, .training-rack-nav-indicator { animation: none; }
 }
 :root[data-scrollbar-tint='neutral'] * { scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent; }
 :root[data-scrollbar='standard'] * { scrollbar-width: auto; scrollbar-color: auto; }

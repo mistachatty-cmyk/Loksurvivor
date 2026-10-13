@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Crosshair, Plus, RotateCcw, Search, Star, Swords, Target, Trash2, Zap, Move, LockKeyhole } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Crosshair, Plus, RotateCcw, Search, Sparkles, Star, Swords, Target, Trash2, Zap, Move, LockKeyhole } from 'lucide-react';
 
 import { createWorld, stepWorld, type EnemyActor, type World } from '@/game/engine/world';
 import { CHARACTERS } from '@/game/data/characters';
 import { ENEMIES_BY_ID } from '@/game/data/enemies';
 import { AREAS } from '@/game/data/areas';
 import { ALL_WEAPON_DEFS } from '@/game/data/weaponPixelModels';
+import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { renderWorld, type Viewport } from '@/game/render/draw';
 import { useMeta } from '@/game/state/metaStore';
 import type { WeaponDef } from '@/game/types';
@@ -44,6 +45,10 @@ function buildTrainingLoadout(): WeaponDef[] {
 }
 
 const TRAINING_LOADOUT = buildTrainingLoadout();
+const EVOLUTION_WEAPON_IDS = new Set(Object.keys(EVOLUTIONS_BY_ID));
+const BASE_TRAINING_WEAPON_COUNT = TRAINING_LOADOUT.filter((weapon) => !EVOLUTION_WEAPON_IDS.has(weapon.id)).length;
+const EVOLUTION_TRAINING_WEAPON_COUNT = TRAINING_LOADOUT.filter((weapon) => EVOLUTION_WEAPON_IDS.has(weapon.id)).length;
+const EVOLUTION_KILL_REQUIREMENT = 6_166;
 
 function makeTrainingDummy(maxHp = DUMMY_START_HP, mode: 'durability' | 'nonlethal' | 'infinite' = 'durability'): EnemyActor {
   const def = ENEMIES_BY_ID[TRAINING_ENEMY_ID]!;
@@ -190,7 +195,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   const lastChallengeWeaponsRef = useRef<WeaponDef[]>([]);
   const { selectedCharacter, meta, recordTrainingSession, setTrainingArenaLoadoutGroups, toggleFavoriteTrainingWeapon } = useMeta();
   const t = useT();
-  const [selectedWeaponId, setSelectedWeaponId] = useState(TRAINING_LOADOUT[0]!.id);
+  const [selectedWeaponId, setSelectedWeaponId] = useState(TRAINING_LOADOUT.find((weapon) => !EVOLUTION_WEAPON_IDS.has(weapon.id))?.id ?? TRAINING_LOADOUT[0]!.id);
   const [expandedWeaponId, setExpandedWeaponId] = useState<string | null>(null);
   const [layout, setLayout] = useState<TrainingArenaLayout>(loadTrainingArenaLayout);
   const [rackColumns, setRackColumns] = useState(2);
@@ -208,6 +213,8 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   const [weaponLevelOverrides, setWeaponLevelOverrides] = useState<Record<string, number>>({});
   const [multiWeaponIds, setMultiWeaponIds] = useState<string[]>([]);
   const [loadoutName, setLoadoutName] = useState('');
+  const [rackPage, setRackPage] = useState<'weapons' | 'evolutions'>('weapons');
+  const [rackPageDirection, setRackPageDirection] = useState<'right' | 'left'>('right');
   const [spam, setSpam] = useState(false);
   const [challengeRunning, setChallengeRunning] = useState(false);
   const [challengeSeconds, setChallengeSeconds] = useState(0);
@@ -232,7 +239,15 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   const selectedWeaponLevel = weaponLevelFor(selectedWeapon.id);
   const allWeaponsMixed = TRAINING_LOADOUT.some((weapon) => weaponLevelFor(weapon.id) !== allWeaponLevel);
   const multiUnlocked = meta.trainingDummyDamage >= 1_000_000 || meta.devModeAllUnlocks;
-  const weaponKills = meta.devModeAllUnlocks ? 616 : (meta.trainingWeaponKills[selectedWeapon.id] ?? 0);
+  const weaponKillsFor = (weapon: WeaponDef): number => {
+    const evolution = EVOLUTIONS_BY_ID[weapon.id];
+    const sourceWeaponId = evolution?.baseWeaponId ?? weapon.id;
+    return meta.devModeAllUnlocks ? (evolution ? EVOLUTION_KILL_REQUIREMENT : 616) : (meta.trainingWeaponKills[sourceWeaponId] ?? 0);
+  };
+  const weaponIsUnlocked = (weapon: WeaponDef): boolean => meta.devModeAllUnlocks || weaponKillsFor(weapon) >= (EVOLUTIONS_BY_ID[weapon.id] ? EVOLUTION_KILL_REQUIREMENT : 616);
+  const selectedEvolution = EVOLUTIONS_BY_ID[selectedWeapon.id];
+  const selectedKillRequirement = selectedEvolution ? EVOLUTION_KILL_REQUIREMENT : 616;
+  const weaponKills = Math.min(selectedKillRequirement, weaponKillsFor(selectedWeapon));
   const selectedWeapons = (multiUnlocked && multiWeaponIds.length > 0
     ? multiWeaponIds.map((id) => TRAINING_LOADOUT.find((weapon) => weapon.id === id)).filter((weapon): weapon is WeaponDef => Boolean(weapon))
     : [selectedWeapon]);
@@ -306,11 +321,16 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   const favoriteWeaponIds = new Set(meta.trainingFavoriteWeaponIds);
   const filteredWeapons = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const catalog = TRAINING_LOADOUT.filter((weapon) => EVOLUTION_WEAPON_IDS.has(weapon.id) === (rackPage === 'evolutions'));
     const filtered = query
-      ? TRAINING_LOADOUT.filter((weapon) => `${weapon.name} ${weapon.kind} ${weapon.description}`.toLowerCase().includes(query))
-      : [...TRAINING_LOADOUT];
+      ? catalog.filter((weapon) => {
+        const evolutionSource = EVOLUTIONS_BY_ID[weapon.id]?.baseWeaponId;
+        const sourceName = evolutionSource ? TRAINING_LOADOUT.find((candidate) => candidate.id === evolutionSource)?.name ?? '' : '';
+        return `${weapon.name} ${weapon.kind} ${weapon.description} ${evolutionSource ?? ''} ${sourceName}`.toLowerCase().includes(query);
+      })
+      : catalog;
     return filtered.sort((a, b) => Number(favoriteWeaponIds.has(b.id)) - Number(favoriteWeaponIds.has(a.id)) || a.name.localeCompare(b.name));
-  }, [search, meta.trainingFavoriteWeaponIds]);
+  }, [search, rackPage, meta.trainingFavoriteWeaponIds]);
 
   useEffect(() => {
     if (!challengeRunning) return;
@@ -625,7 +645,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   };
 
   const startChallenge = (): void => {
-    if (testRunningRef.current || (!multiUnlocked && multiWeaponIds.length > 1)) return;
+    if (testRunningRef.current || (!multiUnlocked && multiWeaponIds.length > 1) || selectedWeapons.some((weapon) => !weaponIsUnlocked(weapon))) return;
     testWeapon(selectedWeapons, true, false);
   };
 
@@ -636,8 +656,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   };
 
   const activateWeapon = (weapon: WeaponDef): void => {
-    const unlocked = meta.devModeAllUnlocks || (meta.trainingWeaponKills[weapon.id] ?? 0) >= 616;
-    if (!unlocked) return;
+    if (!weaponIsUnlocked(weapon)) return;
     setSelectedWeaponId(weapon.id);
     testWeapon(weapon, false, spam);
   };
@@ -656,8 +675,15 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   };
 
   const toggleMultiWeapon = (weapon: WeaponDef): void => {
-    if (!multiUnlocked || (meta.trainingWeaponKills[weapon.id] ?? 0) < 616) return;
+    if (!multiUnlocked || !weaponIsUnlocked(weapon)) return;
     setMultiWeaponIds((ids) => ids.includes(weapon.id) ? ids.filter((id) => id !== weapon.id) : [...ids, weapon.id]);
+  };
+
+  const selectRackPage = (nextPage: 'weapons' | 'evolutions'): void => {
+    if (nextPage === rackPage) return;
+    setRackPageDirection(nextPage === 'evolutions' ? 'right' : 'left');
+    setRackPage(nextPage);
+    setExpandedWeaponId(null);
   };
 
   const selectLoadoutGroup = (groupId: string): void => {
@@ -701,8 +727,12 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
     const loadout = activeLoadoutGroup.loadouts.find((candidate) => candidate.id === loadoutId);
     if (!loadout || (loadout.weaponIds.length > 1 && !multiUnlocked)) return;
     const weaponIds = loadout.weaponIds.filter((id) => TRAINING_LOADOUT.some((weapon) => weapon.id === id));
-    if (weaponIds.length === 0) return;
+    if (weaponIds.length === 0 || weaponIds.some((id) => {
+      const weapon = TRAINING_LOADOUT.find((candidate) => candidate.id === id);
+      return !weapon || !weaponIsUnlocked(weapon);
+    })) return;
     const selected = TRAINING_LOADOUT.find((weapon) => weapon.id === weaponIds[0])!;
+    if (EVOLUTION_WEAPON_IDS.has(selected.id)) selectRackPage('evolutions');
     setSelectedWeaponId(selected.id);
     setMultiWeaponIds(multiUnlocked ? weaponIds : []);
     const groups = meta.trainingArenaLoadoutGroups.map((group) => group.id === activeLoadoutGroup.id ? { ...group, activeLoadoutId: loadoutId } : group);
@@ -859,10 +889,20 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
               <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider sm:text-xs"><Zap size={13} className="text-orange-200" /> {t('training.rack.title')}</p>
               <div className="flex items-center gap-1" aria-label={t('training.rack.columns')}>
                 {[2, 3, 4].map((columns) => <button key={columns} type="button" onClick={() => { setRackColumns(columns); if (columns > 2) setExpandedWeaponId(null); }} aria-pressed={rackColumns === columns} title={t('training.rack.columns')} className={`min-h-6 min-w-6 border font-mono text-[8px] font-bold ${rackColumns === columns ? 'border-cyan-200/60 bg-cyan-200/15 text-cyan-100' : 'border-white/10 text-white/45 hover:text-white'}`}>{columns}</button>)}
-                <span className="ml-1 font-mono text-[8px] text-white/40">{TRAINING_LOADOUT.length}</span>
+                <span className="ml-1 font-mono text-[8px] text-white/40">{rackPage === 'evolutions' ? EVOLUTION_TRAINING_WEAPON_COUNT : BASE_TRAINING_WEAPON_COUNT}</span>
               </div>
             </div>
             {!mainLayout && <p className="mt-1 text-xs text-white/45">{t('training.rack.help')}</p>}
+            <div className={`training-rack-nav mt-1 flex border border-white/10 bg-black/25 p-0.5 sm:mt-2 ${mainLayout ? 'gap-0.5' : 'gap-1'}`} role="tablist" aria-label={t('training.rack.pages')}>
+              <button type="button" role="tab" aria-selected={rackPage === 'weapons'} onClick={() => selectRackPage('weapons')} className={`relative min-h-7 flex-1 overflow-hidden px-1.5 font-mono text-[7px] font-black uppercase tracking-wider transition-colors sm:text-[8px] ${rackPage === 'weapons' ? 'bg-orange-200/15 text-orange-100' : 'text-white/45 hover:text-white'}`}>
+                {rackPage === 'weapons' && <span aria-hidden="true" className="training-rack-nav-indicator" />}
+                <span className="relative inline-flex items-center gap-1"><Swords size={10} />{t('training.rack.basePage')}</span>
+              </button>
+              <button type="button" role="tab" aria-selected={rackPage === 'evolutions'} onClick={() => selectRackPage('evolutions')} className={`relative min-h-7 flex-1 overflow-hidden px-1.5 font-mono text-[7px] font-black uppercase tracking-wider transition-colors sm:text-[8px] ${rackPage === 'evolutions' ? 'bg-fuchsia-200/15 text-fuchsia-100' : 'text-white/45 hover:text-white'}`}>
+                {rackPage === 'evolutions' && <span aria-hidden="true" className="training-rack-nav-indicator training-rack-nav-indicator--evolution" />}
+                <span className="relative inline-flex items-center gap-1"><Sparkles size={10} />{t('training.rack.evolutionPage')}</span>
+              </button>
+            </div>
             <div className={`flex items-center gap-1 ${mainLayout ? 'mt-1 sm:mt-2' : 'mt-3'}`}>
               <label className="flex min-w-0 flex-1 items-center gap-2 border border-white/15 bg-black/25 px-2">
                 <Search size={13} className="shrink-0 text-white/40" />
@@ -876,12 +916,15 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
               </button>
             </div>
           </div>
-          <div className={`training-arena-weapon-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain ${mainLayout ? 'grid content-start gap-1 p-1.5 sm:gap-1.5 sm:p-2' : 'grid content-start gap-2 p-3'}`} style={{ gridTemplateColumns: `repeat(${rackColumns}, minmax(0, 1fr))` }}>
+          <div key={`rack-page-${rackPage}`} role="tabpanel" aria-label={t(rackPage === 'evolutions' ? 'training.rack.evolutionPage' : 'training.rack.basePage')} className={`${rackPageDirection === 'right' ? 'settings-slide-from-right' : 'settings-slide-from-left'} training-arena-weapon-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain ${mainLayout ? 'grid content-start gap-1 p-1.5 sm:gap-1.5 sm:p-2' : 'grid content-start gap-2 p-3'}`} style={{ gridTemplateColumns: `repeat(${rackColumns}, minmax(0, 1fr))` }}>
             {filteredWeapons.map((weapon) => {
               const active = weapon.id === selectedWeapon.id;
               const expanded = expandedWeaponId === weapon.id;
-              const kills = meta.devModeAllUnlocks ? 616 : Math.min(616, meta.trainingWeaponKills[weapon.id] ?? 0);
-              const unlocked = kills >= 616;
+              const evolution = EVOLUTIONS_BY_ID[weapon.id];
+              const killTarget = evolution ? EVOLUTION_KILL_REQUIREMENT : 616;
+              const kills = Math.min(killTarget, weaponKillsFor(weapon));
+              const unlocked = weaponIsUnlocked(weapon);
+              const evolutionSource = evolution ? TRAINING_LOADOUT.find((candidate) => candidate.id === evolution.baseWeaponId) : undefined;
               const inMultiLoadout = multiWeaponIds.includes(weapon.id);
               return mainLayout ? (
                 <article key={weapon.id} style={{ gridColumn: expanded ? '1 / -1' : undefined }} className={`min-w-0 border transition ${active ? 'border-cyan-200/70 bg-cyan-300/[.08]' : 'border-white/10 bg-white/[.025] hover:border-white/25'}`}>
@@ -900,6 +943,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
                   {expanded && (
                     <div id={`weapon-details-${weapon.id}`} className="border-t border-lime-300/25 bg-black/35 p-2" data-testid={`weapon-details-${weapon.id}`}>
                       <p className="text-[9px] leading-relaxed text-white/65">{weapon.description}</p>
+                      {evolution && <p className="mt-1 font-mono text-[8px] leading-relaxed text-fuchsia-100/75">{t('training.evolution.source', { weapon: evolutionSource?.name ?? evolution.baseWeaponId, kills: kills.toLocaleString(), target: killTarget.toLocaleString() })}</p>}
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <p className="font-mono text-[8px] font-black uppercase tracking-wider text-lime-200">{t('training.rack.stats')}</p>
                         <div className="flex items-center gap-1 border border-white/10 bg-black/35 p-0.5" aria-label={t('training.rack.levelControl', { weapon: weapon.name })}>
@@ -924,7 +968,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
                         {weapon.nativeCharacterId && <p><b className="text-cyan-200">{t('training.rack.affinity')}:</b> {weapon.nativeCharacterId}</p>}
                       </div>}
                       {!weapon.statusEffectId && !weapon.bonusVsStatusId && !weapon.nativeCharacterId && <p className="mt-2 border-t border-white/10 pt-1.5 text-[8px] text-white/35">{t('training.rack.noModifiers')}</p>}
-                      {!unlocked && <p className="mt-2 font-mono text-[8px] font-bold uppercase tracking-wider text-amber-200">{t('training.rack.locked', { kills })}</p>}
+                      {!unlocked && !evolution && <p className="mt-2 font-mono text-[8px] font-bold uppercase tracking-wider text-amber-200">{t('training.rack.locked', { kills: kills.toLocaleString(), target: killTarget.toLocaleString() })}</p>}
                       <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked} className="mt-2 min-h-8 w-full border border-cyan-200/35 bg-cyan-200/[.08] px-2 font-mono text-[8px] font-black uppercase tracking-wider text-cyan-50 hover:bg-cyan-200/15 disabled:opacity-45">{t('training.rack.test')}</button>
                       {multiUnlocked && unlocked ? <button type="button" onClick={() => toggleMultiWeapon(weapon)} aria-pressed={inMultiLoadout} className="mt-1 min-h-8 w-full border border-violet-200/30 px-2 font-mono text-[8px] font-black uppercase tracking-wider text-violet-100 hover:bg-violet-200/10">{inMultiLoadout ? t('training.rack.remove') : t('training.rack.add')}</button> : !multiUnlocked ? <p className="mt-1 text-[8px] leading-relaxed text-white/40">{t('training.rack.multiLocked')}</p> : null}
                     </div>
@@ -942,6 +986,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
                   {expanded && (
                     <div id={`classic-weapon-details-${weapon.id}`} className="border-t border-white/10 p-2">
                       <p className="text-[9px] leading-relaxed text-white/55">{weapon.description}</p>
+                      {evolution && <p className="mt-1 font-mono text-[8px] leading-relaxed text-fuchsia-100/75">{t('training.evolution.source', { weapon: evolutionSource?.name ?? evolution.baseWeaponId, kills: kills.toLocaleString(), target: killTarget.toLocaleString() })}</p>}
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <p className="font-mono text-[8px] font-black uppercase tracking-wider text-cyan-100">{t('training.rack.stats')}</p>
                         <div className="flex items-center gap-1 border border-white/10 bg-black/35 p-0.5" aria-label={t('training.rack.levelControl', { weapon: weapon.name })}>
@@ -966,7 +1011,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
                         {weapon.nativeCharacterId && <p><b className="text-cyan-200">{t('training.rack.affinity')}:</b> {weapon.nativeCharacterId}</p>}
                       </div>}
                       {!weapon.statusEffectId && !weapon.bonusVsStatusId && !weapon.nativeCharacterId && <p className="mt-2 border-t border-white/10 pt-1.5 text-[8px] text-white/35">{t('training.rack.noModifiers')}</p>}
-                      {!unlocked && <p className="mt-2 font-mono text-[8px] font-bold uppercase tracking-wider text-amber-200">{t('training.rack.locked', { kills })}</p>}
+                      {!unlocked && !evolution && <p className="mt-2 font-mono text-[8px] font-bold uppercase tracking-wider text-amber-200">{t('training.rack.locked', { kills: kills.toLocaleString(), target: killTarget.toLocaleString() })}</p>}
                       <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked} className="mt-2 min-h-8 w-full border border-cyan-200/25 px-2 font-mono text-[8px] font-black uppercase tracking-wider text-cyan-50 hover:bg-cyan-200/10 disabled:cursor-wait disabled:opacity-50">{t('training.rack.test')}</button>
                       {multiUnlocked && unlocked ? <button type="button" onClick={() => toggleMultiWeapon(weapon)} aria-pressed={inMultiLoadout} className="mt-1 min-h-8 w-full border border-violet-200/30 px-2 font-mono text-[8px] font-black uppercase tracking-wider text-violet-100 hover:bg-violet-200/10">{inMultiLoadout ? t('training.rack.remove') : t('training.rack.add')}</button> : !multiUnlocked ? <p className="mt-1 text-[8px] leading-relaxed text-white/40">{t('training.rack.multiLocked')}</p> : null}
                     </div>
@@ -1033,7 +1078,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
                 <span>{t('training.stats.baseDamage')}: <b className="text-white">{Math.round(selectedWeapon.damage * (1 + (selectedWeaponLevel - 1) * selectedWeapon.levelDamageScale))}</b></span>
                 <span>{t('training.stats.cooldown')}: <b className="text-white">{(selectedWeapon.cooldownMs / 1000).toFixed(2)}s</b></span>
                 <span>{t('training.stats.title')}: <b className="text-white">{selectedWeapons.map((weapon) => weapon.name).join(' + ')}</b></span>
-                <span>{t('training.rack.progress', { kills: weaponKills })}</span>
+                <span>{t('training.rack.progress', { kills: weaponKills.toLocaleString(), target: selectedKillRequirement.toLocaleString() })}</span>
                 <span>{t('training.rack.multiCount', { count: multiWeaponIds.length })}</span>
                 <span>{meta.trainingDummyDamage.toLocaleString()} / 1,000,000 dummy damage</span>
               </div>
@@ -1048,9 +1093,9 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <button type="button" onClick={resetDummy} className="inline-flex min-h-8 items-center gap-1 border border-white/15 px-2 text-[8px] font-bold uppercase tracking-wider text-white/70 hover:bg-white/10"><RotateCcw size={12} /> {t('training.controls.reset')}</button>
-                  <button ref={challengeTriggerRef} type="button" onClick={startChallenge} disabled={testRunning || (!multiUnlocked && multiWeaponIds.length > 1)} className="inline-flex min-h-8 items-center gap-1 border border-violet-200/40 px-2 font-mono text-[8px] font-black uppercase tracking-wider text-violet-100 hover:bg-violet-100/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-200 disabled:opacity-45">{challengeRunning ? t('training.controls.challengeRunning') : `${t('training.controls.challenge')} · ${challengeSeconds || 24}s`}</button>
+                  <button ref={challengeTriggerRef} type="button" onClick={startChallenge} disabled={testRunning || (!multiUnlocked && multiWeaponIds.length > 1) || selectedWeapons.some((weapon) => !weaponIsUnlocked(weapon))} className="inline-flex min-h-8 items-center gap-1 border border-violet-200/40 px-2 font-mono text-[8px] font-black uppercase tracking-wider text-violet-100 hover:bg-violet-100/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-200 disabled:opacity-45">{challengeRunning ? t('training.controls.challengeRunning') : `${t('training.controls.challenge')} · ${challengeSeconds || 24}s`}</button>
                   {challengeRunning && <span className="font-mono text-[9px] font-black text-amber-200">{t('training.controls.remaining', { seconds: challengeSeconds })}</span>}
-                  <button type="button" onClick={() => testRunning ? stopTest() : testWeapon(selectedWeapons, false, spam)} disabled={!testRunning && !meta.devModeAllUnlocks && selectedWeapons.some((weapon) => (meta.trainingWeaponKills[weapon.id] ?? 0) < 616)} className="inline-flex min-h-8 items-center gap-1 bg-cyan-200 px-2.5 text-[8px] font-black uppercase tracking-wider text-slate-950 hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"><Crosshair size={12} /> {testRunning ? t(challengeRunning ? 'training.controls.challengeRunning' : 'training.controls.testing') : t('training.controls.test')}</button>
+                  <button type="button" onClick={() => testRunning ? stopTest() : testWeapon(selectedWeapons, false, spam)} disabled={!testRunning && selectedWeapons.some((weapon) => !weaponIsUnlocked(weapon))} className="inline-flex min-h-8 items-center gap-1 bg-cyan-200 px-2.5 text-[8px] font-black uppercase tracking-wider text-slate-950 hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"><Crosshair size={12} /> {testRunning ? t(challengeRunning ? 'training.controls.challengeRunning' : 'training.controls.testing') : t('training.controls.test')}</button>
                 </div>
               </div>
               <p className="mt-1 text-right font-mono text-[7px] text-white/35">{t('training.controls.best', { damage: (meta.trainingChallengeBests[challengeKey] ?? 0).toLocaleString() })}</p>

@@ -1448,7 +1448,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       ? [...new Set(parsed.trainingFavoriteWeaponIds.filter((id): id is string => typeof id === 'string' && id.length > 0))].slice(0, 512)
       : [],
     trainingWeaponKills: parsed.trainingWeaponKills && typeof parsed.trainingWeaponKills === 'object'
-      ? Object.fromEntries(Object.entries(parsed.trainingWeaponKills).filter(([id, value]) => id.length > 0 && typeof value === 'number' && Number.isFinite(value)).map(([id, value]) => [id, Math.max(0, Math.min(616, Math.floor(value as number)))]))
+      ? Object.fromEntries(Object.entries(parsed.trainingWeaponKills).filter(([id, value]) => id.length > 0 && typeof value === 'number' && Number.isFinite(value)).map(([id, value]) => [id, Math.max(0, Math.min(6_166, Math.floor(value as number)))]))
       : {},
     trainingDummyDamage: Math.max(0, Number.isFinite(parsed.trainingDummyDamage) ? Math.floor(parsed.trainingDummyDamage!) : 0),
     trainingOperatorXp: parsed.trainingOperatorXp && typeof parsed.trainingOperatorXp === 'object'
@@ -4283,7 +4283,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       if (prev.trainingWeaponRackOwned && result.areaId !== 'training-arena') {
         for (const [weaponId, count] of Object.entries(result.weaponKills ?? {})) {
           const oldCount = trainingWeaponKills[weaponId] ?? 0;
-          const nextCount = Math.min(616, oldCount + Math.max(0, Math.floor(count)));
+          const nextCount = Math.min(6_166, oldCount + Math.max(0, Math.floor(count)));
           trainingWeaponKills[weaponId] = nextCount;
           if (oldCount < 616 && nextCount >= 616) newlyTrainingWeapons.push(weaponId);
         }
