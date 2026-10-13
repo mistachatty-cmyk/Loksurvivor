@@ -579,6 +579,21 @@ const RAW_ACHIEVEMENTS: RawAchievement[] = [
     },
     reward: { kind: 'lootTokens', amount: 50 },
   },
+  ...[
+    { threshold: 0, id: 'training-damage-0', name: 'Showed Up' },
+    { threshold: 1_000, id: 'training-damage-1000', name: 'At Least You Tried' },
+    { threshold: 5_000, id: 'training-damage-5000', name: 'Weapon Warmup' },
+    { threshold: 1_000_000, id: 'training-damage-1000000', name: 'Million-Point Strike' },
+    { threshold: 5_000_000, id: 'training-damage-5000000', name: 'Damage Machine' },
+    { threshold: 100_000_000, id: 'training-damage-100000000', name: 'One Hundred Million' },
+  ].map(({ threshold, id, name }) => ({
+    id,
+    name,
+    description: `Deal at least ${threshold.toLocaleString()} damage in one 24-second Training Arena challenge.`,
+    tier: threshold >= 5_000_000 ? 'legendary' as const : threshold >= 1_000_000 ? 'gold' as const : threshold >= 5_000 ? 'silver' as const : 'bronze' as const,
+    isComplete: (meta: MetaState) => meta.trainingChallengeMilestones.includes(threshold),
+    progress: (meta: MetaState) => meta.trainingChallengeMilestones.includes(threshold) ? 1 : 0,
+  })),
 ];
 
 /**

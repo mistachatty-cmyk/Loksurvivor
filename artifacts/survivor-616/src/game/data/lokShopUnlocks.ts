@@ -51,6 +51,14 @@ export const LOK_SHOP_UNLOCKS: LokShopUnlockDef[] = [
     tier: 'legendary',
     cost: 1500,
   },
+  {
+    id: 'weapon-rack',
+    kind: 'weaponRackUnlock',
+    name: 'Training Arena Weapon Rack',
+    description: 'Opens the Training Arena. Earn 616 defeats with each weapon to unlock its test slot.',
+    tier: 'rare',
+    cost: 750,
+  },
 ];
 
 export const LOK_SHOP_UNLOCKS_BY_ID: Record<string, LokShopUnlockDef> = Object.fromEntries(

@@ -1457,6 +1457,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.33.0',
     date: '2026-10-13',
+    publishedAt: '2026-10-13T12:00:00Z',
     kind: 'update',
     title: 'Field Specimens and Clearer Arena Rooms',
     body: [
@@ -1528,6 +1529,17 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Training Arena mobile header fix',
     body: [
       'The floating Looks & LokPets shortcut no longer covers the Training Arena title while the arena is open on a narrow screen.',
+    ],
+  },
+  {
+    version: '0.39.0',
+    date: '2026-10-13',
+    publishedAt: '2026-10-13T21:32:41Z',
+    kind: 'update',
+    title: 'Training Arena Progression and Challenges',
+    body: [
+      'Buy a permanent Training Arena Weapon Rack in LokShop, then earn 616 defeats with each weapon to unlock its test slot. Unlock notices are saved in the new Notifications mailbox.',
+      'The arena adds multi-weapon testing, operator Training XP, damage and effect readouts, target durability modes, and a 24-second damage challenge with personal bests and achievements.',
     ],
   },
 ];

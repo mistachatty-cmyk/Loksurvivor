@@ -99,6 +99,42 @@ test('update notice choices persist independently and old saves enable all four'
   assert.equal(initial.meta.updatePopupKinds.hotfix, true);
 });
 
+test('Training Arena progression is backward-compatible and mailbox actions persist', () => {
+  const fresh = createInitialMeta();
+  assert.equal(fresh.trainingWeaponRackOwned, false);
+  assert.deepEqual(fresh.trainingWeaponKills, {});
+  assert.deepEqual(fresh.trainingMailbox, []);
+
+  const normalized = normalizeMeta({
+    version: 1,
+    trainingWeaponRackOwned: true,
+    trainingWeaponKills: { 'void-slash': 619, invalid: Number.NaN },
+    trainingMailbox: [
+      { id: 'notice', title: 'Unlocked', body: 'Ready', createdAt: 10, read: 'yes', kept: false },
+      { id: '', title: 'Invalid', body: 'Bad id', createdAt: 11 },
+    ],
+  });
+  assert.equal(normalized.trainingWeaponRackOwned, true);
+  assert.deepEqual(normalized.trainingWeaponKills, { 'void-slash': 616 });
+  assert.deepEqual(normalized.trainingMailbox.map(({ id, read, kept }) => ({ id, read, kept })), [
+    { id: 'notice', read: false, kept: false },
+  ]);
+
+  let state = { meta: fresh, lastRun: null };
+  state = reducer(state, { type: 'grantTrainingWeaponRack' });
+  state = reducer(state, { type: 'recordTrainingSession', characterId: 'operator', damage: 1_000_000, xp: 0.4, challenge: { key: 'void-slash@1', damage: 1_000_000 } });
+  assert.equal(state.meta.trainingDummyDamage, 1_000_000);
+  assert.equal(state.meta.trainingOperatorXp.operator, 0.4);
+  assert.deepEqual(state.meta.trainingChallengeMilestones, [0, 1_000, 5_000, 1_000_000]);
+  assert.equal(state.meta.trainingMailbox[0]?.read, false);
+  state = reducer(state, { type: 'markTrainingMailboxRead', id: 'training-multi-weapon-unlocked' });
+  state = reducer(state, { type: 'keepTrainingMailboxEntry', id: 'training-multi-weapon-unlocked', kept: true });
+  assert.equal(state.meta.trainingMailbox[0]?.read, true);
+  assert.equal(state.meta.trainingMailbox[0]?.kept, true);
+  state = reducer(state, { type: 'deleteTrainingMailboxEntry', id: 'training-multi-weapon-unlocked' });
+  assert.deepEqual(state.meta.trainingMailbox, []);
+});
+
 test('soundtrack objective progress safely defaults for older saves', () => {
   assert.equal(createInitialMeta().soundtrackObjectiveCompletions, 0);
   assert.equal(normalizeMeta({ version: 1 }).soundtrackObjectiveCompletions, 0);

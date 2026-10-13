@@ -53,7 +53,7 @@ function Feather({ color }: { color: string }) {
 
 export function LokShopScreen({ onBack, onOpenCosmetics, onSignIn }: { onBack: () => void; onOpenCosmetics?: () => void; onSignIn?: () => void }) {
   const t = useT();
-  const { meta, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer, grantLokShopPerk, lokShopVisit, lokShopHaggle } = useMeta();
+  const { meta, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer, grantTrainingWeaponRack, grantLokShopPerk, lokShopVisit, lokShopHaggle } = useMeta();
   const { signedIn, balance, ownedSkus, priceOf, spend, activeSupporterTier, supporter, setSupporterVisible } = useLokEconomy();
   const recent = useRef<string[]>([]);
   const today = bondDayKey(Date.now());
@@ -98,12 +98,13 @@ export function LokShopScreen({ onBack, onOpenCosmetics, onSignIn }: { onBack: (
     if (ownedSkus.has(catalogSku('fieldGuideUnlock', 'field-guide')) && !meta.lokPetFieldGuideUnlocked) grantLokPetFieldGuide();
     if (ownedSkus.has(catalogSku('collectorAccess', 'collector-access')) && !meta.lokPetCollectorAccessUnlocked) grantLokPetCollectorAccess();
     if (ownedSkus.has(catalogSku('packVisualizerUnlock', 'lokpack-visualizer')) && !meta.lokPackVisualizerUnlocked) grantLokPackVisualizer();
-  }, [ownedSkus, meta, grantLokShopPerk, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer]);
+    if (ownedSkus.has(catalogSku('weaponRackUnlock', 'weapon-rack')) && !meta.trainingWeaponRackOwned) grantTrainingWeaponRack();
+  }, [ownedSkus, meta, grantLokShopPerk, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer, grantTrainingWeaponRack]);
 
   const unlockOwned = (u: LokShopUnlockDef) =>
-    u.id === 'field-guide' ? meta.lokPetFieldGuideUnlocked : u.id === 'lokpack-visualizer' ? meta.lokPackVisualizerUnlocked : meta.lokPetCollectorAccessUnlocked;
+    u.id === 'field-guide' ? meta.lokPetFieldGuideUnlocked : u.id === 'lokpack-visualizer' ? meta.lokPackVisualizerUnlocked : u.id === 'weapon-rack' ? meta.trainingWeaponRackOwned : meta.lokPetCollectorAccessUnlocked;
   const grantUnlock = (u: LokShopUnlockDef) =>
-    u.id === 'field-guide' ? grantLokPetFieldGuide() : u.id === 'lokpack-visualizer' ? grantLokPackVisualizer() : grantLokPetCollectorAccess();
+    u.id === 'field-guide' ? grantLokPetFieldGuide() : u.id === 'lokpack-visualizer' ? grantLokPackVisualizer() : u.id === 'weapon-rack' ? grantTrainingWeaponRack() : grantLokPetCollectorAccess();
 
   const purchase = (sku: string, name: string, fallbackPrice: number, grant: () => void) => {
     if (!signedIn) {
@@ -212,7 +213,7 @@ export function LokShopScreen({ onBack, onOpenCosmetics, onSignIn }: { onBack: (
 
         {tab === 'unlocks' ? (
           <ul className="mt-3 grid gap-2">
-            {LOK_SHOP_UNLOCKS.map((u) => itemCard(u.id, u.name, u.description, u.tier, unlockOwned(u), catalogSku(u.kind, u.id), () => grantUnlock(u)))}
+            {LOK_SHOP_UNLOCKS.map((u) => itemCard(u.id, u.id === 'weapon-rack' ? t('training.shop.name') : u.name, u.id === 'weapon-rack' ? t('training.shop.description') : u.description, u.tier, unlockOwned(u), catalogSku(u.kind, u.id), () => grantUnlock(u)))}
             {onOpenCosmetics ? (
               <li>
                 <button type="button" onClick={onOpenCosmetics} className="lokshop-card flex w-full items-center gap-3 p-3 text-left" data-testid="button-lokshop-cosmetics">
