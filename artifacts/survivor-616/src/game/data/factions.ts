@@ -44,6 +44,13 @@ export const FACTIONS: FactionDef[] = [
     roster: ['clampjaw', 'deadlock'],
   },
   {
+    id: 'kennel-patrol',
+    name: 'Kennel Patrol',
+    description: 'A rogue animal-control unit that tracks by floodlight and uses capture hooks to haul survivors into reach.',
+    accent: '#67e8f9',
+    roster: ['kennel-marshal'],
+  },
+  {
     id: 'relay-corps',
     name: 'Relay Corps',
     description: "Commanders that never close the distance themselves -- they just keep detector circles wandering the block until one sticks to you.",

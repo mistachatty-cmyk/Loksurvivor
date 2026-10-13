@@ -1,7 +1,21 @@
 import { arachnidRig, blobRig, expressiveRig, giantRig, humanoidRig, quadrupedRig, serpentRig, triangleRig } from '@/game/sprites/rigs';
-import type { EnemyDef } from '@/game/types';
+import type { EnemyDef, SpriteRig } from '@/game/types';
 import { palette } from './authoring';
 import { REACTION_PRESETS } from './reactivity';
+
+function kennelMarshalRig(): SpriteRig {
+  const rig = humanoidRig({ height: 24, width: 15, bulk: true, hood: true, headColor: 'bodyDark', torsoColor: 'body' });
+  rig.parts.unshift({ key: 'aura', x: -14, y: 4, w: 28, h: 20, color: 'bodyDark', z: 0 });
+  rig.parts.push(
+    { key: 'crest', x: -10, y: 12, w: 5, h: 10, color: 'accent', z: 8 },
+    { key: 'crest', x: 5, y: 12, w: 5, h: 10, color: 'accent', z: 8 },
+    { key: 'armR', x: 8, y: 11, w: 18, h: 4, color: 'accent', z: 8 },
+    { key: 'crest', x: 22, y: 9, w: 5, h: 8, color: 'glow', z: 9 },
+    { key: 'aura', x: -12, y: 27, w: 24, h: 2, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 30;
+  return rig;
+}
 
 /**
  * Everything that wants the player gone. `behavior` selects the movement
@@ -2953,6 +2967,27 @@ export const ENEMIES: EnemyDef[] = [
     drops: [{ kind: 'prism-quartz', chance: 0.12 }, { kind: 'rootglass-cell', chance: 0.08 }],
     deathBurst: { radius: 64, damage: 10 },
     lore: 'Saves its place before it walks up to you, then loads the save. Both the exit and the arrival hurt.',
+  },
+  {
+    id: 'kennel-marshal',
+    name: 'Kennel Marshal',
+    family: 'Street',
+    behavior: 'grappler',
+    hp: 168,
+    speed: 34,
+    damage: 16,
+    radius: 16,
+    xp: 24,
+    mass: 4.4,
+    impactResistance: 0.3,
+    faction: 'Kennel Patrol',
+    role: 'disruptor',
+    sizeClass: 'elite',
+    glowRadius: 84,
+    palette: palette({ ink: '#101820', body: '#155e75', bodyDark: '#0c2838', accent: '#facc15', accentBright: '#fff1ae', glow: '#67e8f9' }),
+    rig: kennelMarshalRig(),
+    drops: [{ kind: 'cred', chance: 0.18, value: 12 }, { kind: 'health', chance: 0.08 }],
+    lore: 'A Watch kennel officer rebuilt from an armored signal suit. Its capture-hook snaps shut on the nearest runner, then drags them into the floodlight.',
   },
 ];
 

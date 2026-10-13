@@ -65,8 +65,48 @@ function cometRig(): SpriteRig {
   return rig;
 }
 
-/** Five authored operators. Their signature weapons are kept off the shared loot pool. */
-export const FORGE_FIVE: CharacterDef[] = [
+function bondkeeperRig(): SpriteRig {
+  const rig = humanoidRig({ height: 22, width: 12, hood: true, torsoColor: 'bodyDark' });
+  rig.parts.unshift({ key: 'aura', x: -12, y: 5, w: 24, h: 19, color: 'body', z: 0 });
+  rig.parts.push(
+    { key: 'crest', x: -8, y: 19, w: 5, h: 7, color: 'accentBright', z: 8 },
+    { key: 'crest', x: 3, y: 19, w: 5, h: 7, color: 'accentBright', z: 8 },
+    { key: 'armR', x: 7, y: 11, w: 16, h: 3, color: 'glow', z: 9 },
+    { key: 'aura', x: 18, y: 8, w: 6, h: 6, color: 'accentBright', z: 0 },
+  );
+  rig.pixelHeight = 29;
+  return rig;
+}
+
+function railwardenRig(): SpriteRig {
+  const rig = humanoidRig({ height: 23, width: 13, bulk: true, cap: true, torsoColor: 'body' });
+  rig.parts.unshift({ key: 'aura', x: -14, y: 5, w: 28, h: 18, color: 'bodyDark', z: 0 });
+  rig.parts.push(
+    { key: 'crest', x: -10, y: 12, w: 5, h: 11, color: 'accent', z: 8 },
+    { key: 'crest', x: 5, y: 12, w: 5, h: 11, color: 'accent', z: 8 },
+    { key: 'armR', x: 8, y: 11, w: 16, h: 5, color: 'bodyDark', z: 8 },
+    { key: 'crest', x: 20, y: 9, w: 4, h: 8, color: 'glow', z: 9 },
+  );
+  rig.pixelHeight = 29;
+  return rig;
+}
+
+function nightlineRig(): SpriteRig {
+  const rig = humanoidRig({ height: 24, width: 8, cap: true, flarePants: true, torsoColor: 'bodyDark' });
+  rig.parts.unshift(
+    { key: 'aura', x: -15, y: 9, w: 10, h: 3, color: 'accent', z: 0 },
+    { key: 'aura', x: 5, y: 5, w: 12, h: 2, color: 'glow', z: 0 },
+  );
+  rig.parts.push(
+    { key: 'crest', x: -8, y: 25, w: 16, h: 3, color: 'accentBright', z: 9 },
+    { key: 'armR', x: 6, y: 11, w: 18, h: 2, color: 'glow', z: 8 },
+  );
+  rig.pixelHeight = 30;
+  return rig;
+}
+
+/** Authored Character Creator operators. Their signature weapons stay out of the shared loot pool. */
+export const CHARACTER_CREATOR_OPERATORS: CharacterDef[] = [
   {
     id: 'vitrail', name: 'Vitrail', handle: 'Window Warden',
     tagline: 'Every broken window becomes a map.',
@@ -116,5 +156,37 @@ export const FORGE_FIVE: CharacterDef[] = [
     weapon: { id: 'courier-star', name: 'Courier Star', kind: 'homing', description: 'Launches star-metal messengers with a streak of blue light.', damage: 14, cooldownMs: 520, range: 430, speed: 420, count: 3, lifetimeMs: 1700, pierce: 1, levelDamageScale: 0.23, impactIntensity: 1, color: '#7addff' },
     ultimate: { id: 'courier-meteor', name: 'Express Orbit', description: 'A burst of orbital speed turns every shot into a streak.', cooldownMs: 21000, durationMs: 4300, effect: { speedMult: 1.8, cooldownMult: 0.5, invulnerable: true } },
     signatureTraits: ['Star-metal visor', 'Blue-tailed messenger stars'], unlock: { kind: 'default' },
+  },
+  {
+    id: 'lokpet-master', name: 'LokPet Master', handle: 'Bondkeeper 616',
+    tagline: 'Every strange thing deserves a steady voice.',
+    bio: 'The last keeper of the Sixth Ward kennel turns a whistle, a hand sign, and a pack of unlikely friends into one coordinated rescue crew.',
+    palette: { ink: '#071827', body: '#155e75', bodyDark: '#0c2838', accent: '#22d3ee', accentBright: '#facc15', skin: '#9d674a', glow: '#a5f3fc' },
+    rig: bondkeeperRig(), stats: { maxHp: 118, speed: 103, power: 1.04, area: 1.08, haste: 1.02, magnet: 88, armor: 0.1, crit: 0.08, lifesteal: 0 },
+    weapon: { id: 'bondkeeper-beacon', name: 'Recall Beacon', kind: 'homing', description: 'A bright signal puck loops toward the nearest threat and marks a safe return path.', damage: 18, cooldownMs: 720, range: 400, speed: 360, count: 2, lifetimeMs: 1700, pierce: 2, levelDamageScale: 0.25, impactIntensity: 2, color: '#22d3ee' },
+    ultimate: { id: 'bondkeeper-rally', name: 'Sixth Ward Rally', description: 'A whistle calls in the whole pack: a broad pulse clears space and surges the team forward.', cooldownMs: 24500, durationMs: 4300, effect: { novaDamage: 64, novaRadius: 175, speedMult: 1.35, damageMult: 1.45 } },
+    signatureTraits: ['Pack-signal harness', 'LokPet collector kit'], unlock: { kind: 'lokCollector', runs: 4, lokPets: 4 }, rarity: 'legendary',
+    crew: { id: 'sixth-ward-kennel', name: 'Sixth Ward Kennel', role: 'LokPet Keeper' },
+    lokPetCollector: { rank: 'LokPet Collector', extraTeamSlots: 1, floorPackChance: 0.006, lokPetPrizeWeightMultiplier: 1.35, bonusCardCreditsPerLootBox: 2 },
+  },
+  {
+    id: 'railwarden', name: 'Railwarden', handle: 'Switchyard Shield',
+    tagline: 'The safe route is the one that still holds.',
+    bio: 'A transit-line repair lead carries a hand-built signal shield. Every pulse turns a broken rail into a barrier and every barrier into a counterattack.',
+    palette: { ink: '#101821', body: '#34515d', bodyDark: '#1b3038', accent: '#f59e0b', accentBright: '#fff1ae', skin: '#81583e', glow: '#67e8f9' },
+    rig: railwardenRig(), stats: { maxHp: 148, speed: 88, power: 1.18, area: 1.16, haste: 0.9, magnet: 52, armor: 0.22, crit: 0.04, lifesteal: 0 },
+    weapon: { id: 'railwarden-spike', name: 'Track Spike Driver', kind: 'projectile', description: 'Fires heavy signal spikes that punch through a lane and ricochet from hard cover.', damage: 32, cooldownMs: 1080, range: 350, speed: 300, count: 1, lifetimeMs: 1600, pierce: 3, obstacleInteraction: 'reflect', levelDamageScale: 0.28, impactIntensity: 4, color: '#f59e0b' },
+    ultimate: { id: 'railwarden-switch', name: 'Switchyard Lock', description: 'Drops a ring of luminous track plates that crushes nearby enemies and braces the survivor.', cooldownMs: 26500, durationMs: 4000, effect: { novaDamage: 84, novaRadius: 165, damageMult: 1.55, invulnerable: true } },
+    signatureTraits: ['Signal-shield silhouette', 'Heavy track-spike volley'], unlock: { kind: 'default' },
+  },
+  {
+    id: 'nightline-runner', name: 'Nightline Runner', handle: 'Last Train Out',
+    tagline: 'Catch the gap before it closes.',
+    bio: 'A midnight courier learned to ride the lit edge of the outage. She leaves a ribbon of decoy signal behind and is gone before the static can follow.',
+    palette: { ink: '#111326', body: '#4338a8', bodyDark: '#201a50', accent: '#e879f9', accentBright: '#fef08a', skin: '#9d6651', glow: '#a5f3fc' },
+    rig: nightlineRig(), stats: { maxHp: 90, speed: 148, power: 1.02, area: 0.95, haste: 1.2, magnet: 70, armor: 0.03, crit: 0.19, lifesteal: 0 },
+    weapon: { id: 'nightline-comet', name: 'Sleeper-Line Comets', kind: 'homing', description: 'Throws a pair of fast signal stars that seek a target and leave a misleading afterimage.', damage: 15, cooldownMs: 560, range: 435, speed: 430, count: 2, lifetimeMs: 1500, pierce: 1, levelDamageScale: 0.24, impactIntensity: 1, color: '#e879f9' },
+    ultimate: { id: 'nightline-gap', name: 'Last Train Gap', description: 'Cuts through the crowd in a flash, striking the whole lane before the decoy trail collapses.', cooldownMs: 21000, durationMs: 3900, effect: { speedMult: 1.85, cooldownMult: 0.55, novaDamage: 42, novaRadius: 150, invulnerable: true } },
+    signatureTraits: ['Signal-ribbon afterimage', 'Fast homing comets'], unlock: { kind: 'default' },
   },
 ];

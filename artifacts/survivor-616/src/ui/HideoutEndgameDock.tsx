@@ -17,7 +17,7 @@ import { OperatorForgePanel } from './OperatorForgePanel';
 const CHIP =
   'min-h-9 border border-fuchsia-300/50 bg-fuchsia-400/10 px-3 font-mono text-[10px] font-bold uppercase tracking-widest text-fuchsia-100 hover:bg-fuchsia-400/25';
 
-export function HideoutEndgameDock({ onOpen }: { onOpen: (panel: HubPanel) => void }) {
+export function HideoutEndgameDock({ onOpen, compact = false }: { onOpen: (panel: HubPanel) => void; compact?: boolean }) {
   const { meta } = useMeta();
   const [open, setOpen] = useState(false);
   const [forgeOpen, setForgeOpen] = useState(false);
@@ -25,9 +25,12 @@ export function HideoutEndgameDock({ onOpen }: { onOpen: (panel: HubPanel) => vo
 
   if (!(meta.devModeAllUnlocks || endgameReached(meta)) || !isHideoutDockEnabled()) return null;
   const forgeOn = meta.devModeAllUnlocks || isFeatureEnabled('forge');
+  const dockClassName = compact
+    ? 'min-w-0 max-w-full border border-fuchsia-300/40 bg-black/70 p-2 shadow-xl backdrop-blur'
+    : 'mb-4 border border-fuchsia-300/40 bg-black/70 p-2 shadow-xl backdrop-blur';
 
   return (
-    <div className="mb-4 border border-fuchsia-300/40 bg-black/70 p-2 shadow-xl backdrop-blur" data-testid="hub-endgame-dock">
+    <div className={dockClassName} data-testid="hub-endgame-dock">
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className={`${CHIP} inline-flex items-center gap-2`} data-testid="button-hub-endgame-dock">
           <Sparkles className="h-4 w-4" />{t('endgame.dock.open')}

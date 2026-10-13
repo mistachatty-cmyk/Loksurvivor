@@ -571,6 +571,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       <button
         type="button"
         onClick={() => setShowLorePopup(true)}
+          aria-haspopup="dialog"
+          aria-expanded={showLorePopup}
         className="fixed left-3 top-3 z-50 inline-flex min-h-11 items-center gap-2 rounded-sm border border-red-500/80 bg-red-950/90 px-3.5 font-mono text-[10px] font-bold uppercase tracking-wider text-red-200 shadow-[0_0_15px_rgba(239,68,68,0.25)] backdrop-blur transition hover:border-red-400 hover:bg-red-900/90 hover:text-white sm:left-5 sm:top-5"
         data-testid="button-hub-mission-briefing"
         title={t('hub.missionBriefingTitle')}
@@ -673,13 +675,14 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
 
       <div className={`relative z-20 flex-1 flex flex-col p-6 ${meta.hideoutStickyHeadOutEnabled ? 'pb-24 sm:pb-6' : 'pb-6'}`}>
         {chromeLayout === 'new' ? (
-          <div className="mb-4 flex flex-col gap-2 border border-white/15 bg-black/75 p-3 shadow-xl backdrop-blur sm:p-4 lg:flex-row lg:items-center" data-testid="hub-control-dock">
+          <div className="sticky top-0 z-[60] mb-4 flex flex-col gap-2 border border-white/15 bg-black/90 p-3 shadow-xl backdrop-blur sm:p-4 lg:flex-row lg:items-center" data-testid="hub-control-dock">
             <div className="flex flex-wrap items-center gap-2">
               {onBack ? <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-white/40 hover:text-white" data-testid="button-hub-back-to-intro" aria-label="Back to title"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
-              <button type="button" onClick={() => setShowLorePopup(true)} className="inline-flex min-h-10 items-center gap-2 border border-red-500/60 bg-red-950/40 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-red-100 hover:border-red-300" data-testid="button-hub-mission-briefing" title={t('hub.missionBriefingTitle')}><ShieldAlert className="h-4 w-4 text-red-400" />{t('hub.missionBriefing')}</button>
+              <button type="button" onClick={() => setShowLorePopup(true)} aria-haspopup="dialog" aria-expanded={showLorePopup} className="inline-flex min-h-10 items-center gap-2 border border-red-500/60 bg-red-950/40 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-red-100 hover:border-red-300" data-testid="button-hub-mission-briefing" title={t('hub.missionBriefingTitle')}><ShieldAlert className="h-4 w-4 text-red-400" />{t('hub.missionBriefing')}</button>
               {(meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
                 <button type="button" onClick={onOpenRunSetup} className="inline-flex min-h-10 items-center gap-2 border border-cyan-200/45 bg-slate-950/70 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 hover:border-cyan-100" data-testid="button-open-run-setup" title={t('hub.looksLokpetsTitle')}><Sparkles className="h-4 w-4 text-cyan-200" />{t('common.looksLokpets')}</button>
               )}
+              <HideoutEndgameDock onOpen={onOpen} compact />
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
               {companion ? <div className="flex min-w-0 max-w-full items-center gap-2 border border-pink-200/35 bg-slate-950/80 p-2" data-testid="hideout-lokpet-companion"><LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={36} /><div className="min-w-0"><p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p><p className="font-mono text-[8px] uppercase tracking-wider text-white/55">{companion.stamina > 0 ? 'At your side' : meta.handheldDigiScopeOwned ? 'Resting in DigiScope' : 'Resting at the kennel'}</p></div></div> : null}
@@ -687,7 +690,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </div>
           </div>
         ) : null}
-        <HideoutEndgameDock onOpen={onOpen} />
+        {chromeLayout === 'classic' ? <HideoutEndgameDock onOpen={onOpen} /> : null}
         {meta.hideoutPreviewEnabled && (
           <HideoutPreview
             rig={selectedCharacter.rig}
