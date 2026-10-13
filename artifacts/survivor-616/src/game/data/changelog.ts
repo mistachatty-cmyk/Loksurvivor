@@ -1432,6 +1432,50 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Your Room now has a Personal Locker for drafts, creations and adoptions. Approved characters can be previewed, adopted, used in runs and exported as attributed cards or vertical videos.',
     ],
   },
+  {
+    version: '0.31.0',
+    date: '2026-10-13',
+    publishedAt: '2026-10-13T11:46:59Z',
+    kind: 'update',
+    title: 'Props Take a Hit',
+    body: [
+      'Breakable props now show cumulative, material-specific cracks from the impact point, then fade through a brief burst into a bounded debris and rubble aftermath.',
+      'The effect uses reduced-motion preferences and trims debris on lower graphics settings. Run Setup now summarizes the selected operator, LokPets, map, controls, modifiers, and contracts; a recommended next map sits above the map filters.',
+    ],
+  },
+  {
+    version: '0.32.0',
+    date: '2026-10-13',
+    publishedAt: '2026-10-13T11:56:01Z',
+    kind: 'update',
+    title: 'The Hideout Cage',
+    body: [
+      'The hideout now opens on an animated cage scene with your actual operator, selected LokPets, and rescued crew together. Switch back to the original room-by-room block scene whenever you like.',
+      'Call for help to gather your LokPets and bring crew over, or encourage the crew for a cheerful reaction. Speech bubbles have an independent on/off control in the hideout and Settings; these interactions are cosmetic.',
+    ],
+  },
+  {
+    version: '0.33.0',
+    date: '2026-10-13',
+    kind: 'update',
+    title: 'Field Specimens and Clearer Arena Rooms',
+    body: [
+      'The first time you clear a standard district, its seeded LokPet-like field specimen is revealed in the run report and saved to a new Bestiary tab. These are research traces for now: they do not enter the battle roster or affect stats.',
+      'Arena now identifies itself as a shared-enemy kill race, reports room connection state, handles tied scores, and allows online guests to retry after a lost connection. Online results no longer grant win tokens because the relay is not authoritative; player combat and ranked results are still future work.',
+    ],
+  },
+  {
+    version: '0.34.0',
+    date: '2026-10-13',
+    publishedAt: '2026-10-13T12:44:00Z',
+    kind: 'update',
+    title: 'The DIGI-Tower Campaign',
+    body: [
+      'Climb 100 floors across ten sectors, with authored story trials, faction squads, mirror fights, field rules and a named Master at every sector capstone.',
+      'Party condition and five-floor checkpoints persist. Wipes can be retried without deadlocking old floor clears or paying first-clear tokens twice; you can also replay any cleared floor safely for reduced pet XP.',
+      'Master Nib opens a token exchange for LokPet treats. Endless Spire, Training Bay, daily floors, Vault picks and Operator/Duo challenges remain future expansions.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

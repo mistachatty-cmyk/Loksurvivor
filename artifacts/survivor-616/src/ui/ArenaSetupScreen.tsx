@@ -22,7 +22,7 @@ import { CHARACTERS } from '@/game/data/characters';
 import { areaOpen, useMeta } from '@/game/state/metaStore';
 import type { AreaDef, CharacterDef } from '@/game/types';
 import { ARENA_MAX_PLAYERS, ARENA_MIN_PLAYERS, type ArenaSeat } from '@/game/arena/arenaWorld';
-import { createRoomCode, hostArenaRoom, type ArenaNetRole, type HostArenaRoom } from '@/game/arena/arenaNet';
+import { createRoomCode, hostArenaRoom, type ArenaConnectionStatus, type ArenaNetRole, type HostArenaRoom } from '@/game/arena/arenaNet';
 import { lokClient } from '@/lib/lokClient';
 
 interface ArenaSetupScreenProps {
@@ -60,6 +60,7 @@ export function ArenaSetupScreen({ onBack, onLaunch, onJoinOnline }: ArenaSetupS
   );
   const [hostCharacterId, setHostCharacterId] = useState(unlockedCharacters[0]?.id ?? '');
   const [room, setRoom] = useState<HostArenaRoom | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<ArenaConnectionStatus>('connecting');
   const [remoteSeats, setRemoteSeats] = useState<RemoteSeat[]>([]);
   const roomRef = useRef<HostArenaRoom | null>(null);
   const seenRequestsRef = useRef<Map<string, string>>(new Map()); // requestId -> assigned seatId
@@ -95,6 +96,7 @@ export function ArenaSetupScreen({ onBack, onLaunch, onJoinOnline }: ArenaSetupS
     const code = createRoomCode();
     const newRoom = hostArenaRoom(lokClient, code);
     newRoom.setHandlers({
+      onStatus: setConnectionStatus,
       onJoinRequest: ({ requestId, characterId, name }) => {
         const already = seenRequestsRef.current.get(requestId);
         if (already) {
@@ -118,7 +120,7 @@ export function ArenaSetupScreen({ onBack, onLaunch, onJoinOnline }: ArenaSetupS
   }
 
   function startOnlineMatch() {
-    if (!room || !area || !hostCharacterId) return;
+    if (!room || connectionStatus !== 'connected' || !area || !hostCharacterId) return;
     const hostCharacter = charactersById[hostCharacterId];
     if (!hostCharacter) return;
     const seats: ArenaSeat[] = [
@@ -359,13 +361,36 @@ export function ArenaSetupScreen({ onBack, onLaunch, onJoinOnline }: ArenaSetupS
 
                   <button
                     type="button"
-                    disabled={totalOnlineSeats < ARENA_MIN_PLAYERS}
+                    disabled={totalOnlineSeats < ARENA_MIN_PLAYERS || connectionStatus !== 'connected'}
                     onClick={startOnlineMatch}
                     className="mt-3 h-10 w-full border-2 border-violet-300/60 bg-violet-300/15 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-violet-100 disabled:border-white/15 disabled:bg-black/40 disabled:text-white/35"
                     data-testid="button-start-online-match"
                   >
                     Start Match
                   </button>
+                  <p className={`mt-2 text-center font-mono text-[9px] uppercase tracking-wider ${connectionStatus === 'connected' ? 'text-emerald-300' : connectionStatus === 'disconnected' ? 'text-rose-300' : 'text-amber-200'}`} role="status">
+                    Room {connectionStatus === 'connected' ? 'connected' : connectionStatus === 'disconnected' ? 'disconnected — create a new room' : 'connecting…'}
+                  </p>
+                  <p className="mt-2 border-t border-white/10 pt-2 font-mono text-[9px] leading-relaxed text-white/40">
+                    This is an informal shared-enemy kill race. It has no player-versus-player combat or verified online score rewards.
+                  </p>
+                  {connectionStatus === 'disconnected' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        room.close();
+                        roomRef.current = null;
+                        setRoom(null);
+                        setRemoteSeats([]);
+                        seenRequestsRef.current.clear();
+                        setConnectionStatus('connecting');
+                        window.setTimeout(createRoom, 0);
+                      }}
+                      className="mt-2 h-8 w-full border border-rose-300/40 bg-rose-300/10 font-mono text-[9px] uppercase tracking-wider text-rose-100"
+                    >
+                      Recreate Room
+                    </button>
+                  )}
                 </section>
               )}
             </div>

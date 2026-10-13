@@ -14,7 +14,7 @@ import { CHARACTERS } from '@/game/data/characters';
 import { isUnlocked, useMeta } from '@/game/state/metaStore';
 import type { AreaDef, CharacterDef } from '@/game/types';
 import type { ArenaSeat } from '@/game/arena/arenaWorld';
-import { joinArenaRoom, type ArenaNetRole, type GuestArenaRoom } from '@/game/arena/arenaNet';
+import { joinArenaRoom, type ArenaNetRole, type ArenaConnectionStatus, type GuestArenaRoom } from '@/game/arena/arenaNet';
 import { lokClient } from '@/lib/lokClient';
 
 interface ArenaJoinScreenProps {
@@ -36,6 +36,7 @@ export function ArenaJoinScreen({ initialCode, onBack, onLaunch }: ArenaJoinScre
   const [name, setName] = useState('');
   const [characterId, setCharacterId] = useState(unlockedCharacters[0]?.id ?? '');
   const [status, setStatus] = useState<'idle' | 'connecting' | 'waiting' | 'error'>('idle');
+  const [connectionStatus, setConnectionStatus] = useState<ArenaConnectionStatus>('connecting');
   const [errorMsg, setErrorMsg] = useState('');
   const roomRef = useRef<GuestArenaRoom | null>(null);
   const retryRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -47,10 +48,20 @@ export function ArenaJoinScreen({ initialCode, onBack, onLaunch }: ArenaJoinScre
 
   function join() {
     if (!lokClient || !code.trim() || !characterId) return;
+    roomRef.current?.close();
+    if (retryRef.current) { clearInterval(retryRef.current); retryRef.current = null; }
     setStatus('connecting');
     const room = joinArenaRoom(lokClient, code.trim().toUpperCase());
     roomRef.current = room;
     room.setHandlers({
+      onStatus: (next) => {
+        setConnectionStatus(next);
+        if (next === 'disconnected') {
+          if (retryRef.current) { clearInterval(retryRef.current); retryRef.current = null; }
+          setErrorMsg('Room connection lost. Try joining again to start a fresh connection.');
+          setStatus('error');
+        }
+      },
       onJoinAccepted: () => {
         setStatus('waiting');
         if (retryRef.current) { clearInterval(retryRef.current); retryRef.current = null; }
@@ -77,7 +88,13 @@ export function ArenaJoinScreen({ initialCode, onBack, onLaunch }: ArenaJoinScre
     let attempts = 0;
     retryRef.current = setInterval(() => {
       attempts += 1;
-      if (attempts > 5) { clearInterval(retryRef.current!); retryRef.current = null; return; }
+      if (attempts > 5) {
+        clearInterval(retryRef.current!);
+        retryRef.current = null;
+        setErrorMsg('No host response. Check the code and connection, then try again.');
+        setStatus('error');
+        return;
+      }
       room.requestJoin(characterId, name.trim() || 'Guest');
     }, 1500);
   }
@@ -158,7 +175,7 @@ export function ArenaJoinScreen({ initialCode, onBack, onLaunch }: ArenaJoinScre
             </button>
           ) : (
             <p className="border border-dashed border-white/15 p-3 text-center font-mono text-[11px] text-white/60" data-testid="text-arena-join-status">
-              {status === 'connecting' ? 'Connecting…' : 'Connected — waiting for the host to start the match…'}
+              {status === 'connecting' ? connectionStatus === 'connected' ? 'Room connected — contacting the host…' : 'Connecting to room…' : 'Connected — waiting for the host to start the match…'}
             </p>
           )}
           {status === 'error' && (

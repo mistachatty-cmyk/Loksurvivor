@@ -28,6 +28,7 @@ import { reactionMultiplier } from '@/game/data/reactivity';
 import { clamp, dist2 } from '@/game/engine/math';
 import { drawForgeFiveProjectile } from './forgeFiveVfx';
 import { drawMapPackProp } from './mapPackArt';
+import { drawPropDamage, propMaterial } from './breakableFx';
 
 /** World units of sprite height per rig pixel. */
 export const SPRITE_SCALE = 2.05;
@@ -2155,7 +2156,10 @@ function drawObstacles(
   // same authored silhouette and profile. Culled to the camera viewport --
   // endless mode can have a full 5x5 chunk window's worth of breakables
   // loaded at once, and this ran unfiltered every frame before.
-  const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind']; artAssetId?: string; damage?: number }> = [];
+  const obstacleList: Array<{
+    x: number; y: number; w: number; h: number; kind: ObstacleDef['kind']; artAssetId?: string; damage?: number;
+    breakable?: boolean; seed?: number; lastHitAt?: number; lastHitX?: number; lastHitY?: number; brokenAt?: number;
+  }> = [];
   const closedBuildings = w.endless?.buildingEntryStyle === 'seamless' && !w.endless.inDungeon
     ? w.endless.buildings.filter((building) =>
         building.id !== w.endless!.walkInBuildingId &&
@@ -2166,14 +2170,19 @@ function drawObstacles(
       )
     : [];
   for (const o of w.breakables) {
-    if (o.broken && o.kind !== 'map-prop') continue;
+    if (o.broken && w.now - o.brokenAt > 760) continue;
     if (o.x < viewBounds.left - margin || o.x > viewBounds.right + margin
       || o.y < viewBounds.top - margin || o.y > viewBounds.bottom + margin) continue;
     if (closedBuildings.some((building) =>
         Math.abs(o.x - building.x) < building.w / 2 - 12 &&
         Math.abs(o.y - building.y) < building.h / 2 - 12,
       )) continue;
-    obstacleList.push({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind, artAssetId: o.artAssetId, damage: o.broken ? 1 : Number.isFinite(o.maxHp) ? 1 - o.hp / o.maxHp : 0 });
+    obstacleList.push({
+      x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind, artAssetId: o.artAssetId,
+      damage: o.broken ? 1 : Number.isFinite(o.maxHp) ? 1 - o.hp / o.maxHp : 0,
+      breakable: o.breakable, seed: o.uid, lastHitAt: o.lastHitAt, lastHitX: o.lastHitX,
+      lastHitY: o.lastHitY, brokenAt: o.broken ? o.brokenAt : undefined,
+    });
   }
   for (const o of w.area.decorations ?? []) {
     if (o.x < viewBounds.left - margin || o.x > viewBounds.right + margin || o.y < viewBounds.top - margin || o.y > viewBounds.bottom + margin) continue;
@@ -2183,7 +2192,12 @@ function drawObstacles(
   const worldTint = w.musicColorOverride ?? (w.worldColorFullRecolor ? w.worldColorPalette : undefined);
   for (const obstacle of obstacleList) {
     if (obstacle.kind === 'map-prop' && obstacle.artAssetId) {
-      drawMapPackProp(ctx, obstacle.artAssetId, obstacle.x, obstacle.y, obstacle.w, obstacle.h, w.now, obstacle.damage);
+      drawMapPackProp(ctx, obstacle.artAssetId, obstacle.x, obstacle.y, obstacle.w, obstacle.h, w.now, obstacle.damage, {
+        seed: obstacle.seed, now: w.now, lastHitAt: obstacle.lastHitAt,
+        lastHitX: obstacle.lastHitX, lastHitY: obstacle.lastHitY, brokenAt: obstacle.brokenAt,
+        motionEnabled: w.effectMotionEnabled,
+        fragmentLimit: w.graphicsQuality === 'performance' ? 4 : w.graphicsQuality === 'balanced' ? 6 : 9,
+      });
       continue;
     }
     const baseColors = OBSTACLE_COLORS[obstacle.kind] ?? OBSTACLE_COLORS.crate;
@@ -2199,12 +2213,15 @@ function drawObstacles(
     ctx.globalAlpha = 1;
 
     ctx.fillStyle = colors.side;
+    const breakFade = obstacle.brokenAt === undefined ? 1 : clamp(1 - (w.now - obstacle.brokenAt) / 190, 0, 1);
+    ctx.globalAlpha = breakFade;
     ctx.fillRect(x, y - height + obstacle.h, obstacle.w, height);
     ctx.fillStyle = colors.top;
     ctx.fillRect(x, y - height, obstacle.w, obstacle.h);
     ctx.strokeStyle = colors.trim;
     ctx.lineWidth = 2;
     ctx.strokeRect(x + 1, y - height + 1, obstacle.w - 2, obstacle.h - 2);
+    ctx.globalAlpha = 1;
 
     // Combat props get a strong, readable symbol in addition to their silhouette.
     if (obstacle.kind === 'cover') {
@@ -2698,18 +2715,7 @@ function drawObstacles(
       ctx.fillText('NEXT HIT REVERSES', obstacle.x, y - height - 10);
       ctx.restore();
     }
-    if (live && !live.broken && live.hp <= live.maxHp * 0.5) {
-      ctx.save();
-      ctx.strokeStyle = live.kind === 'barrel' ? '#ffb347' : '#f5d7a1';
-      ctx.globalAlpha = 0.85;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(x + obstacle.w * 0.25, y - height + 5);
-      ctx.lineTo(x + obstacle.w * 0.48, y - height + obstacle.h * 0.6);
-      ctx.lineTo(x + obstacle.w * 0.7, y - height + obstacle.h * 0.25);
-      ctx.stroke();
-      ctx.restore();
-    } else if (obstacle.kind === 'metal-box') {
+    if (obstacle.kind === 'metal-box') {
       ctx.save();
       ctx.globalAlpha = 0.9;
       ctx.strokeStyle = '#e2e8f0';
@@ -2734,6 +2740,24 @@ function drawObstacles(
       ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.75);
       ctx.stroke();
       ctx.restore();
+    }
+    if (obstacle.breakable) {
+      drawPropDamage(ctx, {
+        x: obstacle.x,
+        y: y - height / 2,
+        w: obstacle.w,
+        h: obstacle.h,
+        damageRatio: obstacle.damage ?? 0,
+        material: propMaterial(obstacle.kind, obstacle.artAssetId),
+        seed: obstacle.seed ?? (Math.round(obstacle.x) * 31 + Math.round(obstacle.y)),
+        now: w.now,
+        lastHitAt: obstacle.lastHitAt,
+        lastHitX: obstacle.lastHitX,
+        lastHitY: obstacle.lastHitY,
+        brokenAt: obstacle.brokenAt,
+        motionEnabled: w.effectMotionEnabled,
+        fragmentLimit: w.graphicsQuality === 'performance' ? 4 : w.graphicsQuality === 'balanced' ? 6 : 9,
+      });
     }
   }
 }

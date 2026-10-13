@@ -1,4 +1,16 @@
 import { MAP_PROP_ART_BY_ID } from '@/game/data/mapPack';
+import { drawPropDamage, propMaterial } from './breakableFx';
+
+export interface MapPropDamageFeedback {
+  seed?: number;
+  now?: number;
+  lastHitAt?: number;
+  lastHitX?: number;
+  lastHitY?: number;
+  brokenAt?: number;
+  motionEnabled?: boolean;
+  fragmentLimit?: number;
+}
 
 /** Top-down, layered world art. Coordinates and animation are shared by editor and run. */
 export function drawMapPackProp(
@@ -10,12 +22,14 @@ export function drawMapPackProp(
   h: number,
   now: number,
   damage = 0,
+  feedback: MapPropDamageFeedback = {},
 ) {
   const art = MAP_PROP_ART_BY_ID[id];
   if (!art) return;
   const pulse = 0.65 + Math.sin(now / 570 + x * 0.02) * 0.24;
-  const ruined = damage >= 1;
+  const breakFade = feedback.brokenAt === undefined ? 1 : Math.max(0, Math.min(1, 1 - (now - feedback.brokenAt) / 190));
   ctx.save();
+  ctx.globalAlpha = breakFade;
   ctx.translate(x, y);
   ctx.scale(w / 100, h / 100);
   ctx.lineJoin = 'round';
@@ -121,20 +135,17 @@ export function drawMapPackProp(
       break;
   }
 
-  if (damage > 0) {
-    ctx.globalAlpha = Math.min(0.9, 0.35 + damage * 0.55);
-    line('#020617', 3 + damage * 3, [[-38, -21], [-12, -7], [-5, 15], [20, 26]]);
-    line('#e2e8f0', 1.5, [[-37, -22], [-11, -8], [-4, 14]]);
-    if (damage > 0.55) line('#020617', 4, [[33, -37], [16, -15], [28, 5], [7, 30]]);
-    ctx.globalAlpha = 1;
-  }
-  if (ruined) {
-    fill('#071116', -49, -49, 98, 94);
-    for (let i = 0; i < 7; i += 1) {
-      const px = Math.sin(i * 8.3 + x) * 37;
-      const py = Math.cos(i * 5.7 + y) * 31;
-      fill(i % 2 ? art.color : '#64748b', px, py, 7 + i % 3 * 4, 4 + i % 2 * 3);
-    }
-  }
   ctx.restore();
+  drawPropDamage(ctx, {
+    x, y, w, h, damageRatio: damage,
+    material: propMaterial('map-prop', id),
+    seed: feedback.seed ?? (id.length * 7919 + Math.round(x) * 31 + Math.round(y)),
+    now: feedback.now ?? now,
+    lastHitAt: feedback.lastHitAt,
+    lastHitX: feedback.lastHitX,
+    lastHitY: feedback.lastHitY,
+    brokenAt: feedback.brokenAt,
+    motionEnabled: feedback.motionEnabled,
+    fragmentLimit: feedback.fragmentLimit,
+  });
 }

@@ -37,7 +37,7 @@ import type { PropArt } from '@/game/data/hideoutProps';
 import { lokPetSpritePalette } from '@/game/data/lokPets';
 import { evolvedRig } from '@/game/engine/petEvolution';
 import { crewTemperamentFor } from '@/game/data/crewTemperaments';
-import { crewPose, reactToProp, stepCrew, syncCrew, talkTo, type CrewActor, type CrewEvent } from '@/game/engine/hideoutCrewLife';
+import { callCrew, crewPose, reactToProp, stepCrew, syncCrew, talkTo, type CrewActor, type CrewEvent } from '@/game/engine/hideoutCrewLife';
 import { drawBubble, measureBubble, rectsOverlap, type BubbleRect } from '@/ui/hideoutBubble';
 import {
   callPets,
@@ -147,6 +147,13 @@ export interface PlayCue {
   durationMs: number;
 }
 
+/** Scene-only request to gather or encourage the rescued crew. */
+export interface CrewCommand {
+  seq: number;
+  kind: 'help' | 'encourage';
+  line: string;
+}
+
 /** A line to show in the corner. A new `seq` shows it. */
 export interface StripNotice {
   seq: number;
@@ -203,6 +210,9 @@ export interface HideoutPreviewProps {
   ball?: { present: boolean; themeId: string };
   /** A new value calls a visitor now (the bell). */
   summonSeq?: number;
+  crewCommand?: CrewCommand;
+  sceneStyle?: 'cage' | 'block';
+  speechBubblesEnabled?: boolean;
   /** The operator picked something up off the ground. Return false to leave it there (nothing was paid). */
   onPickup?: (kindId: string, seed: number) => boolean | void;
 }
@@ -231,7 +241,7 @@ export function HideoutPreview({
   rig, palette, height = 176, className = '', pets = [], weather = 'clear', biome = 'sanctum', accent = '#f59e0b', eventsMode = 'on',
   onPetCare, onPetEvent, firstEventDelayMs = 9000,
   props: roomProps = [], interactive = false, keyboardActive = true, cue, notice, crewSpeak, say,
-  onPropUse, onFocusPet, onWalkBeat, eventChip = null, onEventChip, ball: ballProp, summonSeq, onPickup,
+  onPropUse, onFocusPet, onWalkBeat, eventChip = null, onEventChip, ball: ballProp, summonSeq, crewCommand, sceneStyle = 'cage', speechBubblesEnabled = true, onPickup,
 }: HideoutPreviewProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -247,11 +257,11 @@ export function HideoutPreview({
   // unchanged, so everything else reaches it through this ref instead of restarting it.
   const live = useRef({
     pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
-    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup, biome, accent, crewSpeak,
+    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, crewCommand, sceneStyle, speechBubblesEnabled, onPickup, biome, accent, crewSpeak,
   });
   live.current = {
     pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
-    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup, biome, accent, crewSpeak,
+    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, crewCommand, sceneStyle, speechBubblesEnabled, onPickup, biome, accent, crewSpeak,
   };
 
   // Keyed on `seq` so a parent re-render that rebuilds the object does not restart the toast.
@@ -354,6 +364,7 @@ export function HideoutPreview({
     let nextVisitor = AMBIENT_TIMING.firstVisitorMs;
     let nextPickup = AMBIENT_TIMING.firstPickupMs;
     let lastSummon = live.current.summonSeq ?? 0;
+    let lastCrewCommand = live.current.crewCommand?.seq ?? 0;
     const callVisitor = (now: number, r: { min: number; max: number }) => {
       const def = pickVisitor(rng, lastVisitorKind);
       lastVisitorKind = def.id;
@@ -466,7 +477,7 @@ export function HideoutPreview({
       const sceneryOpts = {
         biome: live.current.biome, accent: live.current.accent, w: cssW, h: cssH, groundY, now,
         energy: sceneAudio.source !== 'none' ? sceneAudio.energy : 0, beatPhase: sceneAudio.phase,
-        lightX: operator.x, reduceMotion,
+        lightX: operator.x, reduceMotion, sceneStyle: settings.sceneStyle,
       };
       drawSceneryBack(ctx, sceneryOpts);
 
@@ -649,6 +660,12 @@ export function HideoutPreview({
         syncCrew(crewActors, npcInfos.map((info) => ({ id: info.id, homeFrac: info.x, t: crewTemperamentFor(crewIdOf(info.id)) })), r, now, rng, crewRangePrev);
         crewRangePrev = { min: r.min, max: r.max };
         const crewList = [...crewActors.values()];
+        const command = settings.crewCommand;
+        if (command && command.seq !== lastCrewCommand) {
+          lastCrewCommand = command.seq;
+          callCrew(crewList, command.kind, command.line, now, operator.x, r, rng);
+          if (command.kind === 'help') callPets([...states.values()], operator.x, now, r, unit);
+        }
         for (const queued of sayQueue.current.splice(0)) {
           const actor = crewActors.get(queued.propId);
           if (actor) talkTo(actor, crewList, queued.line, now, operator.x, rng);
@@ -953,6 +970,7 @@ export function HideoutPreview({
       for (let i = notes.length - 1; i >= 0; i -= 1) {
         const note = notes[i]!;
         if (now >= note.until) { notes.splice(i, 1); continue; }
+        if (!settings.speechBubblesEnabled) continue;
         const at = anchorOf(note.anchor);
         if (!at) { notes.splice(i, 1); setToast({ key: Date.now(), title: note.title, line: note.text }); continue; }
         taken.push(drawBubble(ctx, {
@@ -960,8 +978,10 @@ export function HideoutPreview({
           age: (now - note.born) / (note.until - note.born), sinceMs: now - note.born,
         }));
       }
-      const spoken = [...placed].filter((p) => crewActors.get(p.info.id)?.bubble && p.info.npc)
-        .sort((p, q) => Number(crewActors.get(q.info.id)!.behavior === 'talk') - Number(crewActors.get(p.info.id)!.behavior === 'talk'));
+      const spoken = settings.speechBubblesEnabled
+        ? [...placed].filter((p) => crewActors.get(p.info.id)?.bubble && p.info.npc)
+          .sort((p, q) => Number(crewActors.get(q.info.id)!.behavior === 'talk') - Number(crewActors.get(p.info.id)!.behavior === 'talk'))
+        : [];
       for (const prop of spoken) {
         const actor = crewActors.get(prop.info.id)!;
         const bubble = actor.bubble!;

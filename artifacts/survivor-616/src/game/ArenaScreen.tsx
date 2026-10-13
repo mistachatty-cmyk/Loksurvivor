@@ -24,7 +24,7 @@ import { renderWorld, type Viewport } from '@/game/render/draw';
 import { type ArenaSeat, createArenaWorld } from '@/game/arena/arenaWorld';
 import { readArenaInputs, type ArenaMove } from '@/game/arena/arenaInput';
 import { arenaStandings, type ArenaStanding } from '@/game/arena/scoreboard';
-import type { ArenaNetRole, ArenaTickMessage } from '@/game/arena/arenaNet';
+import type { ArenaConnectionStatus, ArenaNetRole, ArenaTickMessage } from '@/game/arena/arenaNet';
 import { useLokEconomy } from '@/state/lokEconomyStore';
 import type { AreaDef } from '@/game/types';
 
@@ -49,6 +49,7 @@ export function ArenaScreen({ area, seats, net, onExit }: ArenaScreenProps) {
   const [standings, setStandings] = useState<ArenaStanding[]>([]);
   const [secondsLeft, setSecondsLeft] = useState(MATCH_DURATION_SEC);
   const [ended, setEnded] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ArenaConnectionStatus>(net ? 'connecting' : 'connected');
   const { earn: earnLokTokens } = useLokEconomy();
 
   // Host: latest input received per remote seat id. Guest: the latest
@@ -66,12 +67,14 @@ export function ArenaScreen({ area, seats, net, onExit }: ArenaScreenProps) {
     if (!net) return;
     if (net.kind === 'host') {
       net.room.setHandlers({
+        onStatus: setConnectionStatus,
         onGuestInput: (msg) => {
           remoteInputsRef.current[msg.seatId] = { moveX: msg.moveX, moveY: msg.moveY };
         },
       });
     } else {
       net.room.setHandlers({
+        onStatus: setConnectionStatus,
         onTick: (msg) => { lastTickRef.current = msg; },
       });
     }
@@ -86,7 +89,9 @@ export function ArenaScreen({ area, seats, net, onExit }: ArenaScreenProps) {
     // matching the winner calls out. A remote guest is its own signed-in
     // session on its own device, so this generalizes cleanly from the
     // old hardcoded "host only" check.
-    if (ended && standings[0]?.id === mySeatId) {
+    // Online counters are relayed by clients and are not server-validated.
+    // Never issue competitive currency for an online result.
+    if (!net && ended && standings[0]?.id === mySeatId && standings[0]?.kills > (standings[1]?.kills ?? 0)) {
       earnLokTokens('arena_match_win', { refType: 'arena-match', refId: `${area.id}-${Date.now()}` });
     }
     // Deliberately keyed only to `ended`'s false->true transition, not
@@ -250,9 +255,13 @@ export function ArenaScreen({ area, seats, net, onExit }: ArenaScreenProps) {
       <canvas ref={canvasRef} className="block h-full w-full" />
       <div className="absolute top-3 right-3 rounded-md bg-black/60 px-3 py-2 font-mono text-xs text-white min-w-[180px]">
         <div className="mb-1 flex items-center justify-between text-white/70">
-          <span>LokSurvivorArena{net ? ` · ${net.code}` : ''}</span>
+          <span>Kill Race{net ? ` · ${net.code}` : ''}</span>
           <span>{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</span>
         </div>
+        {net && <div className={`mb-1 text-[10px] uppercase ${connectionStatus === 'connected' ? 'text-emerald-300' : connectionStatus === 'disconnected' ? 'text-rose-300' : 'text-amber-200'}`}>
+          {connectionStatus === 'connected' ? 'Room connected' : connectionStatus === 'disconnected' ? 'Connection lost · match may desync' : 'Connecting to room…'}
+        </div>}
+        {net && <div className="mb-2 text-[9px] text-white/45">Shared-enemy kill race · no player combat · online scores are unranked</div>}
         {standings.map((row, i) => (
           <div key={row.id} className="flex items-center justify-between gap-3">
             <span>{i + 1}. {row.name}{row.id === mySeatId ? ' (you)' : ''}</span>
@@ -264,8 +273,13 @@ export function ArenaScreen({ area, seats, net, onExit }: ArenaScreenProps) {
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/70 text-white font-mono">
           <div className="text-xl">Match over</div>
           <div>
-            {standings[0] ? `${standings[0].name} wins with ${standings[0].kills} kills` : 'No winner'}
+            {standings[0] && standings[0].kills > (standings[1]?.kills ?? 0)
+              ? `${standings[0].name} wins with ${standings[0].kills} kills`
+              : standings[0] && standings[0].kills === (standings[1]?.kills ?? 0)
+                ? `Tie at ${standings[0].kills} kills`
+                : 'No winner'}
           </div>
+          {net && <p className="max-w-sm text-center text-xs text-white/60">Online results are an informal room scoreboard. Player-versus-player combat and verified ranked rewards are not available in this mode.</p>}
           <button
             type="button"
             onClick={onExit}

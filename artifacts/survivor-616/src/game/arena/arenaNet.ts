@@ -49,12 +49,22 @@ export interface ArenaMatchStartPayload {
 interface HostHandlers {
   onJoinRequest?(msg: { requestId: string; characterId: string; name: string }): void;
   onGuestInput?(msg: { seatId: string; moveX: number; moveY: number }): void;
+  onStatus?(status: ArenaConnectionStatus): void;
 }
 
 interface GuestHandlers {
   onJoinAccepted?(seatId: string): void;
   onMatchStart?(payload: ArenaMatchStartPayload): void;
   onTick?(msg: ArenaTickMessage): void;
+  onStatus?(status: ArenaConnectionStatus): void;
+}
+
+export type ArenaConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+
+function arenaStatus(status: string): ArenaConnectionStatus {
+  if (status === 'SUBSCRIBED') return 'connected';
+  if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') return 'disconnected';
+  return 'connecting';
 }
 
 export interface HostArenaRoom {
@@ -79,15 +89,19 @@ export interface GuestArenaRoom {
 /** Host side: owns the room's channel for its whole lifetime (lobby through match end). */
 export function hostArenaRoom(client: SupabaseClient, code: string): HostArenaRoom {
   let handlers: HostHandlers = {};
+  let connectionStatus: ArenaConnectionStatus = 'connecting';
   const channel = client.channel(`arena:${code}`, { config: { broadcast: { self: false } } });
   channel
     .on('broadcast', { event: 'join-request' }, ({ payload }) => handlers.onJoinRequest?.(payload))
     .on('broadcast', { event: 'input' }, ({ payload }) => handlers.onGuestInput?.(payload))
-    .subscribe();
+    .subscribe((status) => {
+      connectionStatus = arenaStatus(status);
+      handlers.onStatus?.(connectionStatus);
+    });
 
   return {
     code,
-    setHandlers: (next) => { handlers = next; },
+    setHandlers: (next) => { handlers = next; next.onStatus?.(connectionStatus); },
     sendJoinAccepted: (requestId, seatId) => {
       void channel.send({ type: 'broadcast', event: 'join-accepted', payload: { requestId, seatId } });
     },
@@ -109,6 +123,7 @@ export type ArenaNetRole =
 /** Guest side: owns the room's channel from join request through match end. */
 export function joinArenaRoom(client: SupabaseClient, code: string): GuestArenaRoom {
   let handlers: GuestHandlers = {};
+  let connectionStatus: ArenaConnectionStatus = 'connecting';
   let mySeatId: string | null = null;
   const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const channel = client.channel(`arena:${code}`, { config: { broadcast: { self: false } } });
@@ -120,11 +135,14 @@ export function joinArenaRoom(client: SupabaseClient, code: string): GuestArenaR
     })
     .on('broadcast', { event: 'match-start' }, ({ payload }) => handlers.onMatchStart?.(payload))
     .on('broadcast', { event: 'tick' }, ({ payload }) => handlers.onTick?.(payload))
-    .subscribe();
+    .subscribe((status) => {
+      connectionStatus = arenaStatus(status);
+      handlers.onStatus?.(connectionStatus);
+    });
 
   return {
     code,
-    setHandlers: (next) => { handlers = next; },
+    setHandlers: (next) => { handlers = next; next.onStatus?.(connectionStatus); },
     requestJoin: (characterId, name) => {
       void channel.send({ type: 'broadcast', event: 'join-request', payload: { requestId, characterId, name } });
     },

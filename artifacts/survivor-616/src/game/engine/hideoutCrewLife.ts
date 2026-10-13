@@ -541,6 +541,48 @@ export function talkTo(a: CrewActor, actors: ReadonlyArray<CrewActor>, line: str
   return ms;
 }
 
+/** A player call in the hideout: crew answer and react without changing save or gameplay state. */
+export function callCrew(
+  actors: ReadonlyArray<CrewActor>,
+  kind: 'help' | 'encourage',
+  line: string,
+  now: number,
+  operatorX: number,
+  range: { min: number; max: number },
+  rng: () => number,
+): void {
+  if (actors.length === 0) return;
+  const speakers = [...actors].sort((a, b) => Math.abs(a.x - operatorX) - Math.abs(b.x - operatorX));
+  const ms = bubbleMs(line);
+  for (const [index, a] of actors.entries()) {
+    a.partner = null;
+    a.visitProp = null;
+    a.usingProp = false;
+    a.moving = false;
+    a.exchange = 0;
+    faceToward(a, operatorX);
+    a.hopUntil = now + HOP_MS;
+    setEmote(a, kind === 'help' ? 'bang' : 'heart', now, kind === 'help' ? 1500 : 2200);
+    if (kind === 'help') {
+      const side = a.x <= operatorX ? -1 : 1;
+      a.behavior = 'approach';
+      a.until = now + 4500;
+      a.targetX = clamp(operatorX - side * (28 + index * 9), range.min, range.max);
+      a.returning = false;
+    } else {
+      a.behavior = 'react';
+      a.until = now + 2400;
+    }
+    a.nextAt = now + (kind === 'help' ? 5000 : 2800) + rng() * 900;
+    a.lastGreetAt = now;
+    a.bubble = null;
+  }
+  const speaker = speakers[0]!;
+  speaker.behavior = 'talk';
+  speaker.until = now + ms + 200;
+  speaker.bubble = { text: line, born: now, until: now + ms };
+}
+
 /** The operator used a prop: crew within earshot look over, and a jukebox gets them dancing. */
 export function reactToProp(actors: ReadonlyArray<CrewActor>, prop: { x: number; art: string }, now: number, rng: () => number, reach: number): void {
   for (const a of actors) {

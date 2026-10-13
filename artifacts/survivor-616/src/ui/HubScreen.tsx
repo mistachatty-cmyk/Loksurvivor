@@ -153,13 +153,6 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   magnet: Magnet,
 };
 
-const SCENE_LOOKS = [
-  { id: 'original', name: 'Original', crew: 0, note: 'The hideout as you found it.' },
-  { id: 'ember', name: 'Ember Watch', crew: 2, note: 'Warm drifting sparks and a firelit street.' },
-  { id: 'moon', name: 'Moonlit Shift', crew: 5, note: 'A slow moon glow over the rooftops.' },
-  { id: 'arcade', name: 'After Hours', crew: 9, note: 'Arcade colors cross the walls in soft waves.' },
-] as const;
-const SCENE_LOOK_KEY = 'survivor616.hideout.sceneLook';
 const NPC_PROP_CAST: Record<string, NpcCastMember> = {
   'jeremey-frogster': JEREMEY_FROGSTER,
   'jeramy-frogster': JERAMY_FROGSTER,
@@ -168,7 +161,7 @@ const NPC_PROP_CAST: Record<string, NpcCastMember> = {
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onPromo, onStartChoiceEvent, onBack }: HubScreenProps) {
   const chromeLayout = useUiChromeLayout();
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet, lookThroughSpyglass, openLuckyChest, collectHideoutPickup } = useMeta();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet, lookThroughSpyglass, openLuckyChest, collectHideoutPickup, setHideoutSceneStyle, setHideoutSpeechBubbles } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const t = useT();
   const locale = useLocale();
@@ -252,10 +245,11 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   // The props standing in this room. Memoized so a poll tick does not rebuild them (the strip
   // reads them through a ref, but a new array each render would still churn the parent).
   const hideoutPropInfos = useMemo<HideoutPropInfo[]>(() => {
-    if (!meta.hideoutInteractive || !meta.hideoutPreviewEnabled) return [];
+    if (!meta.hideoutPreviewEnabled) return [];
     const now = Date.now();
-    // Rescued crew stand in the room they hang out in, so every room has someone to meet.
-    const crewHere = rescuedAllies.filter((ally) => ally.room === activeRoomId);
+    // The cage displays your real rescued crew together. The legacy block keeps
+    // the old room-by-room cast. Crew remain visible when walking/props are off.
+    const crewHere = rescuedAllies.filter((ally) => meta.hideoutSceneStyle === 'cage' || ally.room === activeRoomId);
     const crewInfos: HideoutPropInfo[] = crewHere.map((ally, i) => ({
       id: `ally:${ally.id}`,
       // Spread across the middle of the strip with room for each to move; they roam from here.
@@ -266,7 +260,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       ready: false,
       npc: { rig: allyRig(ally), palette: ally.palette },
     }));
-    return [...propsForRoom(activeRoomId).map((def) => {
+    const roomProps = meta.hideoutInteractive ? propsForRoom(activeRoomId).map((def) => {
       const npc = def.npcId ? NPC_PROP_CAST[def.npcId] : undefined;
       return {
         id: def.id,
@@ -277,10 +271,11 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         ready: def.action.kind !== 'talk' && def.action.kind !== 'panel' ? propReady(def, meta.hideoutClaims, now) : false,
         npc: npc ? { rig: npc.rig, palette: npc.palette } : undefined,
       };
-    }), ...crewInfos];
+    }) : [];
+    return [...roomProps, ...crewInfos];
   // `t` never changes identity, so the locale is what relabels the props.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRoomId, meta.hideoutInteractive, meta.hideoutPreviewEnabled, meta.hideoutClaims, rescuedAllies, locale]);
+  }, [activeRoomId, meta.hideoutInteractive, meta.hideoutPreviewEnabled, meta.hideoutSceneStyle, meta.hideoutClaims, rescuedAllies, locale]);
 
   // The pet the play bar is about: the one you last tapped on the strip, else the first walker.
   const focusPet = meta.savedLokPets.find((pet) => pet.id === (hideoutPets.some((p) => p.id === focusPetId) ? focusPetId : hideoutPets[0]?.id));
@@ -436,13 +431,14 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     () => meta.hideoutArrivalEnabled && !hasShownHideoutArrivalThisSession,
   );
   const [showLorePopup, setShowLorePopup] = useState(false);
-  const [sceneLook, setSceneLook] = useState(() => {
-    try { return localStorage.getItem(SCENE_LOOK_KEY) ?? 'original'; } catch { return 'original'; }
-  });
-  const earnedSceneLook = SCENE_LOOKS.find((look) => look.id === sceneLook && rescuedAllies.length >= look.crew) ?? SCENE_LOOKS[0];
-  const chooseSceneLook = (id: string) => {
-    setSceneLook(id);
-    try { localStorage.setItem(SCENE_LOOK_KEY, id); } catch { /* Device storage may be unavailable. */ }
+  const [crewCommand, setCrewCommand] = useState<{ seq: number; kind: 'help' | 'encourage'; line: string } | undefined>();
+  const commandCrew = (kind: 'help' | 'encourage') => {
+    noticeSeqRef.current += 1;
+    setCrewCommand({
+      seq: noticeSeqRef.current,
+      kind,
+      line: t(kind === 'help' ? ('hideout.scene.helpReply' as never) : ('hideout.scene.encourageReply' as never)),
+    });
   };
   const companion = travelLeadPet(meta);
   const legendaryPoliceDog = meta.savedLokPets.find((pet) => pet.roll.variantId === 'blue-616');
@@ -631,11 +627,10 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           {/* CSS background, not an <img>: reference art must never render as a
               raw document image if the stylesheet is missing. */}
           <div
-            className={`h-full w-full bg-cover bg-center opacity-40 mix-blend-luminosity grayscale scene-look-photo scene-look-${earnedSceneLook.id}`}
+            className="h-full w-full bg-cover bg-center opacity-40 mix-blend-luminosity grayscale scene-look-photo scene-look-original"
             style={{ backgroundImage: `url(${import.meta.env.BASE_URL}${activeRoom.backdrop})` }}
             aria-hidden="true"
           />
-          {earnedSceneLook.id !== 'original' && <div className={`scene-look-layer scene-look-${earnedSceneLook.id}`} style={{ animationPlayState: isPageVisible ? 'running' : 'paused' }} aria-hidden="true" />}
            <div
              // Bounded to one viewport, not `inset-0` against this screen's
              // full (much taller) scrollable height -- every child here uses
@@ -695,6 +690,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           <HideoutPreview
             rig={selectedCharacter.rig}
             palette={selectedCharacterPalette}
+            height={meta.hideoutSceneStyle === 'cage' ? 220 : 176}
             className="mb-6 -mx-6 w-auto sm:mx-0 sm:w-full"
             pets={hideoutPets}
             weather={scene.weather}
@@ -710,6 +706,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             notice={stripNotice}
             crewSpeak={crewLineFor}
             say={crewSay}
+            crewCommand={crewCommand}
+            sceneStyle={meta.hideoutSceneStyle}
+            speechBubblesEnabled={meta.hideoutSpeechBubblesEnabled}
             summonSeq={summonSeq}
             onPickup={handlePickup}
             ball={{ present: ballOut && meta.ownsBall && meta.hideoutInteractive, themeId: meta.uiTheme }}
@@ -746,13 +745,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             onSwitch={setFocusPetId}
           />
         ) : null}
-        <div className="mb-5 flex flex-wrap items-center gap-2 rounded border border-white/10 bg-black/50 px-3 py-2">
-          <span className="text-[10px] font-black uppercase tracking-widest text-primary">Hideout scene</span>
+        <div className="mb-5 flex flex-wrap items-center gap-2 rounded border border-white/10 bg-black/50 px-3 py-2" data-testid="hideout-scene-controls">
+          <span className="text-[10px] font-black uppercase tracking-widest text-primary">{t('hideout.scene.title' as never)}</span>
+          {([['cage', 'hideout.scene.cage'], ['block', 'hideout.scene.oldBlock']] as const).map(([style, labelKey]) => (
+            <button key={style} type="button" onClick={() => setHideoutSceneStyle(style)} aria-pressed={meta.hideoutSceneStyle === style} className={`rounded border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${meta.hideoutSceneStyle === style ? 'border-primary bg-primary text-primary-foreground' : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/15'}`} data-testid={`button-hideout-scene-${style}`}>{t(labelKey as never)}</button>
+          ))}
+          <span className="ml-2 text-[10px] font-black uppercase tracking-widest text-primary">{t('hideout.scene.chat' as never)}</span>
+          {([true, false] as const).map((enabled) => (
+            <button key={String(enabled)} type="button" onClick={() => setHideoutSpeechBubbles(enabled)} aria-pressed={meta.hideoutSpeechBubblesEnabled === enabled} className={`rounded border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${meta.hideoutSpeechBubblesEnabled === enabled ? 'border-cyan-200 bg-cyan-100 text-slate-950' : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/15'}`} data-testid={`button-hideout-chat-${enabled ? 'on' : 'off'}`}>{t(enabled ? ('settings.hideout.on' as never) : ('settings.hideout.off' as never))}</button>
+          ))}
+          <button type="button" disabled={!rescuedAllies.length} onClick={() => commandCrew('help')} className="rounded border border-amber-300/50 bg-amber-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-100 enabled:hover:bg-amber-400/20 disabled:opacity-40" data-testid="button-hideout-call-help">{t('hideout.scene.callHelp' as never)}</button>
+          <button type="button" disabled={!rescuedAllies.length} onClick={() => commandCrew('encourage')} className="rounded border border-pink-300/50 bg-pink-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-pink-100 enabled:hover:bg-pink-400/20 disabled:opacity-40" data-testid="button-hideout-encourage">{t('hideout.scene.encourage' as never)}</button>
           <button type="button" onClick={() => setUiChromeLayout(chromeLayout === 'new' ? 'classic' : 'new')} className="ml-auto border border-white/20 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wide text-white/65 hover:border-primary hover:text-white" data-testid="button-toggle-hub-layout">{chromeLayout === 'new' ? 'Classic corners' : 'New control dock'}</button>
-          {SCENE_LOOKS.map((look) => {
-            const earned = rescuedAllies.length >= look.crew;
-            return <button key={look.id} type="button" disabled={!earned} title={earned ? look.note : `Rescue ${look.crew} crew to earn`} aria-pressed={earnedSceneLook.id === look.id} onClick={() => chooseSceneLook(look.id)} className={`rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${earnedSceneLook.id === look.id ? 'bg-primary text-primary-foreground' : earned ? 'bg-white/10 text-white hover:bg-white/20' : 'cursor-not-allowed bg-white/5 text-white/35'}`}>{look.name}{!earned && ` · ${look.crew} crew`}</button>;
-          })}
         </div>
         <header className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">

@@ -446,6 +446,7 @@ export function RunScreen({
         runAuraStyle: getRunAuraStyle(meta.activeRunAuraId),
         hatStyle: getHatStyle(meta.activeHatId),
         paletteEffect: prefersReducedMotion || !meta.paletteAnimationsEnabled ? undefined : getThemePalette(meta.activePaletteId)?.effect,
+        effectMotionEnabled: !prefersReducedMotion && meta.paletteAnimationsEnabled,
         rescueAllyId,
         startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && (pet.starter || pet.stamina > 0)).map((pet) => {
           const scale = runPowerScale(pet.level ?? 1, pet.starter);

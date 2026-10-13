@@ -7,6 +7,7 @@ import { isFeatureAvailable } from '@/game/state/operatorForgeStore';
 import { t } from '@/lib/i18n';
 import { CustomBestiaryView } from './CustomBestiaryView';
 import { ENEMIES } from '@/game/data/enemies';
+import { BODY_PLAN_BY_ID, THEME_BY_ID, definingTraits, feelLabel, rollCreature } from '@/game/data/creatureTraits';
 import { CHARACTERS } from '@/game/data/characters';
 import { FACTIONS } from '@/game/data/factions';
 import { describeUnlock, useMeta } from '@/game/state/metaStore';
@@ -429,7 +430,7 @@ function EnemyIntelModal({
 export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
   const { meta, unlockedCharacters } = useMeta();
   const isListView = meta.uiDensity === 'list';
-  const [view, setView] = useState<'threats' | 'factions' | 'effects' | 'custom'>('threats');
+  const [view, setView] = useState<'threats' | 'factions' | 'effects' | 'field' | 'custom'>('threats');
   const [selectedEnemy, setSelectedEnemy] = useState<(typeof ENEMIES)[number] | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [threatFilter, setThreatFilter] = useState<'all' | 'discovered' | 'apex'>('all');
@@ -443,6 +444,10 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
   const discoveredFactionCount = FACTIONS.filter((faction) =>
     faction.roster.some((enemyId) => (meta.bestiary[enemyId] ?? 0) > 0),
   ).length;
+  const fieldSpecimens = useMemo(
+    () => meta.fieldCreatureSeeds.map((seed) => rollCreature(seed, { tier: 'wild', findability: 'common' })),
+    [meta.fieldCreatureSeeds],
+  );
 
   const filteredEnemies = useMemo(() => {
     return ENEMIES.filter((enemy) => {
@@ -568,7 +573,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
         <div className="flex items-center gap-3">
           <Users className="h-4 w-4 text-primary" />
           <h2 className="text-xl font-black uppercase tracking-tight text-white">
-            {view === 'threats' ? 'Known threats' : view === 'effects' ? 'Random effects' : view === 'factions' ? 'Factions' : t('bestiary.custom.tab')}
+            {view === 'threats' ? 'Known threats' : view === 'effects' ? 'Random effects' : view === 'field' ? 'Field specimens' : view === 'factions' ? 'Factions' : t('bestiary.custom.tab')}
           </h2>
         </div>
         <div className="flex gap-2">
@@ -613,6 +618,15 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
             <Zap className="h-3.5 w-3.5" />
             Effects
           </button>
+          <button
+            type="button"
+            onClick={() => setView('field')}
+            className={`flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${view === 'field' ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-white'}`}
+            data-testid="button-bestiary-view-field"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Field specimens <span className="font-mono text-[10px] opacity-75">{fieldSpecimens.length}</span>
+          </button>
           {customBestiaryOpen ? (
             <button
               type="button"
@@ -634,7 +648,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
       {view === 'custom' && customBestiaryOpen ? <CustomBestiaryView kills={meta.bestiary} /> : null}
 
       {/* Search and Filters Bar */}
-      <div hidden={view === 'custom'} className="mb-5 flex flex-wrap items-center gap-2.5 border-b border-border/60 pb-3">
+      <div hidden={view !== 'threats'} className="mb-5 flex flex-wrap items-center gap-2.5 border-b border-border/60 pb-3">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <input
@@ -694,7 +708,30 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
         )}
       </div>
 
-      {view === 'custom' ? null : view === 'effects' ? (
+      {view === 'custom' ? null : view === 'field' ? (
+        fieldSpecimens.length === 0 ? (
+          <div className="border border-violet-200/20 bg-card/40 p-8 text-center" data-testid="section-field-specimens-empty">
+            <p className="font-mono text-xs uppercase tracking-widest text-violet-100/70">No field specimens yet</p>
+            <p className="mt-2 text-sm text-muted-foreground">Clear a district for the first time to log a deterministic creature trace in your Bestiary.</p>
+          </div>
+        ) : (
+          <div className={`grid gap-4 ${isListView ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-3'}`} data-testid="section-field-specimens">
+            {fieldSpecimens.map((specimen) => (
+              <article key={specimen.seed} className="border border-violet-200/25 bg-card p-4" data-testid={`card-field-specimen-${specimen.seed.replace(/[^a-z0-9-]/gi, '-')}`}>
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-violet-200/65">{specimen.tier} · {specimen.findability} · {BODY_PLAN_BY_ID[specimen.plan]?.kind ?? 'unknown'}</p>
+                <h3 className="mt-1 text-lg font-black uppercase text-white">{specimen.name}</h3>
+                <p className="text-xs uppercase tracking-wider text-violet-100/65">{BODY_PLAN_BY_ID[specimen.plan]?.noun ?? specimen.plan} · {feelLabel(specimen.traits)}</p>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{THEME_BY_ID[specimen.themes[0] ?? '']?.blurb ?? 'A trace found beyond the known roster.'}</p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {definingTraits(specimen.traits, 4).map(({ axis, value }) => <span key={axis.id} className="border border-violet-100/15 px-2 py-1 font-mono text-[9px] uppercase text-violet-100">{axis.label} {value}/5</span>)}
+                  {specimen.quirks.slice(0, 3).map((quirk) => <span key={quirk} className="border border-white/10 px-2 py-1 font-mono text-[9px] uppercase text-white/55">{quirk.replace(/-/g, ' ')}</span>)}
+                </div>
+                <p className="mt-3 border-t border-white/10 pt-2 font-mono text-[8px] uppercase tracking-wider text-white/35">Seed: {specimen.seed}</p>
+              </article>
+            ))}
+          </div>
+        )
+      ) : view === 'effects' ? (
         <QuirkChart mapsCleared={meta.clearedAreaIds.length} />
       ) : view === 'factions' ? (
         filteredFactions.length === 0 ? (

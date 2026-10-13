@@ -344,6 +344,9 @@ function Game() {
       );
       const resultWithFatigue = {
         ...result,
+        fieldCreatureSeed: result.cleared && !result.missionId && !meta.clearedAreaIds.includes(result.areaId)
+          ? `field:${result.areaId}`
+          : undefined,
         fatigueAddedPct: fatigueAfter - fatigueBefore,
         fatigueAfterPct: fatigueAfter,
         lokPetDiscoveries: getLokPetDiscoveries(meta.lokPetCatalog, result.lokPets),
@@ -628,6 +631,8 @@ function Game() {
       return (
         <RunSetupScreen
           intent={screen.destination === 'run' ? 'launch' : 'manage'}
+          areaId={screen.areaId}
+          challengeIds={screen.challengeIds}
           onBack={screen.destination === 'hub' ? returnFromLooks : goHub}
           onComplete={() => {
             if (screen.destination === 'hub' || !screen.areaId) {

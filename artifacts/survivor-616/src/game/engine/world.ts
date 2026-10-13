@@ -1305,6 +1305,8 @@ export interface World {
   hatStyle: HatStyle;
   /** Optional animated flourish supplied by the active palette; visual only. */
   paletteEffect?: PaletteEffectDef;
+  /** Reduce cosmetic impact motion when the player or OS asks for less animation. */
+  effectMotionEnabled: boolean;
   /** Optional difficulty contracts selected before the run. */
   challenges: ChallengeContractDef[];
   /** One bounded hideout rumor carried into this run. */
@@ -1553,6 +1555,7 @@ export function createWorld(
     runAuraStyle?: RunAuraStyle;
     hatStyle?: HatStyle;
     paletteEffect?: PaletteEffectDef;
+    effectMotionEnabled?: boolean;
     /** Progression-aware rescue selected by the meta layer. Undefined means this route is complete. */
     rescueAllyId?: string | undefined;
     startingLokPets?: LokPetRoll[];
@@ -1863,6 +1866,7 @@ export function createWorld(
     runAuraStyle: setup.runAuraStyle ?? 'street-halo',
     hatStyle: setup.hatStyle ?? 'none',
     paletteEffect: setup.paletteEffect,
+    effectMotionEnabled: setup.effectMotionEnabled ?? true,
     challenges: [...challenges],
     activeCrewRumor: activeCrewRumor ? { ...activeCrewRumor } : null,
     rumorTriggered: activeCrewRumor?.rumorId === 'painted-shortcut',
