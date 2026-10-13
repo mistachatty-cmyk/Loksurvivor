@@ -1520,6 +1520,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Classic arrangement remains available. The layout choice is saved on this device; the rack has its own visible scroll area, and the arena top bar, operator, target and stage have dedicated positions.',
     ],
   },
+  {
+    version: '0.38.1',
+    date: '2026-10-13',
+    publishedAt: '2026-10-13T20:55:46Z',
+    kind: 'update',
+    title: 'Training Arena mobile header fix',
+    body: [
+      'The floating Looks & LokPets shortcut no longer covers the Training Arena title while the arena is open on a narrow screen.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

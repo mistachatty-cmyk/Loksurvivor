@@ -26,6 +26,7 @@ The user later provided a layout sketch and clarified the intended composition: 
 - The follow-up fix gives the screen a fixed viewport, keeps weapon scrolling inside the rack, overlays the controls and readouts on the arena, and pins both actors in place between simulation steps.
 - Test simulation now runs until the tracked attack activity clears, then settles. A selected non-orbit weapon fires once; an orbit weapon gets one rotation. A 10-second simulation-time cap clears any attack that otherwise remains active indefinitely.
 - The sketch-led default uses a slim left dock with a green-tinted internal scrollbar, expandable weapon cards and a wide, white-framed arena. The top bar uses the orange accent, and separate blue/silver actor tags keep operator and target identity clear. The Main/Classic selection persists locally; weapon choice itself does not fire an attack.
+- The floating Looks & LokPets shortcut is hidden while the Training Arena is open so it cannot cover the arena heading at narrow widths.
 
 Key implementation files:
 
@@ -41,7 +42,7 @@ Key implementation files:
 3. **Weapon list scope:** the rack is driven by `ALL_WEAPON_DEFS`; verify that this is the desired set, including character-specific and evolved definitions, and that every entry visibly activates against the target.
 4. **Unlock design:** the first pass uses 616 total defeats. Confirm that this threshold and the main-floor placement match the intended progression.
 5. **Localization:** the new screen copy is currently written directly in the component instead of using the locale message catalog. Move player-facing strings into the project's localization flow before treating localization as complete.
-6. **Visual and input review:** no manual playtest or screenshot was done for the sketch-led layout. Review desktop and narrow/mobile layouts, target readability, attack effects, keyboard focus, the saved Classic toggle, and whether any weapon requires different framing.
+6. **Visual and input review:** after PR #276, a 390×844 manual click-through caught the floating shortcut covering the title; this branch fixes that overlap. The hideout-to-arena click and a weapon activation both passed at 390×844 with no browser errors or page overflow. Full desktop/mobile review, weapon-family coverage, target readability, keyboard focus, and the saved Classic toggle still need review.
 7. **Next-pass systems:** LokShop rack purchase, per-weapon 616 kill gate, mailbox notifications, arena XP/stats, non-lethal and infinite-HP target modes, and the 24-second damage challenge are captured in [the next-pass spec](training-arena-next-pass-spec-2026-10-13.md). These are not implemented yet.
 
 The target stays defeated after a lethal test until Reset Dummy or another weapon test recreates it. Damage is bounded by the target's remaining HP, so a lethal test will not report theoretical overkill damage.
