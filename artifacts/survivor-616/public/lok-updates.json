@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 124,
+      "version": "0.30.0",
+      "date": "2026-10-12",
+      "publishedAt": "2026-10-12T23:50:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Character Studio v3",
+      "body": [
+        "Build eight-direction characters with layered 48-pixel art, six rig families, six styles and individual animation frames. Classic Forge and detailed v2 designs stay in place.",
+        "Save v3 drafts to this device or your account, review every required frame, then submit a complete creation for the moderated Community Gallery.",
+        "Your Room now has a Personal Locker for drafts, creations and adoptions. Approved characters can be previewed, adopted, used in runs and exported as attributed cards or vertical videos."
+      ]
+    },
+    {
       "number": 123,
       "version": "0.29.0",
       "date": "2026-10-12",

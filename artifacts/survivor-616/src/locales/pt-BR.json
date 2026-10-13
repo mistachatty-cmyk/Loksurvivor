@@ -64,6 +64,8 @@
   "hub.room.music.description": "Defina o clima",
   "hub.room.studio.label": "Estúdio",
   "hub.room.studio.description": "Remixar e gravar",
+  "hub.room.locker.label": "Armário pessoal",
+  "hub.room.locker.description": "Seus personagens e criações",
   "hub.room.recovery.label": "Recuperação",
   "hub.room.recovery.description": "Deixe a tripulação respirar",
   "hub.room.vendor.label": "Intendente",

@@ -85,6 +85,7 @@
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
     "fflate": "0.8.2",
+    "mediabunny": "1.57.0",
     "tone": "^15.1.22"
   }
 }

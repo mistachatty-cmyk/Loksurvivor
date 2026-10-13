@@ -6,8 +6,11 @@
  */
 
 import type { AnimName, FrameDelta, SpritePalette, SpriteRig } from '@/game/types';
+import type { Direction, StudioProject } from '@/game/studio/v3Project';
+import { renderStudioPixels, studioFrameAt } from '@/game/studio/v3Project';
 
 export interface DrawRigOptions {
+  direction?: Direction;
   /** Flash the whole silhouette white (hit reaction). */
   flash?: boolean;
   /** 0..1 -- eats away pixels for the depixelating death sequence. */
@@ -18,6 +21,50 @@ export interface DrawRigOptions {
   alpha?: number;
   /** Extra tint drawn over the sprite at this alpha. */
   tint?: { color: string; alpha: number };
+}
+
+const studioFrameCache = new WeakMap<StudioProject, Map<string, HTMLCanvasElement>>();
+export function studioDirection(vx: number, vy: number, facing: 1 | -1): Direction {
+  if (Math.hypot(vx, vy) < 0.1) return facing === 1 ? 'E' : 'W';
+  const directions: Direction[] = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'];
+  const index = (Math.round(Math.atan2(vy, vx) / (Math.PI / 4)) + 8) % 8;
+  return directions[index]!;
+}
+export function studioFrame(project: StudioProject, direction: Direction, anim: AnimName, elapsedMs: number): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  const clip = project.views[direction]?.[anim];
+  if (!clip?.length) return null;
+  const index = studioFrameAt(project, direction, anim, elapsedMs);
+  const key = `${direction}:${anim}:${index}`;
+  let frames = studioFrameCache.get(project);
+  if (!frames) { frames = new Map(); studioFrameCache.set(project, frames); }
+  const cached = frames.get(key);
+  if (cached) return cached;
+  const canvas = document.createElement('canvas'); canvas.width = 48; canvas.height = 48;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  renderStudioPixels(ctx, project, clip[index]!);
+  frames.set(key, canvas);
+  return canvas;
+}
+
+function drawStudioRig(ctx: CanvasRenderingContext2D, rig: SpriteRig, anim: AnimName, elapsedMs: number, screenX: number, screenY: number, facing: 1 | -1, scale: number, options: DrawRigOptions): boolean {
+  const project = rig.studioV3;
+  if (!project || project.approvalState !== 'approved') return false;
+  const frame = studioFrame(project, options.direction ?? (facing === 1 ? 'E' : 'W'), anim, elapsedMs);
+  if (!frame) return false;
+  const oldAlpha = ctx.globalAlpha;
+  const oldSmooth = ctx.imageSmoothingEnabled;
+  const oldFilter = ctx.filter;
+  ctx.globalAlpha *= (options.alpha ?? 1) * (1 - (options.dissolve ?? 0));
+  ctx.imageSmoothingEnabled = false;
+  if (options.flash) ctx.filter = 'brightness(5)';
+  const extent = 48 * scale * rig.pixelHeight / 48;
+  ctx.drawImage(frame, screenX - extent / 2, screenY - extent, extent, extent);
+  ctx.filter = oldFilter;
+  ctx.imageSmoothingEnabled = oldSmooth;
+  ctx.globalAlpha = oldAlpha;
+  return true;
 }
 
 function frameIndex(rig: SpriteRig, anim: AnimName, elapsedMs: number): number {
@@ -241,6 +288,7 @@ export function drawRig(
   scale: number,
   options: DrawRigOptions = {},
 ) {
+  if (drawStudioRig(ctx, rig, anim, elapsedMs, screenX, screenY, facing, scale, options)) return;
   const { flash = false, dissolve = 0, outline = false, alpha = 1, tint } = options;
   const clip = rig.anims[anim];
   const index = frameIndex(rig, anim, elapsedMs);

@@ -64,6 +64,8 @@
   "hub.room.music.description": "调整心情",
   "hub.room.studio.label": "工作室",
   "hub.room.studio.description": "混音和录制",
+  "hub.room.locker.label": "个人储物柜",
+  "hub.room.locker.description": "你的角色和创作",
   "hub.room.recovery.label": "恢复",
   "hub.room.recovery.description": "让船员们呼吸",
   "hub.room.vendor.label": "军需",

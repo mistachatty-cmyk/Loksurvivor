@@ -64,6 +64,8 @@
   "hub.room.music.description": "분위기를 설정하세요",
   "hub.room.studio.label": "스튜디오",
   "hub.room.studio.description": "리믹스 및 녹음",
+  "hub.room.locker.label": "개인 사물함",
+  "hub.room.locker.description": "당신의 캐릭터와 창작물",
   "hub.room.recovery.label": "회복",
   "hub.room.recovery.description": "승무원들 숨 좀 쉬게 해주세요",
   "hub.room.vendor.label": "병참장교",

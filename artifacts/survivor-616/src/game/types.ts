@@ -82,6 +82,8 @@ export interface SpriteRig {
   pixelHeight: number;
   parts: SpritePart[];
   anims: Record<AnimName, AnimClip>;
+  /** Optional approved Character Studio v3 appearance; gameplay stays on this base rig. */
+  studioV3?: import('./studio/v3Project').StudioProject;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1629,7 +1631,7 @@ export interface DirectorRunState {
 
 /** A one-shot meta-progression announcement, drained and shown by the hub on return. See `MetaState.pendingNotifications`. */
 /** A hideout panel a room tile or prop can open. */
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'grpd-armory' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher' | 'frog-ranch' | 'lok-shop';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'locker' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'grpd-armory' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher' | 'frog-ranch' | 'lok-shop';
 
 /** Today's hideout payouts (local day), see `engine/hideoutRewards.ts`. */
 export interface HideoutLedger {
@@ -2488,6 +2490,8 @@ export interface MetaState {
   totalLevelUps: number;
   /** Soft currency earned per run. */
   cred: number;
+  /** Cumulative account creator Cred already applied to this save. */
+  creatorCredApplied?: number;
   /** Loot tokens spendable in the hideout. */
   lootTokens: number;
   /** Currency earned from blue loot boxes and spent at the LokPet card shop. */

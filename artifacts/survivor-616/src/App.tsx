@@ -12,6 +12,7 @@ import { AuthProvider } from '@/state/authStore';
 import { CloudSyncProvider } from '@/state/cloudSyncStore';
 import { LokEconomyProvider, useLokEconomy } from '@/state/lokEconomyStore';
 import { getEnemy } from '@/game/data/enemies';
+import { restoreStudioAppearances } from '@/game/studio/v3Appearances';
 import {
   FATIGUE_PER_RUN_PCT,
   getLokPetDiscoveries,
@@ -43,6 +44,7 @@ import { ArchivePanel } from '@/ui/ArchivePanel';
 import { DirectorTerminalPanel } from '@/ui/DirectorTerminalPanel';
 import { AreaSelect } from '@/ui/AreaSelect';
 import { BestiaryPanel } from '@/ui/BestiaryPanel';
+import { PersonalLockerV3 } from '@/ui/PersonalLockerV3';
 import { CharacterSelect } from '@/ui/CharacterSelect';
 import { HubScreen, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
@@ -96,7 +98,7 @@ const queryClient = new QueryClient();
 const DOCK_HIDDEN_SCREENS = ['intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'hub', 'run-setup', 'run', 'arena', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle'];
 
 /** Screens with no payload that browser Back may return to. */
-const HISTORY_SCREENS = new Set(['intro', 'hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'recovery', 'vendor', 'workshop', 'card-shop', 'lok-shop', 'weapon-bans', 'settings', 'palette-store', 'sound-booth', 'account', 'feedback']);
+const HISTORY_SCREENS = new Set(['intro', 'hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'locker', 'recovery', 'vendor', 'workshop', 'card-shop', 'lok-shop', 'weapon-bans', 'settings', 'palette-store', 'sound-booth', 'account', 'feedback']);
 
 type Screen =
   | { name: 'intro' }
@@ -109,6 +111,7 @@ type Screen =
   | { name: 'archive'; variantId?: string; chapter?: string; updateVersion?: string }
   | { name: 'music' }
   | { name: 'studio' }
+  | { name: 'locker' }
   | { name: 'recovery' }
   | { name: 'vendor'; initialCategory?: VendorItemCategory }
   | { name: 'workshop' }
@@ -209,6 +212,7 @@ function initialScreen(): Screen {
 }
 
 function Game() {
+  useEffect(() => { void restoreStudioAppearances().catch(() => {}); }, []);
   const { meta, markOnboarded, selectedCharacter, completeRun, completeSectorMission, enterHideout, unlockedAreas, unlockedRooms } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen());
   const chromeLayout = useUiChromeLayout();
@@ -268,6 +272,9 @@ function Game() {
         break;
       case 'studio':
         setScreen({ name: 'studio' });
+        break;
+      case 'locker':
+        setScreen({ name: 'locker' });
         break;
       case 'recovery':
         setScreen({ name: 'recovery' });
@@ -634,6 +641,9 @@ function Game() {
 
     case 'bestiary':
       return <BestiaryPanel onBack={goHub} />;
+
+    case 'locker':
+      return <PersonalLockerV3 onBack={goHub} />;
 
     case 'archive':
       return <ArchivePanel onBack={goHub} focusVariantId={screen.variantId} initialChapter={screen.chapter} focusUpdateVersion={screen.updateVersion} />;

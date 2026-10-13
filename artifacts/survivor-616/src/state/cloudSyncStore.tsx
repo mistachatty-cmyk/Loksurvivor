@@ -22,6 +22,7 @@ import { useMeta } from '@/game/state/metaStore';
 import type { MetaState } from '@/game/types';
 import { buildLokDexSnapshot, lokDexSnapshotFingerprint } from '@/lib/lokDexSnapshot';
 import { musicObjectives } from '@/lib/lokMusicProgress';
+import { lokClient } from '@/lib/lokClient';
 
 /** Bookkeeping only -- not part of MetaState/normalizeMeta -- when this device's save was last known to match the cloud. */
 const SYNCED_AT_KEY = 'survivor616.meta.v1.syncedAt';
@@ -50,7 +51,8 @@ const CloudSyncContext = createContext<CloudSyncStatus>('off');
 
 export function CloudSyncProvider({ children }: { children: ReactNode }) {
   const { session, loadCloudSave, saveCloudSave, saveLokDex, saveMusicProgress } = useAuth();
-  const { meta, importMeta } = useMeta();
+  const { meta, importMeta, applyCreatorCredTotal } = useMeta();
+  const lastCredCheckAt = useRef(0);
   const [status, setStatus] = useState<CloudSyncStatus>('off');
   const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncedUserId = useRef<string | null>(null);
@@ -101,6 +103,13 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
           setStatus('synced');
         }
       }
+      if (lokClient) {
+        const { data, error } = await lokClient.rpc('gsix_creator_cred_total');
+        if (!cancelled && !error && typeof data === 'number') {
+          applyCreatorCredTotal(data);
+          lastCredCheckAt.current = Date.now();
+        }
+      }
       if (!cancelled) {
         syncReady.current = true;
         setSyncSettled(true);
@@ -113,6 +122,19 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
     // should run once per sign-in, not on every local change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, loadCloudSave, saveCloudSave, importMeta]);
+
+  useEffect(() => {
+    if (!session || !syncSettled || !lokClient) return;
+    const refresh = () => {
+      if (document.hidden || Date.now() - lastCredCheckAt.current < 600_000) return;
+      lastCredCheckAt.current = Date.now();
+      void lokClient!.rpc('gsix_creator_cred_total').then(({ data, error }) => {
+        if (!error && typeof data === 'number') applyCreatorCredTotal(data);
+      });
+    };
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, [session?.user.id, syncSettled, applyCreatorCredTotal]);
 
   // Pushes local changes to the cloud once signed in, debounced so a burst
   // of dispatches (e.g. a run's rewards landing) fires one request, not many.

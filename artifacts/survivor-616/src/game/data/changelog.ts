@@ -1420,6 +1420,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Enemies gain Classic and Styled palette previews. Faction Races Pass, Furniture City Dusk, Furnace Orbit, Relay Mast and Ticker Tape join the customization catalog.',
     ],
   },
+  {
+    version: '0.30.0',
+    date: '2026-10-12',
+    publishedAt: '2026-10-12T23:50:00Z',
+    kind: 'update',
+    title: 'Character Studio v3',
+    body: [
+      'Build eight-direction characters with layered 48-pixel art, six rig families, six styles and individual animation frames. Classic Forge and detailed v2 designs stay in place.',
+      'Save v3 drafts to this device or your account, review every required frame, then submit a complete creation for the moderated Community Gallery.',
+      'Your Room now has a Personal Locker for drafts, creations and adoptions. Approved characters can be previewed, adopted, used in runs and exported as attributed cards or vertical videos.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

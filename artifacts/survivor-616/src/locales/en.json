@@ -68,6 +68,8 @@
   "hub.room.music.description": "Set the mood",
   "hub.room.studio.label": "Studio",
   "hub.room.studio.description": "Remix & record",
+  "hub.room.locker.label": "Personal Locker",
+  "hub.room.locker.description": "Your characters and creations",
   "hub.room.recovery.label": "Recovery",
   "hub.room.recovery.description": "Let the crew breathe",
   "hub.room.vendor.label": "Quartermaster",

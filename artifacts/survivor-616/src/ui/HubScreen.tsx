@@ -98,6 +98,7 @@ const PANEL_CONFIG: Record<HubPanel, { icon: any; testId: string }> = {
   unlocks: { icon: Unlock, testId: 'button-open-unlocks' },
   music: { icon: Music, testId: 'button-open-music' },
   studio: { icon: RadioTower, testId: 'button-open-studio' },
+  locker: { icon: Paintbrush, testId: 'button-open-locker' },
   recovery: { icon: Waves, testId: 'button-open-recovery' },
   vendor: { icon: Package, testId: 'button-open-vendor' },
   kennel: { icon: Dog, testId: 'button-open-kennel' },
@@ -819,6 +820,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   <Sparkles className="inline w-3 h-3" />{lokBalance} LokTokens
                 </button>
               )}
+              {(roomId === 'main-floor' || roomId === 'the-back-room') && <button type="button" onClick={() => onOpen('locker')} className="mt-2 flex min-h-10 items-center gap-2 border border-primary/50 bg-primary/10 px-3 py-2 text-xs font-bold text-primary" data-testid="button-open-locker"><Paintbrush className="h-4 w-4" />Personal Locker</button>}
               {showCurrencyGlossary && <CurrencyGlossary />}
             </div>
           </div>
