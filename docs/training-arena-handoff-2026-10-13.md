@@ -5,8 +5,8 @@
 - **Owner:** User for design review; Codex for this implementation and handoff.
 - **Goal:** Record what shipped in the Training Arena and identify decisions and checks still needed.
 - **Scope:** `artifacts/survivor-616/src/ui/WeaponTrainingArenaScreen.tsx`, its hideout/app navigation, and its changelog entry.
-- **Status:** Feature merged in PR [#273](https://github.com/mistachatty-cmyk/Loksurvivor/pull/273), commit `f8317ab`. This note is ready for review.
-- **Checked:** `pnpm typecheck` passed on the feature branch after rebasing on current `main`; GitHub Vercel status was successful. No automated tests or manual playtest were run for this feature.
+- **Status:** Feature merged in PR [#273](https://github.com/mistachatty-cmyk/Loksurvivor/pull/273), commit `f8317ab`. The viewport and attack-completion follow-up is included in the current PR for review.
+- **Checked:** `pnpm typecheck` passes on the follow-up branch; the public update export was refreshed. No automated tests or manual playtest have been run for the follow-up.
 - **Next:** Review the design gaps and acceptance checklist below; decide which follow-up items belong in the next implementation pass.
 
 ## Request captured from this chat
@@ -21,6 +21,8 @@ Bring back a dedicated, unlockable training room in 616 Survivor. It should have
 - The target has 1,000, 5,000, or 20,000 HP settings. Reset Dummy restores its current HP setting.
 - Each test reports observed damage and average damage per second. The selected weapon's base damage and cooldown are also shown.
 - The implementation uses the normal world step and renderer for attacks and visuals. The arena does not start a normal run.
+- The follow-up fix gives the screen a fixed viewport, keeps weapon scrolling inside the rack, overlays the controls and readouts on the arena, and pins both actors in place between simulation steps.
+- Test simulation now runs until the tracked attack activity clears, then settles. A selected non-orbit weapon fires once; an orbit weapon gets one rotation. A 10-second simulation-time cap clears any attack that otherwise remains active indefinitely.
 
 Key implementation files:
 
@@ -32,7 +34,7 @@ Key implementation files:
 ## Needed decisions or incomplete work
 
 1. **Single weapon versus a custom loadout:** the rack contains the full weapon definition list, but only one weapon is active per test. There is no way to assemble a multi-weapon loadout or test multiple selected weapons together. Confirm whether that is required for the intended meaning of “test all weapons in a loadout.”
-2. **Coverage and accuracy:** the arena runs each test for 1.5 seconds (1.8 seconds for orbit weapons), at weapon level 1, using the selected operator's stats. It raises attack range to at least 310 world units so attacks can reach the placed target. This makes the room useful for previews, but it does not reproduce normal run spacing or a full cooldown/DPS benchmark. Longer-duration, delayed, status, and evolution behavior needs deliberate review.
+2. **Coverage and accuracy:** each test is at weapon level 1 and uses the selected operator's stats. It raises attack range to at least 310 world units so attacks can reach the placed target. Simulation now waits for tracked attack objects and statuses to finish, up to a 10-second cap. This is a visual/observed-damage preview, not a full multi-cooldown DPS benchmark. Review delayed, status, and evolution behavior, especially effects that reach the cap.
 3. **Weapon list scope:** the rack is driven by `ALL_WEAPON_DEFS`; verify that this is the desired set, including character-specific and evolved definitions, and that every entry visibly activates against the target.
 4. **Unlock design:** the first pass uses 616 total defeats. Confirm that this threshold and the main-floor placement match the intended progression.
 5. **Localization:** the new screen copy is currently written directly in the component instead of using the locale message catalog. Move player-facing strings into the project's localization flow before treating localization as complete.
