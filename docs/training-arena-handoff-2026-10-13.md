@@ -5,13 +5,13 @@
 - **Owner:** User for design review; Codex for this implementation and handoff.
 - **Goal:** Record what shipped in the Training Arena and identify decisions and checks still needed.
 - **Scope:** `artifacts/survivor-616/src/ui/WeaponTrainingArenaScreen.tsx`, its hideout/app navigation, and its changelog entry.
-- **Status:** Base feature merged in PR [#273](https://github.com/mistachatty-cmyk/Loksurvivor/pull/273); viewport/attack-settling work merged in PR [#274](https://github.com/mistachatty-cmyk/Loksurvivor/pull/274). The sketch-led main layout and saved Classic alternative are in progress on `codex/training-arena-sketch-layout`.
-- **Checked:** `pnpm typecheck` and `git diff --check` pass; `lok-updates.json` parses. The local preview opened directly to the new Training Arena route and exposed the main layout, rack, operator, target, and controls. No gameplay tests or screenshot-level visual review have been done for this layout pass.
-- **Next:** Review screenshots at desktop and narrow/mobile sizes, and manually test representative weapon families; keep refinements additive to the Classic option.
+- **Status:** Base feature merged in PR [#273](https://github.com/mistachatty-cmyk/Loksurvivor/pull/273); viewport/attack-settling work merged in PR [#274](https://github.com/mistachatty-cmyk/Loksurvivor/pull/274); roadmap and layout work merged in PRs [#275](https://github.com/mistachatty-cmyk/Loksurvivor/pull/275) and [#276](https://github.com/mistachatty-cmyk/Loksurvivor/pull/276). The full next-pass request is documented in [the next-pass spec](training-arena-next-pass-spec-2026-10-13.md).
+- **Checked:** Prior layout work passed `pnpm typecheck` and `git diff --check`; `lok-updates.json` parses. A local preview exposed the arena layout, rack, operator, target, and controls. The next-pass progression and challenge systems in the linked spec are not implemented or visually checked yet.
+- **Next:** Review the linked spec's remaining decisions, then implement the approved progression, mailbox, stats, and timed-challenge work.
 
 ## Request captured from this chat
 
-Bring back a dedicated, unlockable training room in 616 Survivor. It should have its own arena, the player and a Dust Mite target standing opposite each other, and a weapon rack on the left. Selecting a weapon should show it activating against the target. Movement is intentionally out of scope for this first pass. The user mentioned additional future features but did not specify them in this chat.
+Bring back a dedicated, unlockable training room in 616 Survivor. It should have its own arena, the player and a Dust Mite target standing opposite each other, and a weapon rack on the left. Selecting a weapon should show it activating against the target. Movement is intentionally out of scope for this first pass. The user later provided the full next-pass requirements; decisions and incomplete work are listed in [the next-pass spec](training-arena-next-pass-spec-2026-10-13.md).
 
 The user later provided a layout sketch and clarified the intended composition: a persistent top bar; a narrow left weapon dock with its own scroll area; each weapon icon expands/collapses detail underneath; the arena occupies the main field with the operator on the left and enemy on the right. This sketch-led layout should be the default. Preserve another layout as a user-selectable, saved option.
 
@@ -42,11 +42,11 @@ Key implementation files:
 4. **Unlock design:** the first pass uses 616 total defeats. Confirm that this threshold and the main-floor placement match the intended progression.
 5. **Localization:** the new screen copy is currently written directly in the component instead of using the locale message catalog. Move player-facing strings into the project's localization flow before treating localization as complete.
 6. **Visual and input review:** no manual playtest or screenshot was done for the sketch-led layout. Review desktop and narrow/mobile layouts, target readability, attack effects, keyboard focus, the saved Classic toggle, and whether any weapon requires different framing.
-7. **Future ideas:** the user noted that more features exist but did not list them here. Capture those requirements separately before expanding this first pass.
+7. **Next-pass systems:** LokShop rack purchase, per-weapon 616 kill gate, mailbox notifications, arena XP/stats, non-lethal and infinite-HP target modes, and the 24-second damage challenge are captured in [the next-pass spec](training-arena-next-pass-spec-2026-10-13.md). These are not implemented yet.
 
 The target stays defeated after a lethal test until Reset Dummy or another weapon test recreates it. Damage is bounded by the target's remaining HP, so a lethal test will not report theoretical overkill damage.
 
-## Review checklist
+## Original first-pass review checklist
 
 - Does 616 defeats unlock this in the right place and at the right time?
 - Should the mode support a multi-weapon custom loadout, or is one-at-a-time testing the intended first release?
