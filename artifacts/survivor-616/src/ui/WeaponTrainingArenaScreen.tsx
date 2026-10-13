@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Crosshair, RotateCcw, Search, Swords, Target, Zap } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Crosshair, RotateCcw, Search, Swords, Target, Zap, Move, LockKeyhole } from 'lucide-react';
 
 import { createWorld, stepWorld, type EnemyActor, type World } from '@/game/engine/world';
 import { CHARACTERS } from '@/game/data/characters';
@@ -180,11 +180,16 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   const continuousStopRef = useRef(false);
   const challengeKeyRef = useRef('');
   const observedEffectsRef = useRef<string[]>([]);
+  const cameraOffsetRef = useRef({ x: 0, y: 0 });
+  const cameraDragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const lastChallengeWeaponsRef = useRef<WeaponDef[]>([]);
   const { selectedCharacter, meta, recordTrainingSession } = useMeta();
   const t = useT();
   const [selectedWeaponId, setSelectedWeaponId] = useState(TRAINING_LOADOUT[0]!.id);
   const [expandedWeaponId, setExpandedWeaponId] = useState<string | null>(null);
   const [layout, setLayout] = useState<TrainingArenaLayout>(loadTrainingArenaLayout);
+  const [rackColumns, setRackColumns] = useState(2);
+  const [cameraCenterLock, setCameraCenterLock] = useState(true);
   const [search, setSearch] = useState('');
   const [dummyHp, setDummyHp] = useState(DUMMY_START_HP);
   const [dummyMaxHp, setDummyMaxHp] = useState<number>(DUMMY_START_HP);
@@ -309,8 +314,6 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
           world.player.kx = 0;
           world.player.ky = 0;
           world.player.facing = 1;
-          world.camera.x = TRAINING_PLAYER_X;
-          world.camera.y = 0;
           const dummy = world.enemies[0];
           if (dummy && !dummy.dying) {
             dummy.x = TRAINING_DUMMY_X;
@@ -401,19 +404,60 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
         accumulator = 0;
       }
 
+      if (cameraCenterLock) {
+        const returnFactor = 1 - Math.exp(-dt * 5);
+        cameraOffsetRef.current.x += (0 - cameraOffsetRef.current.x) * returnFactor;
+        cameraOffsetRef.current.y += (0 - cameraOffsetRef.current.y) * returnFactor;
+      }
+      world.camera.x = TRAINING_PLAYER_X + cameraOffsetRef.current.x;
+      world.camera.y = cameraOffsetRef.current.y;
       resize();
       renderWorld(ctx, world, view);
     };
 
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [selectedCharacter, dummyMaxHp, layout, recordTrainingSession]);
+  }, [selectedCharacter, dummyMaxHp, layout, recordTrainingSession, cameraCenterLock]);
 
   const testWeapon = (weaponToTest: WeaponDef | WeaponDef[] = selectedWeapon, challenge = false, continuous = false): void => {
     const world = worldRef.current;
     if (!world) return;
     const weaponsToTest = Array.isArray(weaponToTest) ? weaponToTest : [weaponToTest];
     if (weaponsToTest.length === 0) return;
+    if (testRunningRef.current && spam) {
+      let target = world.enemies[0];
+      if (!target || target.dying) {
+        target = makeTrainingDummy(dummyMaxHp, targetMode);
+        world.enemies = [target];
+      }
+      target.hp = Math.max(target.hp, 1);
+      target.dying = false;
+      target.trainingDummyMode = challengeModeRef.current ? 'infinite' : targetMode;
+      const additions = weaponsToTest.map((weapon) => ({
+        def: { ...weapon, range: Math.max(weapon.range, MIN_TEST_RANGE) },
+        level: weaponLevel,
+        count: weapon.count ?? 1,
+        readyAt: world.now,
+      }));
+      world.weapons.push(...additions);
+      const orbitWeapons = weaponsToTest.filter((weapon) => weapon.kind === 'orbit');
+      world.orbiters.push(...orbitWeapons.flatMap((weapon) => Array.from({ length: Math.max(1, weapon.count ?? 1) }, (_, index) => ({
+        weaponId: weapon.id,
+        angle: (Math.PI * 2 * index) / Math.max(1, weapon.count ?? 1),
+        radius: Math.max(weapon.range, MIN_TEST_RANGE),
+        damage: 0,
+        cooldowns: new Map<number, number>(),
+      }))));
+      firingPendingRef.current = firingPendingRef.current || weaponsToTest.some((weapon) => weapon.kind !== 'orbit');
+      if (challengeModeRef.current) {
+        const allWeapons = [...lastChallengeWeaponsRef.current, ...weaponsToTest];
+        lastChallengeWeaponsRef.current = [...new Map(allWeapons.map((weapon) => [weapon.id, weapon])).values()];
+        challengeKeyRef.current = lastChallengeWeaponsRef.current.map((weapon) => weapon.id).sort().join('+') + `@${weaponLevel}`;
+      }
+      setLastTest(t('training.status.activated', { weapon: weaponsToTest.map((weapon) => weapon.name).join(' + ') }));
+      return;
+    }
+    if (testRunningRef.current) return;
     world.projectiles = [];
     world.effects = [];
     world.particles = [];
@@ -461,7 +505,8 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
     challengeStopRef.current = false;
     continuousModeRef.current = continuous && !challenge;
     continuousStopRef.current = false;
-    challengeKeyRef.current = challenge ? challengeKey : '';
+    challengeKeyRef.current = challenge ? weaponsToTest.map((weapon) => weapon.id).sort().join('+') + `@${weaponLevel}` : '';
+    if (challenge) lastChallengeWeaponsRef.current = [...weaponsToTest];
     setChallengeResult(null);
     setChallengeRunning(challenge);
     setChallengeSeconds(challenge ? 24 : 0);
@@ -492,6 +537,20 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   const startChallenge = (): void => {
     if (testRunningRef.current || (!multiUnlocked && multiWeaponIds.length > 1)) return;
     testWeapon(selectedWeapons, true, false);
+  };
+
+  const retryChallenge = (): void => {
+    const retryWeapons = lastChallengeWeaponsRef.current.length > 0 ? lastChallengeWeaponsRef.current : selectedWeapons;
+    setChallengeResult(null);
+    testWeapon(retryWeapons, true, false);
+  };
+
+  const activateWeapon = (weapon: WeaponDef): void => {
+    const unlocked = meta.devModeAllUnlocks || (meta.trainingWeaponKills[weapon.id] ?? 0) >= 616;
+    if (!unlocked || (testRunningRef.current && !spam)) return;
+    setSelectedWeaponId(weapon.id);
+    setExpandedWeaponId(weapon.id);
+    testWeapon(weapon, false, spam);
   };
 
   const toggleMultiWeapon = (weapon: WeaponDef): void => {
@@ -610,6 +669,8 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
             <button type="button" onClick={() => setWeaponLevel(1)} aria-pressed={weaponLevel === 1} className={`min-h-8 px-2 font-mono text-[8px] font-black uppercase tracking-wider ${weaponLevel === 1 ? 'bg-cyan-200 text-slate-950' : 'text-white/55'}`}>{t('training.stage.base')}</button>
             <button type="button" onClick={() => setWeaponLevel(8)} aria-pressed={weaponLevel === 8} className={`min-h-8 px-2 font-mono text-[8px] font-black uppercase tracking-wider ${weaponLevel === 8 ? 'bg-cyan-200 text-slate-950' : 'text-white/55'}`}>{t('training.stage.level')}</button>
           </div>
+          <button type="button" onClick={() => setCameraCenterLock((locked) => !locked)} aria-pressed={cameraCenterLock} title={t('training.camera.centerLock')} className={`inline-flex min-h-8 items-center gap-1 border px-2 font-mono text-[8px] font-bold uppercase tracking-wider ${cameraCenterLock ? 'border-cyan-200/50 bg-cyan-200/10 text-cyan-100' : 'border-white/15 text-white/55'}`}>{cameraCenterLock ? <LockKeyhole size={11} /> : <Move size={11} />}{t('training.camera.center')}</button>
+          <button type="button" onClick={() => { cameraOffsetRef.current = { x: 0, y: 0 }; }} title={t('training.camera.reset')} className="min-h-8 border border-white/15 px-2 font-mono text-[8px] font-bold uppercase tracking-wider text-white/55 hover:text-white">{t('training.camera.reset')}</button>
           <div className="hidden items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-white/50 sm:flex">
             <Swords size={14} className="text-orange-200" /> {t('training.header.stationary')}
           </div>
@@ -621,7 +682,10 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
           <div className={`shrink-0 border-b border-white/10 ${mainLayout ? 'px-2 py-1.5 sm:p-3' : 'p-3 sm:p-4'}`}>
             <div className="flex items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider sm:text-xs"><Zap size={13} className="text-orange-200" /> {t('training.rack.title')}</p>
-              <span className="font-mono text-[8px] text-white/40">{TRAINING_LOADOUT.length}</span>
+              <div className="flex items-center gap-1" aria-label={t('training.rack.columns')}>
+                {[2, 3, 4].map((columns) => <button key={columns} type="button" onClick={() => { setRackColumns(columns); if (columns > 2) setExpandedWeaponId(null); }} aria-pressed={rackColumns === columns} title={t('training.rack.columns')} className={`min-h-6 min-w-6 border font-mono text-[8px] font-bold ${rackColumns === columns ? 'border-cyan-200/60 bg-cyan-200/15 text-cyan-100' : 'border-white/10 text-white/45 hover:text-white'}`}>{columns}</button>)}
+                <span className="ml-1 font-mono text-[8px] text-white/40">{TRAINING_LOADOUT.length}</span>
+              </div>
             </div>
             {!mainLayout && <p className="mt-1 text-xs text-white/45">Select an icon for details. Test when ready.</p>}
             <label className={`flex items-center gap-2 border border-white/15 bg-black/25 px-2 ${mainLayout ? 'mt-1 sm:mt-2' : 'mt-3'}`}>
@@ -629,7 +693,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('training.rack.search')} className={`${mainLayout ? 'h-7 sm:h-8' : 'h-10'} min-w-0 flex-1 bg-transparent text-[10px] text-white outline-none placeholder:text-white/35`} />
             </label>
           </div>
-          <div className={`training-arena-weapon-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain ${mainLayout ? 'grid grid-cols-2 content-start gap-1.5 p-1.5 sm:grid-cols-1 sm:gap-1.5 sm:p-2' : 'grid grid-cols-2 content-start gap-2 p-3 sm:grid-cols-3 lg:grid-cols-1'}`}>
+          <div className={`training-arena-weapon-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain ${mainLayout ? 'grid content-start gap-1 p-1.5 sm:gap-1.5 sm:p-2' : 'grid content-start gap-2 p-3'}`} style={{ gridTemplateColumns: `repeat(${rackColumns}, minmax(0, 1fr))` }}>
             {filteredWeapons.map((weapon) => {
               const active = weapon.id === selectedWeapon.id;
               const expanded = expandedWeaponId === weapon.id;
@@ -637,41 +701,42 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
               const unlocked = kills >= 616;
               const inMultiLoadout = multiWeaponIds.includes(weapon.id);
               return mainLayout ? (
-                <article key={weapon.id} className={`min-w-0 border transition ${active ? 'border-cyan-200/70 bg-cyan-300/[.08]' : 'border-white/10 bg-white/[.025] hover:border-white/25'}`}>
-                  <button type="button" onClick={() => chooseWeapon(weapon)} disabled={testRunning} aria-expanded={expanded} aria-pressed={active} aria-controls={`weapon-details-${weapon.id}`} className="flex min-h-12 w-full items-center gap-1.5 px-1.5 py-1 text-left transition disabled:cursor-wait disabled:opacity-60 sm:min-h-14 sm:gap-2 sm:px-2">
-                    <WeaponIcon kind={weapon.kind} weaponId={weapon.id} color={weapon.color} size={30} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[10px] font-bold leading-tight sm:text-xs">{weapon.name}</span>
-                      <span className="mt-0.5 block truncate font-mono text-[8px] uppercase tracking-wider text-white/40">{weaponKindLabel(weapon)}</span>
-                    </span>
-                    {expanded ? <ChevronDown size={13} className="shrink-0 text-lime-300" /> : <ChevronRight size={13} className="shrink-0 text-white/35" />}
-                  </button>
+                <article key={weapon.id} style={{ gridColumn: expanded ? '1 / -1' : undefined }} className={`min-w-0 border transition ${active ? 'border-cyan-200/70 bg-cyan-300/[.08]' : 'border-white/10 bg-white/[.025] hover:border-white/25'}`}>
+                  <div className="flex min-h-12 w-full items-center gap-1 px-1 py-1 sm:min-h-14 sm:gap-1.5 sm:px-1.5">
+                    <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked || (testRunning && !spam)} aria-label={`${t('training.rack.activate')} ${weapon.name}`} title={`${t('training.rack.activate')} ${weapon.name}`} className="shrink-0 rounded-sm outline-none transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"><WeaponIcon kind={weapon.kind} weaponId={weapon.id} color={weapon.color} size={30} /></button>
+                    <button type="button" onClick={() => chooseWeapon(weapon)} aria-expanded={expanded} aria-pressed={active} aria-controls={`weapon-details-${weapon.id}`} className="flex min-w-0 flex-1 items-center gap-0.5 text-left">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[9px] font-bold leading-tight sm:text-[10px]">{weapon.name}</span>
+                        <span className="mt-0.5 block truncate font-mono text-[7px] uppercase tracking-wider text-white/40">{weaponKindLabel(weapon)}</span>
+                      </span>
+                      {expanded ? <ChevronDown size={11} className="shrink-0 text-lime-300" /> : <ChevronRight size={11} className="shrink-0 text-white/35" />}
+                    </button>
+                  </div>
                   {expanded && (
                     <div id={`weapon-details-${weapon.id}`} className="border-t border-lime-300/25 bg-black/35 p-2" data-testid={`weapon-details-${weapon.id}`}>
                       <p className="text-[9px] leading-relaxed text-white/65">{weapon.description}</p>
                       <p className="mt-1.5 font-mono text-[8px] uppercase tracking-wider text-white/45">{weapon.damage} damage · {(weapon.cooldownMs / 1000).toFixed(2)}s cooldown</p>
                       {!unlocked && <p className="mt-2 font-mono text-[8px] font-bold uppercase tracking-wider text-amber-200">{t('training.rack.locked', { kills })}</p>}
-                      <button type="button" onClick={() => { setSelectedWeaponId(weapon.id); if (unlocked) testWeapon(weapon); }} disabled={!unlocked || testRunning} className="mt-2 min-h-8 w-full border border-cyan-200/35 bg-cyan-200/[.08] px-2 font-mono text-[8px] font-black uppercase tracking-wider text-cyan-50 hover:bg-cyan-200/15 disabled:opacity-45">{t('training.rack.test')}</button>
+                      <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked || (testRunning && !spam)} className="mt-2 min-h-8 w-full border border-cyan-200/35 bg-cyan-200/[.08] px-2 font-mono text-[8px] font-black uppercase tracking-wider text-cyan-50 hover:bg-cyan-200/15 disabled:opacity-45">{t('training.rack.test')}</button>
                       {multiUnlocked && unlocked ? <button type="button" onClick={() => toggleMultiWeapon(weapon)} aria-pressed={inMultiLoadout} className="mt-1 min-h-8 w-full border border-violet-200/30 px-2 font-mono text-[8px] font-black uppercase tracking-wider text-violet-100 hover:bg-violet-200/10">{inMultiLoadout ? t('training.rack.remove') : t('training.rack.add')}</button> : !multiUnlocked ? <p className="mt-1 text-[8px] leading-relaxed text-white/40">{t('training.rack.multiLocked')}</p> : null}
                     </div>
                   )}
                 </article>
               ) : (
-                <article key={weapon.id} className={`min-w-0 border ${active ? 'border-cyan-300/60 bg-cyan-300/[.06]' : 'border-white/10 bg-white/[.025]'}`}>
-                  <button type="button" onClick={() => chooseWeapon(weapon)} disabled={testRunning} aria-expanded={expanded} aria-pressed={active} aria-controls={`classic-weapon-details-${weapon.id}`} className="flex min-h-12 w-full items-center gap-2 px-2.5 py-2 text-left transition disabled:cursor-wait disabled:opacity-60">
-                    <WeaponIcon kind={weapon.kind} weaponId={weapon.id} color={weapon.color} size={30} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-bold">{weapon.name}</span>
-                      <span className="mt-0.5 block font-mono text-[9px] uppercase tracking-wider text-white/40">{weaponKindLabel(weapon)}</span>
-                    </span>
-                    {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                  </button>
+                <article key={weapon.id} style={{ gridColumn: expanded ? '1 / -1' : undefined }} className={`min-w-0 border ${active ? 'border-cyan-300/60 bg-cyan-300/[.06]' : 'border-white/10 bg-white/[.025]'}`}>
+                  <div className="flex min-h-12 w-full items-center gap-1.5 px-1.5 py-1.5">
+                    <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked || (testRunning && !spam)} aria-label={`${t('training.rack.activate')} ${weapon.name}`} title={`${t('training.rack.activate')} ${weapon.name}`} className="shrink-0 rounded-sm outline-none transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"><WeaponIcon kind={weapon.kind} weaponId={weapon.id} color={weapon.color} size={30} /></button>
+                    <button type="button" onClick={() => chooseWeapon(weapon)} aria-expanded={expanded} aria-pressed={active} aria-controls={`classic-weapon-details-${weapon.id}`} className="flex min-w-0 flex-1 items-center gap-1 text-left">
+                      <span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-bold">{weapon.name}</span><span className="mt-0.5 block truncate font-mono text-[8px] uppercase tracking-wider text-white/40">{weaponKindLabel(weapon)}</span></span>
+                      {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                    </button>
+                  </div>
                   {expanded && (
                     <div id={`classic-weapon-details-${weapon.id}`} className="border-t border-white/10 p-2">
                       <p className="text-[9px] leading-relaxed text-white/55">{weapon.description}</p>
                       <p className="mt-1 font-mono text-[8px] uppercase tracking-wider text-white/40">{weapon.damage} damage · {(weapon.cooldownMs / 1000).toFixed(2)}s cooldown</p>
                       {!unlocked && <p className="mt-2 font-mono text-[8px] font-bold uppercase tracking-wider text-amber-200">{t('training.rack.locked', { kills })}</p>}
-                      <button type="button" onClick={() => { setSelectedWeaponId(weapon.id); if (unlocked) testWeapon(weapon); }} disabled={!unlocked || testRunning} className="mt-2 min-h-8 w-full border border-cyan-200/25 px-2 font-mono text-[8px] font-black uppercase tracking-wider text-cyan-50 hover:bg-cyan-200/10 disabled:cursor-wait disabled:opacity-50">{t('training.rack.test')}</button>
+                      <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked || (testRunning && !spam)} className="mt-2 min-h-8 w-full border border-cyan-200/25 px-2 font-mono text-[8px] font-black uppercase tracking-wider text-cyan-50 hover:bg-cyan-200/10 disabled:cursor-wait disabled:opacity-50">{t('training.rack.test')}</button>
                       {multiUnlocked && unlocked ? <button type="button" onClick={() => toggleMultiWeapon(weapon)} aria-pressed={inMultiLoadout} className="mt-1 min-h-8 w-full border border-violet-200/30 px-2 font-mono text-[8px] font-black uppercase tracking-wider text-violet-100 hover:bg-violet-200/10">{inMultiLoadout ? t('training.rack.remove') : t('training.rack.add')}</button> : !multiUnlocked ? <p className="mt-1 text-[8px] leading-relaxed text-white/40">{t('training.rack.multiLocked')}</p> : null}
                     </div>
                   )}
@@ -684,7 +749,26 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
 
         <section data-testid="training-arena-stage" className={`relative min-h-0 overflow-hidden ${mainLayout ? 'p-1.5 sm:p-3' : 'p-2 sm:p-4'}`}>
           <div className={`relative h-full min-h-0 overflow-hidden bg-[#111522] shadow-[inset_0_0_80px_rgba(9,20,42,.65)] ${mainLayout ? 'border-2 border-white/40' : 'border border-cyan-200/20'}`}>
-            <canvas ref={canvasRef} aria-label={`${t('training.header.title')} — ${selectedCharacter.name} facing ${t('training.stage.dustMite')}`} className="absolute inset-0 h-full w-full" />
+            <canvas
+              ref={canvasRef}
+              aria-label={`${t('training.header.title')} — ${selectedCharacter.name} facing ${t('training.stage.dustMite')}`}
+              className="absolute inset-0 h-full w-full touch-none cursor-grab active:cursor-grabbing"
+              onPointerDown={(event) => {
+                cameraDragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }}
+              onPointerMove={(event) => {
+                const drag = cameraDragRef.current;
+                if (!drag || drag.pointerId !== event.pointerId) return;
+                const bounds = event.currentTarget.getBoundingClientRect();
+                cameraOffsetRef.current.x -= (event.clientX - drag.x) * (720 / Math.max(1, bounds.width));
+                cameraOffsetRef.current.y -= (event.clientY - drag.y) * (720 / Math.max(1, bounds.height));
+                cameraDragRef.current = { ...drag, x: event.clientX, y: event.clientY };
+              }}
+              onPointerUp={(event) => { if (cameraDragRef.current?.pointerId === event.pointerId) cameraDragRef.current = null; }}
+              onPointerCancel={() => { cameraDragRef.current = null; }}
+            />
+            <div className="pointer-events-none absolute bottom-2 left-2 z-10 border border-white/10 bg-black/55 px-1.5 py-1 font-mono text-[7px] uppercase tracking-wider text-white/40 sm:bottom-auto sm:left-3 sm:top-20">{t('training.camera.dragHint')}</div>
             <div className="pointer-events-none absolute inset-x-2 top-2 z-10 flex items-start justify-between gap-1.5 sm:inset-x-3 sm:top-3 sm:gap-3">
               <div className="max-w-[42%] border border-blue-200/50 bg-blue-950/85 px-2 py-1.5 shadow-lg sm:px-3 sm:py-2">
                 <p className="font-mono text-[7px] uppercase tracking-[.16em] text-blue-200/75 sm:text-[9px]">{t('training.stage.operator')}</p>
@@ -741,7 +825,20 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
               </div>
               <p className="mt-1 text-right font-mono text-[7px] text-white/35">{t('training.controls.best', { damage: (meta.trainingChallengeBests[challengeKey] ?? 0).toLocaleString() })}</p>
             </div>
-            {challengeResult && <div className="absolute inset-0 z-20 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={t('training.challenge.celebration', { tier: t(challengeResult.tier as never), damage: challengeResult.damage.toLocaleString() })}><div className="max-w-sm border-2 border-amber-200/60 bg-slate-950 p-6 text-center shadow-2xl"><p className="text-3xl">✦</p><p className="mt-2 font-mono text-lg font-black uppercase tracking-widest text-amber-100">{t(challengeResult.tier as never)}</p><p className="mt-2 text-sm text-white/75">{t('training.challenge.celebration', { tier: t(challengeResult.tier as never), damage: challengeResult.damage.toLocaleString() })}</p><button type="button" onClick={() => setChallengeResult(null)} className="mt-4 min-h-9 border border-white/20 px-4 font-mono text-xs font-bold uppercase tracking-widest hover:bg-white/10">{t('common.back')}</button></div></div>}
+            {challengeResult && <div className="absolute inset-0 z-20 grid place-items-center bg-slate-950/75 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-label={t('training.challenge.celebration', { tier: t(challengeResult.tier as never), damage: challengeResult.damage.toLocaleString() })}>
+              <div className="relative w-full max-w-sm overflow-hidden border border-amber-200/60 bg-gradient-to-b from-[#302517] via-slate-950 to-slate-950 p-5 text-center shadow-[0_24px_80px_rgba(0,0,0,.7)] sm:p-7">
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-amber-200 to-transparent" />
+                <p className="text-4xl text-amber-200 drop-shadow-[0_0_18px_rgba(253,230,138,.6)]">✦</p>
+                <p className="mt-1 font-mono text-[9px] font-bold uppercase tracking-[.3em] text-amber-100/55">{t('training.challenge.result')}</p>
+                <p className="mt-1 font-mono text-xl font-black uppercase tracking-widest text-amber-100">{t(challengeResult.tier as never)}</p>
+                <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-white/75">{t('training.challenge.celebration', { tier: t(challengeResult.tier as never), damage: challengeResult.damage.toLocaleString() })}</p>
+                <div className="mx-auto mt-4 max-w-[220px] border-y border-amber-100/15 py-2"><p className="font-mono text-[8px] uppercase tracking-[.2em] text-white/45">{t('training.stats.damage')}</p><p className="font-mono text-2xl font-black tabular-nums text-white">{challengeResult.damage.toLocaleString()}</p></div>
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setChallengeResult(null)} className="min-h-10 border border-white/20 bg-white/[.04] px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-white/75 hover:bg-white/10">{t('training.challenge.close')}</button>
+                  <button type="button" onClick={retryChallenge} className="inline-flex min-h-10 items-center justify-center gap-1.5 border border-cyan-200/60 bg-cyan-200 px-3 font-mono text-[10px] font-black uppercase tracking-wider text-slate-950 shadow-lg hover:bg-white"><RotateCcw size={12} />{t('training.challenge.retry')}</button>
+                </div>
+              </div>
+            </div>}
           </div>
         </section>
       </div>

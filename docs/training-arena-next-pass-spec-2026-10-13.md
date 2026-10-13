@@ -6,8 +6,8 @@
 - **Goal:** Add progression, notifications, stats, and damage challenges to the Training Arena.
 - **Scope:** LokShop access, per-weapon progression, persistent notifications, training stats and target options, operator XP, multi-weapon testing, and a timed damage challenge.
 - **Current baseline:** Training Arena is on `main` after PRs #273, #274, #275, and #276. The current arena has a dedicated stationary test scene, Dust Mite target, weapon dock, and in-screen controls. See [the original handoff](training-arena-handoff-2026-10-13.md).
-- **This change:** The implementation is on `codex/training-arena-progression-systems` for issue [#279](https://github.com/mistachatty-cmyk/Loksurvivor/issues/279); typecheck, production build, and all 1,011 tests pass. The review PR is still pending.
-- **Next:** Finish checks and visual review; then leave an open PR for the user to arrange review.
+- **This change:** The implementation is on `codex/training-arena-progression-systems` for issue [#279](https://github.com/mistachatty-cmyk/Loksurvivor/issues/279) and open PR [#280](https://github.com/mistachatty-cmyk/Loksurvivor/pull/280). This follow-up adds overlapping Spam activations, direct icon activation, selectable rack columns, draggable camera with center-lock, and challenge retry/back actions.
+- **Next:** Finish typecheck, tests, build, locale sync, and visual review. Leave PR #280 open for the user to arrange review; do not merge it.
 
 ## Implementation decisions for this pass
 
@@ -15,7 +15,7 @@
 - Each weapon earns final-hit kills during normal runs, with persistent `x/616` progress committed only when the run ends. Burn/acid ticks inherit the weapon that applied the status when available. Training Arena kills do not count.
 - Multi-Weapon Testing unlocks from 1,000,000 cumulative Training Arena damage.
 - Base tests at weapon level 1; Level tests at level 8. The operator bar is separate Training Arena XP, awarded 0.1 per hit and 0.3 total for a critical hit.
-- The damage challenge uses a visible-tab 24-second timer. The selected weapon/loadout stays fixed for the attempt; Spam turns on automatically. The target temporarily has infinite HP during a challenge, so target durability does not cap the score.
+- The damage challenge uses a visible-tab 24-second timer. Spam turns on automatically, and players may activate additional weapons from the rack during the challenge; those activations overlap without clearing previous attacks. The final score's saved loadout key includes every weapon activated during that attempt. The target temporarily has infinite HP during a challenge, so target durability does not cap the score. The result panel offers Retry with the challenge's weapon set and Back to Arena.
 - Opening the mailbox marks items read; keeping is optional, delete is permanent, and at most 100 items are retained.
 - The six placeholder damage achievements use 0, 1,000, 5,000, 1,000,000, 5,000,000, and 100,000,000 damage thresholds in one challenge. Challenge tiers below 5,000 use “At Least You Tried.”
 
@@ -25,7 +25,10 @@
 - Persistent Notifications mailbox with unread badge, weapon icons, read/keep/delete actions.
 - Arena stats/effect readout, Base/Level weapon toggle, operator Training XP bar, and durability/non-lethal/infinite target options.
 - Cumulative dummy damage, multi-weapon selection, 24-second challenge, saved best per loadout/level, celebrations, and achievement milestones.
-- New player-facing text is in the English message catalog. Other locale files still need the project's auto-localization update.
+- Clicking a rack icon activates that weapon directly. Spam allows rapid activations to append attacks to the current simulation, preserving existing projectiles, effects, and target damage. Outside Spam, a running attack remains protected from interruption.
+- The rack density can be set to 2, 3, or 4 columns. The player can drag the arena canvas to pan the view; Center is on by default and eases the camera back to its starting position, while Recenter resets it immediately.
+- Challenge results use a styled score card with Retry and Back to Arena controls.
+- Player-facing copy is in the English message catalog. I ran the project's auto-localization sync; the configured translator reported 100+ failed strings for processed targets and added no non-English Training Arena keys. Translation remains incomplete; rerun sync when its translation backends are available or translate the missing Training Arena messages manually.
 - Reducer and combat tests are being added; visual review and the final full test suite are still pending.
 
 ## Reviewed requirements
@@ -98,5 +101,7 @@
 1. **Visual approval:** Complete desktop and mobile browser review. Check one weapon from every attack family and all mailbox/progression flows.
 2. **Catalog publishing:** Generate and apply the updated Lok registry SQL so the Weapon Rack SKU can be purchased in the shared economy.
 3. **Localization:** Run the repo localization flow for non-English locales.
+4. **Spam/challenge:** Rapidly activate different rack icons and repeat the same icon during Spam and during the 24-second challenge; confirm earlier attacks continue, damage remains cumulative, and Retry restarts the recorded challenge weapon set.
+5. **Camera/rack:** Pan with mouse and touch, with Center enabled and disabled; check Recenter and the 2/3/4-column rack options at desktop and narrow mobile sizes.
 4. **Combat limits:** The rack lists all base, character-specific, evolved, and relic definitions. Some definitions may rely on run-state or companion prerequisites that the isolated arena cannot reproduce; record these during the weapon-family pass.
 The progression choices above are implementation assumptions for user review. The shared Lok economy publish and full visual review remain incomplete; do not describe the end-to-end purchase and arena experience as fully verified until those are done.
