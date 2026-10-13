@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 132,
+      "version": "0.38.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T20:19:49Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Training Arena layout controls",
+      "body": [
+        "The default Training Arena layout puts the operator and Dust Mite in a wide stage with the weapon rack in a dedicated side rail. Weapon icons expand inline details and require an explicit test action.",
+        "The Classic arrangement remains available. The layout choice is saved on this device; the rack has its own visible scroll area, and the arena top bar, operator, target and stage have dedicated positions."
+      ]
+    },
+    {
       "number": 131,
       "version": "0.37.0",
       "date": "2026-10-13",
