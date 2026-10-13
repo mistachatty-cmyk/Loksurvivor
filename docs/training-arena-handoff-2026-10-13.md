@@ -5,24 +5,27 @@
 - **Owner:** User for design review; Codex for this implementation and handoff.
 - **Goal:** Record what shipped in the Training Arena and identify decisions and checks still needed.
 - **Scope:** `artifacts/survivor-616/src/ui/WeaponTrainingArenaScreen.tsx`, its hideout/app navigation, and its changelog entry.
-- **Status:** Feature merged in PR [#273](https://github.com/mistachatty-cmyk/Loksurvivor/pull/273), commit `f8317ab`. The viewport and attack-completion follow-up is included in the current PR for review.
-- **Checked:** `pnpm typecheck` passes on the follow-up branch; the public update export was refreshed. No automated tests or manual playtest have been run for the follow-up.
-- **Next:** Review the design gaps and acceptance checklist below; decide which follow-up items belong in the next implementation pass.
+- **Status:** Base feature merged in PR [#273](https://github.com/mistachatty-cmyk/Loksurvivor/pull/273); viewport/attack-settling work merged in PR [#274](https://github.com/mistachatty-cmyk/Loksurvivor/pull/274). The sketch-led main layout and saved Classic alternative are in progress on `codex/training-arena-sketch-layout`.
+- **Checked:** `pnpm typecheck` and `git diff --check` pass; `lok-updates.json` parses. The local preview opened directly to the new Training Arena route and exposed the main layout, rack, operator, target, and controls. No gameplay tests or screenshot-level visual review have been done for this layout pass.
+- **Next:** Review screenshots at desktop and narrow/mobile sizes, and manually test representative weapon families; keep refinements additive to the Classic option.
 
 ## Request captured from this chat
 
 Bring back a dedicated, unlockable training room in 616 Survivor. It should have its own arena, the player and a Dust Mite target standing opposite each other, and a weapon rack on the left. Selecting a weapon should show it activating against the target. Movement is intentionally out of scope for this first pass. The user mentioned additional future features but did not specify them in this chat.
 
+The user later provided a layout sketch and clarified the intended composition: a persistent top bar; a narrow left weapon dock with its own scroll area; each weapon icon expands/collapses detail underneath; the arena occupies the main field with the operator on the left and enemy on the right. This sketch-led layout should be the default. Preserve another layout as a user-selectable, saved option.
+
 ## What was added
 
 - A **Training Arena** entry appears on the hideout main floor after 616 total defeats. Developer all-unlocks mode also reveals it.
 - The arena is a separate screen with a dedicated test world. The selected operator and a stationary Dust Mite face each other.
-- The searchable, alphabetized rack is populated from `ALL_WEAPON_DEFS`. Selecting an entry immediately runs that weapon test; the Test Weapon button repeats it.
+- The searchable, alphabetized rack is populated from `ALL_WEAPON_DEFS`. In the sketch-led layout, selecting a weapon chooses it and toggles its inline detail; a separate test action fires it. The former layout remains selectable.
 - The target has 1,000, 5,000, or 20,000 HP settings. Reset Dummy restores its current HP setting.
 - Each test reports observed damage and average damage per second. The selected weapon's base damage and cooldown are also shown.
 - The implementation uses the normal world step and renderer for attacks and visuals. The arena does not start a normal run.
 - The follow-up fix gives the screen a fixed viewport, keeps weapon scrolling inside the rack, overlays the controls and readouts on the arena, and pins both actors in place between simulation steps.
 - Test simulation now runs until the tracked attack activity clears, then settles. A selected non-orbit weapon fires once; an orbit weapon gets one rotation. A 10-second simulation-time cap clears any attack that otherwise remains active indefinitely.
+- The sketch-led default uses a slim left dock with a green-tinted internal scrollbar, expandable weapon cards and a wide, white-framed arena. The top bar uses the orange accent, and separate blue/silver actor tags keep operator and target identity clear. The Main/Classic selection persists locally; weapon choice itself does not fire an attack.
 
 Key implementation files:
 
@@ -38,7 +41,7 @@ Key implementation files:
 3. **Weapon list scope:** the rack is driven by `ALL_WEAPON_DEFS`; verify that this is the desired set, including character-specific and evolved definitions, and that every entry visibly activates against the target.
 4. **Unlock design:** the first pass uses 616 total defeats. Confirm that this threshold and the main-floor placement match the intended progression.
 5. **Localization:** the new screen copy is currently written directly in the component instead of using the locale message catalog. Move player-facing strings into the project's localization flow before treating localization as complete.
-6. **Visual and input review:** no manual playtest or screenshot was done. Review desktop and narrow/mobile layouts, target readability, attack effects, keyboard focus, and whether any weapon requires different framing.
+6. **Visual and input review:** no manual playtest or screenshot was done for the sketch-led layout. Review desktop and narrow/mobile layouts, target readability, attack effects, keyboard focus, the saved Classic toggle, and whether any weapon requires different framing.
 7. **Future ideas:** the user noted that more features exist but did not list them here. Capture those requirements separately before expanding this first pass.
 
 The target stays defeated after a lethal test until Reset Dummy or another weapon test recreates it. Damage is bounded by the target's remaining HP, so a lethal test will not report theoretical overkill damage.

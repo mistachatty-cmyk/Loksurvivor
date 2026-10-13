@@ -1509,6 +1509,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Weapon tests now run through their active attack effects before settling. Each selection fires once; orbit weapons get one visible rotation.',
     ],
   },
+  {
+    version: '0.38.0',
+    date: '2026-10-13',
+    publishedAt: '2026-10-13T20:19:49Z',
+    kind: 'update',
+    title: 'Training Arena layout controls',
+    body: [
+      'The default Training Arena layout puts the operator and Dust Mite in a wide stage with the weapon rack in a dedicated side rail. Weapon icons expand inline details and require an explicit test action.',
+      'The Classic arrangement remains available. The layout choice is saved on this device; the rack has its own visible scroll area, and the arena top bar, operator, target and stage have dedicated positions.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
