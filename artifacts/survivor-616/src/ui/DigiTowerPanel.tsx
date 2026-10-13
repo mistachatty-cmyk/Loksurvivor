@@ -1,9 +1,11 @@
-import { useMemo } from 'react';
-import { Award, CheckCircle2, ChevronRight, Lock, RadioTower, Shield, Sparkles, Swords } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Award, CheckCircle2, ChevronRight, Dumbbell, Lock, RadioTower, RotateCcw, Shield, Sparkles, Swords } from 'lucide-react';
 
 import { allDigiTowerFloors, getDigiTowerFloor, isDigiTowerSectorUnlocked, type DigiTowerFloorDef } from '@/game/data/digiTower';
 import { endgameReached, mapsCleared } from '@/game/data/endgameUnlocks';
+import { lokPetTrainingAllowance, lokPetUnspentTrainingPoints, LOKPET_TRAINING_STATS, TRAINING_DATA_RESPEC_COST } from '@/game/engine/petTraining';
 import { useMeta } from '@/game/state/metaStore';
+import type { LokPetTrainingStat } from '@/game/types';
 
 interface DigiTowerPanelProps {
   onLaunchFloor: (floor: DigiTowerFloorDef, practice?: boolean) => void;
@@ -14,7 +16,8 @@ const KIND_LABEL: Record<DigiTowerFloorDef['kind'], string> = {
 };
 
 export function DigiTowerPanel({ onLaunchFloor }: DigiTowerPanelProps) {
-  const { meta, claimDigiTowerRest, buyDigiTowerSupply } = useMeta();
+  const { meta, claimDigiTowerRest, trainLokPetAtTower, respecLokPetAtTower, buyDigiTowerSupply } = useMeta();
+  const [selectedTrainingPetId, setSelectedTrainingPetId] = useState('');
   const progress = meta.digiTower;
   const floors = useMemo(() => allDigiTowerFloors(), []);
   const unlocked = meta.savedLokPets.length > 0 && (meta.lokPetBattleWins > 0 || meta.devModeAllUnlocks);
@@ -23,6 +26,8 @@ export function DigiTowerPanel({ onLaunchFloor }: DigiTowerPanelProps) {
   const currentSectorOpen = current ? isDigiTowerSectorUnlocked(current.sector, progress.defeatedMasterIds, towerEndgame) : false;
   const unlockedMasterCount = progress.defeatedMasterIds.length;
   const currentSectorFloor = current?.sectorFloor ?? 10;
+  const trainingPet = meta.savedLokPets.find((pet) => pet.id === selectedTrainingPetId) ?? meta.savedLokPets[0];
+  const restUnclaimed = current?.kind === 'rest' && !progress.claimedRestFloorIds.includes(`tower-floor-${current.floor}`);
 
   return (
     <div className="space-y-5" data-testid="panel-digi-tower">
@@ -45,6 +50,7 @@ export function DigiTowerPanel({ onLaunchFloor }: DigiTowerPanelProps) {
             <Stat label="Highest floor" value={`${progress.highestFloor} / 100`} />
             <Stat label="Masters defeated" value={`${unlockedMasterCount} / 10`} />
             <Stat label="Tower Tokens" value={`${progress.tokens}`} />
+            <Stat label="Training Data" value={`${progress.trainingData}`} />
             <Stat label="Checkpoint" value={progress.checkpointFloor ? `Floor ${progress.checkpointFloor}` : 'Entry'} />
           </div>
         </div>
@@ -83,6 +89,58 @@ export function DigiTowerPanel({ onLaunchFloor }: DigiTowerPanelProps) {
             <p className="font-mono text-[10px] font-black uppercase tracking-[.25em] text-amber-100"><CheckCircle2 className="mr-1 inline h-4 w-4" /> Apex Terminal cleared</p>
             <p className="mt-1 text-sm text-white/70">Grandmaster Apex’s seal is yours. Endless Spire and Duo floors are the next expansion of the Tower.</p>
           </div>
+        )}
+        {restUnclaimed && current && (
+          <section className="relative mt-4 border border-violet-200/25 bg-violet-950/15 p-4 sm:p-5" data-testid="tower-training-bay">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="font-mono text-[9px] font-black uppercase tracking-[.25em] text-violet-200/70"><Dumbbell className="mr-1 inline h-3 w-3" />Free rest-floor visit</p>
+                <h3 className="mt-1 text-lg font-black uppercase text-white">Training Bay</h3>
+                <p className="mt-1 max-w-2xl text-xs leading-relaxed text-white/60">Assign level-earned points before you continue. Each evolution also grants a bonus point. A rank improves real battle stats; the starter’s training cap is doubled.</p>
+              </div>
+              <div className="flex items-center gap-2 border border-violet-100/15 bg-black/25 px-3 py-2 font-mono text-[9px] uppercase text-violet-100/75">
+                <span>{progress.trainingData} Training Data</span>
+                <span className="text-white/35">·</span>
+                <span>Respec {TRAINING_DATA_RESPEC_COST}</span>
+              </div>
+            </div>
+            {trainingPet ? (
+              <>
+                <label className="mt-4 block max-w-sm font-mono text-[8px] font-bold uppercase tracking-[.18em] text-white/45">
+                  Select LokPet
+                  <select value={trainingPet.id} onChange={(event) => setSelectedTrainingPetId(event.target.value)} className="mt-1 block w-full border border-white/15 bg-slate-950 px-3 py-2 text-xs font-bold normal-case tracking-normal text-white">
+                    {meta.savedLokPets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name || pet.roll.name} · Lv {pet.level ?? 1}{pet.starter ? ' · Partner' : ''}</option>)}
+                  </select>
+                </label>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                  {LOKPET_TRAINING_STATS.map((stat) => {
+                    const training = trainingPet.training ?? { vigor: 0, fury: 0, guard: 0, pace: 0, spirit: 0 };
+                    const cap = trainingPet.starter ? 20 : 10;
+                    const rank = training[stat.id];
+                    const canAdd = restUnclaimed && lokPetUnspentTrainingPoints(trainingPet) > 0 && rank < cap;
+                    return (
+                      <article key={stat.id} className="border border-white/10 bg-black/25 p-3" data-testid={`tower-training-${stat.id}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-[9px] font-black uppercase tracking-wider text-white">{stat.label}</span>
+                          <span className="font-mono text-[9px] text-violet-100/70">{rank}/{cap}</span>
+                        </div>
+                        <p className="mt-1 min-h-8 text-[9px] leading-relaxed text-white/45">{stat.description}</p>
+                        <button type="button" disabled={!canAdd} onClick={() => trainLokPetAtTower(current.floor, trainingPet.id, stat.id as LokPetTrainingStat)} className="mt-2 w-full border border-violet-200/25 bg-violet-200/[.07] px-2 py-1.5 font-mono text-[8px] font-black uppercase tracking-wider text-violet-50 hover:bg-violet-200/[.14] disabled:cursor-not-allowed disabled:opacity-30" aria-label={`Train ${stat.label}`}>
+                          + Train · 1 point
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <p className="font-mono text-[9px] uppercase tracking-wider text-white/50">Unspent: <strong className="text-violet-100">{lokPetUnspentTrainingPoints(trainingPet)}</strong> / {lokPetTrainingAllowance(trainingPet.level, trainingPet.starter)} level-earned points</p>
+                  <button type="button" disabled={!restUnclaimed || progress.trainingData < TRAINING_DATA_RESPEC_COST || !trainingPet.training || Object.values(trainingPet.training).every((rank) => rank === 0)} onClick={() => respecLokPetAtTower(current.floor, trainingPet.id)} className="border border-rose-200/20 bg-rose-300/[.05] px-3 py-2 font-mono text-[8px] font-bold uppercase tracking-wider text-rose-100/75 hover:bg-rose-300/10 disabled:cursor-not-allowed disabled:opacity-30" data-testid="button-tower-training-respec">
+                    <RotateCcw className="mr-1 inline h-3 w-3" /> Respec · {TRAINING_DATA_RESPEC_COST} Data
+                  </button>
+                </div>
+              </>
+            ) : <p className="mt-3 text-xs text-white/50">Save a LokPet to open the Training Bay.</p>}
+          </section>
         )}
         {progress.defeatedMasterIds.includes('nib') && (
           <div className="relative mt-4 flex flex-col gap-3 border border-amber-200/20 bg-amber-950/15 p-3 sm:flex-row sm:items-center sm:justify-between" data-testid="tower-supply-exchange">

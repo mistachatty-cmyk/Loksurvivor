@@ -12,7 +12,7 @@ The Tower is a progression loop, not just a lore tab or a battle-mode label. It 
 2. Deploy floors in sequence. A saved party of up to three is used; if a selected loadout exists it is honored, otherwise the first three saved pets are used.
 3. Encounter structure repeats with authored purpose: sector entry, route/scout encounters, curated story trials on floors 3 and 9, faction squads on floors 4 and 7, a mirror practice encounter on floor 8, a rest vault/checkpoint on floor 5, and the sector Master on floor 10.
 4. On victory, save pet HP/energy/status, reward pet growth and CRED, record the floor, and award Tower Tokens once. Master seals unlock the next sector.
-5. Rest floors restore all saved party condition and offer a choice between more Tower Tokens or a smaller token payout plus LokPet treats. Clearing a floor divisible by five also commits the checkpoint party condition.
+5. Rest floors restore all saved party condition, open one free Training Bay visit, and offer a choice between more Tower Tokens or a smaller token payout plus LokPet treats. Clearing a floor divisible by five also commits the checkpoint party condition. Training ranks use level/evolution-earned points; each rest choice also gives 10 Training Data.
 6. On a wipe, return to the last checkpoint and retain completed progress. Floors cleared again after a wipe allow the campaign to advance; they award reduced XP/CRED and no duplicate Tower Tokens or Master seal.
 7. A player can leave a live floor and resume that same floor later. An interrupted battle never commits partial damage or consumes a floor clear.
 8. Any cleared floor can be replayed with full party condition, no expedition risk, no campaign progress and 25% pet XP. It grants no Tower tokens, treats, cards or CRED.
@@ -37,18 +37,18 @@ These names and blurbs are now authored playable Tower content, while the larger
 
 ## Balance and save contracts
 
-- Floor IDs are stable `tower-floor-N` keys. `MetaState.digiTower` is normalized as untrusted local-save data, bounded to 100 floors, ten seals, one million tokens, and a small party/status payload.
+- Floor IDs are stable `tower-floor-N` keys. `MetaState.digiTower` is normalized as untrusted local-save data, bounded to 100 floors, ten seals, one million each of Tower Tokens and Training Data, and a small party/status payload.
 - Tower writes are sequential: the reducer accepts a campaign clear only when it equals `nextFloor`. Practice never sends a campaign floor result. This prevents forged/out-of-order floor mutation and makes a resumed floor deterministic in progression.
 - First-clear status is independent from the current retry attempt. Wiping can require re-clearing floors above the checkpoint without deadlocking progression or paying the first-clear token grant twice.
 - A checkpoint stores the party state as it was at its clear. Voluntary battle exit keeps the committed pre-floor state and current floor. Wipe recovery restores checkpoint condition.
 - Sector rules affect only attacks of the named element, on both teams. They do not alter healing, damage-over-time, enemy turn scheduling or non-Tower battles.
 - Mirror floors copy the player's current party species and levels into opposing generated pets; they are thematic sparring matches, not copies of hidden stats, equipment or condition.
-- The rest floor is a deterministic safe choice with full restore. There is no random item roll and no loss of saved pets.
+- The rest floor is a deterministic safe choice with full restore and a free Training Bay window before continuing. Training/respec actions validate the active unclaimed rest floor in the reducer; the respec costs 25 earned Training Data. There is no random item roll and no loss of saved pets.
 - Token payouts are first-clear only. The initial exchange is intentionally a simple consumable sink; do not let an exchange buy permanent combat power or bypass progression gates.
 
 ## Follow-on content (not represented as shipped)
 
-- Endless Spire after floor 100, a daily seeded challenge, Vault choice rewards, Training Bay stat allocation, Evolution Cores, pet-specific Companion Trials, and the larger Tower token cosmetics shop.
+- Endless Spire after floor 100, a daily seeded challenge, Vault choice rewards, Evolution Cores, pet-specific Companion Trials, and the larger Tower token cosmetics shop.
 - Operator-only rooms and Operator + LokPet Duo floors. Keep the first campaign pet-only so it can be tuned and completed independently.
 - Distinct faction rosters should use the shared faction registry when it exposes compatible LokPet identities. Until then, sector teams are curated from the LokPet battle variant catalog and use sector faction IDs as flavor metadata.
 - More than one Master reward style, Master voice lines, sector transition scenes, and optional voice/callout settings.
@@ -57,6 +57,7 @@ These names and blurbs are now authored playable Tower content, while the larger
 
 - Fresh profile unlock: first saved companion + first pet battle exposes the Tower without trapping the player in a modal.
 - Floors 1–10: verify enemy teams, material/element rules, Master seal, rest choice, token exchange, and display of exact first-clear rewards.
+- Rest floors: spend earned ranks across every training stat, verify starter/non-starter rank caps and point allowance, respec for 25 Data, and verify neither action works after continuing.
 - Retry path: clear floors 1–5, clear 6–7, wipe, resume at 6, re-clear through 10, and verify progress advances while tokens/seals are not duplicated.
 - Checkpoint path: quit on an active floor and resume with the last committed pre-floor condition; separately wipe and confirm the checkpoint party condition is restored.
 - Practice path: replay a cleared Master and a cleared ordinary floor; verify 25% pet XP, no currency/tokens/status carry/progression writes, and no changes to the active expedition.

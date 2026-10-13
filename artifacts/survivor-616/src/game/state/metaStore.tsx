@@ -77,6 +77,7 @@ import { RENTABLE_GENERATORS, RENTABLE_GENERATORS_BY_ID } from '@/game/data/gene
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
 import type { BattleRewards } from '@/game/engine/lokPetBattleTypes';
 import { getExpForLevel } from '@/game/engine/petExpCurve';
+import { lokPetUnspentTrainingPoints, normalizeLokPetTraining, trainLokPet, TRAINING_DATA_RESPEC_COST } from '@/game/engine/petTraining';
 import { HIDEOUT_EVENTS_BY_ID } from '@/game/data/hideoutEvents';
 import { applyPetCare } from '@/game/data/petCare';
 import { applyChoice } from '@/game/engine/choiceEvents';
@@ -144,6 +145,7 @@ import type {
   ThreatEventId,
   DigiTowerProgress,
   DigiTowerPetCondition,
+  LokPetTrainingStat,
 } from '@/game/types';
 
 export const DEFAULT_THREAT_CALIBRATIONS: ThreatCalibrations = {
@@ -179,7 +181,7 @@ export function normalizeThreatCalibrations(raw: unknown): ThreatCalibrations {
 }
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 25;
+const META_VERSION = 26;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 export const BASE_LOKPET_TEAM_SLOTS = 3;
@@ -187,7 +189,7 @@ export const BASE_CARD_CREDITS_PER_LOOT_BOX = 2;
 export const LOKPET_CARD_PACK_COST = 14;
 
 function emptyDigiTowerProgress(): DigiTowerProgress {
-  return { highestFloor: 0, nextFloor: 1, checkpointFloor: 0, clearedFloorIds: [], defeatedMasterIds: [], claimedRestFloorIds: [], tokens: 0, carry: [], checkpointCarry: [] };
+  return { highestFloor: 0, nextFloor: 1, checkpointFloor: 0, clearedFloorIds: [], defeatedMasterIds: [], claimedRestFloorIds: [], tokens: 0, trainingData: 0, carry: [], checkpointCarry: [] };
 }
 
 function normalizeTowerCarry(value: unknown): DigiTowerPetCondition[] {
@@ -220,6 +222,7 @@ function normalizeDigiTowerProgress(raw: unknown): DigiTowerProgress {
     defeatedMasterIds,
     claimedRestFloorIds,
     tokens: boundedInt(value.tokens, 0, 1_000_000),
+    trainingData: boundedInt(value.trainingData, 0, 1_000_000),
     carry: normalizeTowerCarry(value.carry),
     checkpointCarry: normalizeTowerCarry(value.checkpointCarry),
   };
@@ -1028,6 +1031,7 @@ function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
       roll: roll as SavedLokPet['roll'],
       stamina: Math.max(0, Math.min(PET_STAMINA_MAX, counter(candidate.stamina))),
       level: typeof candidate.level === 'number' && candidate.level >= 1 ? Math.min(candidate.starter === true ? 99 : 50, Math.floor(candidate.level)) : 1,
+      training: normalizeLokPetTraining(candidate.training, candidate.starter === true),
       exp: typeof candidate.exp === 'number' ? Math.max(0, Math.floor(candidate.exp)) : 0,
       battlesWon: counter(candidate.battlesWon),
       battlesFought: counter(candidate.battlesFought),
@@ -2106,6 +2110,8 @@ type Action =
   | { type: 'feedRanchKibble'; petId: string; credCost: number }
   | { type: 'recordLokPetBattleResult'; rewards: BattleRewards; winningPetIds: string[]; towerFloor?: number; towerCarry?: DigiTowerPetCondition[] }
   | { type: 'claimDigiTowerRest'; floor: number; choice: 'treats' | 'tokens' }
+  | { type: 'trainLokPetAtTower'; floor: number; petId: string; stat: LokPetTrainingStat }
+  | { type: 'respecLokPetAtTower'; floor: number; petId: string }
   | { type: 'buyDigiTowerSupply' }
   | { type: 'endDigiTowerClimb' }
   | { type: 'toggleFavoriteLokPet'; id: string }
@@ -2643,7 +2649,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         // stops XP from vanishing between battles.
         const result = rewards.petResults?.find((r) => r.petId.includes(candidate.id));
         const newLevel = result ? result.level : levelUp ? levelUp.newLevel : (candidate.level || 1);
-        const bond = applyBond(candidate, 'battle', now);
+        const bond = applyBond(candidate, 'battle', now, Math.floor((candidate.training?.spirit ?? 0) / 5));
         return {
           ...candidate,
           level: newLevel,
@@ -2685,6 +2691,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
                 clearedFloorIds,
                 defeatedMasterIds: isMaster && master ? [...new Set([...progress.defeatedMasterIds, master.masterId])] : progress.defeatedMasterIds,
                 tokens: Math.min(1_000_000, progress.tokens + (firstClear ? tokenReward : 0)),
+                trainingData: Math.min(1_000_000, progress.trainingData + (firstClear ? 3 + Math.ceil(action.towerFloor / 5) : 0)),
                 carry,
                 checkpointCarry: isCheckpoint ? carry : progress.checkpointCarry,
               };
@@ -2714,9 +2721,37 @@ function coreReducer(state: StoreState, action: Action): StoreState {
             clearedFloorIds: alreadyCleared ? progress.clearedFloorIds : [...progress.clearedFloorIds, id],
             claimedRestFloorIds,
             tokens: Math.min(1_000_000, progress.tokens + (action.choice === 'tokens' ? 35 + Math.ceil(action.floor / 10) * 5 : 20 + Math.ceil(action.floor / 10) * 5)),
+            trainingData: Math.min(1_000_000, progress.trainingData + 10),
             carry: healedCarry,
             checkpointCarry: healedCarry,
           },
+        },
+      };
+    }
+
+    case 'trainLokPetAtTower': {
+      const floorId = `tower-floor-${action.floor}`;
+      const progress = state.meta.digiTower;
+      if (!Number.isInteger(action.floor) || action.floor !== progress.nextFloor || action.floor < 1 || action.floor > 100 || action.floor % 10 !== 5 || progress.claimedRestFloorIds.includes(floorId)) return state;
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.petId);
+      if (!pet || lokPetUnspentTrainingPoints(pet) < 1) return state;
+      const trained = trainLokPet(pet, action.stat);
+      if (!trained) return state;
+      return { ...state, meta: { ...state.meta, savedLokPets: state.meta.savedLokPets.map((candidate) => candidate.id === pet.id ? trained : candidate) } };
+    }
+
+    case 'respecLokPetAtTower': {
+      const floorId = `tower-floor-${action.floor}`;
+      const progress = state.meta.digiTower;
+      if (!Number.isInteger(action.floor) || action.floor !== progress.nextFloor || action.floor < 1 || action.floor > 100 || action.floor % 10 !== 5 || progress.claimedRestFloorIds.includes(floorId) || progress.trainingData < TRAINING_DATA_RESPEC_COST) return state;
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.petId);
+      if (!pet || !pet.training || Object.values(normalizeLokPetTraining(pet.training, pet.starter)).every((rank) => rank === 0)) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          savedLokPets: state.meta.savedLokPets.map((candidate) => candidate.id === pet.id ? { ...candidate, training: normalizeLokPetTraining(undefined, pet.starter) } : candidate),
+          digiTower: { ...progress, trainingData: progress.trainingData - TRAINING_DATA_RESPEC_COST },
         },
       };
     }
@@ -4435,6 +4470,8 @@ export interface MetaContextValue {
   feedRanchKibble: (petId: string, credCost: number) => void;
   recordLokPetBattleResult: (rewards: BattleRewards, winningPetIds: string[], towerFloor?: number, towerCarry?: DigiTowerPetCondition[]) => void;
   claimDigiTowerRest: (floor: number, choice: 'treats' | 'tokens') => void;
+  trainLokPetAtTower: (floor: number, petId: string, stat: LokPetTrainingStat) => void;
+  respecLokPetAtTower: (floor: number, petId: string) => void;
   buyDigiTowerSupply: () => void;
   endDigiTowerClimb: () => void;
   toggleFavoriteLokPet: (id: string) => void;
@@ -4654,6 +4691,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     [],
   );
   const claimDigiTowerRest = useCallback((floor: number, choice: 'treats' | 'tokens') => dispatch({ type: 'claimDigiTowerRest', floor, choice }), []);
+  const trainLokPetAtTower = useCallback((floor: number, petId: string, stat: LokPetTrainingStat) => dispatch({ type: 'trainLokPetAtTower', floor, petId, stat }), []);
+  const respecLokPetAtTower = useCallback((floor: number, petId: string) => dispatch({ type: 'respecLokPetAtTower', floor, petId }), []);
   const buyDigiTowerSupply = useCallback(() => dispatch({ type: 'buyDigiTowerSupply' }), []);
   const endDigiTowerClimb = useCallback(() => dispatch({ type: 'endDigiTowerClimb' }), []);
   const toggleFavoriteLokPet = useCallback((id: string) => dispatch({ type: 'toggleFavoriteLokPet', id }), []);
@@ -4989,6 +5028,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       feedRanchKibble,
       recordLokPetBattleResult,
       claimDigiTowerRest,
+      trainLokPetAtTower,
+      respecLokPetAtTower,
       buyDigiTowerSupply,
       endDigiTowerClimb,
       toggleFavoriteLokPet,
@@ -5174,6 +5215,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     feedRanchKibble,
     recordLokPetBattleResult,
     claimDigiTowerRest,
+    trainLokPetAtTower,
+    respecLokPetAtTower,
     buyDigiTowerSupply,
     endDigiTowerClimb,
     toggleFavoriteLokPet,

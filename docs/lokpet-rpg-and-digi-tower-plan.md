@@ -1,7 +1,7 @@
 # LokPet RPG, Bonds, Hideout Companions and the DIGI-Tower: plan
 
-Status: **0.11.0 (Bond and Growth), 0.11.1 (Hideout Companions, 15 events) and 0.11.2 (Evolution Paths: 2 branches per starter, one per family, cinematic, 24 h free undo) are built; everything after them is plan only.** Written 2026-10-04 against v0.10.9
-(`META_VERSION` 21). It answers the owner's requests of 16:53, 16:57 and 17:16
+Status: **Bond and Growth, Hideout Companions, Evolution Paths, the 100-floor DIGI-Tower and its rest-floor Training Bay are built.** Remaining sections describe planned follow-ups. Written 2026-10-04 against v0.10.9
+(`META_VERSION` 21), with implementation status updated 2026-10-13. It answers the owner's requests of 16:53, 16:57 and 17:16
 (Limit Break), and every number in it is a starting point to tune in playtests,
 not a decision.
 
@@ -127,18 +127,24 @@ bounds in `data/lokPets.ts` stay the base. This is applied where
 ### 3.3 Five pet stats you can train
 
 Pets get five trainable stats: **Vigor** (HP), **Fury** (damage), **Guard**
-(defense), **Pace** (speed and cooldown), **Spirit** (special ability and ultimate
-strength, and bond gain). Each level grants 1 training point (2 on an evolution
-level). Points are spent in the Tower's **Training Bay** or the kennel. Each stat
+(defense), **Pace** (battle speed), **Spirit** (special ability and ultimate
+strength, starting energy, and bond gain). Each level grants 1 training point (2 on an evolution
+level). Points are spent in the Tower's **Training Bay** (currently on rest floors). Each stat
 has a soft cap of +10 per stat (+20 for starters) so a build is a choice, not a
 solved spreadsheet. A **respec** costs Training Data (below), never real money or
 anything irreversible.
+
+Current effects: Vigor, Fury, Guard, and Pace add 2% to their matching battle stat
+per rank. Spirit adds 1% skill/ultimate power and 1.5 starting energy per rank,
+plus one extra bond point on battle wins at every fifth rank (still under the daily
+bond cap). The available rank budget is derived from level and evolution level, so
+old levelled pets receive their earned points without a save reset.
 
 ### 3.4 New currencies (all earned in play, none bought)
 
 | Currency | Used for | Where it comes from |
 | :--- | :--- | :--- |
-| Training Data | stat points beyond level grants, respecs | Tower floors, runs, achievements |
+| Training Data | respecs (25 per pet) | Tower first clears and rest floors (current implementation); runs and achievements are planned sources |
 | Evolution Cores | unlocking branch evolutions (section 5) | Tower Masters, rare run drops |
 | Tower Tokens | the Tower's earnables shop (cosmetics, props, titles) | Tower floors and first clears |
 
@@ -565,7 +571,7 @@ placeholders to approve or replace.
   moves are stronger this fight") for Masters. Additive; battles without one behave as
   today.
 - **Save:** `towerProgress` (best floor, checkpoint, Masters defeated, the climb in
-  progress so a reload does not lose it), plus the three currencies.
+  progress so a reload does not lose it), plus Tower Tokens and Training Data.
 
 ---
 

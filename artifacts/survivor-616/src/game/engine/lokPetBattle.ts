@@ -24,6 +24,7 @@ import {
 import { applyPetExp, getExpForLevel, scalePetExp } from '@/game/engine/petExpCurve';
 import { evolvedLook, petEvolvedLook } from '@/game/engine/petEvolution';
 import { petBattleName } from '@/game/engine/petGrowth';
+import { normalizeLokPetTraining } from '@/game/engine/petTraining';
 import type { LokPetElement, LokPetFamily, SavedLokPet } from '@/game/types';
 
 export { getExpForLevel };
@@ -227,6 +228,7 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
   const expToNext = getExpForLevel(level);
   const stage = getLokPetEvolutionStage(level, savedPet.starter);
   const stageMult = stage === 3 ? 1.3 : stage === 2 ? 1.15 : 1.0;
+  const training = normalizeLokPetTraining(savedPet.training, savedPet.starter);
   // A chosen branch renames and re-dresses the later forms; stats still follow the stage only.
   const look = petEvolvedLook(savedPet);
 
@@ -235,10 +237,10 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
   const baseDmg = roll.stats?.damage || 20;
   const baseSpd = roll.stats?.moveSpeed || 150;
 
-  const maxHp = Math.floor((baseHp + 60) * (1 + level * 0.08) * stageMult);
-  const attack = Math.floor((baseDmg + 12) * (1 + level * 0.07) * stageMult);
-  const defense = Math.floor((12 + level * 1.6) * stageMult);
-  const speed = Math.floor(baseSpd * 0.1 + level * 0.9);
+  const maxHp = Math.floor((baseHp + 60) * (1 + level * 0.08) * stageMult * (1 + training.vigor * 0.02));
+  const attack = Math.floor((baseDmg + 12) * (1 + level * 0.07) * stageMult * (1 + training.fury * 0.02));
+  const defense = Math.floor((12 + level * 1.6) * stageMult * (1 + training.guard * 0.02));
+  const speed = Math.floor((baseSpd * 0.1 + level * 0.9) * (1 + training.pace * 0.02));
 
   // Trinket stat adjustments
   let trinketBonusHp = 0;
@@ -261,7 +263,11 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
   }
 
   const finalMaxHp = maxHp + trinketBonusHp;
-  const moves = assignBattleMoves(roll.variantId, roll.family, roll.element, level, stage);
+  const moves = assignBattleMoves(roll.variantId, roll.family, roll.element, level, stage).map((move) =>
+    move.kind === 'skill' || move.kind === 'ultimate'
+      ? { ...move, power: move.power * (1 + training.spirit * 0.01) }
+      : move,
+  );
 
   return {
     id: `battle-${savedPet.id}-${Date.now()}`,
@@ -280,7 +286,7 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
     expToNext,
     hp: finalMaxHp,
     maxHp: finalMaxHp,
-    energy: startingEnergy,
+    energy: Math.min(100, startingEnergy + training.spirit * 1.5),
     maxEnergy: 100,
     attack: attack + trinketBonusAtk,
     defense: defense + trinketBonusDef,
