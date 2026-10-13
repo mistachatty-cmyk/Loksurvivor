@@ -203,7 +203,8 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   const [testRunning, setTestRunning] = useState(false);
   const [lastTest, setLastTest] = useState('training.status.ready');
   const [targetMode, setTargetMode] = useState<'durability' | 'nonlethal' | 'infinite'>('durability');
-  const [weaponLevel, setWeaponLevel] = useState<1 | 8>(1);
+  const [allWeaponLevel, setAllWeaponLevel] = useState(1);
+  const [weaponLevelOverrides, setWeaponLevelOverrides] = useState<Record<string, number>>({});
   const [multiWeaponIds, setMultiWeaponIds] = useState<string[]>([]);
   const [spam, setSpam] = useState(true);
   const [challengeRunning, setChallengeRunning] = useState(false);
@@ -214,13 +215,30 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   const [liveLargestHit, setLiveLargestHit] = useState(0);
   const [liveDamage, setLiveDamage] = useState(0);
   const [liveEffects, setLiveEffects] = useState<string[]>([]);
+  const weaponLevelFor = (weaponId: string): number => weaponLevelOverrides[weaponId] ?? allWeaponLevel;
+  const adjustWeaponLevel = (weaponId: string, amount: number): void => {
+    setWeaponLevelOverrides((levels) => ({
+      ...levels,
+      [weaponId]: Math.max(1, Math.min(8, (levels[weaponId] ?? allWeaponLevel) + amount)),
+    }));
+  };
+  const adjustAllWeaponLevels = (amount: number): void => {
+    setAllWeaponLevel((level) => Math.max(1, Math.min(8, level + amount)));
+    setWeaponLevelOverrides({});
+  };
   const selectedWeapon = TRAINING_LOADOUT.find((weapon) => weapon.id === selectedWeaponId) ?? TRAINING_LOADOUT[0]!;
+  const selectedWeaponLevel = weaponLevelFor(selectedWeapon.id);
+  const allWeaponsMixed = TRAINING_LOADOUT.some((weapon) => weaponLevelFor(weapon.id) !== allWeaponLevel);
   const multiUnlocked = meta.trainingDummyDamage >= 1_000_000 || meta.devModeAllUnlocks;
   const weaponKills = meta.devModeAllUnlocks ? 616 : (meta.trainingWeaponKills[selectedWeapon.id] ?? 0);
   const selectedWeapons = (multiUnlocked && multiWeaponIds.length > 0
     ? multiWeaponIds.map((id) => TRAINING_LOADOUT.find((weapon) => weapon.id === id)).filter((weapon): weapon is WeaponDef => Boolean(weapon))
     : [selectedWeapon]);
-  const challengeKey = selectedWeapons.map((weapon) => weapon.id).sort().join('+') + `@${weaponLevel}`;
+  const makeWeaponLevelKey = (weapons: WeaponDef[]): string => weapons
+    .map((weapon) => `${weapon.id}@L${weaponLevelFor(weapon.id)}`)
+    .sort()
+    .join('+');
+  const challengeKey = makeWeaponLevelKey(selectedWeapons);
   const mainLayout = layout === 'main';
 
   const toggleSpam = (): void => {
@@ -499,7 +517,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
       target.trainingDummyMode = challengeModeRef.current ? 'infinite' : targetMode;
       const additions = weaponsToTest.map((weapon) => ({
         def: { ...weapon, range: Math.max(weapon.range, MIN_TEST_RANGE) },
-        level: weaponLevel,
+        level: weaponLevelFor(weapon.id),
         count: weapon.count ?? 1,
         readyAt: world.now,
       }));
@@ -516,7 +534,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
       if (challengeModeRef.current) {
         const allWeapons = [...lastChallengeWeaponsRef.current, ...weaponsToTest];
         lastChallengeWeaponsRef.current = [...new Map(allWeapons.map((weapon) => [weapon.id, weapon])).values()];
-        challengeKeyRef.current = lastChallengeWeaponsRef.current.map((weapon) => weapon.id).sort().join('+') + `@${weaponLevel}`;
+        challengeKeyRef.current = makeWeaponLevelKey(lastChallengeWeaponsRef.current);
       }
       setLastTest(t('training.status.activated', { weapon: weaponsToTest.map((weapon) => weapon.name).join(' + ') }));
       return;
@@ -544,7 +562,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
     world.trainingHits = 0;
     world.trainingCriticalHits = 0;
     world.trainingLargestHit = 0;
-    world.weapons = weaponsToTest.map((weapon) => ({ def: { ...weapon, range: Math.max(weapon.range, MIN_TEST_RANGE) }, level: weaponLevel, count: weapon.count ?? 1, readyAt: world.now }));
+    world.weapons = weaponsToTest.map((weapon) => ({ def: { ...weapon, range: Math.max(weapon.range, MIN_TEST_RANGE) }, level: weaponLevelFor(weapon.id), count: weapon.count ?? 1, readyAt: world.now }));
     const orbitWeapons = weaponsToTest.filter((weapon) => weapon.kind === 'orbit');
     world.orbiters = orbitWeapons.flatMap((weapon) => Array.from({ length: Math.max(1, weapon.count ?? 1) }, (_, index) => ({
       weaponId: weapon.id,
@@ -569,7 +587,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
     challengeStopRef.current = false;
     continuousModeRef.current = continuous && !challenge;
     continuousStopRef.current = false;
-    challengeKeyRef.current = challenge ? weaponsToTest.map((weapon) => weapon.id).sort().join('+') + `@${weaponLevel}` : '';
+    challengeKeyRef.current = challenge ? makeWeaponLevelKey(weaponsToTest) : '';
     if (challenge) lastChallengeWeaponsRef.current = [...weaponsToTest];
     setChallengeResult(null);
     setChallengeRunning(challenge);
@@ -740,9 +758,13 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
             <button type="button" onClick={() => setLayout('main')} aria-pressed={mainLayout} data-testid="training-arena-layout-main" className={`min-h-8 px-2 font-mono text-[8px] font-black uppercase tracking-wider transition sm:px-3 sm:text-[9px] ${mainLayout ? 'bg-orange-300 text-slate-950' : 'text-white/55 hover:text-white'}`}>{t('training.layout.main')}</button>
             <button type="button" onClick={() => setLayout('classic')} aria-pressed={!mainLayout} data-testid="training-arena-layout-classic" className={`min-h-8 px-2 font-mono text-[8px] font-black uppercase tracking-wider transition sm:px-3 sm:text-[9px] ${!mainLayout ? 'bg-white/20 text-white' : 'text-white/55 hover:text-white'}`}>{t('training.layout.classic')}</button>
           </div>
-          <div className="flex items-center border border-white/10 bg-black/25 p-0.5" aria-label={t('training.stage.levelContext', { level: weaponLevel })}>
-            <button type="button" onClick={() => setWeaponLevel(1)} aria-pressed={weaponLevel === 1} className={`min-h-8 px-2 font-mono text-[8px] font-black uppercase tracking-wider ${weaponLevel === 1 ? 'bg-cyan-200 text-slate-950' : 'text-white/55'}`}>{t('training.stage.base')}</button>
-            <button type="button" onClick={() => setWeaponLevel(8)} aria-pressed={weaponLevel === 8} className={`min-h-8 px-2 font-mono text-[8px] font-black uppercase tracking-wider ${weaponLevel === 8 ? 'bg-cyan-200 text-slate-950' : 'text-white/55'}`}>{t('training.stage.level')}</button>
+          <div className="flex min-h-8 items-center gap-1 border border-lime-300/25 bg-black/25 px-1" aria-label={t('training.rack.allLevels')} title={t('training.rack.allLevelsHelp')}>
+            <span className="px-1 font-mono text-[7px] font-black uppercase tracking-wider text-lime-200">{t('training.rack.all')}</span>
+            <button type="button" onClick={() => adjustAllWeaponLevels(-1)} disabled={testRunning || allWeaponLevel <= 1} aria-label={t('training.rack.lowerAll')} className="grid h-6 w-6 place-items-center border border-white/10 text-xs text-white/70 hover:bg-white/10 disabled:opacity-30">−</button>
+            <button key={`all-control-${allWeaponsMixed ? 'mixed' : allWeaponLevel}`} type="button" onClick={() => setWeaponLevelOverrides({})} disabled={testRunning || !allWeaponsMixed} aria-label={t('training.rack.applyAll', { level: allWeaponLevel })} title={t('training.rack.applyAll', { level: allWeaponLevel })} className="training-tier-pop min-w-9 text-center font-mono text-[8px] font-black text-lime-100 disabled:cursor-default">
+              {allWeaponsMixed ? t('training.rack.mixed') : t('training.rack.level', { level: allWeaponLevel })}
+            </button>
+            <button type="button" onClick={() => adjustAllWeaponLevels(1)} disabled={testRunning || allWeaponLevel >= 8} aria-label={t('training.rack.raiseAll')} className="grid h-6 w-6 place-items-center border border-white/10 text-xs text-white/70 hover:bg-white/10 disabled:opacity-30">+</button>
           </div>
           <button type="button" onClick={() => setCameraCenterLock((locked) => !locked)} aria-pressed={cameraCenterLock} title={t('training.camera.centerLock')} className={`inline-flex min-h-8 items-center gap-1 border px-2 font-mono text-[8px] font-bold uppercase tracking-wider ${cameraCenterLock ? 'border-cyan-200/50 bg-cyan-200/10 text-cyan-100' : 'border-white/15 text-white/55'}`}>{cameraCenterLock ? <LockKeyhole size={11} /> : <Move size={11} />}{t('training.camera.center')}</button>
           <button type="button" onClick={() => { cameraOffsetRef.current = { x: 0, y: 0 }; }} title={t('training.camera.reset')} className="min-h-8 border border-white/15 px-2 font-mono text-[8px] font-bold uppercase tracking-wider text-white/55 hover:text-white">{t('training.camera.reset')}</button>
@@ -786,7 +808,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
               return mainLayout ? (
                 <article key={weapon.id} style={{ gridColumn: expanded ? '1 / -1' : undefined }} className={`min-w-0 border transition ${active ? 'border-cyan-200/70 bg-cyan-300/[.08]' : 'border-white/10 bg-white/[.025] hover:border-white/25'}`}>
                   <div className="flex min-h-12 w-full items-center gap-1 px-1 py-1 sm:min-h-14 sm:gap-1.5 sm:px-1.5">
-                    <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked} aria-label={`${t('training.rack.activate')} ${weapon.name}`} title={`${t('training.rack.activate')} ${weapon.name}`} className="shrink-0 rounded-sm outline-none transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"><WeaponIcon kind={weapon.kind} weaponId={weapon.id} color={weapon.color} size={30} /></button>
+                    <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked} aria-label={`${t('training.rack.activate')} ${weapon.name} ${t('training.rack.level', { level: weaponLevelFor(weapon.id) })}`} title={`${t('training.rack.activate')} · ${t('training.rack.level', { level: weaponLevelFor(weapon.id) })}`} className="shrink-0 rounded-sm outline-none transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"><span className="relative grid h-[30px] w-[30px] place-items-center"><WeaponIcon kind={weapon.kind} weaponId={weapon.id} color={weapon.color} size={30} /><span key={`badge-${weaponLevelFor(weapon.id)}`} aria-hidden="true" className="training-tier-pop absolute -bottom-1 -right-1 z-10 min-w-4 border border-slate-950 bg-lime-300 px-0.5 font-mono text-[7px] font-black leading-[12px] text-slate-950">L{weaponLevelFor(weapon.id)}</span></span></button>
                     <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked} aria-pressed={active} className="flex min-w-0 flex-1 items-center gap-0.5 text-left disabled:cursor-not-allowed disabled:opacity-50">
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[9px] font-bold leading-tight sm:text-[10px]">{weapon.name}</span>
@@ -802,13 +824,14 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
                       <p className="text-[9px] leading-relaxed text-white/65">{weapon.description}</p>
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <p className="font-mono text-[8px] font-black uppercase tracking-wider text-lime-200">{t('training.rack.stats')}</p>
-                        <div className="flex items-center border border-white/10 bg-black/35 p-0.5" aria-label={t('training.stage.levelContext', { level: weaponLevel })}>
-                          <button type="button" onClick={() => setWeaponLevel(1)} aria-pressed={weaponLevel === 1} className={`min-h-6 px-2 font-mono text-[7px] font-black uppercase ${weaponLevel === 1 ? 'bg-cyan-200 text-slate-950' : 'text-white/50'}`}>{t('training.stage.base')}</button>
-                          <button type="button" onClick={() => setWeaponLevel(8)} aria-pressed={weaponLevel === 8} className={`min-h-6 px-2 font-mono text-[7px] font-black uppercase ${weaponLevel === 8 ? 'bg-cyan-200 text-slate-950' : 'text-white/50'}`}>{t('training.stage.level')}</button>
+                        <div className="flex items-center gap-1 border border-white/10 bg-black/35 p-0.5" aria-label={t('training.rack.levelControl', { weapon: weapon.name })}>
+                          <button type="button" onClick={() => adjustWeaponLevel(weapon.id, -1)} disabled={testRunning || weaponLevelFor(weapon.id) <= 1} aria-label={t('training.rack.lowerLevel', { weapon: weapon.name })} className="grid h-6 w-6 place-items-center border border-white/10 text-xs text-white/70 hover:bg-white/10 disabled:opacity-30">−</button>
+                          <span key={`detail-${weaponLevelFor(weapon.id)}`} className="training-tier-pop min-w-10 text-center font-mono text-[8px] font-black text-lime-100">{t('training.rack.level', { level: weaponLevelFor(weapon.id) })}</span>
+                          <button type="button" onClick={() => adjustWeaponLevel(weapon.id, 1)} disabled={testRunning || weaponLevelFor(weapon.id) >= 8} aria-label={t('training.rack.raiseLevel', { weapon: weapon.name })} className="grid h-6 w-6 place-items-center border border-white/10 text-xs text-white/70 hover:bg-white/10 disabled:opacity-30">+</button>
                         </div>
                       </div>
                       <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[8px] uppercase tracking-wider text-white/50">
-                        <span>{t('training.rack.statDamage')} <b className="text-white">{Math.round(weapon.damage * (1 + (weaponLevel - 1) * weapon.levelDamageScale))}</b></span>
+                        <span>{t('training.rack.statDamage')} <b className="text-white">{Math.round(weapon.damage * (1 + (weaponLevelFor(weapon.id) - 1) * weapon.levelDamageScale))}</b></span>
                         <span>{t('training.rack.statCooldown')} <b className="text-white">{(weapon.cooldownMs / 1000).toFixed(2)}s</b></span>
                         <span>{t('training.rack.statRange')} <b className="text-white">{weapon.range}</b></span>
                         {weapon.count !== undefined && <span>{t('training.rack.statCount')} <b className="text-white">{weapon.count}</b></span>}
@@ -832,7 +855,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
               ) : (
                 <article key={weapon.id} style={{ gridColumn: expanded ? '1 / -1' : undefined }} className={`min-w-0 border ${active ? 'border-cyan-300/60 bg-cyan-300/[.06]' : 'border-white/10 bg-white/[.025]'}`}>
                   <div className="flex min-h-12 w-full items-center gap-1.5 px-1.5 py-1.5">
-                    <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked} aria-label={`${t('training.rack.activate')} ${weapon.name}`} title={`${t('training.rack.activate')} ${weapon.name}`} className="shrink-0 rounded-sm outline-none transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"><WeaponIcon kind={weapon.kind} weaponId={weapon.id} color={weapon.color} size={30} /></button>
+                    <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked} aria-label={`${t('training.rack.activate')} ${weapon.name} ${t('training.rack.level', { level: weaponLevelFor(weapon.id) })}`} title={`${t('training.rack.activate')} · ${t('training.rack.level', { level: weaponLevelFor(weapon.id) })}`} className="shrink-0 rounded-sm outline-none transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"><span className="relative grid h-[30px] w-[30px] place-items-center"><WeaponIcon kind={weapon.kind} weaponId={weapon.id} color={weapon.color} size={30} /><span key={`badge-${weaponLevelFor(weapon.id)}`} aria-hidden="true" className="training-tier-pop absolute -bottom-1 -right-1 z-10 min-w-4 border border-slate-950 bg-lime-300 px-0.5 font-mono text-[7px] font-black leading-[12px] text-slate-950">L{weaponLevelFor(weapon.id)}</span></span></button>
                     <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked} aria-pressed={active} className="flex min-w-0 flex-1 items-center gap-1 text-left disabled:cursor-not-allowed disabled:opacity-50">
                       <span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-bold">{weapon.name}</span><span className="mt-0.5 block truncate font-mono text-[8px] uppercase tracking-wider text-white/40">{weaponKindLabel(weapon)}</span></span>
                     </button>
@@ -843,13 +866,14 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
                       <p className="text-[9px] leading-relaxed text-white/55">{weapon.description}</p>
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <p className="font-mono text-[8px] font-black uppercase tracking-wider text-cyan-100">{t('training.rack.stats')}</p>
-                        <div className="flex items-center border border-white/10 bg-black/35 p-0.5" aria-label={t('training.stage.levelContext', { level: weaponLevel })}>
-                          <button type="button" onClick={() => setWeaponLevel(1)} aria-pressed={weaponLevel === 1} className={`min-h-6 px-2 font-mono text-[7px] font-black uppercase ${weaponLevel === 1 ? 'bg-cyan-200 text-slate-950' : 'text-white/50'}`}>{t('training.stage.base')}</button>
-                          <button type="button" onClick={() => setWeaponLevel(8)} aria-pressed={weaponLevel === 8} className={`min-h-6 px-2 font-mono text-[7px] font-black uppercase ${weaponLevel === 8 ? 'bg-cyan-200 text-slate-950' : 'text-white/50'}`}>{t('training.stage.level')}</button>
+                        <div className="flex items-center gap-1 border border-white/10 bg-black/35 p-0.5" aria-label={t('training.rack.levelControl', { weapon: weapon.name })}>
+                          <button type="button" onClick={() => adjustWeaponLevel(weapon.id, -1)} disabled={testRunning || weaponLevelFor(weapon.id) <= 1} aria-label={t('training.rack.lowerLevel', { weapon: weapon.name })} className="grid h-6 w-6 place-items-center border border-white/10 text-xs text-white/70 hover:bg-white/10 disabled:opacity-30">−</button>
+                          <span key={`detail-${weaponLevelFor(weapon.id)}`} className="training-tier-pop min-w-10 text-center font-mono text-[8px] font-black text-lime-100">{t('training.rack.level', { level: weaponLevelFor(weapon.id) })}</span>
+                          <button type="button" onClick={() => adjustWeaponLevel(weapon.id, 1)} disabled={testRunning || weaponLevelFor(weapon.id) >= 8} aria-label={t('training.rack.raiseLevel', { weapon: weapon.name })} className="grid h-6 w-6 place-items-center border border-white/10 text-xs text-white/70 hover:bg-white/10 disabled:opacity-30">+</button>
                         </div>
                       </div>
                       <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[8px] uppercase tracking-wider text-white/45">
-                        <span>{t('training.rack.statDamage')} <b className="text-white">{Math.round(weapon.damage * (1 + (weaponLevel - 1) * weapon.levelDamageScale))}</b></span>
+                        <span>{t('training.rack.statDamage')} <b className="text-white">{Math.round(weapon.damage * (1 + (weaponLevelFor(weapon.id) - 1) * weapon.levelDamageScale))}</b></span>
                         <span>{t('training.rack.statCooldown')} <b className="text-white">{(weapon.cooldownMs / 1000).toFixed(2)}s</b></span>
                         <span>{t('training.rack.statRange')} <b className="text-white">{weapon.range}</b></span>
                         {weapon.count !== undefined && <span>{t('training.rack.statCount')} <b className="text-white">{weapon.count}</b></span>}
@@ -916,7 +940,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
               <p className="mt-0.5 font-mono text-[7px] text-white/55">{t('training.stage.xp', { current: operatorTrainingProgress.toFixed(1), next: 100 })}</p>
             </div>
             <div className="absolute inset-x-2 bottom-2 z-10 max-h-[62%] overflow-y-auto border border-white/15 bg-black/80 p-2 backdrop-blur-sm sm:inset-x-3 sm:bottom-3 sm:max-h-[50%] sm:p-3">
-              <div className="flex items-center justify-between gap-2 text-[10px] text-white/65 sm:text-xs"><span className="flex min-w-0 items-center gap-2"><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${testRunning ? 'animate-pulse bg-amber-300' : 'bg-cyan-300'}`} /><span className="truncate">{statusText}</span></span><span className="shrink-0 font-mono text-[8px] text-white/40">{t('training.stage.levelContext', { level: weaponLevel })}</span></div>
+              <div className="flex items-center justify-between gap-2 text-[10px] text-white/65 sm:text-xs"><span className="flex min-w-0 items-center gap-2"><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${testRunning ? 'animate-pulse bg-amber-300' : 'bg-cyan-300'}`} /><span className="truncate">{statusText}</span></span><span className="shrink-0 font-mono text-[8px] text-white/40">{t('training.rack.level', { level: selectedWeaponLevel })}</span></div>
               <div className="mt-1.5 grid grid-cols-3 gap-1 border-t border-white/10 pt-1.5 sm:grid-cols-6 sm:gap-2 sm:pt-2">
                 {[
                   [t('training.stats.damage'), shownDamage.toLocaleString()],
@@ -928,7 +952,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
                 ].map(([label, value]) => <div key={label} className="border border-white/10 bg-white/[.035] px-1.5 py-1"><p className="font-mono text-[7px] uppercase tracking-wider text-white/40">{label}</p><p className="font-mono text-[10px] font-bold text-white sm:text-xs">{value}</p></div>)}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[8px] uppercase tracking-wider text-white/50">
-                <span>{t('training.stats.baseDamage')}: <b className="text-white">{Math.round(selectedWeapon.damage * (1 + (weaponLevel - 1) * selectedWeapon.levelDamageScale))}</b></span>
+                <span>{t('training.stats.baseDamage')}: <b className="text-white">{Math.round(selectedWeapon.damage * (1 + (selectedWeaponLevel - 1) * selectedWeapon.levelDamageScale))}</b></span>
                 <span>{t('training.stats.cooldown')}: <b className="text-white">{(selectedWeapon.cooldownMs / 1000).toFixed(2)}s</b></span>
                 <span>{t('training.stats.title')}: <b className="text-white">{selectedWeapons.map((weapon) => weapon.name).join(' + ')}</b></span>
                 <span>{t('training.rack.progress', { kills: weaponKills })}</span>

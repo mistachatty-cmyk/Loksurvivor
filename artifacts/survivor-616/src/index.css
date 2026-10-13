@@ -700,6 +700,15 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .training-arena-weapon-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
 .training-arena-weapon-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.06); }
 .training-arena-weapon-scroll::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: #a3e635; background-clip: padding-box; }
+.training-tier-pop { animation: training-tier-pop 180ms cubic-bezier(.2,.9,.3,1.25) both; transform-origin: center; }
+@keyframes training-tier-pop {
+  0% { opacity: .45; transform: translateY(2px) scale(.78); }
+  72% { opacity: 1; transform: translateY(-1px) scale(1.14); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .training-tier-pop { animation: none; }
+}
 :root[data-scrollbar-tint='neutral'] * { scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent; }
 :root[data-scrollbar='standard'] * { scrollbar-width: auto; scrollbar-color: auto; }
 :root[data-scrollbar='hidden'] * { scrollbar-width: none; }
