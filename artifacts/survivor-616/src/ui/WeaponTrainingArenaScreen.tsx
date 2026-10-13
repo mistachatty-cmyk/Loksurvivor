@@ -592,7 +592,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
     setChallengeResult(null);
     setChallengeRunning(challenge);
     setChallengeSeconds(challenge ? 24 : 0);
-    if (challenge) setSpam(true);
+    if (challenge) setSpam(false);
     testRunningRef.current = true;
     setTestRunning(true);
     setLastDamage(0);

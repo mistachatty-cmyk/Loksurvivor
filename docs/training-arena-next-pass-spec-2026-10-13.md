@@ -15,7 +15,7 @@
 - Each weapon earns final-hit kills during normal runs, with persistent `x/616` progress committed only when the run ends. Burn/acid ticks inherit the weapon that applied the status when available. Training Arena kills do not count.
 - Multi-Weapon Testing unlocks from 1,000,000 cumulative Training Arena damage.
 - Base tests at weapon level 1; Level tests at level 8. The operator bar is separate Training Arena XP, awarded 0.1 per hit and 0.3 total for a critical hit.
-- The damage challenge uses a visible-tab 24-second timer. Spam turns on automatically, and players may activate additional weapons from the rack during the challenge; those activations overlap without clearing previous attacks. The final score's saved loadout key includes every weapon activated during that attempt. The target temporarily has infinite HP during a challenge, so target durability does not cap the score. The result panel offers Retry with the challenge's weapon set and Back to Arena.
+- The damage challenge uses a visible-tab 24-second timer. Spam starts off for each challenge attempt; the player may toggle it on explicitly. Players may activate additional weapons from the rack during the challenge; those activations overlap without clearing previous attacks. The final score's saved loadout key includes every weapon activated during that attempt. The target temporarily has infinite HP during a challenge, so target durability does not cap the score. The result panel offers Retry with the challenge's weapon set and Back to Arena.
 - Opening the mailbox marks items read; keeping is optional, delete is permanent, and at most 100 items are retained.
 - The six placeholder damage achievements use 0, 1,000, 5,000, 1,000,000, 5,000,000, and 100,000,000 damage thresholds in one challenge. Challenge tiers below 5,000 use “At Least You Tried.”
 
@@ -65,7 +65,7 @@
 ### 24-second damage challenge
 
 - Add a **24-second damage challenge** that repeatedly activates the selected available weapon against the stationary dummy. Display the countdown and running damage total.
-- Add a **Spam** toggle beside Search and Lock in the rack header. It defaults on and is automatically on when the 24-second challenge starts. Turning it off settles the current attack; turning it on during a live test resumes repeated firing.
+- Add a **Spam** toggle beside Search and Lock in the rack header. It defaults on in the normal arena, but starts off whenever a 24-second challenge starts or retries. Turning it off settles the current attack; turning it on during a live test resumes repeated firing.
 - The run records the final total damage for that weapon/build and shows a celebration naming its achieved tier. Tier names are placeholders for now; the user will provide final names later.
 - Use damage thresholds at `0`, `1,000`, `5,000`, `1,000,000`, `5,000,000`, and `100,000,000`. Award an achievement for each threshold reached, with duplicate awards prevented. The user described `0` and `1–1,000` as an **“At Least You Tried”** tier and identified the higher thresholds, but exact inclusive boundaries and names for all tiers remain to be settled.
 - Save each result so players can see their best damage per weapon and configuration. Whether to keep only a personal best or a full history is undecided.
@@ -92,7 +92,7 @@
 - One shot of each weapon family, including delayed attacks, damage-over-time, criticals, orbit/ring attacks, status effects, and weapons with secondary actors. Confirm the effect list agrees with what is drawn.
 - Base/Level toggle and the operator XP bar, including an attack, a critical, and XP progress across a level boundary.
 - Target durability settings, Non-lethal, and Infinite HP; attacks should finish their preview without pausing or leaving effects stuck.
-- 24-second challenge start, automatic Spam enablement, countdown completion, final stats, celebration, each achievement boundary, and best-result persistence.
+- 24-second challenge start with Spam off, manual Spam toggle, countdown completion, final stats, celebration, each achievement boundary, and best-result persistence.
 - Weapon unlock at run end, icon toast, mailbox badge, read/keep/delete actions, and persistence after leaving and reopening the hideout.
 - Keyboard navigation, focus visibility, reduced-motion behavior, and screen-reader names for rack entries, progress, timer, and stat values.
 

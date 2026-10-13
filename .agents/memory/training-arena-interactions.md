@@ -4,11 +4,11 @@ The default Training Arena is built around the user's weapon-dock sketch: fixed 
 
 ## Weapon rack
 
-- Spam starts enabled and sits directly beside the details Lock control at the right of search.
+- Spam starts enabled in the normal arena and sits directly beside the details Lock control at the right of search. Starting or retrying a challenge turns Spam off; the player can explicitly toggle it on during the challenge.
 - Clicking a weapon icon or weapon name activates it immediately; do not make a card click only select or open a detail panel.
 - A separate, clearly visible disclosure control opens the weapon's details. It shows stats for its current level and any authored target debuff, status synergy, or operator affinity. Omit effects the weapon does not have.
 - Lock closes any open detail panel and prevents details from opening. Rack activation remains available; clicking the disclosure spot while locked activates the weapon.
-- Turning Spam off lets the current attack resolve and settle; turning it on during a live test resumes repeated attacks. Challenge timing remains controlled by the challenge mode.
+- Turning Spam off lets the current attack resolve and settle; turning it on during a live test resumes repeated attacks. Challenge entry never enables Spam automatically, and the challenge timer remains controlled by challenge mode.
 - Show each weapon's current level as a compact badge on its icon button. Its detail panel has clamped level-down/level-up controls from 1–8. A separate All counter in the top bar raises or lowers every weapon to the same level and clears individual overrides.
 - Animate level changes with a brief, restrained pop; honor `prefers-reduced-motion`. The level used for damage, challenge records, and weapon activation must match the badge.
 
@@ -20,7 +20,7 @@ The default Training Arena is built around the user's weapon-dock sketch: fixed 
 
 ## Review checks
 
-- Spam defaults on, toggles cleanly while a weapon is firing, and the rack controls remain reachable beside search on narrow screens.
+- Spam defaults on in the normal arena, starts off for every challenge attempt, and toggles cleanly while a weapon is firing; the rack controls remain reachable beside search on narrow screens.
 - Icon/name activation fires without expanding details. The disclosure control opens/closes details; Lock closes details and converts the disclosure control into activation.
 - Per-weapon stats match its selected level. Debuffs and status synergies appear only when the weapon defines them.
 - Each weapon's badge, details counter, damage preview, and firing level agree. Individual level changes do not affect another weapon; the All counter sets every weapon to one level. Counters stop at level 1 and level 8, and reduced-motion disables the pop animation.
