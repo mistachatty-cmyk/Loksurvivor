@@ -18,6 +18,7 @@ import {
 } from 'react';
 
 import { AREAS, getArea } from '@/game/data/areas';
+import { DIGI_TOWER_SECTORS } from '@/game/data/digiTower';
 import { isDamageNumberStyle } from '@/game/data/damageNumbers';
 import { CHARACTERS, getCharacter } from '@/game/data/characters';
 import { CHARACTER_EPISODES, CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
@@ -141,6 +142,8 @@ import type {
   UIPanelLayout,
   ThreatCalibrations,
   ThreatEventId,
+  DigiTowerProgress,
+  DigiTowerPetCondition,
 } from '@/game/types';
 
 export const DEFAULT_THREAT_CALIBRATIONS: ThreatCalibrations = {
@@ -182,6 +185,45 @@ export const FATIGUE_PER_RUN_PCT = 0.5;
 export const BASE_LOKPET_TEAM_SLOTS = 3;
 export const BASE_CARD_CREDITS_PER_LOOT_BOX = 2;
 export const LOKPET_CARD_PACK_COST = 14;
+
+function emptyDigiTowerProgress(): DigiTowerProgress {
+  return { highestFloor: 0, nextFloor: 1, checkpointFloor: 0, clearedFloorIds: [], defeatedMasterIds: [], claimedRestFloorIds: [], tokens: 0, carry: [], checkpointCarry: [] };
+}
+
+function normalizeTowerCarry(value: unknown): DigiTowerPetCondition[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 8).flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const row = entry as Partial<DigiTowerPetCondition>;
+    if (typeof row.petId !== 'string') return [];
+    const statusEffects = Array.isArray(row.statusEffects) ? row.statusEffects.slice(0, 8).flatMap((effect) => {
+      if (!effect || typeof effect !== 'object' || typeof effect.type !== 'string') return [];
+      const item = effect as DigiTowerPetCondition['statusEffects'][number];
+      return [{ type: item.type.slice(0, 24), duration: Math.max(0, Math.min(9, Math.floor(Number(item.duration) || 0))), value: Math.max(0, Math.min(999, Number(item.value) || 0)), sourcePetName: String(item.sourcePetName || '').slice(0, 40) }];
+    }) : [];
+    return [{ petId: row.petId.slice(0, 120), hpRatio: Math.max(0, Math.min(1, Number(row.hpRatio) || 0)), energyRatio: Math.max(0, Math.min(1, Number(row.energyRatio) || 0)), statusEffects }];
+  });
+}
+
+function normalizeDigiTowerProgress(raw: unknown): DigiTowerProgress {
+  if (!raw || typeof raw !== 'object') return emptyDigiTowerProgress();
+  const value = raw as Partial<DigiTowerProgress>;
+  const boundedInt = (input: unknown, fallback: number, max: number) => typeof input === 'number' && Number.isFinite(input) ? Math.max(0, Math.min(max, Math.floor(input))) : fallback;
+  const clearedFloorIds = Array.isArray(value.clearedFloorIds) ? [...new Set(value.clearedFloorIds.filter((id): id is string => typeof id === 'string' && /^tower-floor-(?:[1-9]|[1-9][0-9]|100)$/.test(id)))].slice(0, 100) : [];
+  const defeatedMasterIds = Array.isArray(value.defeatedMasterIds) ? [...new Set(value.defeatedMasterIds.filter((id): id is string => typeof id === 'string' && /^[a-z0-9-]{1,40}$/.test(id)))].slice(0, 10) : [];
+  const claimedRestFloorIds = Array.isArray(value.claimedRestFloorIds) ? [...new Set(value.claimedRestFloorIds.filter((id): id is string => typeof id === 'string' && /^tower-floor-(?:[1-9]|[1-9][0-9]|100)$/.test(id)))].slice(0, 20) : [];
+  return {
+    highestFloor: boundedInt(value.highestFloor, 0, 100),
+    nextFloor: boundedInt(value.nextFloor, 1, 101),
+    checkpointFloor: boundedInt(value.checkpointFloor, 0, 100),
+    clearedFloorIds,
+    defeatedMasterIds,
+    claimedRestFloorIds,
+    tokens: boundedInt(value.tokens, 0, 1_000_000),
+    carry: normalizeTowerCarry(value.carry),
+    checkpointCarry: normalizeTowerCarry(value.checkpointCarry),
+  };
+}
 
 export function lokPetTeamCapacity(character: CharacterDef): number {
   return BASE_LOKPET_TEAM_SLOTS + (character.lokPetCollector?.extraTeamSlots ?? 0);
@@ -329,6 +371,8 @@ export function createInitialMeta(): MetaState {
     hideoutArrivalEnabled: true,
     hideoutSectionsCollapsedByDefault: false,
     hideoutPreviewEnabled: true,
+    hideoutSceneStyle: 'cage',
+    hideoutSpeechBubblesEnabled: true,
     hideoutPets: 'all',
     hideoutEvents: 'on',
     hideoutInteractive: true,
@@ -371,6 +415,7 @@ export function createInitialMeta(): MetaState {
     petElixirs: 3,
     petElixirUpdatedAt: Date.now(),
     bestiary: {},
+    fieldCreatureSeeds: [],
     totalKills: 0,
     quirkKills: {},
     quirkEverywhereRuns: 0,
@@ -441,6 +486,7 @@ export function createInitialMeta(): MetaState {
     unlockedEvolutionIds: [],
     episodeProgressById: {},
     completedSectorMissionIds: [],
+    digiTower: emptyDigiTowerProgress(),
     knownRelicIds: [],
     customMaps: [],
     uiPanelLayout: 'rail',
@@ -1217,6 +1263,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     new Set(SECTOR_MISSIONS.map((mission) => mission.id)),
     [],
   );
+  const digiTower = normalizeDigiTowerProgress(parsed.digiTower);
   const knownRelicIds = idList(
     parsed.knownRelicIds,
     new Set(CITY_RELICS.map((relic) => relic.id)),
@@ -1363,6 +1410,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       : !(typeof window !== 'undefined' && window.localStorage.getItem('survivor616.attractMode') === 'off'),
     hideoutSectionsCollapsedByDefault: parsed.hideoutSectionsCollapsedByDefault === true,
     hideoutPreviewEnabled: parsed.hideoutPreviewEnabled !== false,
+    hideoutSceneStyle: parsed.hideoutSceneStyle === 'block' ? 'block' : 'cage',
+    hideoutSpeechBubblesEnabled: parsed.hideoutSpeechBubblesEnabled !== false,
     hideoutPets: parsed.hideoutPets === 'companion' || parsed.hideoutPets === 'off' ? parsed.hideoutPets : 'all',
     hideoutEvents: parsed.hideoutEvents === 'quiet' || parsed.hideoutEvents === 'off' ? parsed.hideoutEvents : 'on',
     hideoutInteractive: parsed.hideoutInteractive !== false,
@@ -1414,6 +1463,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     visitingLokCards: normalizeVisitingLokCards(parsed.visitingLokCards),
     ...recoveredElixirs,
     bestiary,
+    fieldCreatureSeeds: Array.isArray(parsed.fieldCreatureSeeds)
+      ? [...new Set(parsed.fieldCreatureSeeds.filter((seed): seed is string => typeof seed === 'string' && /^field:[a-z0-9-]+$/.test(seed)))].slice(0, 500)
+      : [],
     totalKills: savedTotalKills,
     quirkKills: normalizeQuirkKills(parsed.quirkKills),
     quirkEverywhereRuns: counter(parsed.quirkEverywhereRuns),
@@ -1489,6 +1541,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     unlockedEvolutionIds,
     episodeProgressById,
     completedSectorMissionIds,
+    digiTower,
     knownRelicIds,
     customMaps,
     uiPanelLayout: parsed.uiPanelLayout === 'slideout' ? 'slideout' : 'rail',
@@ -2051,7 +2104,10 @@ type Action =
   | { type: 'feedLokPetTreat'; id: string }
   | { type: 'adoptRancherPet'; variantId: string; credCost: number }
   | { type: 'feedRanchKibble'; petId: string; credCost: number }
-  | { type: 'recordLokPetBattleResult'; rewards: BattleRewards; winningPetIds: string[] }
+  | { type: 'recordLokPetBattleResult'; rewards: BattleRewards; winningPetIds: string[]; towerFloor?: number; towerCarry?: DigiTowerPetCondition[] }
+  | { type: 'claimDigiTowerRest'; floor: number; choice: 'treats' | 'tokens' }
+  | { type: 'buyDigiTowerSupply' }
+  | { type: 'endDigiTowerClimb' }
   | { type: 'toggleFavoriteLokPet'; id: string }
   | { type: 'renameLokPet'; id: string; name: string }
   | { type: 'setLokPetName'; id: string; slot: PetNameSlot; name: string }
@@ -2123,6 +2179,8 @@ type Action =
   | { type: 'setHideoutWeather'; enabled: boolean }
   | { type: 'setHideoutSectionsCollapsedByDefault'; enabled: boolean }
   | { type: 'setHideoutPreview'; enabled: boolean }
+  | { type: 'setHideoutSceneStyle'; style: MetaState['hideoutSceneStyle'] }
+  | { type: 'setHideoutSpeechBubbles'; enabled: boolean }
   | { type: 'setHideoutPets'; mode: MetaState['hideoutPets'] }
   | { type: 'setHideoutEvents'; mode: MetaState['hideoutEvents'] }
   | { type: 'setHideoutInteractive'; enabled: boolean }
@@ -2568,6 +2626,8 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'recordLokPetBattleResult': {
       const { rewards, winningPetIds } = action;
+      const towerFloorId = action.towerFloor ? `tower-floor-${action.towerFloor}` : undefined;
+      if (towerFloorId && action.towerFloor !== state.meta.digiTower.nextFloor) return state;
       const nextWins = state.meta.lokPetBattleWins + 1;
       const badges = [...state.meta.lokPetBattleBadges];
       let leagueTier = state.meta.lokPetLeagueTier;
@@ -2606,6 +2666,82 @@ function coreReducer(state: StoreState, action: Action): StoreState {
           lokPetBattleBadges: badges,
           lokPetLeagueTier: leagueTier,
           savedLokPets: updatedSaved,
+          ...(towerFloorId && action.towerFloor ? {
+            digiTower: (() => {
+              const progress = state.meta.digiTower;
+              const firstClear = !progress.clearedFloorIds.includes(towerFloorId!);
+              const clearedFloorIds = firstClear ? [...progress.clearedFloorIds, towerFloorId] : progress.clearedFloorIds;
+              const isMaster = action.towerFloor % 10 === 0;
+              const isCheckpoint = action.towerFloor % 5 === 0;
+              const carry = normalizeTowerCarry(action.towerCarry);
+              const masterIndex = Math.floor(action.towerFloor / 10) - 1;
+              const master = DIGI_TOWER_SECTORS[masterIndex];
+              const tokenReward = isMaster ? master?.masterReward ?? 0 : 5 + Math.ceil(action.towerFloor / 10) * 2;
+              return {
+                ...progress,
+                highestFloor: Math.max(progress.highestFloor, action.towerFloor),
+                nextFloor: Math.min(101, Math.max(progress.nextFloor, action.towerFloor + 1)),
+                checkpointFloor: isCheckpoint ? action.towerFloor : progress.checkpointFloor,
+                clearedFloorIds,
+                defeatedMasterIds: isMaster && master ? [...new Set([...progress.defeatedMasterIds, master.masterId])] : progress.defeatedMasterIds,
+                tokens: Math.min(1_000_000, progress.tokens + (firstClear ? tokenReward : 0)),
+                carry,
+                checkpointCarry: isCheckpoint ? carry : progress.checkpointCarry,
+              };
+            })(),
+          } : {}),
+        },
+      };
+    }
+
+    case 'claimDigiTowerRest': {
+      const id = `tower-floor-${action.floor}`;
+      const progress = state.meta.digiTower;
+      if (!Number.isInteger(action.floor) || action.floor !== progress.nextFloor || action.floor < 1 || action.floor > 100 || action.floor % 10 !== 5 || progress.clearedFloorIds.includes(id)) return state;
+      const claimedRestFloorIds = [...progress.claimedRestFloorIds, id];
+      const alreadyCleared = progress.clearedFloorIds.includes(id);
+      const healedCarry = progress.carry.map((pet) => ({ ...pet, hpRatio: 1, energyRatio: 1, statusEffects: [] }));
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          lokPetTreats: state.meta.lokPetTreats + (action.choice === 'treats' ? 2 : 0),
+          digiTower: {
+            ...progress,
+            highestFloor: Math.max(progress.highestFloor, action.floor),
+            nextFloor: action.floor + 1,
+            checkpointFloor: action.floor,
+            clearedFloorIds: alreadyCleared ? progress.clearedFloorIds : [...progress.clearedFloorIds, id],
+            claimedRestFloorIds,
+            tokens: Math.min(1_000_000, progress.tokens + (action.choice === 'tokens' ? 35 + Math.ceil(action.floor / 10) * 5 : 20 + Math.ceil(action.floor / 10) * 5)),
+            carry: healedCarry,
+            checkpointCarry: healedCarry,
+          },
+        },
+      };
+    }
+
+    case 'buyDigiTowerSupply': {
+      const progress = state.meta.digiTower;
+      const cost = 50;
+      if (!progress.defeatedMasterIds.includes('nib') || progress.tokens < cost) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          lokPetTreats: Math.min(99_999, state.meta.lokPetTreats + 3),
+          digiTower: { ...progress, tokens: progress.tokens - cost },
+        },
+      };
+    }
+
+    case 'endDigiTowerClimb': {
+      const progress = state.meta.digiTower;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          digiTower: { ...progress, nextFloor: Math.min(100, progress.checkpointFloor + 1), carry: progress.checkpointCarry },
         },
       };
     }
@@ -3486,6 +3622,10 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'setHideoutPreview':
       return { ...state, meta: { ...state.meta, hideoutPreviewEnabled: action.enabled } };
+    case 'setHideoutSceneStyle':
+      return { ...state, meta: { ...state.meta, hideoutSceneStyle: action.style } };
+    case 'setHideoutSpeechBubbles':
+      return { ...state, meta: { ...state.meta, hideoutSpeechBubblesEnabled: action.enabled } };
 
     case 'setHideoutPets':
       return { ...state, meta: { ...state.meta, hideoutPets: action.mode } };
@@ -4001,6 +4141,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         ? addUnique(prev.clearedAreaIds, result.areaId)
         : prev.clearedAreaIds;
       const lokPetCatalog = recordLokPetCatalog(prev.lokPetCatalog, result.lokPets);
+      const fieldCreatureSeeds = result.fieldCreatureSeed
+        ? addUnique(prev.fieldCreatureSeeds, result.fieldCreatureSeed)
+        : prev.fieldCreatureSeeds;
       const recoveredElixirs = replenishPetElixirs(prev);
       const spentPetIds = new Set(prev.selectedLokPetIds);
       const runNow = Date.now();
@@ -4036,6 +4179,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         bestRunStreak,
         ownedUiThemeIds: discoveryIds.includes('breach-616-plate') ? addUnique(prev.ownedUiThemeIds, 'breach-616') : prev.ownedUiThemeIds,
         bestiary,
+        fieldCreatureSeeds,
         rescuedAllyIds,
         discoveryIds,
         lokPetCatalog,
@@ -4289,7 +4433,10 @@ export interface MetaContextValue {
   feedLokPetTreat: (id: string) => void;
   adoptRancherPet: (variantId: string, credCost: number) => void;
   feedRanchKibble: (petId: string, credCost: number) => void;
-  recordLokPetBattleResult: (rewards: BattleRewards, winningPetIds: string[]) => void;
+  recordLokPetBattleResult: (rewards: BattleRewards, winningPetIds: string[], towerFloor?: number, towerCarry?: DigiTowerPetCondition[]) => void;
+  claimDigiTowerRest: (floor: number, choice: 'treats' | 'tokens') => void;
+  buyDigiTowerSupply: () => void;
+  endDigiTowerClimb: () => void;
   toggleFavoriteLokPet: (id: string) => void;
   renameLokPet: (id: string, name: string) => void;
   setLokPetName: (id: string, slot: PetNameSlot, name: string) => void;
@@ -4364,6 +4511,8 @@ export interface MetaContextValue {
   setHideoutWeather: (enabled: boolean) => void;
   setHideoutSectionsCollapsedByDefault: (enabled: boolean) => void;
   setHideoutPreview: (enabled: boolean) => void;
+  setHideoutSceneStyle: (style: MetaState['hideoutSceneStyle']) => void;
+  setHideoutSpeechBubbles: (enabled: boolean) => void;
   setHideoutPets: (mode: MetaState['hideoutPets']) => void;
   setHideoutEvents: (mode: MetaState['hideoutEvents']) => void;
   setHideoutInteractive: (enabled: boolean) => void;
@@ -4500,10 +4649,13 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const adoptRancherPet = useCallback((variantId: string, credCost: number) => dispatch({ type: 'adoptRancherPet', variantId, credCost }), []);
   const feedRanchKibble = useCallback((petId: string, credCost: number) => dispatch({ type: 'feedRanchKibble', petId, credCost }), []);
   const recordLokPetBattleResult = useCallback(
-    (rewards: BattleRewards, winningPetIds: string[]) =>
-      dispatch({ type: 'recordLokPetBattleResult', rewards, winningPetIds }),
+    (rewards: BattleRewards, winningPetIds: string[], towerFloor?: number, towerCarry?: DigiTowerPetCondition[]) =>
+      dispatch({ type: 'recordLokPetBattleResult', rewards, winningPetIds, ...(towerFloor ? { towerFloor, towerCarry } : {}) }),
     [],
   );
+  const claimDigiTowerRest = useCallback((floor: number, choice: 'treats' | 'tokens') => dispatch({ type: 'claimDigiTowerRest', floor, choice }), []);
+  const buyDigiTowerSupply = useCallback(() => dispatch({ type: 'buyDigiTowerSupply' }), []);
+  const endDigiTowerClimb = useCallback(() => dispatch({ type: 'endDigiTowerClimb' }), []);
   const toggleFavoriteLokPet = useCallback((id: string) => dispatch({ type: 'toggleFavoriteLokPet', id }), []);
   const renameLokPet = useCallback((id: string, name: string) => dispatch({ type: 'renameLokPet', id, name }), []);
   const setLokPetName = useCallback((id: string, slot: PetNameSlot, name: string) => dispatch({ type: 'setLokPetName', id, slot, name }), []);
@@ -4616,6 +4768,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setHideoutPreview', enabled }),
     [],
   );
+  const setHideoutSceneStyle = useCallback((style: MetaState['hideoutSceneStyle']) => dispatch({ type: 'setHideoutSceneStyle', style }), []);
+  const setHideoutSpeechBubbles = useCallback((enabled: boolean) => dispatch({ type: 'setHideoutSpeechBubbles', enabled }), []);
   const setHideoutPets = useCallback((mode: MetaState['hideoutPets']) => dispatch({ type: 'setHideoutPets', mode }), []);
   const setHideoutEvents = useCallback((mode: MetaState['hideoutEvents']) => dispatch({ type: 'setHideoutEvents', mode }), []);
   const setHideoutInteractive = useCallback((enabled: boolean) => dispatch({ type: 'setHideoutInteractive', enabled }), []);
@@ -4834,6 +4988,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       adoptRancherPet,
       feedRanchKibble,
       recordLokPetBattleResult,
+      claimDigiTowerRest,
+      buyDigiTowerSupply,
+      endDigiTowerClimb,
       toggleFavoriteLokPet,
       renameLokPet,
       setLokPetName,
@@ -4905,6 +5062,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setHideoutWeather,
       setHideoutSectionsCollapsedByDefault,
       setHideoutPreview,
+      setHideoutSceneStyle,
+      setHideoutSpeechBubbles,
       setHideoutPets,
       setHideoutEvents,
       setHideoutInteractive,
@@ -5014,6 +5173,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     adoptRancherPet,
     feedRanchKibble,
     recordLokPetBattleResult,
+    claimDigiTowerRest,
+    buyDigiTowerSupply,
+    endDigiTowerClimb,
     toggleFavoriteLokPet,
     renameLokPet,
     setLokPetName,
@@ -5085,6 +5247,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setHideoutWeather,
     setHideoutSectionsCollapsedByDefault,
     setHideoutPreview,
+    setHideoutSceneStyle,
+    setHideoutSpeechBubbles,
     setHideoutPets,
     setHideoutEvents,
     setHideoutInteractive,

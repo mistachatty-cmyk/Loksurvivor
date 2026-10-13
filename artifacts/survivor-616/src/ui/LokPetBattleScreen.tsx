@@ -21,11 +21,15 @@ import {
   Gift,
   Activity,
   Bot,
+  RadioTower,
 } from 'lucide-react';
 
 import { HANDHELD_DIGISCOPE_COST, useMeta } from '@/game/state/metaStore';
 import { RigPortrait } from '@/ui/RigPortrait';
 import { PetEvolutionPanel } from '@/ui/PetEvolutionPanel';
+import { DigiTowerPanel } from '@/ui/DigiTowerPanel';
+import { getDigiTowerFloor, type DigiTowerFloorDef } from '@/game/data/digiTower';
+import type { DigiTowerPetCondition, LokPetElement, SavedLokPet } from '@/game/types';
 import { evolvedRig, petEvolvedLook } from '@/game/engine/petEvolution';
 import {
   lokPetRig,
@@ -56,11 +60,10 @@ import type {
   LeagueTierDef,
   LokPetBattleMove,
 } from '@/game/engine/lokPetBattleTypes';
-import type { LokPetElement, SavedLokPet } from '@/game/types';
 
 export interface LokPetBattleScreenProps {
   onReturnToHub: () => void;
-  initialTab?: 'league' | 'sparring' | 'kennel';
+  initialTab?: 'league' | 'sparring' | 'kennel' | 'tower';
   initialTierId?: string;
 }
 
@@ -76,9 +79,10 @@ export function LokPetBattleScreen({
     buyHandheldDigiScope,
     toggleFavoriteLokPet,
     equipLokPetTrinket,
+    endDigiTowerClimb,
   } = useMeta();
 
-  const [activeTab, setActiveTab] = useState<'league' | 'sparring' | 'kennel'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'league' | 'sparring' | 'kennel' | 'tower'>(initialTab);
   const [battleState, setBattleState] = useState<BattleState | null>(null);
 
   // Lit Corner Sparring Sandbox Config
@@ -270,11 +274,76 @@ export function LokPetBattleScreen({
     setBattleState(battle);
   };
 
+  const startDigiTowerBattle = (floorDef: DigiTowerFloorDef, practice = false) => {
+    const selectedParty = meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id)).slice(0, 3);
+    const playerParty = selectedParty.length > 0 ? selectedParty : meta.savedLokPets.slice(0, 3);
+    const opponents = floorDef.kind === 'mirror'
+      ? playerParty.map((pet) => ({ variantId: pet.roll.variantId, level: pet.level ?? 1, name: `Mirror ${pet.name ?? pet.roll.name}` }))
+      : floorDef.opponents;
+    const battle = createBattle({
+      gameMode: 'digi-tower',
+      playerPets: playerParty,
+      opponentTeam: opponents,
+      digiTowerFloor: floorDef.floor,
+      digiTowerRule: floorDef.rule,
+      digiTowerPractice: practice,
+      digiTowerRepeat: !practice && meta.digiTower.clearedFloorIds.includes(floorDef.id),
+    });
+    const carryByPetId = new Map((practice ? [] : meta.digiTower.carry).map((entry) => [entry.petId, entry]));
+    battle.playerTeam = battle.playerTeam.map((pet) => {
+      const condition = pet.originalSavedPetId ? carryByPetId.get(pet.originalSavedPetId) : undefined;
+      if (!condition) return pet;
+      const hp = Math.min(pet.maxHp, Math.max(0, Math.round(pet.maxHp * condition.hpRatio)));
+      return {
+        ...pet,
+        hp,
+        energy: Math.min(pet.maxEnergy, Math.max(0, Math.round(pet.maxEnergy * condition.energyRatio))),
+        statusEffects: condition.statusEffects as typeof pet.statusEffects,
+        fainted: hp <= 0,
+      };
+    });
+    const firstAblePet = battle.playerTeam.findIndex((pet) => !pet.fainted);
+    if (firstAblePet >= 0) battle.activePlayerIndex = firstAblePet;
+    setBattleState(battle);
+  };
+
+  const towerPartyCondition = (team: BattlePet[]): DigiTowerPetCondition[] => team.flatMap((pet) => pet.originalSavedPetId ? [{
+    petId: pet.originalSavedPetId,
+    hpRatio: pet.maxHp > 0 ? pet.hp / pet.maxHp : 0,
+    energyRatio: pet.maxEnergy > 0 ? pet.energy / pet.maxEnergy : 0,
+    statusEffects: pet.statusEffects.map((effect) => ({ ...effect })),
+  }] : []);
+
+  const leaveBattle = () => {
+    if (battleState?.gameMode === 'digi-tower') {
+      setActiveTab('tower');
+    }
+    setBattleState(null);
+  };
+
   // Claim Rewards & Finish
   const handleClaimVictory = () => {
     if (!battleState || !battleState.rewards) return;
     const winningIds = battleState.playerTeam.map((p) => p.originalSavedPetId).filter(Boolean) as string[];
-    recordLokPetBattleResult(battleState.rewards, winningIds);
+    if (battleState.gameMode === 'digi-tower') {
+      recordLokPetBattleResult(
+        battleState.rewards,
+        winningIds,
+        battleState.digiTowerPractice ? undefined : battleState.floor,
+        battleState.digiTowerPractice ? undefined : towerPartyCondition(battleState.playerTeam),
+      );
+      setActiveTab('tower');
+    } else {
+      recordLokPetBattleResult(battleState.rewards, winningIds);
+    }
+    setBattleState(null);
+  };
+
+  const handleDefeat = () => {
+    if (battleState?.gameMode === 'digi-tower' && !battleState.digiTowerPractice) {
+      endDigiTowerClimb();
+      setActiveTab('tower');
+    }
     setBattleState(null);
   };
 
@@ -364,14 +433,14 @@ export function LokPetBattleScreen({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setBattleState(null)}
+              onClick={leaveBattle}
               className="flex items-center gap-1.5 rounded border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-700"
             >
               <ArrowLeft className="h-4 w-4" /> Forfeit / Exit
             </button>
             <span className="h-4 w-px bg-slate-800" />
             <span className="text-xs font-mono uppercase tracking-widest text-slate-400">
-              Round {battleState.turn} · {battleState.gameMode === 'league' ? 'Sanctum League' : 'Sparring Dojo'}
+              {battleState.gameMode === 'digi-tower' ? `Floor ${battleState.floor} · ${battleState.digiTowerRule?.title ?? 'DIGI-Tower'}` : `Round ${battleState.turn} · ${battleState.gameMode === 'league' ? 'Sanctum League' : 'Sparring Dojo'}`}
             </span>
           </div>
 
@@ -828,10 +897,14 @@ export function LokPetBattleScreen({
                     <Trophy className="h-8 w-8 animate-bounce" />
                   </div>
                   <h2 className="mt-4 text-2xl font-black uppercase tracking-wider text-white">
-                    VICTORY ACHIEVED!
+                    {battleState.gameMode === 'digi-tower' ? `FLOOR ${battleState.floor} CLEARED` : 'VICTORY ACHIEVED!'}
                   </h2>
                   <p className="mt-1 text-sm text-slate-300">
-                    Your companion team proved victorious in the Sanctum Coliseum!
+                    {battleState.gameMode === 'digi-tower'
+                      ? battleState.digiTowerPractice
+                        ? `Practice clear in ${getDigiTowerFloor(battleState.floor ?? 1).sector.name}. Your active climb and saved party condition were left untouched.`
+                        : `Your team holds the line in ${getDigiTowerFloor(battleState.floor ?? 1).sector.name}. Its condition carries forward; the checkpoint is saved every five floors.`
+                      : 'Your companion team proved victorious in the Sanctum Coliseum!'}
                   </p>
 
                   {battleState.rewards && (
@@ -853,6 +926,13 @@ export function LokPetBattleScreen({
                           <span className="text-[10px] text-slate-400">TREATS</span>
                         </div>
                       </div>
+                      {battleState.gameMode === 'digi-tower' && !battleState.digiTowerPractice && (
+                        <div className="mt-2 rounded border border-cyan-300/25 bg-cyan-300/10 p-2 text-center font-mono text-xs text-cyan-100">
+                          {battleState.digiTowerRepeat
+                            ? 'Retry clear · no duplicate Tower Tokens'
+                            : `First-clear grant · +${getDigiTowerFloor(battleState.floor ?? 1).firstClearTokens} Tower Tokens`}
+                        </div>
+                      )}
 
                       {/* Level Ups & Digi Evolutions */}
                       {battleState.rewards.levelUps.length > 0 && (
@@ -888,7 +968,7 @@ export function LokPetBattleScreen({
                     onClick={handleClaimVictory}
                     className="mt-6 w-full rounded-lg bg-gradient-to-r from-amber-500 to-yellow-400 py-3 font-bold uppercase tracking-wider text-black transition hover:brightness-110 shadow-lg"
                   >
-                    Claim Rewards & Return
+                    {battleState.gameMode === 'digi-tower' ? battleState.digiTowerPractice ? 'Return from Practice' : 'Save Floor & Return to Tower' : 'Claim Rewards & Return'}
                   </button>
                 </>
               ) : (
@@ -900,14 +980,18 @@ export function LokPetBattleScreen({
                     COMPANIONS COLLAPSED
                   </h2>
                   <p className="mt-1 text-sm text-slate-400">
-                    Your team fell in battle. Tend to your companions in the kennel and try again!
+                    {battleState.gameMode === 'digi-tower'
+                      ? battleState.digiTowerPractice
+                        ? 'Practice ended. Your campaign floor, checkpoint, and expedition condition are unchanged.'
+                        : `The expedition ends here. Your completed floors and last checkpoint hold; the next climb resumes after floor ${meta.digiTower.checkpointFloor || 0}.`
+                      : 'Your team fell in battle. Tend to your companions in the kennel and try again!'}
                   </p>
                   <button
                     type="button"
-                    onClick={() => setBattleState(null)}
+                    onClick={handleDefeat}
                     className="mt-6 w-full rounded-lg border border-slate-700 bg-slate-800 py-3 font-bold uppercase tracking-wider text-white transition hover:bg-slate-700"
                   >
-                    Return to Arena Hub
+                    {battleState.gameMode === 'digi-tower' ? battleState.digiTowerPractice ? 'Return to Tower' : 'Recover at Last Checkpoint' : 'Return to Arena Hub'}
                   </button>
                 </>
               )}
@@ -958,6 +1042,11 @@ export function LokPetBattleScreen({
             <span className="text-slate-400">Badges:</span>
             <span className="font-bold text-cyan-300">{(meta.lokPetBattleBadges || []).length} / 5</span>
           </div>
+          <div className="rounded-lg border border-cyan-300/20 bg-cyan-950/25 px-3 py-1.5 flex items-center gap-1.5">
+            <RadioTower className="h-4 w-4 text-cyan-300" />
+            <span className="text-slate-400">Tower:</span>
+            <span className="font-bold text-cyan-100">{meta.digiTower.tokens || 0} tokens</span>
+          </div>
         </div>
       </header>
 
@@ -985,6 +1074,19 @@ export function LokPetBattleScreen({
           }`}
         >
           <Trophy className="h-4 w-4" /> Sanctum League Circuit
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('tower')}
+          className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition ${
+            activeTab === 'tower'
+              ? 'border-cyan-300 bg-cyan-400/15 text-cyan-100'
+              : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-white'
+          }`}
+          data-testid="button-battle-tab-digi-tower"
+        >
+          <RadioTower className="h-4 w-4" /> DIGI-Tower · {meta.digiTower.highestFloor}/100
         </button>
 
         <button
@@ -1242,6 +1344,10 @@ export function LokPetBattleScreen({
             })}
           </div>
         </div>
+      )}
+
+      {activeTab === 'tower' && (
+        <DigiTowerPanel onLaunchFloor={startDigiTowerBattle} />
       )}
 
       {/* TAB 3: KENNEL & COMPANION MANAGEMENT */}

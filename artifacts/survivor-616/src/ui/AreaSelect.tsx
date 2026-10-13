@@ -75,6 +75,9 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
   const filteredLocked = lockedAreas.filter((a) => {
     return inFilter(a, filter);
   });
+  const recommendedArea = unlockedAreas.find((area) => areaCategory(area) === 'standard' && !meta.clearedAreaIds.includes(area.id))
+    ?? unlockedAreas.find((area) => areaCategory(area) === 'standard')
+    ?? unlockedAreas[0];
 
   const allAuthoredAreas = [...unlockedAreas, ...lockedAreas];
   const endlessCount = allAuthoredAreas.filter((area) => areaCategory(area) === 'endless').length;
@@ -99,6 +102,17 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
       <div className="mb-6">
         <FirstNightBoard />
       </div>
+
+      {recommendedArea ? (
+        <section className="mb-6 flex flex-col gap-3 border border-cyan-200/30 bg-cyan-950/20 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="section-recommended-map">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[.2em] text-cyan-200">Recommended next run</p>
+            <h2 className="mt-1 truncate text-lg font-black uppercase text-white">{recommendedArea.name}</h2>
+            <p className="mt-1 line-clamp-2 text-xs text-white/65">{recommendedArea.description}</p>
+          </div>
+          <button type="button" onClick={() => onLaunch(recommendedArea.id, selectedChallengeIds)} className="min-h-11 shrink-0 border border-cyan-100/60 bg-cyan-100 px-4 font-mono text-[10px] font-black uppercase tracking-widest text-slate-950 hover:bg-white" data-testid="button-recommended-map">Play this map</button>
+        </section>
+      ) : null}
 
       {challenges.length > 0 && (
         <section className="mb-6 border border-red-500/30 bg-red-950/10 p-4 sm:p-5" data-testid="section-run-contracts">

@@ -368,6 +368,8 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setHideoutWeather,
     setHideoutSectionsCollapsedByDefault,
     setHideoutPreview,
+    setHideoutSceneStyle,
+    setHideoutSpeechBubbles,
     setHideoutPets,
     setHideoutEvents,
     setHideoutInteractive,
@@ -1083,6 +1085,20 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
               </div>
               {meta.hideoutPreviewEnabled ? (
                 <div className="mt-3 border border-border/70 bg-background/50 p-4" data-testid="settings-hideout-pets">
+                  <h3 className="text-sm font-black uppercase tracking-wide text-white">{t('hideout.scene.title' as never)}</h3>
+                  <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('hideout.scene.description' as never)}</p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('hideout.scene.title' as never)}>
+                    {([['cage', 'hideout.scene.cage'], ['block', 'hideout.scene.oldBlock']] as const).map(([style, labelKey]) => (
+                      <button key={style} type="button" onClick={() => setHideoutSceneStyle(style)} aria-pressed={meta.hideoutSceneStyle === style} className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${meta.hideoutSceneStyle === style ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`} data-testid={`settings-hideout-scene-${style}`}>{t(labelKey as never)}</button>
+                    ))}
+                  </div>
+                  <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('hideout.scene.chat' as never)}</h3>
+                  <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('hideout.scene.chatDescription' as never)}</p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('hideout.scene.chat' as never)}>
+                    {([true, false] as const).map((enabled) => (
+                      <button key={String(enabled)} type="button" onClick={() => setHideoutSpeechBubbles(enabled)} aria-pressed={meta.hideoutSpeechBubblesEnabled === enabled} className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${meta.hideoutSpeechBubblesEnabled === enabled ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`} data-testid={`settings-hideout-chat-${enabled ? 'on' : 'off'}`}>{t(enabled ? ('settings.hideout.on' as never) : ('settings.hideout.off' as never))}</button>
+                    ))}
+                  </div>
                   <h3 className="text-sm font-black uppercase tracking-wide text-white">Pets in the hideout</h3>
                   <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
                     Your LokPets walk the strip with you, bounce to the music, nap and play. Tap one to pet it, tap the ground to call it over.

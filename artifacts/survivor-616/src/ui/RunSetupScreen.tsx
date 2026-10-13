@@ -12,12 +12,16 @@ import { petNameplate } from '@/game/engine/petGrowth';
 import { RigPortrait } from '@/ui/RigPortrait';
 import { THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
 import { detectRuntimePerformanceTier, RUNTIME_TIER_LABELS } from '@/game/performanceProfile';
+import { customMapToArea } from '@/game/data/customMaps';
+import { availableChallengeContracts } from '@/game/data/vendor';
 
 type SetupStep = 'companion' | 'look';
 
 export interface RunSetupScreenProps {
   /** Launch continues into a run; manage returns to the hideout after saving. */
   intent: 'launch' | 'manage';
+  areaId?: string;
+  challengeIds?: string[];
   onBack: () => void;
   onComplete: () => void;
 }
@@ -50,9 +54,10 @@ function selectClass(selected: boolean) {
     : 'border-white/15 bg-black/25 text-white/65 hover:border-white/45 hover:text-white';
 }
 
-export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenProps) {
+export function RunSetupScreen({ intent, areaId, challengeIds = [], onBack, onComplete }: RunSetupScreenProps) {
   const {
     meta,
+    unlockedAreas,
     selectedCharacter,
     setLokPetLoadout,
     setLokPetArtStyle,
@@ -88,6 +93,13 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
   const activeSwatchId = activeUiThemeSwatchId(meta);
   const paletteIndex = Math.max(0, ownedPalettes.findIndex((palette) => palette.id === meta.activePaletteId));
   const runtimeTier = detectRuntimePerformanceTier();
+  const customMap = areaId ? meta.customMaps.find((map) => map.id === areaId) : undefined;
+  const briefingArea = areaId ? unlockedAreas.find((area) => area.id === areaId) ?? (customMap ? customMapToArea(customMap) : undefined) : undefined;
+  const briefingPets = meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && (pet.starter || pet.stamina > 0));
+  const briefingContracts = availableChallengeContracts(meta).filter((contract) => challengeIds.includes(contract.id));
+  const briefingModifiers = Object.entries(meta.runModifiers)
+    .filter(([, enabled]) => enabled)
+    .map(([key]) => key.replace(/Enabled$/, '').replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`).trim());
 
   // One slot behaves like a radio button, as before; Collector characters can take a full team.
   const togglePet = (id: string) => {
@@ -123,6 +135,27 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
   return (
     <main className="min-h-[100dvh] bg-[#05060b] px-3 py-4 text-white sm:px-6 sm:py-7" data-testid="screen-run-setup">
       <div className="mx-auto w-full max-w-5xl">
+        {isLaunch && briefingArea ? (
+          <section className="mb-4 border border-cyan-200/25 bg-cyan-950/15 p-4 sm:p-5" data-testid="run-briefing-card">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-[10px] font-black uppercase tracking-[.22em] text-cyan-200">Run briefing · ready when you are</p>
+                <h2 className="mt-1 text-lg font-black uppercase text-white">{briefingArea.name}</h2>
+                <p className="mt-1 max-w-3xl text-xs leading-relaxed text-white/70">{briefingArea.description}</p>
+              </div>
+              <div className="grid min-w-44 gap-2 text-right sm:text-left">
+                <p className="font-mono text-[10px] uppercase text-white/55">Operator <span className="ml-1 font-bold text-white">{selectedCharacter.name}</span></p>
+                <p className="font-mono text-[10px] uppercase text-white/55">LokPets <span className="ml-1 font-bold text-white">{briefingPets.length ? briefingPets.map((pet) => pet.name ?? pet.roll.name).join(', ') : 'None selected'}</span></p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-white/10 pt-3 font-mono text-[9px] uppercase tracking-wider text-white/55">
+              <span>Move: WASD / arrows or touch pad</span>
+              <span>Dash: Space or touch button</span>
+              <span>Modifiers: {briefingModifiers.length ? briefingModifiers.join(', ') : 'Standard rules'}</span>
+              {briefingContracts.length ? <span className="text-amber-200">Contracts: {briefingContracts.map((contract) => contract.name).join(', ')}</span> : <span>No optional contracts</span>}
+            </div>
+          </section>
+        ) : null}
         <header className="flex items-start justify-between gap-4 border-b border-white/15 pb-4">
           <div>
             <button
@@ -390,7 +423,7 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
                 {isLaunch ? 'Start the run' : 'Save my look'} <ArrowLeft className="h-4 w-4 rotate-180" />
               </button>
             </div>
-            <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-wider text-white/40">Change this anytime from the floating Looks & LokPets button.</p>
+            <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-wider text-white/40">Change this anytime from Looks & LokPets in the Hideout dock.</p>
           </section>
         )}
         </div>

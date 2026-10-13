@@ -363,6 +363,11 @@ export function createBattle(options: {
   dummyPresetId?: string;
   dummyCustomVariant?: string;
   dummyLevel?: number;
+  opponentTeam?: Array<{ variantId: string; level: number; name?: string }>;
+  digiTowerFloor?: number;
+  digiTowerRule?: BattleState['digiTowerRule'];
+  digiTowerPractice?: boolean;
+  digiTowerRepeat?: boolean;
 }): BattleState {
   let playerTeam = options.playerPets.map(convertSavedPetToBattlePet);
 
@@ -383,7 +388,9 @@ export function createBattle(options: {
 
   // Generate Enemy Team
   let enemyTeam: BattlePet[] = [];
-  if (options.tierDef) {
+  if (options.opponentTeam) {
+    enemyTeam = options.opponentTeam.map((entry) => generateOpponentPet(entry.variantId, entry.level, entry.name));
+  } else if (options.tierDef) {
     enemyTeam = options.tierDef.team.map((entry) =>
       generateOpponentPet(entry.variantId, entry.level, entry.name),
     );
@@ -417,7 +424,10 @@ export function createBattle(options: {
   return {
     gameMode: options.gameMode,
     tierId: options.tierDef?.id,
-    floor: 1,
+    floor: options.digiTowerFloor ?? 1,
+    digiTowerRule: options.digiTowerRule,
+    digiTowerPractice: options.digiTowerPractice,
+    digiTowerRepeat: options.digiTowerRepeat,
     playerTeam,
     activePlayerIndex: 0,
     enemyTeam,
@@ -563,6 +573,9 @@ export function executeMove(
       const isCrit = Math.random() < attacker.critRate;
       const critMultiplier = isCrit ? 1.75 : 1.0;
       const elementResult = getElementalMultiplier(move.element, defender.element);
+      const towerRotation = state.digiTowerRule?.elementRotation;
+      const activeTowerElement = towerRotation?.length ? towerRotation[(Math.max(1, state.turn) - 1) % towerRotation.length] : state.digiTowerRule?.elementBoost;
+      const towerElementMultiplier = state.gameMode === 'digi-tower' && activeTowerElement === move.element ? 1.2 : 1;
 
       // Status boosts -- magnitude comes from the move that applied it, not a flat number.
       const empowerEffect = attacker.statusEffects.find((e) => e.type === 'empower');
@@ -572,7 +585,7 @@ export function executeMove(
       const effectiveDef = defender.isGuarding ? defender.defense * 1.8 : defender.defense;
       const rawDamage = (attacker.attack * move.power * 2.2 * empowered) / (1 + effectiveDef * 0.03);
       const variance = 0.9 + Math.random() * 0.2; // 90% - 110%
-      let finalDamage = Math.max(1, Math.floor(rawDamage * critMultiplier * elementResult.multiplier * variance));
+      let finalDamage = Math.max(1, Math.floor(rawDamage * critMultiplier * elementResult.multiplier * towerElementMultiplier * variance));
 
       // Shield absorption
       const shieldEffect = defender.statusEffects.find((e) => e.type === 'shield');
@@ -996,6 +1009,13 @@ export function calculateBattleRewards(state: BattleState): BattleRewards {
     baseCardCredits = 50;
     baseTreats = 2;
     baseExp = scalePetExp(250);
+  } else if (state.gameMode === 'digi-tower') {
+    const floor = Math.max(1, state.floor ?? 1);
+    const repeatMultiplier = state.digiTowerPractice || state.digiTowerRepeat ? 0.25 : 1;
+    baseCred = state.digiTowerPractice ? 0 : Math.floor((100 + floor * 12) * repeatMultiplier);
+    baseCardCredits = 0;
+    baseTreats = !state.digiTowerPractice && !state.digiTowerRepeat && floor % 10 === 0 ? 3 : 0;
+    baseExp = scalePetExp(Math.round((100 + floor * 22) * repeatMultiplier));
   }
 
   const levelUps: BattleRewards['levelUps'] = [];

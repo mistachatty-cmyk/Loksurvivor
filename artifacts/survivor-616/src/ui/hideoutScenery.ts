@@ -11,6 +11,7 @@
 import type { HideoutBiome } from '@/game/types';
 
 export interface SceneryOptions {
+  sceneStyle?: 'cage' | 'block';
   biome: HideoutBiome;
   accent: string;
   w: number;
@@ -86,6 +87,44 @@ function skyline(
 function drawBackdrop(ctx: CanvasRenderingContext2D, o: SceneryOptions) {
   const { biome, accent, w, groundY, now } = o;
   const t = o.reduceMotion ? 0 : now;
+  if (o.sceneStyle === 'cage') {
+    // A compact holding bay around the real hideout cast. Keep this behind the
+    // characters so the cage reads as a place they occupy, not an overlay.
+    const wall = ctx.createLinearGradient(0, 0, 0, groundY);
+    wall.addColorStop(0, '#11141d');
+    wall.addColorStop(1, '#24252d');
+    ctx.fillStyle = wall;
+    ctx.fillRect(0, 0, w, groundY);
+    ctx.fillStyle = '#090b10';
+    ctx.fillRect(0, groundY * 0.12, w, groundY * 0.12);
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    ctx.fillRect(0, groundY * 0.24, w, 2);
+    // Back mesh catches the accent light; the thicker cage frame gives the room
+    // a clear silhouette at phone sizes without obscuring the occupants.
+    ctx.save();
+    ctx.strokeStyle = rgba(accent, 0.11);
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= w; x += 24) {
+      ctx.beginPath(); ctx.moveTo(x, groundY * 0.2); ctx.lineTo(x, groundY * 0.83); ctx.stroke();
+    }
+    for (let y = groundY * 0.28; y < groundY * 0.83; y += 20) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+    ctx.restore();
+    const lamp = ctx.createRadialGradient(w * 0.5, groundY * 0.4, 0, w * 0.5, groundY * 0.4, w * 0.48);
+    lamp.addColorStop(0, rgba(accent, 0.12 + Math.sin(t / 1700) * 0.025));
+    lamp.addColorStop(1, rgba(accent, 0));
+    ctx.fillStyle = lamp;
+    ctx.fillRect(0, 0, w, groundY);
+    // Header rail and corner posts.
+    ctx.fillStyle = '#313641';
+    ctx.fillRect(0, groundY * 0.18, w, 5);
+    ctx.fillRect(0, groundY * 0.18, 5, groundY * 0.68);
+    ctx.fillRect(w - 5, groundY * 0.18, 5, groundY * 0.68);
+    ctx.fillStyle = rgba(accent, 0.75);
+    ctx.fillRect(8, groundY * 0.18 + 1, Math.max(16, w * 0.14), 2);
+    return;
+  }
   switch (biome) {
     case 'sanctum': {
       // Warm bar room: shuttered windows with rain-blur light and an awning edge.
@@ -257,6 +296,24 @@ export function drawSceneryBack(ctx: CanvasRenderingContext2D, o: SceneryOptions
 
 /** Soft vignette over the finished frame so the edges fall away into the page. */
 export function drawSceneryFront(ctx: CanvasRenderingContext2D, o: SceneryOptions): void {
+  if (o.sceneStyle === 'cage') {
+    // Foreground bars are deliberately thin and dim so character silhouettes
+    // and their speech bubbles stay legible.
+    ctx.save();
+    ctx.strokeStyle = 'rgba(5,7,12,0.66)';
+    ctx.lineWidth = 3;
+    for (let x = 18; x < o.w; x += 38) {
+      ctx.beginPath(); ctx.moveTo(x, o.groundY * 0.2); ctx.lineTo(x, o.groundY * 0.87); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(210,220,238,0.18)';
+    ctx.lineWidth = 1;
+    for (let x = 18; x < o.w; x += 38) {
+      ctx.beginPath(); ctx.moveTo(x - 1, o.groundY * 0.2); ctx.lineTo(x - 1, o.groundY * 0.87); ctx.stroke();
+    }
+    ctx.fillStyle = '#252a35';
+    ctx.fillRect(0, o.groundY * 0.85, o.w, 4);
+    ctx.restore();
+  }
   const side = ctx.createLinearGradient(0, 0, o.w, 0);
   side.addColorStop(0, 'rgba(0,0,0,0.45)');
   side.addColorStop(0.18, 'rgba(0,0,0,0)');

@@ -2373,6 +2373,10 @@ export interface MetaState {
   hideoutSectionsCollapsedByDefault: boolean;
   /** The animated walking-rig hero at the top of the Hideout screen. On by default; off reverts to the classic static layout. */
   hideoutPreviewEnabled: boolean;
+  /** Backdrop around real operator/crew/LokPet rigs in the hideout scene. */
+  hideoutSceneStyle: 'cage' | 'block';
+  /** Show the canvas dialogue boxes above hideout actors and props. */
+  hideoutSpeechBubblesEnabled: boolean;
   /** Which pets walk the Hideout strip: all selected pets and the partner, only the partner, or none. */
   hideoutPets: 'all' | 'companion' | 'off';
   /** How often small pet events play in the Hideout: normal, rarely, or never. */
@@ -2420,6 +2424,8 @@ export interface MetaState {
   worldColorFullRecolorEnabled: boolean;
   /** Sector Command missions cleared at least once. */
   completedSectorMissionIds: string[];
+  /** DIGI-Tower campaign record; only completed floor IDs grant first-clear Tokens. */
+  digiTower: DigiTowerProgress;
   /** Whether device tilt steers the player on supported hardware. */
   gyroEnabled: boolean;
   /** Tilt sensitivity, 0.5 (gentle) .. 2 (twitchy). */
@@ -2460,6 +2466,8 @@ export interface MetaState {
   petElixirUpdatedAt: number;
   /** enemyId -> total defeats, drives the bestiary. */
   bestiary: Record<string, number>;
+  /** Seeded trait specimens catalogued on first district clears. */
+  fieldCreatureSeeds: string[];
   totalKills: number;
   /** Lifetime kills of enemies carrying each random quirk, by quirk id. */
   quirkKills: Record<string, number>;
@@ -2714,6 +2722,28 @@ export interface MetaState {
   cardCustomizationsByCardId: Record<string, { frame?: string; overlay?: string; companionSeal?: string }>;
 }
 
+export interface DigiTowerPetCondition {
+  petId: string;
+  /** Current HP as a fraction of max HP, saved at the last cleared floor. */
+  hpRatio: number;
+  /** Current energy as a fraction of max energy. */
+  energyRatio: number;
+  statusEffects: Array<{ type: string; duration: number; value: number; sourcePetName: string }>;
+}
+
+export interface DigiTowerProgress {
+  highestFloor: number;
+  nextFloor: number;
+  checkpointFloor: number;
+  clearedFloorIds: string[];
+  defeatedMasterIds: string[];
+  claimedRestFloorIds: string[];
+  tokens: number;
+  /** Party condition is committed only after a floor clear, so quitting mid-floor is recoverable. */
+  carry: DigiTowerPetCondition[];
+  checkpointCarry: DigiTowerPetCondition[];
+}
+
 export type ThreatAngleMode = 'standard' | 'pincer' | 'cardinal' | 'spiral' | 'corners';
 export type ThreatEventId = 'emp-storm' | 'gravity-anomaly' | 'glitch-surge' | 'solar-flare' | 'blood-overclock' | 'swarm-frenzy';
 
@@ -2839,6 +2869,8 @@ export interface RunResult {
   };
   /** City relic knowledge found by clearing a district for the first time. */
   newlyDiscoveredRelicIds?: string[];
+  /** Seeded trait creature found on a district's first successful clear. */
+  fieldCreatureSeed?: string;
   /** Optional district setpiece encounter state from this run. */
   districtIncursion?: {
     id: string;
