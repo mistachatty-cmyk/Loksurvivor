@@ -64,6 +64,8 @@
   "hub.room.music.description": "気分を整える",
   "hub.room.studio.label": "スタジオ",
   "hub.room.studio.description": "リミックス＆レコーディング",
+  "hub.room.locker.label": "個人ロッカー",
+  "hub.room.locker.description": "あなたのキャラクターと作品",
   "hub.room.recovery.label": "回復",
   "hub.room.recovery.description": "乗組員に息を吹き込んでください",
   "hub.room.vendor.label": "補給官",

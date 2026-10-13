@@ -64,6 +64,8 @@
   "hub.room.music.description": "Mettre l'ambiance",
   "hub.room.studio.label": "Atelier",
   "hub.room.studio.description": "Remixer et enregistrer",
+  "hub.room.locker.label": "Casier personnel",
+  "hub.room.locker.description": "Vos personnages et créations",
   "hub.room.recovery.label": "Récupération",
   "hub.room.recovery.description": "Laisse l'équipage respirer",
   "hub.room.vendor.label": "Intendant",

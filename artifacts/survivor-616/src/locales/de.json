@@ -64,6 +64,8 @@
   "hub.room.music.description": "Sorgen Sie für Stimmung",
   "hub.room.studio.label": "Studio",
   "hub.room.studio.description": "Remixen und aufnehmen",
+  "hub.room.locker.label": "Persönlicher Spind",
+  "hub.room.locker.description": "Deine Charaktere und Kreationen",
   "hub.room.recovery.label": "Erholung",
   "hub.room.recovery.description": "Lassen Sie die Crew atmen",
   "hub.room.vendor.label": "Quartiermeister",

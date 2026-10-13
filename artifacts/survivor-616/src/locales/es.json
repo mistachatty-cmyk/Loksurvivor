@@ -64,6 +64,8 @@
   "hub.room.music.description": "Establecer el estado de ánimo",
   "hub.room.studio.label": "Estudio",
   "hub.room.studio.description": "Remezclar y grabar",
+  "hub.room.locker.label": "Casillero personal",
+  "hub.room.locker.description": "Tus personajes y creaciones.",
   "hub.room.recovery.label": "Recuperación",
   "hub.room.recovery.description": "Deja que la tripulación respire",
   "hub.room.vendor.label": "Oficial de intendencia",
