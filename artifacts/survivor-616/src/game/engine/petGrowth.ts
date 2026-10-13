@@ -92,10 +92,10 @@ export interface BondResult {
   gained: number;
 }
 
-export function applyBond(pet: Pick<SavedLokPet, 'bond' | 'bondDay' | 'bondToday'>, source: BondSource, now: number): BondResult {
+export function applyBond(pet: Pick<SavedLokPet, 'bond' | 'bondDay' | 'bondToday'>, source: BondSource, now: number, bonus = 0): BondResult {
   const day = bondDayKey(now);
   const usedToday = pet.bondDay === day ? Math.max(0, pet.bondToday ?? 0) : 0;
-  const gained = Math.max(0, Math.min(BOND_GAIN[source], BOND_DAILY_CAP - usedToday));
+  const gained = Math.max(0, Math.min(BOND_GAIN[source] + Math.max(0, Math.floor(bonus)), BOND_DAILY_CAP - usedToday));
   return { bond: Math.max(0, pet.bond ?? 0) + gained, bondDay: day, bondToday: usedToday + gained, gained };
 }
 

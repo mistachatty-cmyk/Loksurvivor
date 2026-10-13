@@ -7,6 +7,36 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 130,
+      "version": "0.36.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T18:36:40Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Training Bay Opens",
+      "body": [
+        "Rest floors now include a free Training Bay visit. Assign Vigor, Fury, Guard, Pace and Spirit points earned from LokPet levels, with bonus points at evolution levels and a higher cap for your starter partner.",
+        "Training changes real battle stats and skill power. Tower first clears and rest stops award Training Data for respecs at later rest stops."
+      ]
+    },
+    {
+      "number": 129,
+      "version": "0.35.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T18:27:51Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Training Arena",
+      "body": [
+        "Unlock the Sanctum Training Arena after 616 defeats, then browse the full weapon rack and test one weapon at a time against a stationary Dust Mite.",
+        "Choose the dummy’s durability, activate any weapon, and review the damage and average damage per second from each test."
+      ]
+    },
+    {
       "number": 128,
       "version": "0.34.0",
       "date": "2026-10-13",

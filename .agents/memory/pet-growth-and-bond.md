@@ -1,6 +1,6 @@
 # LokPet growth, bond and names (v0.11.0), hideout companions (v0.11.1), plus the Masters lore
 
-**Plan:** `docs/lokpet-rpg-and-digi-tower-plan.md` (phases 0.11.0 to 0.11.8). 0.11.0 shipped Phase 0 plus XP, bond, names, Growth Recap and achievement categories. Everything later (hideout companions, evolutions, handlers, DIGI-Tower, Limit Break) is not built.
+**Plan:** `docs/lokpet-rpg-and-digi-tower-plan.md` (original phases 0.11.0 to 0.11.8; implementation status has moved on). Bond/XP/names/Growth Recap, hideout companions, evolution paths, the DIGI-Tower and its Training Bay are implemented. For the current full status and remaining gaps, read `docs/survivor616-gameplay-roadmap-review.md`, `digi-tower-campaign.md`, and `pet-training-bay.md`.
 
 **Decisions that are easy to undo by accident.**
 - **Thresholds did not change.** `getExpForLevel` is the same curve; the XP *sources* are multiplied by `PET_EXP_SCALE` (10). Nobody's level moves, nothing is retroactive. The curve and `applyPetExp` live in `engine/petExpCurve.ts` so the arena engine and `petGrowth.ts` can both use them without a circular import.

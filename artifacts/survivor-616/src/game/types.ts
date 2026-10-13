@@ -224,6 +224,8 @@ export interface SavedLokPet {
   level?: number;
   /** Current battle experience points. */
   exp?: number;
+  /** Permanently assigned Training Bay ranks. Unspent points come from pet levels. */
+  training?: LokPetTraining;
   /** Lifetime battle victories in sparring, league, and gauntlet. */
   battlesWon?: number;
   /** Total battles fought. */
@@ -256,6 +258,16 @@ export interface SavedLokPet {
    * evolution is derived from this plus level, so old saves keep working.
    */
   evolutionPath?: { branchId: string; chosenAt: number };
+}
+
+export type LokPetTrainingStat = 'vigor' | 'fury' | 'guard' | 'pace' | 'spirit';
+
+export interface LokPetTraining {
+  vigor: number;
+  fury: number;
+  guard: number;
+  pace: number;
+  spirit: number;
 }
 
 /** One pet's line in the Growth Recap shown after a run (not persisted). */
@@ -2739,6 +2751,8 @@ export interface DigiTowerProgress {
   defeatedMasterIds: string[];
   claimedRestFloorIds: string[];
   tokens: number;
+  /** Earned Training Bay currency; never purchased with premium or real-money currency. */
+  trainingData: number;
   /** Party condition is committed only after a floor clear, so quitting mid-floor is recoverable. */
   carry: DigiTowerPetCondition[];
   checkpointCarry: DigiTowerPetCondition[];

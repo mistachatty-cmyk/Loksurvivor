@@ -1487,6 +1487,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Choose the dummy’s durability, activate any weapon, and review the damage and average damage per second from each test.',
     ],
   },
+  {
+    version: '0.36.0',
+    date: '2026-10-13',
+    publishedAt: '2026-10-13T18:36:40Z',
+    kind: 'update',
+    title: 'The Training Bay Opens',
+    body: [
+      'Rest floors now include a free Training Bay visit. Assign Vigor, Fury, Guard, Pace and Spirit points earned from LokPet levels, with bonus points at evolution levels and a higher cap for your starter partner.',
+      'Training changes real battle stats and skill power. Tower first clears and rest stops award Training Data for respecs at later rest stops.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
