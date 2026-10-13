@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Crosshair, RotateCcw, Search, Swords, Target, Zap, Move, LockKeyhole } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Crosshair, Plus, RotateCcw, Search, Star, Swords, Target, Trash2, Zap, Move, LockKeyhole } from 'lucide-react';
 
 import { createWorld, stepWorld, type EnemyActor, type World } from '@/game/engine/world';
 import { CHARACTERS } from '@/game/data/characters';
@@ -10,6 +10,7 @@ import { renderWorld, type Viewport } from '@/game/render/draw';
 import { useMeta } from '@/game/state/metaStore';
 import type { WeaponDef } from '@/game/types';
 import type { CharacterDef } from '@/game/types';
+import type { TrainingArenaLoadoutGroup } from '@/game/types';
 import { WeaponIcon } from './WeaponIcon';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { useT } from '@/lib/i18n';
@@ -187,7 +188,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   const cameraOffsetRef = useRef({ x: 0, y: 0 });
   const cameraDragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const lastChallengeWeaponsRef = useRef<WeaponDef[]>([]);
-  const { selectedCharacter, meta, recordTrainingSession } = useMeta();
+  const { selectedCharacter, meta, recordTrainingSession, setTrainingArenaLoadoutGroups, toggleFavoriteTrainingWeapon } = useMeta();
   const t = useT();
   const [selectedWeaponId, setSelectedWeaponId] = useState(TRAINING_LOADOUT[0]!.id);
   const [expandedWeaponId, setExpandedWeaponId] = useState<string | null>(null);
@@ -206,6 +207,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   const [allWeaponLevel, setAllWeaponLevel] = useState(1);
   const [weaponLevelOverrides, setWeaponLevelOverrides] = useState<Record<string, number>>({});
   const [multiWeaponIds, setMultiWeaponIds] = useState<string[]>([]);
+  const [loadoutName, setLoadoutName] = useState('');
   const [spam, setSpam] = useState(false);
   const [challengeRunning, setChallengeRunning] = useState(false);
   const [challengeSeconds, setChallengeSeconds] = useState(0);
@@ -298,11 +300,17 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
     }
   }, [layout]);
 
+  const activeLoadoutGroup = meta.trainingArenaLoadoutGroups.find((group) => group.id === meta.trainingArenaActiveGroupId)
+    ?? meta.trainingArenaLoadoutGroups[0]!;
+  const activeLoadout = activeLoadoutGroup.loadouts.find((loadout) => loadout.id === activeLoadoutGroup.activeLoadoutId) ?? null;
+  const favoriteWeaponIds = new Set(meta.trainingFavoriteWeaponIds);
   const filteredWeapons = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return TRAINING_LOADOUT;
-    return TRAINING_LOADOUT.filter((weapon) => `${weapon.name} ${weapon.kind} ${weapon.description}`.toLowerCase().includes(query));
-  }, [search]);
+    const filtered = query
+      ? TRAINING_LOADOUT.filter((weapon) => `${weapon.name} ${weapon.kind} ${weapon.description}`.toLowerCase().includes(query))
+      : [...TRAINING_LOADOUT];
+    return filtered.sort((a, b) => Number(favoriteWeaponIds.has(b.id)) - Number(favoriteWeaponIds.has(a.id)) || a.name.localeCompare(b.name));
+  }, [search, meta.trainingFavoriteWeaponIds]);
 
   useEffect(() => {
     if (!challengeRunning) return;
@@ -652,6 +660,62 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
     setMultiWeaponIds((ids) => ids.includes(weapon.id) ? ids.filter((id) => id !== weapon.id) : [...ids, weapon.id]);
   };
 
+  const selectLoadoutGroup = (groupId: string): void => {
+    setTrainingArenaLoadoutGroups(meta.trainingArenaLoadoutGroups, groupId);
+  };
+
+  const createLoadoutGroup = (): void => {
+    if (meta.trainingArenaLoadoutGroups.length >= 4) return;
+    const group: TrainingArenaLoadoutGroup = {
+      id: `training-group-${Date.now()}`,
+      activeLoadoutId: null,
+      loadouts: [],
+    };
+    setTrainingArenaLoadoutGroups([...meta.trainingArenaLoadoutGroups, group], group.id);
+  };
+
+  const removeLoadoutGroup = (groupId: string): void => {
+    if (meta.trainingArenaLoadoutGroups.length <= 1) return;
+    const groups = meta.trainingArenaLoadoutGroups.filter((group) => group.id !== groupId);
+    const activeGroupId = groupId === meta.trainingArenaActiveGroupId ? groups[0]!.id : meta.trainingArenaActiveGroupId;
+    setTrainingArenaLoadoutGroups(groups, activeGroupId);
+    if (groupId === meta.trainingArenaActiveGroupId) {
+      setMultiWeaponIds([]);
+      setSelectedWeaponId(TRAINING_LOADOUT[0]!.id);
+    }
+  };
+
+  const saveCurrentLoadout = (): void => {
+    const weaponIds = [...new Set(multiUnlocked && multiWeaponIds.length > 0 ? multiWeaponIds : [selectedWeapon.id])];
+    if (weaponIds.length === 0) return;
+    const name = loadoutName.trim() || t('training.loadouts.defaultName', { number: activeLoadoutGroup.loadouts.length + 1 });
+    const newLoadout = { id: `training-loadout-${Date.now()}`, name: name.slice(0, 32), weaponIds };
+    const groups = meta.trainingArenaLoadoutGroups.map((group) => group.id === activeLoadoutGroup.id
+      ? { ...group, activeLoadoutId: newLoadout.id, loadouts: [...group.loadouts, newLoadout] }
+      : group);
+    setTrainingArenaLoadoutGroups(groups, activeLoadoutGroup.id);
+    setLoadoutName('');
+  };
+
+  const loadSavedLoadout = (loadoutId: string): void => {
+    const loadout = activeLoadoutGroup.loadouts.find((candidate) => candidate.id === loadoutId);
+    if (!loadout || (loadout.weaponIds.length > 1 && !multiUnlocked)) return;
+    const weaponIds = loadout.weaponIds.filter((id) => TRAINING_LOADOUT.some((weapon) => weapon.id === id));
+    if (weaponIds.length === 0) return;
+    const selected = TRAINING_LOADOUT.find((weapon) => weapon.id === weaponIds[0])!;
+    setSelectedWeaponId(selected.id);
+    setMultiWeaponIds(multiUnlocked ? weaponIds : []);
+    const groups = meta.trainingArenaLoadoutGroups.map((group) => group.id === activeLoadoutGroup.id ? { ...group, activeLoadoutId: loadoutId } : group);
+    setTrainingArenaLoadoutGroups(groups, activeLoadoutGroup.id);
+  };
+
+  const deleteSavedLoadout = (loadoutId: string): void => {
+    const groups = meta.trainingArenaLoadoutGroups.map((group) => group.id === activeLoadoutGroup.id
+      ? { ...group, activeLoadoutId: group.activeLoadoutId === loadoutId ? null : group.activeLoadoutId, loadouts: group.loadouts.filter((loadout) => loadout.id !== loadoutId) }
+      : group);
+    setTrainingArenaLoadoutGroups(groups, activeLoadoutGroup.id);
+  };
+
   const resetDummy = (): void => {
     const world = worldRef.current;
     if (!world) return;
@@ -731,6 +795,20 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   const shownHits = testRunning ? liveHits : liveHits;
   const shownCrits = testRunning ? liveCrits : liveCrits;
   const statusText = lastTest.startsWith('training.status.') ? t(lastTest as never) : lastTest;
+  const renderWeaponIconButton = (weapon: WeaponDef, unlocked: boolean) => {
+    const favorite = favoriteWeaponIds.has(weapon.id);
+    return (
+      <div className="relative h-9 w-9 shrink-0">
+        <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked} aria-label={`${t('training.rack.activate')} ${weapon.name} ${t('training.rack.level', { level: weaponLevelFor(weapon.id) })}`} title={`${t('training.rack.activate')} · ${t('training.rack.level', { level: weaponLevelFor(weapon.id) })}`} className="absolute inset-1 grid place-items-center rounded-sm outline-none transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40">
+          <WeaponIcon kind={weapon.kind} weaponId={weapon.id} color={weapon.color} size={30} />
+          <span key={`badge-${weaponLevelFor(weapon.id)}`} aria-hidden="true" className="training-tier-pop absolute -bottom-1 -right-1 z-10 min-w-4 border border-slate-950 bg-lime-300 px-0.5 font-mono text-[7px] font-black leading-[12px] text-slate-950">L{weaponLevelFor(weapon.id)}</span>
+        </button>
+        <button type="button" onClick={() => toggleFavoriteTrainingWeapon(weapon.id)} aria-pressed={favorite} aria-label={t(favorite ? 'training.rack.unfavorite' : 'training.rack.favorite', { weapon: weapon.name })} title={t(favorite ? 'training.rack.unfavorite' : 'training.rack.favorite', { weapon: weapon.name })} className="absolute -right-0.5 -top-0.5 z-20 grid h-4 w-4 place-items-center rounded-full border border-slate-950 bg-slate-950/95 text-primary outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-primary">
+          <span key={`favorite-${favorite ? 'on' : 'off'}`} className={favorite ? 'training-favorite-pop' : ''}><Star size={10} className={favorite ? 'fill-primary/35 text-primary' : 'text-white/45'} /></span>
+        </button>
+      </div>
+    );
+  };
 
   if (rackLocked) return (
     <main className="flex h-[100dvh] flex-col items-center justify-center gap-4 bg-slate-950 px-5 text-center text-slate-100">
@@ -808,7 +886,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
               return mainLayout ? (
                 <article key={weapon.id} style={{ gridColumn: expanded ? '1 / -1' : undefined }} className={`min-w-0 border transition ${active ? 'border-cyan-200/70 bg-cyan-300/[.08]' : 'border-white/10 bg-white/[.025] hover:border-white/25'}`}>
                   <div className="flex min-h-12 w-full items-center gap-1 px-1 py-1 sm:min-h-14 sm:gap-1.5 sm:px-1.5">
-                    <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked} aria-label={`${t('training.rack.activate')} ${weapon.name} ${t('training.rack.level', { level: weaponLevelFor(weapon.id) })}`} title={`${t('training.rack.activate')} · ${t('training.rack.level', { level: weaponLevelFor(weapon.id) })}`} className="shrink-0 rounded-sm outline-none transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"><span className="relative grid h-[30px] w-[30px] place-items-center"><WeaponIcon kind={weapon.kind} weaponId={weapon.id} color={weapon.color} size={30} /><span key={`badge-${weaponLevelFor(weapon.id)}`} aria-hidden="true" className="training-tier-pop absolute -bottom-1 -right-1 z-10 min-w-4 border border-slate-950 bg-lime-300 px-0.5 font-mono text-[7px] font-black leading-[12px] text-slate-950">L{weaponLevelFor(weapon.id)}</span></span></button>
+                    {renderWeaponIconButton(weapon, unlocked)}
                     <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked} aria-pressed={active} className="flex min-w-0 flex-1 items-center gap-0.5 text-left disabled:cursor-not-allowed disabled:opacity-50">
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[9px] font-bold leading-tight sm:text-[10px]">{weapon.name}</span>
@@ -855,7 +933,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
               ) : (
                 <article key={weapon.id} style={{ gridColumn: expanded ? '1 / -1' : undefined }} className={`min-w-0 border ${active ? 'border-cyan-300/60 bg-cyan-300/[.06]' : 'border-white/10 bg-white/[.025]'}`}>
                   <div className="flex min-h-12 w-full items-center gap-1.5 px-1.5 py-1.5">
-                    <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked} aria-label={`${t('training.rack.activate')} ${weapon.name} ${t('training.rack.level', { level: weaponLevelFor(weapon.id) })}`} title={`${t('training.rack.activate')} · ${t('training.rack.level', { level: weaponLevelFor(weapon.id) })}`} className="shrink-0 rounded-sm outline-none transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"><span className="relative grid h-[30px] w-[30px] place-items-center"><WeaponIcon kind={weapon.kind} weaponId={weapon.id} color={weapon.color} size={30} /><span key={`badge-${weaponLevelFor(weapon.id)}`} aria-hidden="true" className="training-tier-pop absolute -bottom-1 -right-1 z-10 min-w-4 border border-slate-950 bg-lime-300 px-0.5 font-mono text-[7px] font-black leading-[12px] text-slate-950">L{weaponLevelFor(weapon.id)}</span></span></button>
+                    {renderWeaponIconButton(weapon, unlocked)}
                     <button type="button" onClick={() => activateWeapon(weapon)} disabled={!unlocked} aria-pressed={active} className="flex min-w-0 flex-1 items-center gap-1 text-left disabled:cursor-not-allowed disabled:opacity-50">
                       <span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-bold">{weapon.name}</span><span className="mt-0.5 block truncate font-mono text-[8px] uppercase tracking-wider text-white/40">{weaponKindLabel(weapon)}</span></span>
                     </button>
@@ -994,6 +1072,44 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
           </div>
         </section>
       </div>
+      <footer data-testid="training-loadout-bar" className="shrink-0 border-t-2 border-lime-300/45 bg-[#0b100c] px-2 py-1.5 sm:px-4">
+        <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-1">
+          <span className="mr-1 shrink-0 font-mono text-[8px] font-black uppercase tracking-widest text-lime-100/80">{t('training.loadouts.groups')}</span>
+          {meta.trainingArenaLoadoutGroups.map((group, index) => (
+            <div key={group.id} className={`flex shrink-0 items-center border ${group.id === activeLoadoutGroup.id ? 'border-lime-200/60 bg-lime-200/10' : 'border-white/10 bg-white/[.025]'}`}>
+              <button type="button" onClick={() => selectLoadoutGroup(group.id)} aria-pressed={group.id === activeLoadoutGroup.id} className="min-h-7 px-2 font-mono text-[8px] font-bold uppercase tracking-wider text-white/75 hover:text-white">{t('training.loadouts.group', { number: index + 1 })}<span className="ml-1 text-white/35">{group.loadouts.length}</span></button>
+              {meta.trainingArenaLoadoutGroups.length > 1 && <button type="button" onClick={() => removeLoadoutGroup(group.id)} aria-label={t('training.loadouts.removeGroup', { number: index + 1 })} title={t('training.loadouts.removeGroup', { number: index + 1 })} className="grid h-7 w-6 place-items-center border-l border-white/10 text-white/35 hover:text-rose-200"><Trash2 size={10} /></button>}
+            </div>
+          ))}
+          <span className="shrink-0 font-mono text-[7px] text-white/35">{t('training.loadouts.groupCount', { count: meta.trainingArenaLoadoutGroups.length })}</span>
+          <button type="button" onClick={createLoadoutGroup} disabled={meta.trainingArenaLoadoutGroups.length >= 4} className="inline-flex min-h-7 shrink-0 items-center gap-1 border border-lime-200/25 px-2 font-mono text-[8px] font-bold uppercase tracking-wider text-lime-100/75 hover:bg-lime-100/10 disabled:opacity-35"><Plus size={11} />{t('training.loadouts.newGroup')}</button>
+          {meta.trainingArenaLoadoutGroups.length >= 4 && <span className="shrink-0 text-[7px] text-white/35">{t('training.loadouts.expansion')}</span>}
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 border-t border-white/10 pt-1.5 sm:flex-nowrap">
+          <div className="flex max-w-[28%] shrink-0 items-center gap-1 overflow-x-auto" aria-label={t('training.loadouts.current')}>
+            {selectedWeapons.map((weapon) => <span key={weapon.id} className="relative grid h-7 w-7 shrink-0 place-items-center border border-cyan-100/25 bg-black/40" title={`${weapon.name} · ${t('training.rack.level', { level: weaponLevelFor(weapon.id) })}`}><WeaponIcon kind={weapon.kind} weaponId={weapon.id} color={weapon.color} size={22} /><span key={`loadout-tier-${weapon.id}-${weaponLevelFor(weapon.id)}`} className="training-tier-pop absolute -bottom-1 -right-1 border border-slate-950 bg-lime-300 px-0.5 font-mono text-[6px] font-black leading-[10px] text-slate-950">L{weaponLevelFor(weapon.id)}</span></span>)}
+          </div>
+          <label className="flex min-w-24 flex-1 items-center border border-white/15 bg-black/30 px-2">
+            <input value={loadoutName} onChange={(event) => setLoadoutName(event.target.value)} maxLength={32} aria-label={t('training.loadouts.name')} placeholder={t('training.loadouts.namePlaceholder')} className="h-7 min-w-0 w-full bg-transparent text-[9px] text-white outline-none placeholder:text-white/35" />
+          </label>
+          <button type="button" onClick={saveCurrentLoadout} className="inline-flex min-h-7 shrink-0 items-center gap-1 border border-cyan-100/35 bg-cyan-100/[.06] px-2 font-mono text-[8px] font-black uppercase tracking-wider text-cyan-50 hover:bg-cyan-100/15"><Check size={10} />{t('training.loadouts.save')}</button>
+          <div className="training-arena-weapon-scroll flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+            {activeLoadoutGroup.loadouts.length === 0 && <span className="px-1 text-[8px] text-white/35">{t('training.loadouts.empty')}</span>}
+            {activeLoadoutGroup.loadouts.map((loadout) => {
+              const active = activeLoadout?.id === loadout.id;
+              const locked = loadout.weaponIds.length > 1 && !multiUnlocked;
+              return <div key={loadout.id} className={`flex shrink-0 items-center border ${active ? 'border-cyan-100/45 bg-cyan-100/10' : 'border-white/10 bg-white/[.025]'}`}>
+                <button type="button" onClick={() => loadSavedLoadout(loadout.id)} disabled={locked} aria-pressed={active} title={locked ? t('training.rack.multiLocked') : t('training.loadouts.load', { name: loadout.name })} className="flex min-h-7 max-w-40 items-center gap-1.5 px-2 text-left disabled:cursor-not-allowed disabled:opacity-40">
+                  <span className="flex shrink-0 items-center">{loadout.weaponIds.slice(0, 3).map((id) => { const weapon = TRAINING_LOADOUT.find((candidate) => candidate.id === id); return weapon ? <WeaponIcon key={id} kind={weapon.kind} weaponId={id} color={weapon.color} size={16} /> : null; })}</span>
+                  <span className="max-w-24 truncate text-[8px] font-bold text-white/80">{loadout.name}</span>
+                  {loadout.weaponIds.length > 3 && <span className="font-mono text-[7px] text-white/45">+{loadout.weaponIds.length - 3}</span>}
+                </button>
+                <button type="button" onClick={() => deleteSavedLoadout(loadout.id)} aria-label={t('training.loadouts.delete', { name: loadout.name })} title={t('training.loadouts.delete', { name: loadout.name })} className="grid h-7 w-6 place-items-center border-l border-white/10 text-white/35 hover:text-rose-200"><Trash2 size={10} /></button>
+              </div>;
+            })}
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }

@@ -6,7 +6,7 @@
 - **Goal:** Add progression, notifications, stats, and damage challenges to the Training Arena.
 - **Scope:** LokShop access, per-weapon progression, persistent notifications, training stats and target options, operator XP, multi-weapon testing, and a timed damage challenge.
 - **Current baseline:** Training Arena is on `main` after PRs #273, #274, #275, and #276. The current arena has a dedicated stationary test scene, Dust Mite target, weapon dock, and in-screen controls. See [the original handoff](training-arena-handoff-2026-10-13.md).
-- **This change:** The progression system merged in PR #280. Its follow-up places Spam beside Search/Lock, makes weapon cards activate on click, reserves a separate control for weapon details, adds stat/effect details, and gives the dummy soft rubber-band return under a fixed midpoint camera. The next PR adds overlapping Spam activations, selectable rack columns, draggable camera with center-lock, and challenge retry/back actions.
+- **This change:** The progression system merged in PR #280. Its follow-up places Spam beside Search/Lock, makes weapon cards activate on click, adds persistent bottom-bar loadouts in up to four groups and theme-colored weapon favorites, reserves a separate control for weapon details, adds stat/effect details, and gives the dummy soft rubber-band return under a fixed midpoint camera. The next PR adds overlapping Spam activations, selectable rack columns, draggable camera with center-lock, and challenge retry/back actions.
 - **Next:** Shared catalog publishing and broader visual review remain.
 
 ## Implementation decisions for this pass
@@ -66,6 +66,8 @@
 
 - Add a **24-second damage challenge** that repeatedly activates the selected available weapon against the stationary dummy. Display the countdown and running damage total.
 - Add a **Spam** toggle beside Search and Lock in the rack header. It defaults off whenever the Training Arena loads and also starts off whenever a 24-second challenge starts or retries. Turning it off settles the current attack; turning it on during a live test resumes repeated firing.
+- Show the active weapon set in a bottom bar and let players save, load, and delete named sets organized into up to four starter groups. Plan a LokShop expansion for more groups later; price and SKU are not decided.
+- Let players favorite weapons from their icon buttons, sort favorites to the top of the rack, and animate a theme-colored star and level counter with reduced-motion support.
 - The run records the final total damage for that weapon/build and shows a celebration naming its achieved tier. Tier names are placeholders for now; the user will provide final names later.
 - Use damage thresholds at `0`, `1,000`, `5,000`, `1,000,000`, `5,000,000`, and `100,000,000`. Award an achievement for each threshold reached, with duplicate awards prevented. The user described `0` and `1–1,000` as an **“At Least You Tried”** tier and identified the higher thresholds, but exact inclusive boundaries and names for all tiers remain to be settled.
 - Save each result so players can see their best damage per weapon and configuration. Whether to keep only a personal best or a full history is undecided.

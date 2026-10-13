@@ -5,12 +5,15 @@ The default Training Arena is built around the user's weapon-dock sketch: fixed 
 ## Weapon rack
 
 - Spam starts off whenever the Training Arena loads and sits directly beside the details Lock control at the right of search. Challenges also start with Spam off. The player must turn it on explicitly.
+- Show the current weapon set in a persistent bottom loadout bar. Save named loadouts inside up to four starter groups; add a LokShop group-capacity expansion later, with no invented price or SKU until designed.
+- Every weapon can be favorited from its rack icon. Favorites sort before other weapons without changing the search filter. Use the active UI theme's primary color for a small animated star; reduced motion disables the star and level-counter bounce.
 - Clicking a weapon icon or weapon name activates it immediately; do not make a card click only select or open a detail panel.
 - A separate, clearly visible disclosure control opens the weapon's details. It shows stats for its current level and any authored target debuff, status synergy, or operator affinity. Omit effects the weapon does not have.
 - Lock closes any open detail panel and prevents details from opening. Rack activation remains available; clicking the disclosure spot while locked activates the weapon.
 - Turning Spam off lets the current attack resolve and settle; turning it on during a live test resumes repeated attacks. Challenge entry never enables Spam automatically, and the challenge timer remains controlled by challenge mode.
 - Show each weapon's current level as a compact badge on its icon button. Its detail panel has clamped level-down/level-up controls from 1–8. A separate All counter in the top bar raises or lowers every weapon to the same level and clears individual overrides.
 - Animate level changes with a brief, restrained pop; honor `prefers-reduced-motion`. The level used for damage, challenge records, and weapon activation must match the badge.
+- Loadout group and favorite data live in the normal player save, not only component state. Loadout tests still respect the Multi-Weapon Testing unlock.
 
 ## Stage and motion
 
@@ -24,5 +27,7 @@ The default Training Arena is built around the user's weapon-dock sketch: fixed 
 - Icon/name activation fires without expanding details. The disclosure control opens/closes details; Lock closes details and converts the disclosure control into activation.
 - Per-weapon stats match its selected level. Debuffs and status synergies appear only when the weapon defines them.
 - Each weapon's badge, details counter, damage preview, and firing level agree. Individual level changes do not affect another weapon; the All counter sets every weapon to one level. Counters stop at level 1 and level 8, and reduced-motion disables the pop animation.
+- Favorite and unfavorite any weapon from its icon; verify star color follows the current theme, starred weapons sort first under search, the saved state survives reload, and reduced-motion disables the star bounce.
+- Save, load, and delete named sets across groups; verify current weapon icons and levels appear in the bottom bar, four groups can be created, a fifth cannot, group/loadout state survives reload, and a multi-weapon preset remains gated until unlocked.
 - Knockback visibly moves the target away from its spawn point and it walks back without a hard positional snap. Camera center remains the midpoint during the movement.
 - Check desktop and phone widths, Main and Classic layouts, keyboard focus, and reduced-motion behavior.

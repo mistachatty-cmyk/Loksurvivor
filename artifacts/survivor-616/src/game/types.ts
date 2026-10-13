@@ -1680,6 +1680,18 @@ export interface TrainingMailboxEntry {
   kept: boolean;
 }
 
+export interface TrainingArenaSavedLoadout {
+  id: string;
+  name: string;
+  weaponIds: string[];
+}
+
+export interface TrainingArenaLoadoutGroup {
+  id: string;
+  activeLoadoutId: string | null;
+  loadouts: TrainingArenaSavedLoadout[];
+}
+
 export type HordeSpinTierId = '1x' | '2x' | '3x' | '4x' | '5x5' | '666';
 export type HordeSpinPhase = 'idle' | 'spinning' | 'result' | 'active';
 
@@ -2681,6 +2693,11 @@ export interface MetaState {
   lokPackVisualizerUnlocked: boolean;
   /** Permanent LokShop purchase required to enter the Training Arena. */
   trainingWeaponRackOwned: boolean;
+  /** Saved weapon sets, organized into four starter groups; more groups are a future LokShop expansion. */
+  trainingArenaLoadoutGroups: TrainingArenaLoadoutGroup[];
+  trainingArenaActiveGroupId: string;
+  /** Weapon ids pinned to the top of the Training Arena rack. */
+  trainingFavoriteWeaponIds: string[];
   /** Weapon id -> kills credited only when a run result is committed. */
   trainingWeaponKills: Record<string, number>;
   /** Cumulative damage dealt to the arena dummy across all visits. */
