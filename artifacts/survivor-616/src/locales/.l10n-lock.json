@@ -845,7 +845,16 @@
     "wallet.offline": "006b29816741",
     "wallet.rank": "dd2787ce8f6d",
     "wallet.signedOut": "c3744f96506e",
-    "wallet.signIn": "ada2e9e96fa9"
+    "wallet.signIn": "ada2e9e96fa9",
+    "training.rack.activate": "92ef08325a48",
+    "training.rack.columns": "80f794fbfe9f",
+    "training.camera.center": "a2391118c814",
+    "training.camera.centerLock": "94a838bcc8be",
+    "training.camera.reset": "da67fde0f737",
+    "training.camera.dragHint": "f5443d3be3e7",
+    "training.challenge.result": "373de5f6b2e5",
+    "training.challenge.retry": "042c862e4467",
+    "training.challenge.close": "2dbe010e44c9"
   },
   "es": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -1693,7 +1702,16 @@
     "wallet.offline": "006b29816741",
     "wallet.rank": "dd2787ce8f6d",
     "wallet.signedOut": "c3744f96506e",
-    "wallet.signIn": "ada2e9e96fa9"
+    "wallet.signIn": "ada2e9e96fa9",
+    "training.rack.activate": "92ef08325a48",
+    "training.rack.columns": "80f794fbfe9f",
+    "training.camera.center": "a2391118c814",
+    "training.camera.centerLock": "94a838bcc8be",
+    "training.camera.reset": "da67fde0f737",
+    "training.camera.dragHint": "f5443d3be3e7",
+    "training.challenge.result": "373de5f6b2e5",
+    "training.challenge.retry": "042c862e4467",
+    "training.challenge.close": "2dbe010e44c9"
   },
   "fr": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -2541,7 +2559,16 @@
     "wallet.offline": "006b29816741",
     "wallet.rank": "dd2787ce8f6d",
     "wallet.signedOut": "c3744f96506e",
-    "wallet.signIn": "ada2e9e96fa9"
+    "wallet.signIn": "ada2e9e96fa9",
+    "training.rack.activate": "92ef08325a48",
+    "training.rack.columns": "80f794fbfe9f",
+    "training.camera.center": "a2391118c814",
+    "training.camera.centerLock": "94a838bcc8be",
+    "training.camera.reset": "da67fde0f737",
+    "training.camera.dragHint": "f5443d3be3e7",
+    "training.challenge.result": "373de5f6b2e5",
+    "training.challenge.retry": "042c862e4467",
+    "training.challenge.close": "2dbe010e44c9"
   },
   "ja": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -3388,7 +3415,17 @@
     "wallet.offline": "006b29816741",
     "wallet.rank": "dd2787ce8f6d",
     "wallet.signedOut": "c3744f96506e",
-    "wallet.signIn": "ada2e9e96fa9"
+    "wallet.signIn": "ada2e9e96fa9",
+    "training.rack.activate": "92ef08325a48",
+    "training.rack.columns": "80f794fbfe9f",
+    "training.camera.center": "a2391118c814",
+    "training.camera.centerLock": "94a838bcc8be",
+    "training.camera.reset": "da67fde0f737",
+    "training.camera.dragHint": "f5443d3be3e7",
+    "training.challenge.result": "373de5f6b2e5",
+    "training.challenge.retry": "042c862e4467",
+    "training.challenge.close": "2dbe010e44c9",
+    "hideout.event.long-way-round.c.follow": "84b8803a4ed7"
   },
   "ko": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -4236,7 +4273,16 @@
     "wallet.offline": "006b29816741",
     "wallet.rank": "dd2787ce8f6d",
     "wallet.signedOut": "c3744f96506e",
-    "wallet.signIn": "ada2e9e96fa9"
+    "wallet.signIn": "ada2e9e96fa9",
+    "training.rack.activate": "92ef08325a48",
+    "training.rack.columns": "80f794fbfe9f",
+    "training.camera.center": "a2391118c814",
+    "training.camera.centerLock": "94a838bcc8be",
+    "training.camera.reset": "da67fde0f737",
+    "training.camera.dragHint": "f5443d3be3e7",
+    "training.challenge.result": "373de5f6b2e5",
+    "training.challenge.retry": "042c862e4467",
+    "training.challenge.close": "2dbe010e44c9"
   },
   "pt-BR": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -5084,7 +5130,16 @@
     "wallet.offline": "006b29816741",
     "wallet.rank": "dd2787ce8f6d",
     "wallet.signedOut": "c3744f96506e",
-    "wallet.signIn": "ada2e9e96fa9"
+    "wallet.signIn": "ada2e9e96fa9",
+    "training.rack.activate": "92ef08325a48",
+    "training.rack.columns": "80f794fbfe9f",
+    "training.camera.center": "a2391118c814",
+    "training.camera.centerLock": "94a838bcc8be",
+    "training.camera.reset": "da67fde0f737",
+    "training.camera.dragHint": "f5443d3be3e7",
+    "training.challenge.result": "373de5f6b2e5",
+    "training.challenge.retry": "042c862e4467",
+    "training.challenge.close": "2dbe010e44c9"
   },
   "zh-CN": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -5931,6 +5986,16 @@
     "wallet.offline": "006b29816741",
     "wallet.rank": "dd2787ce8f6d",
     "wallet.signedOut": "c3744f96506e",
-    "wallet.signIn": "ada2e9e96fa9"
+    "wallet.signIn": "ada2e9e96fa9",
+    "training.rack.activate": "92ef08325a48",
+    "training.rack.columns": "80f794fbfe9f",
+    "training.camera.center": "a2391118c814",
+    "training.camera.centerLock": "94a838bcc8be",
+    "training.camera.reset": "da67fde0f737",
+    "training.camera.dragHint": "f5443d3be3e7",
+    "training.challenge.result": "373de5f6b2e5",
+    "training.challenge.retry": "042c862e4467",
+    "training.challenge.close": "2dbe010e44c9",
+    "training.controls.remaining": "4eb395c150b3"
   }
 }

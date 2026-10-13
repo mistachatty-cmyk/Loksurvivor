@@ -28,7 +28,7 @@
 - Clicking a rack icon activates that weapon directly. Spam allows rapid activations to append attacks to the current simulation, preserving existing projectiles, effects, and target damage. Outside Spam, a running attack remains protected from interruption.
 - The rack density can be set to 2, 3, or 4 columns. The player can drag the arena canvas to pan the view; Center is on by default and eases the camera back to its starting position, while Recenter resets it immediately.
 - Challenge results use a styled score card with Retry and Back to Arena controls.
-- Player-facing copy is in the English message catalog. I ran the project's auto-localization sync; the configured translator reported 100+ failed strings for processed targets and added no non-English Training Arena keys. Translation remains incomplete; rerun sync when its translation backends are available or translate the missing Training Arena messages manually.
+- Player-facing copy is in the English catalog and all seven configured locales. The initial local auto-localization attempt reported translation failures; the workflow's translation commit then arrived on the branch. This follow-up adds translations and lock hashes for its nine new labels. Review machine-generated locale wording during normal QA.
 - Reducer and combat tests are being added; visual review and the final full test suite are still pending.
 
 ## Reviewed requirements
