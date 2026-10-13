@@ -1476,6 +1476,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Master Nib opens a token exchange for LokPet treats. Endless Spire, Training Bay, daily floors, Vault picks and Operator/Duo challenges remain future expansions.',
     ],
   },
+  {
+    version: '0.35.0',
+    date: '2026-10-13',
+    publishedAt: '2026-10-13T18:27:51Z',
+    kind: 'update',
+    title: 'Training Arena',
+    body: [
+      'Unlock the Sanctum Training Arena after 616 defeats, then browse the full weapon rack and test one weapon at a time against a stationary Dust Mite.',
+      'Choose the dummy’s durability, activate any weapon, and review the damage and average damage per second from each test.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

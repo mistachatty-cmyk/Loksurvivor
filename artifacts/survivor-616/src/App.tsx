@@ -91,14 +91,15 @@ import { ArenaJoinScreen } from '@/ui/ArenaJoinScreen';
 import { ArenaScreen } from '@/game/ArenaScreen';
 const StudioScreen = lazy(() => import('@/ui/StudioScreen').then(m => ({ default: m.StudioScreen })));
 const RunScreen = lazy(() => import('@/game/RunScreen').then(m => ({ default: m.RunScreen })));
+const WeaponTrainingArenaScreen = lazy(() => import('@/ui/WeaponTrainingArenaScreen').then(m => ({ default: m.WeaponTrainingArenaScreen })));
 
 const queryClient = new QueryClient();
 
 /** Full-screen moments where a persistent menu would intrude. */
-const DOCK_HIDDEN_SCREENS = ['intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'hub', 'run-setup', 'run', 'arena', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle'];
+const DOCK_HIDDEN_SCREENS = ['intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'hub', 'run-setup', 'run', 'arena', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle', 'weapon-training-arena'];
 
 /** Screens with no payload that browser Back may return to. */
-const HISTORY_SCREENS = new Set(['intro', 'hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'locker', 'recovery', 'vendor', 'workshop', 'card-shop', 'lok-shop', 'weapon-bans', 'settings', 'palette-store', 'sound-booth', 'account', 'feedback']);
+const HISTORY_SCREENS = new Set(['intro', 'hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'locker', 'recovery', 'vendor', 'workshop', 'card-shop', 'lok-shop', 'weapon-bans', 'settings', 'palette-store', 'sound-booth', 'account', 'feedback', 'weapon-training-arena']);
 
 type Screen =
   | { name: 'intro' }
@@ -131,6 +132,7 @@ type Screen =
   | { name: 'map-editor' }
   | { name: 'sector-command' }
   | { name: 'lokpet-battle'; initialTab?: 'league' | 'sparring' | 'kennel' }
+  | { name: 'weapon-training-arena' }
   | { name: 'arena-setup' }
   | { name: 'arena-join'; initialCode?: string }
   | { name: 'arena'; area: AreaDef; seats: ArenaSeat[]; net?: ArenaNetRole }
@@ -182,6 +184,7 @@ function initialScreen(): Screen {
     }
     if (requested === 'run-setup') return { name: 'run-setup', destination: 'hub' };
     if (requested === 'lokpet-battle') return { name: 'lokpet-battle' };
+    if (requested === 'weapon-training-arena') return { name: 'weapon-training-arena' };
     if (requested === 'starter-lokpet-encounter') return { name: 'starter-lokpet-encounter' };
     if (
       requested === 'hub' ||
@@ -563,6 +566,7 @@ function Game() {
           onOpenMapEditor={() => setScreen({ name: 'map-editor' })}
           onOpenSectorCommand={() => setScreen({ name: 'sector-command' })}
           onOpenLokPetBattle={() => setScreen({ name: 'lokpet-battle' })}
+          onOpenTrainingArena={() => setScreen({ name: 'weapon-training-arena' })}
           onOpenArena={() => setScreen({ name: 'arena-setup' })}
           onOpenRunSetup={openLooks}
           onStartChoiceEvent={(eventId, propId) => {
@@ -575,6 +579,13 @@ function Game() {
 
     case 'lokpet-battle':
       return <LokPetBattleScreen onReturnToHub={goHub} initialTab={screen.initialTab} />;
+
+    case 'weapon-training-arena':
+      return (
+        <Suspense fallback={<div className="grid min-h-dvh place-items-center bg-black font-mono text-xs uppercase tracking-[.25em] text-cyan-200">Opening the training chamber…</div>}>
+          <WeaponTrainingArenaScreen onBack={goHub} />
+        </Suspense>
+      );
 
     case 'arena-setup':
       return (
