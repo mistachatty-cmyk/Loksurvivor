@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 131,
+      "version": "0.37.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T20:07:09Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Training Arena stays in view",
+      "body": [
+        "The arena now fills the screen, keeps the weapon rack in its own scroll panel, and places test controls and readouts over the arena view.",
+        "Weapon tests now run through their active attack effects before settling. Each selection fires once; orbit weapons get one visible rotation."
+      ]
+    },
+    {
       "number": 130,
       "version": "0.36.0",
       "date": "2026-10-13",

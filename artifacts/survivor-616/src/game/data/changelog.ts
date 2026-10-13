@@ -1498,6 +1498,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Training changes real battle stats and skill power. Tower first clears and rest stops award Training Data for respecs at later rest stops.',
     ],
   },
+  {
+    version: '0.37.0',
+    date: '2026-10-13',
+    publishedAt: '2026-10-13T20:07:09Z',
+    kind: 'update',
+    title: 'Training Arena stays in view',
+    body: [
+      'The arena now fills the screen, keeps the weapon rack in its own scroll panel, and places test controls and readouts over the arena view.',
+      'Weapon tests now run through their active attack effects before settling. Each selection fires once; orbit weapons get one visible rotation.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
