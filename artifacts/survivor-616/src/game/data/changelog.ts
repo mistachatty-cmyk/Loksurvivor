@@ -1544,6 +1544,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The arena adds multi-weapon testing, operator Training XP, damage and effect readouts, target durability modes, and a 24-second damage challenge with personal bests and achievements.',
     ],
   },
+  {
+    version: '0.39.1',
+    date: '2026-10-14',
+    publishedAt: '2026-10-14T05:05:56Z',
+    kind: 'bugfix',
+    title: 'Weapon Rack account sync',
+    body: [
+      'LokShop purchases can now reach the shared LokToken purchase service.',
+      'A Weapon Rack bought with LokTokens now opens the Training Arena as soon as account inventory loads, even if you go straight to the hideout after signing in or reloading.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

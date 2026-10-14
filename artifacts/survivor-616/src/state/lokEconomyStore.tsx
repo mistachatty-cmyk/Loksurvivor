@@ -37,10 +37,14 @@ import {
 
 import { useAuth } from '@/state/authStore';
 import { lokClient } from '@/lib/lokClient';
+import { catalogSku } from '@/lib/lokStoreCatalog';
+import { useMeta } from '@/game/state/metaStore';
 import { setForgeSupporterTier } from '@/game/state/operatorForgeStore';
 
 /** This app's `lok_apps.app_key`. */
 const APP_KEY = 'survivor616';
+const WEAPON_RACK_SKU = catalogSku('weaponRackUnlock', 'weapon-rack');
+const EMPTY_SKUS: ReadonlySet<string> = new Set();
 
 export interface EarnRef {
   refType?: string;
@@ -84,10 +88,12 @@ const LokEconomyContext = createContext<LokEconomyContextValue>({
 
 export function LokEconomyProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
+  const { meta, grantTrainingWeaponRack } = useMeta();
   const [balance, setBalance] = useState<number | null>(null);
   const [lifetimeEarned, setLifetimeEarned] = useState<number | null>(null);
   const [rank, setRank] = useState<LokProfileRank | null>(null);
-  const [ownedSkus, setOwnedSkus] = useState<ReadonlySet<string>>(() => new Set());
+  const [inventory, setInventory] = useState<{ userId: string; skus: ReadonlySet<string> } | null>(null);
+  const ownedSkus = inventory && inventory.userId === session?.user.id ? inventory.skus : EMPTY_SKUS;
   const [activeSupporterTier, setActiveSupporterTier] = useState<SupporterTier | null>(null);
   const [supporter, setSupporter] = useState<MySupporter | null>(null);
   const [prices, setPrices] = useState<Record<string, number>>({});
@@ -110,7 +116,7 @@ export function LokEconomyProvider({ children }: { children: ReactNode }) {
       setBalance(null);
       setLifetimeEarned(null);
       setRank(null);
-      setOwnedSkus(new Set());
+      setInventory(null);
       setSupporter(null);
       return;
     }
@@ -121,7 +127,7 @@ export function LokEconomyProvider({ children }: { children: ReactNode }) {
     });
     void fetchMySupporter(lokClient).then((r) => { if (r.ok) setSupporter(r.supporter); });
     void fetchOwnedSkus(lokClient).then((owned) => {
-      if (owned.ok) setOwnedSkus(new Set(owned.skus));
+      if (owned.ok) setInventory({ userId: session.user.id, skus: new Set(owned.skus) });
     });
     const profile = await getLokProfile(lokClient, session.user.id, APP_KEY);
     if (!profile.ok) return;
@@ -140,6 +146,14 @@ export function LokEconomyProvider({ children }: { children: ReactNode }) {
     refreshedForUserId.current = session.user.id;
     void refresh();
   }, [session, refresh]);
+
+  // Account inventory unlocks the arena even when the player goes straight to
+  // the hideout after signing in or loading a cloud save.
+  useEffect(() => {
+    if (session && ownedSkus.has(WEAPON_RACK_SKU) && !meta.trainingWeaponRackOwned) {
+      grantTrainingWeaponRack();
+    }
+  }, [session, ownedSkus, meta.trainingWeaponRackOwned, grantTrainingWeaponRack]);
 
   const earn = useCallback(
     (eventKey: string, ref?: EarnRef) => {

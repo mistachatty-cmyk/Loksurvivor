@@ -1,5 +1,9 @@
 # Training Arena interaction contract
 
+The Weapon Rack purchase belongs to account inventory. Reconcile its SKU in the shared economy provider when inventory loads, so the hideout arena entry unlocks without opening LokShop first. Keep inventory scoped to the current signed-in user when sessions change; a previous account's pending fetch must not grant the new account's rack.
+
+The live LokServices project needs both the catalog row and the `lok-spend` Edge Function for purchases. The catalog row and JWT-protected function were deployed on 2026-10-14; the function source lives at `supabase/functions/lok-spend/index.ts`. A 401 from an anonymous call verifies the auth boundary, but a signed-in purchase still needs a dedicated QA account check.
+
 The default Training Arena is built around the user's weapon-dock sketch: fixed orange top bar, green-accented internal weapon scroller, and a large stage with operator left and target right. The green scroller is the room's default accent, but it must continue to respond to the selected theme. The Classic layout remains an optional saved choice.
 
 ## Weapon rack
