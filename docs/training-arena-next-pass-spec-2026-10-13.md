@@ -7,11 +7,11 @@
 - **Scope:** LokShop access, per-weapon progression, persistent notifications, training stats and target options, operator XP, multi-weapon testing, and a timed damage challenge.
 - **Current baseline:** The dedicated stationary arena, Dust Mite, weapon dock, and in-screen controls are on `main` after PRs #273–#281. Related ultimate character looks and animated themes shipped in #282. See [the original handoff](training-arena-handoff-2026-10-13.md).
 - **This change:** Progression and mailbox systems merged in PR #280. PR #281 added overlapping Spam activations, rack density controls, draggable/center-lock camera, retry/back challenge actions, loadout groups, weapon favorites, level controls, and the evolutions page. Spam defaults off both in the arena and at challenge start.
-- **Next:** Finish the visual review with a dedicated QA save, and publish the LokShop registry only through an authorized owner session.
+- **Next:** Finish the visual review with a dedicated QA save and check a real account Weapon Rack purchase and arena unlock. The LokShop registry was published on 2026-10-14.
 
 ## Implementation decisions for this pass
 
-- The Weapon Rack is a permanent 750 LokToken rare-tier LokShop feature unlock. The catalog SQL still needs to be applied to the shared economy before purchases can complete for real accounts.
+- The Weapon Rack is a permanent 750 LokToken rare-tier LokShop feature unlock. Its catalog entry is live in the shared economy; a real account purchase and unlock still need an end-to-end check.
 - Each weapon earns final-hit kills during normal runs, with persistent `x/616` progress committed only when the run ends. Burn/acid ticks inherit the weapon that applied the status when available. Training Arena kills do not count.
 - Multi-Weapon Testing unlocks from 1,000,000 cumulative Training Arena damage.
 - Base tests at weapon level 1; Level tests at level 8. The operator bar is separate Training Arena XP, awarded 0.1 per hit and 0.3 total for a critical hit.
@@ -105,10 +105,10 @@
 1. **Visual review:** Complete desktop and mobile review of the dock, actor readability, 2/3/4-column layouts, mouse/touch camera pan, Center/Recenter, keyboard focus, and reduced motion. A local preview currently reaches first-time companion setup; use a dedicated QA save rather than selecting a permanent companion just to enter the arena.
 2. **Weapon coverage:** One preview confirmed 189 rack entries; this is not a check of every weapon. Glitch, meteor, DVD bounce, and arc-tether still need focused review, along with every weapon family and attacks with companion/run-state prerequisites.
 3. **Progression flows:** Exercise an actual run-end 616-kill unlock, weapon-icon notification, mailbox keep/delete/persistence, and the 6,166-kill evolution gate with a QA profile. The earlier manual review opened the mailbox empty state but did not complete a weapon unlock.
-4. **LokShop publishing:** A generated review copy is available at [the Survivor 616 catalog SQL](lok-registry-review/survivor616.catalog.sql); it contains 114 catalog items, including the Weapon Rack SKU. It has not been applied to the shared economy. Regenerate it from `artifacts/survivor-616` with `pnpm exec tsx scripts/export-lok-registry.ts <outDir>` when catalog content changes. Apply it only through an authorized owner session; until then, the real cross-account purchase path is unverified.
+4. **LokShop purchase QA:** The [Survivor 616 catalog SQL](lok-registry-review/survivor616.catalog.sql) was applied to the shared economy on 2026-10-14. Its 114 catalog items include the Weapon Rack SKU. The [publish record](lok-registry-review/README.md) has the project, tenant, and readback. A real account purchase and unlock remain unverified. Regenerate the SQL from `artifacts/survivor-616` with `pnpm exec tsx scripts/export-lok-registry.ts <outDir>` when catalog content changes, then compare and publish through an authorized owner session.
 5. **Localization QA:** All configured locales and lock hashes are present, and the GitHub translation checks passed. Review machine-generated non-English wording during the full UI pass.
 
-The implementation is merged. Shared-economy publishing and the full visual/progression review remain incomplete, so the end-to-end purchase and unlock experience is not yet fully verified.
+The implementation and shared catalog are live. The full visual/progression review and real account purchase remain incomplete, so the end-to-end purchase and unlock experience is not yet fully verified.
 
 ## Follow-up review notes
 
@@ -117,5 +117,5 @@ The implementation is merged. Shared-economy publishing and the full visual/prog
 - Infinite HP continued tracking damage without lowering the target's displayed HP. Non-lethal mode left the target alive at 4,936 / 5,000 HP after a hit. The Classic layout persisted after leaving and re-entering the arena; Main was restored as the saved default.
 - The mailbox opened and displayed its empty state. Weapon unlock notification delivery was not exercised because the visual-review profile had no 616-kill progress to complete. A full view of all 189 rack entries confirmed the catalog count, but did not verify every weapon individually.
 - Glitch, meteor, DVD bounce, and arc-tether attacks still need a focused visual pass, as do desktop and mobile camera dragging, every rack density, actual 616-kill unlock delivery, and the real purchase flow.
-- The registry SQL for the Weapon Rack has not been applied to the shared Lok economy. The generated review copy is linked above; apply it only through an authorized owner session after confirming the target project and tenant context.
+- The registry SQL for the Weapon Rack was applied to the shared Lok economy on 2026-10-14. The linked publish record documents the confirmed project, tenant, and readback; the real purchase flow still needs review.
 - The current local browser review reached the first-time companion choice but stopped there to avoid storing a permanent choice in the QA save. No Training Arena visual check was performed during this pass.
