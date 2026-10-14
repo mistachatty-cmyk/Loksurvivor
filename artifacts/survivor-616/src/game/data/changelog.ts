@@ -1520,6 +1520,48 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Classic arrangement remains available. The layout choice is saved on this device; the rack has its own visible scroll area, and the arena top bar, operator, target and stage have dedicated positions.',
     ],
   },
+  {
+    version: '0.39.0',
+    date: '2026-10-14',
+    publishedAt: '2026-10-14T02:20:36Z',
+    kind: 'update',
+    title: 'Pixel map tools for Character Studio',
+    body: [
+      'Character Studio now shows a toggleable 48 × 48 pixel grid with direct X/Y placement, a color palette, and a brush that scales from one pixel to eight. Four pixels is the suggested brush for larger shapes.',
+      'Painting and erasing stay inside the map, and one drag is now a single undo step. Switching drafts clears the old edit history. Existing Forge designs and V3 drafts keep their format.',
+    ],
+  },
+  {
+    version: '0.40.0',
+    date: '2026-10-14',
+    publishedAt: '2026-10-14T03:22:47Z',
+    kind: 'update',
+    title: 'Copy animation clips across directions',
+    body: [
+      'Character Studio can copy the current animation clip into the other seven directions. Copied frames need review, and one undo restores every replaced clip.',
+    ],
+  },
+  {
+    version: '0.41.0',
+    date: '2026-10-14',
+    publishedAt: '2026-10-14T04:12:05Z',
+    kind: 'update',
+    title: 'Copy poses through an animation',
+    body: [
+      'Character Studio can copy the selected frame’s art and layer transforms into the other frames in that clip. Frame timing stays in place, and copied frames need fresh review.',
+    ],
+  },
+  {
+    version: '0.42.0',
+    date: '2026-10-14',
+    publishedAt: '2026-10-14T04:38:59Z',
+    kind: 'update',
+    title: 'Draw your own Character Studio art',
+    body: [
+      'Start from a blank pixel map or a generated pose. Touch, mouse, and pen strokes now paint every pixel along the path and undo in one step.',
+      'Edit all 16 palette colors, build and arrange layers, and approve a reviewed clip together. Account submissions queue for staff review before appearing in the Survivor 616 and GSix creator galleries.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
