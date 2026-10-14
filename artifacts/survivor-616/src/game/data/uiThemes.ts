@@ -193,6 +193,26 @@ export const UI_THEMES: UIThemeDef[] = [
     cost: 6400,
     swatches: [{ id: 'fern-green', name: 'Fern Green', primaryHsl: '150 60% 55%' }, { id: 'condensation-blue', name: 'Condensation Blue', primaryHsl: '195 55% 70%' }, { id: 'terracotta-pot', name: 'Terracotta Pot', primaryHsl: '18 65% 58%' }],
   },
+  {
+    id: 'starfall-rooftops', name: 'Starfall Rooftops', tier: 'legendary',
+    description: 'A midnight skyline under slow meteor trails, with cobalt glass and rose-gold windows.', cost: 7200,
+    swatches: [{ id: 'meteor-blue', name: 'Meteor Blue', primaryHsl: '201 100% 70%' }, { id: 'roof-rose', name: 'Roof Rose', primaryHsl: '337 100% 72%' }, { id: 'window-gold', name: 'Window Gold', primaryHsl: '42 100% 65%' }],
+  },
+  {
+    id: 'deep-current', name: 'Deep Current', tier: 'legendary',
+    description: 'A submerged arcade of ink-blue glass, bright coral, and slow underwater light.', cost: 7600,
+    swatches: [{ id: 'current-teal', name: 'Current Teal', primaryHsl: '174 95% 58%' }, { id: 'coral-glow', name: 'Coral Glow', primaryHsl: '8 100% 69%' }, { id: 'abyss-violet', name: 'Abyss Violet', primaryHsl: '267 100% 74%' }],
+  },
+  {
+    id: 'sunbreak-cathedral', name: 'Sunbreak Cathedral', tier: 'legendary',
+    description: 'Gold light pours through stained-glass panels over a deep plum evening.', cost: 8000,
+    swatches: [{ id: 'sun-prism', name: 'Sun Prism', primaryHsl: '44 100% 66%' }, { id: 'plum-glass', name: 'Plum Glass', primaryHsl: '286 85% 72%' }, { id: 'rose-window', name: 'Rose Window', primaryHsl: '351 100% 72%' }],
+  },
+  {
+    id: 'glimmerwild', name: 'Glimmerwild', tier: 'legendary',
+    description: 'A luminous garden after dark: jade leaves, violet petals, and drifting fireflies.', cost: 8400,
+    swatches: [{ id: 'jade-firefly', name: 'Jade Firefly', primaryHsl: '145 90% 63%' }, { id: 'violet-petal', name: 'Violet Petal', primaryHsl: '280 100% 75%' }, { id: 'moon-cream', name: 'Moon Cream', primaryHsl: '49 88% 84%' }],
+  },
 ];
 
 export const UI_THEMES_BY_ID: Record<string, UIThemeDef> = Object.fromEntries(

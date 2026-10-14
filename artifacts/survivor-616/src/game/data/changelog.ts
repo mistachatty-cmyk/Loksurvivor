@@ -1536,8 +1536,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-10-13',
     publishedAt: '2026-10-13T21:32:41Z',
     kind: 'update',
-    title: 'Training Arena Progression and Challenges',
+    title: 'Ultimate Looks and Training Arena Updates',
     body: [
+      'Every fighter now has three mastery skins: Null-Crowned at 616 lifetime defeats, Solar Ascendant at 6,160, and Prism Overdrive at 16,160. Their animated finish follows the selected skin into the run and the roster preview.',
+      'The customization shop adds four animated menu atmospheres and six high-tier animated palettes. Each new backdrop has its own colors and scene treatment, and reduced-motion settings keep the atmosphere still.',
       'Buy a permanent Training Arena Weapon Rack in LokShop, then earn 616 defeats with each weapon to unlock its test slot. Unlock notices are saved in the new Notifications mailbox.',
       'The arena adds multi-weapon testing, operator Training XP, damage and effect readouts, target durability modes, and a 24-second damage challenge with personal bests and achievements.',
     ],
