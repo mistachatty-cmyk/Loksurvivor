@@ -1587,7 +1587,7 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
     };
     const loaded = withStoredMeta(legacySave, loadMeta);
 
-    assert.equal(loaded.version, 25);
+    assert.equal(loaded.version, 26);
     assert.deepEqual(loaded.clearedAreaIds, [AREAS[0]!.id]);
     assert.equal(loaded.totalKills, 17);
     assert.equal(loaded.totalRuns, 3);
@@ -1654,6 +1654,52 @@ test('relic knowledge normalizes safely and clears unlock the matching recipe fo
   const repeat = reducer(first, { type: 'completeRun', result });
   assert.deepEqual(repeat.meta.knownRelicIds, ['mural-pigment']);
   assert.deepEqual(repeat.lastRun?.newlyDiscoveredRelicIds, []);
+});
+
+test('Training Arena target modes retain observed damage and credit lethal hits to their weapon', () => {
+  const world = createWorld(testArea({ x: 300, y: 300, w: 30, h: 30, kind: 'crate' }), testCharacter('spray-can'), CHARACTERS[0]!.stats, 616, [], 1, true);
+  const nonlethal = addEnemy(world);
+  nonlethal.hp = 5;
+  nonlethal.trainingDummyMode = 'nonlethal';
+  damageEnemy(world, nonlethal, 10, 0, 0, 0, undefined, 0, undefined, 'spray-can');
+  assert.equal(nonlethal.hp, 1);
+  assert.equal(nonlethal.dying, false);
+  assert.equal(world.trainingDamage, 10);
+  assert.equal(world.trainingHits, 1);
+
+  const infinite = addEnemy(world, 'nightcrawler', 40, 0);
+  infinite.hp = 100;
+  infinite.trainingDummyMode = 'infinite';
+  damageEnemy(world, infinite, 10, 0, 0, 0, undefined, 0, undefined, 'spray-can');
+  assert.equal(infinite.hp, infinite.maxHp);
+  assert.equal(world.trainingDamage, 20);
+
+  const lethal = addEnemy(world, 'nightcrawler', 60, 0);
+  lethal.hp = 5;
+  damageEnemy(world, lethal, 10, 0, 0, 0, undefined, 0, undefined, 'spray-can');
+  assert.equal(world.weaponKills['spray-can'], 1);
+
+  const environmentalFinish = addEnemy(world, 'nightcrawler', 80, 0);
+  environmentalFinish.hp = 5;
+  damageEnemy(world, environmentalFinish, 1, 0, 0, 0, undefined, 0, undefined, 'spray-can');
+  damageEnemy(world, environmentalFinish, 10, 0, 0, 0);
+  assert.equal(world.weaponKills['spray-can'], 1, 'an uncredited final hit must clear earlier weapon attribution');
+});
+
+test('weapon kill unlock progress commits only when a non-training run ends', () => {
+  const initial = { meta: createInitialMeta(), lastRun: null };
+  const withRack = reducer(initial, { type: 'grantTrainingWeaponRack' });
+  const result = runResult([], true);
+  result.weaponKills = { 'spray-can': 616 };
+  const trainingResult = { ...result, areaId: 'training-arena' };
+  const ignored = reducer(withRack, { type: 'completeRun', result: trainingResult });
+  assert.equal(ignored.meta.trainingWeaponKills['spray-can'], undefined);
+
+  result.areaId = AREAS[0]!.id;
+  const completed = reducer(withRack, { type: 'completeRun', result });
+  assert.equal(completed.meta.trainingWeaponKills['spray-can'], 616);
+  assert.equal(completed.meta.pendingNotifications.some((notification) => notification.iconId === 'spray-can'), true);
+  assert.equal(completed.meta.trainingMailbox.some((notification) => notification.iconId === 'spray-can' && !notification.read), true);
 });
 
 test('known relic recipes enter level-up eligibility, apply once, and keep the normal kill path', () => {

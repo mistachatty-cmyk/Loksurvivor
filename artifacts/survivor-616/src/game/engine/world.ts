@@ -214,6 +214,10 @@ export interface EnemyActor extends Actor {
   dying: boolean;
   deathAt: number;
   activeEffects: StatusEffectInstance[];
+  /** Set only for the Training Arena target; bypasses normal death behavior in practice modes. */
+  trainingDummyMode?: 'durability' | 'nonlethal' | 'infinite';
+  /** Last weapon to damage this actor, used when its defeat is committed to a run. */
+  lastDamageWeaponId?: string;
   /** wraith: undamageable and unrendered while `w.now < invisibleUntil`. */
   invisibleUntil: number;
   /** wraith: w.now this circling phase ends and the next teleport fires.
@@ -1105,6 +1109,8 @@ export interface World {
   musicColorOverride?: SpritePalette;
   orbiters: Orbiter[];
   weapons: RunWeapon[];
+  /** Synchronous damage attribution while a weapon activation is being resolved. */
+  currentWeaponDamageId?: string;
   frogSwing: FrogSwing | null;
   frogThrows: FrogThrow[];
   rewindMarks: RewindMark[];
@@ -1188,6 +1194,13 @@ export interface World {
 
   kills: number;
   killsByEnemy: Record<string, number>;
+  /** Run-end attribution for kills credited to the final weapon hit. */
+  weaponKills: Record<string, number>;
+  /** Training Arena measurement counters (zero in ordinary runs). */
+  trainingDamage: number;
+  trainingHits: number;
+  trainingCriticalHits: number;
+  trainingLargestHit: number;
   /** Kills of quirked enemies this run, by quirk id. */
   killsByQuirk: Record<string, number>;
   /** Quirk Surge progress: 0 waiting, 1 running, 2 paid out. */
@@ -1810,6 +1823,11 @@ export function createWorld(
     ultActiveUntil: -1,
     kills: 0,
     killsByEnemy: {},
+    weaponKills: {},
+    trainingDamage: 0,
+    trainingHits: 0,
+    trainingCriticalHits: 0,
+    trainingLargestHit: 0,
     killsByQuirk: {},
     quirkAnnounced: {},
     quirkSurgePhase: 0,
@@ -3671,7 +3689,7 @@ function updateFollowers(w: World, dt: number) {
       const cooldown = follower.readyAt ?? 0;
       if (w.now >= cooldown) {
         follower.readyAt = w.now + 620;
-        damageEnemy(w, target, follower.damage * damageMult(w), WEAPONS_BY_ID[follower.weaponId]?.impactIntensity ?? 1, follower.x, follower.y);
+        damageEnemy(w, target, follower.damage * damageMult(w), WEAPONS_BY_ID[follower.weaponId]?.impactIntensity ?? 1, follower.x, follower.y, undefined, 0, undefined, follower.weaponId);
         spawnParticles(w, follower.x, follower.y, follower.color, 3, 55);
       }
     }
@@ -3843,7 +3861,7 @@ function emitEnemyImpactBurst(
     if (dist2(enemy.x, enemy.y, source.x, source.y) > reach * reach) return;
     // Secondary hits deliberately use a shove, not the burst threshold, so
     // one impact cannot recursively duplicate its own reward chain.
-    damageEnemy(w, enemy, burstDamage, 1, source.x, source.y, undefined, 1);
+    damageEnemy(w, enemy, burstDamage, 1, source.x, source.y, undefined, 1, undefined, source.lastDamageWeaponId);
   });
   w.effects.push({
     uid: uid(w),
@@ -3884,6 +3902,7 @@ export function damageEnemy(
   burstDepth = 0,
   /** LokSurvivorArena: which guest dealt this damage, if any -- see killEnemy. */
   killerId?: string,
+  weaponId?: string,
 ) {
   if (enemy.dying) return;
   // Sector Command: this is the single choke point for player-caused damage,
@@ -3900,7 +3919,8 @@ export function damageEnemy(
   // Zero Day: frozen "stone" enemies are untargetable by normal damage --
   // they're resolved directly via killEnemy() when thrown, not damageEnemy().
   if (w.now < enemy.frozenUntil) return;
-  if (statusEffectId) applyStatusEffect(w, enemy, statusEffectId);
+  const sourceWeaponId = weaponId ?? w.currentWeaponDamageId;
+  if (statusEffectId) applyStatusEffect(w, enemy, statusEffectId, sourceWeaponId);
 
   let adjustedAmount = amount;
   if (enemy.def.behavior === 'phalanx') {
@@ -3935,9 +3955,24 @@ export function damageEnemy(
   const beatBonus = onBeat ? ON_BEAT_CRIT_MULT : 1;
   const stealthBonus = w.now < w.stealthUntil ? 1 + (w.stealthConfig?.damageBonusPct ?? 0) : 1;
   const dealt = Math.max(1, Math.round((isCrit ? adjustedAmount * 2 : adjustedAmount) * beatBonus * stealthBonus));
+  // Attribution follows the final damaging source. Clearing an absent source
+  // prevents a later environmental hit from inheriting an older weapon's credit.
+  enemy.lastDamageWeaponId = sourceWeaponId;
+  if (enemy.trainingDummyMode) {
+    w.trainingDamage += dealt;
+    w.trainingHits += 1;
+    w.trainingLargestHit = Math.max(w.trainingLargestHit, dealt);
+    if (isCrit) w.trainingCriticalHits += 1;
+  }
   if (onBeat) w.onBeatHits += 1;
   pushSfx(w, isCrit ? 'critHit' : 'hit', onBeat);
-  enemy.hp -= dealt;
+  if (enemy.trainingDummyMode === 'infinite') {
+    enemy.hp = enemy.maxHp;
+  } else if (enemy.trainingDummyMode === 'nonlethal') {
+    enemy.hp = Math.max(1, enemy.hp - dealt);
+  } else {
+    enemy.hp -= dealt;
+  }
   // Sector Command: an enemy you have already worked into its capture window,
   // while standing next to it, must not evaporate to the next auto-fired shot.
   // Flooring it at 1 hp for the priming window is what turns "I killed it
@@ -3981,7 +4016,7 @@ export function damageEnemy(
     emitEnemyImpactBurst(w, enemy, dealt, '#fff1a8');
   }
 
-  if (enemy.hp <= 0) {
+  if (enemy.hp <= 0 && !enemy.trainingDummyMode) {
     killEnemy(w, enemy, killerId);
   }
 }
@@ -4022,16 +4057,17 @@ function pushCascadeNumber(w: World, enemy: EnemyActor, dealt: number, isCrit: b
 }
 
 /** Apply a metadata-defined effect, refreshing duration and stacking safely. */
-function applyStatusEffect(w: World, enemy: EnemyActor, id: string) {
+function applyStatusEffect(w: World, enemy: EnemyActor, id: string, weaponId?: string) {
   const def = STATUS_EFFECTS_BY_ID[id];
   if (!def) return;
   const existing = enemy.activeEffects.find((effect) => effect.id === id);
   if (existing) {
     existing.expiresAt = Math.max(existing.expiresAt, w.now + def.durationMs);
     existing.stacks = Math.min(def.maxStacks, existing.stacks + 1);
+    if (weaponId) existing.sourceWeaponId = weaponId;
     return;
   }
-  enemy.activeEffects.push({ id, stacks: 1, appliedAt: w.now, expiresAt: w.now + def.durationMs });
+  enemy.activeEffects.push({ id, stacks: 1, appliedAt: w.now, expiresAt: w.now + def.durationMs, sourceWeaponId: weaponId });
 }
 
 function updateStatusEffects(w: World) {
@@ -4040,7 +4076,7 @@ function updateStatusEffects(w: World) {
       if ((effect.id === 'burning' || effect.id === 'acid') && w.now >= (effect.nextTickAt ?? effect.appliedAt)) {
         const tick = effect.id === 'burning' ? 2 : 1;
         effect.nextTickAt = w.now + 520;
-        damageEnemy(w, enemy, tick * effect.stacks, 0, enemy.x, enemy.y);
+        damageEnemy(w, enemy, tick * effect.stacks, 0, enemy.x, enemy.y, undefined, 0, undefined, effect.sourceWeaponId);
       }
       if (effect.id === 'corrupted' && w.now >= (effect.nextTickAt ?? effect.appliedAt) && !enemy.dying && w.now >= enemy.frozenUntil) {
         effect.nextTickAt = w.now + 900;
@@ -4418,6 +4454,7 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
   enemy.animStartedAt = w.now;
   w.kills += 1;
   w.killsByEnemy[enemy.defId] = (w.killsByEnemy[enemy.defId] ?? 0) + 1;
+  if (enemy.lastDamageWeaponId) w.weaponKills[enemy.lastDamageWeaponId] = (w.weaponKills[enemy.lastDamageWeaponId] ?? 0) + 1;
   if (enemy.quirk) w.killsByQuirk[enemy.quirk] = (w.killsByQuirk[enemy.quirk] ?? 0) + 1;
   if (w.millionHorde) w.millionHorde.defeatedPopulation += 1;
   // LokSurvivorArena: a guest kill also counts toward `kills`/`killsByEnemy`
@@ -4808,12 +4845,12 @@ function damagePlayer(
 }
 
 /** Damage every enemy inside a circle once. */
-function novaDamage(w: World, x: number, y: number, radius: number, damage: number, impactIntensity: ImpactIntensity, statusEffectId?: string) {
+function novaDamage(w: World, x: number, y: number, radius: number, damage: number, impactIntensity: ImpactIntensity, statusEffectId?: string, weaponId?: string) {
   forEachNearby(w, x, y, radius + 40, (enemy) => {
     if (enemy.dying) return;
     const reach = radius + enemy.radius;
     if (dist2(enemy.x, enemy.y, x, y) <= reach * reach) {
-      damageEnemy(w, enemy, damage, impactIntensity, x, y, statusEffectId);
+      damageEnemy(w, enemy, damage, impactIntensity, x, y, statusEffectId, 0, undefined, weaponId);
     }
   });
 }
@@ -5336,14 +5373,27 @@ export function arcTetherTargets(enemies: readonly EnemyActor[], origin: { x: nu
 
 function fireWeapon(w: World, runWeapon: RunWeapon) {
   const weapon = runWeapon.def;
+  w.currentWeaponDamageId = weapon.id;
+  const firstProjectile = w.projectiles.length;
+  const firstEffect = w.effects.length;
+  const firstFollower = w.followers.length;
+  const stampWeaponArtifacts = () => {
+    for (const projectile of w.projectiles.slice(firstProjectile)) {
+      if (projectile.fromPlayer && !projectile.weaponId) projectile.weaponId = weapon.id;
+    }
+    for (const effect of w.effects.slice(firstEffect)) {
+      if (!effect.weaponId) effect.weaponId = weapon.id;
+    }
+    for (const follower of w.followers.slice(firstFollower)) follower.weaponId = weapon.id;
+  };
   const p = w.player;
   const damage = runWeaponDamage(w, runWeapon);
   const reach = weapon.range * areaMult(w);
   const palette = w.character.palette;
   const behavior = weaponEvolutionBehavior(w, weapon);
 
-  if (fireLegendaryWeapon(w, runWeapon, damage, reach)) return;
-  if (fireArchiveWeapon(w, runWeapon, damage, reach)) return;
+  if (fireLegendaryWeapon(w, runWeapon, damage, reach)) { stampWeaponArtifacts(); w.currentWeaponDamageId = undefined; return; }
+  if (fireArchiveWeapon(w, runWeapon, damage, reach)) { stampWeaponArtifacts(); w.currentWeaponDamageId = undefined; return; }
 
   switch (weapon.kind) {
     case 'arc-tether': {
@@ -5410,7 +5460,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         evolutionBehavior: behavior,
         weaponId: weapon.id,
       });
-      novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon), weapon.statusEffectId);
+  novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon), weapon.statusEffectId, weapon.id);
       if (weapon.id === 'graviton-repulsor') {
         forEachNearby(w, p.x, p.y, reach + 30, (enemy) => {
           if (enemy.dying) return;
@@ -5434,7 +5484,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
 
     case 'aura': {
       // The aura is permanent; each activation is a damage tick.
-      novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon), weapon.statusEffectId);
+      novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon), weapon.statusEffectId, weapon.id);
       damageBreakable(w, p.x, p.y, reach, damage, weaponImpact(weapon), p.x, p.y, weapon.impactTrigger);
       w.effects.push({
         uid: uid(w),
@@ -5554,7 +5604,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         const dx = target.x - p.x; const dy = target.y - p.y; const len = Math.hypot(dx, dy) || 1;
         p.x = target.x - (dx / len) * (p.radius + target.radius + 8);
         p.y = target.y - (dy / len) * (p.radius + target.radius + 8);
-        novaDamage(w, p.x, p.y, 42, damage, weaponImpact(weapon), weapon.statusEffectId);
+        novaDamage(w, p.x, p.y, 42, damage, weaponImpact(weapon), weapon.statusEffectId, weapon.id);
         damageBreakable(w, p.x, p.y, 42, damage, weaponImpact(weapon), p.x, p.y, weapon.impactTrigger);
         w.effects.push({ uid: uid(w), kind: 'teleport', x: p.x, y: p.y, radius: 42, angle: 0, spread: 0,
           bornAt: w.now, expiresAt: w.now + 420, color: weapon.color ?? palette.accent, damage: 0, impactIntensity: 0,
@@ -5605,7 +5655,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
           damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger,
           hitUids: new Set(), followPlayer: false,
         });
-        novaDamage(w, p.x, p.y, weapon.range, damage, weaponImpact(weapon), 'freeze');
+        novaDamage(w, p.x, p.y, weapon.range, damage, weaponImpact(weapon), 'freeze', weapon.id);
         damageBreakable(w, p.x, p.y, weapon.range, damage, weaponImpact(weapon), p.x, p.y, weapon.impactTrigger);
         w.shake = Math.max(w.shake, 4);
       }
@@ -5906,6 +5956,8 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       break;
     }
   }
+  stampWeaponArtifacts();
+  w.currentWeaponDamageId = undefined;
 }
 
 function updateOrbiters(w: World, dt: number) {
@@ -5929,10 +5981,10 @@ function updateOrbiters(w: World, dt: number) {
       const reach = 11 + enemy.radius;
       if (dist2(enemy.x, enemy.y, ox, oy) <= reach * reach) {
         orb.cooldowns.set(enemy.uid, w.now + 420);
-        damageEnemy(w, enemy, damage, weaponImpact(weapon), ox, oy);
+        damageEnemy(w, enemy, damage, weaponImpact(weapon), ox, oy, undefined, 0, undefined, weapon.id);
         if (weapon.id === 'commentstorm-crown' || weapon.id === 'crown-of-replies') {
           const burstRadius = weapon.id === 'crown-of-replies' ? 62 : 38;
-          novaDamage(w, ox, oy, burstRadius, damage * 0.32, 1, 'slow');
+          novaDamage(w, ox, oy, burstRadius, damage * 0.32, 1, 'slow', weapon.id);
           w.effects.push({ uid: uid(w), kind: 'ring', weaponId: weapon.id,
             x: ox, y: oy, radius: burstRadius, angle: 0, spread: 0,
             bornAt: w.now, expiresAt: w.now + 230, color: weapon.color ?? '#ffe38d',
@@ -5943,7 +5995,7 @@ function updateOrbiters(w: World, dt: number) {
         const behavior = weaponEvolutionBehavior(w, weapon);
         if (behavior?.kind === 'orbit-burst') {
           const burstRadius = behavior.radius ?? 56;
-          novaDamage(w, ox, oy, burstRadius, damage * 0.35, 0, behavior.statusEffectId);
+          novaDamage(w, ox, oy, burstRadius, damage * 0.35, 0, behavior.statusEffectId, weapon.id);
           w.effects.push({
             uid: uid(w),
             kind: 'ring',
@@ -9454,7 +9506,7 @@ function updateProjectiles(w: World, dt: number) {
           const reach = proj.radius + enemy.radius;
           if (dist2(enemy.x, enemy.y, proj.x, proj.y) <= reach * reach) {
             hit = true;
-            damageEnemy(w, enemy, proj.damage, proj.impactIntensity, proj.x, proj.y);
+            damageEnemy(w, enemy, proj.damage, proj.impactIntensity, proj.x, proj.y, proj.statusEffectId, 0, undefined, proj.weaponId);
             spawnParticles(w, proj.x, proj.y, proj.color, 10, 120);
           }
         });
@@ -9535,7 +9587,7 @@ function updateProjectiles(w: World, dt: number) {
               true,
             );
           } else {
-            damageEnemy(w, enemy, proj.damage, proj.impactIntensity, proj.x, proj.y, proj.statusEffectId);
+        damageEnemy(w, enemy, proj.damage, proj.impactIntensity, proj.x, proj.y, proj.statusEffectId, 0, undefined, proj.weaponId);
           }
           if (proj.customKind === 'baby-llama' || proj.customKind === 'elemental-llama') {
             const pSpeed = Math.hypot(proj.vx, proj.vy) || 1;
@@ -10997,7 +11049,7 @@ function updateEffects(w: World) {
         const hasBonusStatus = effect.bonusVsStatusId && enemy.activeEffects.some((e) => e.id === effect.bonusVsStatusId);
         const dealt = hasBonusStatus ? effect.damage * (effect.bonusVsStatusMult ?? 1) : effect.damage;
         if (hasBonusStatus) spawnParticles(w, enemy.x, enemy.y, '#ffffff', 6, 100);
-        damageEnemy(w, enemy, dealt, effect.impactIntensity, effect.x, effect.y, effect.statusEffectId);
+        damageEnemy(w, enemy, dealt, effect.impactIntensity, effect.x, effect.y, effect.statusEffectId, 0, undefined, effect.weaponId);
         triggerEvolutionHit(
           w,
           effect.evolutionBehavior,
@@ -11021,7 +11073,7 @@ function updateEffects(w: World) {
         if (enemy.dying || effect.hitUids.has(enemy.uid)) return;
         if (Math.abs(enemy.x - effect.x) <= boxW / 2 && Math.abs(enemy.y - effect.y) <= boxH / 2) {
           effect.hitUids.add(enemy.uid);
-          damageEnemy(w, enemy, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.statusEffectId ?? 'freeze');
+          damageEnemy(w, enemy, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.statusEffectId ?? 'freeze', 0, undefined, effect.weaponId);
           triggerEvolutionHit(
             w,
             effect.evolutionBehavior,
@@ -11053,7 +11105,7 @@ function updateEffects(w: World) {
           enemy.kx += (dx / distance) * effect.pullStrength;
           enemy.ky += (dy / distance) * effect.pullStrength;
         }
-        damageEnemy(w, enemy, effect.damage, 0, effect.x, effect.y, effect.statusEffectId ?? (effect.color.includes('b8ff') ? 'acid' : 'burning'));
+        damageEnemy(w, enemy, effect.damage, 0, effect.x, effect.y, effect.statusEffectId ?? (effect.color.includes('b8ff') ? 'acid' : 'burning'), 0, undefined, effect.weaponId);
       });
       if (effect.hurtsPlayer && dist2(p.x, p.y, effect.x, effect.y) <= (effect.radius + p.radius) ** 2) {
         damagePlayer(w, Math.max(1, Math.round(effect.damage * 0.45)), effect.x, effect.y);
@@ -12941,6 +12993,7 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     level: w.level,
     cred: finalCred,
     killsByEnemy: { ...w.killsByEnemy },
+    weaponKills: { ...w.weaponKills },
     killsByQuirk: { ...w.killsByQuirk },
     quirkEverywhereRun: w.enemyQuirks.everywhere.some((id) => !w.enemyQuirks.disabled.has(id)),
     quirkTakenRun: w.enemyQuirks.taken.size > 0,

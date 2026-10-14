@@ -2,12 +2,34 @@
 
 ## Status
 
-- **Owner:** User for design review; implementation not started.
-- **Goal:** Capture the reviewed next-pass requirements, integration points, and remaining decisions for the Training Arena.
+- **Owner:** Codex implementation; user review next.
+- **Goal:** Add progression, notifications, stats, and damage challenges to the Training Arena.
 - **Scope:** LokShop access, per-weapon progression, persistent notifications, training stats and target options, operator XP, multi-weapon testing, and a timed damage challenge.
 - **Current baseline:** Training Arena is on `main` after PRs #273, #274, #275, and #276. The current arena has a dedicated stationary test scene, Dust Mite target, weapon dock, and in-screen controls. See [the original handoff](training-arena-handoff-2026-10-13.md).
-- **This change:** Documentation only. It does not implement the next-pass systems.
-- **Next:** Review the open decisions below, then build the approved system in small connected steps and visually check each flow.
+- **This change:** The implementation is on `codex/training-arena-progression-systems` for issue [#279](https://github.com/mistachatty-cmyk/Loksurvivor/issues/279) and open PR [#280](https://github.com/mistachatty-cmyk/Loksurvivor/pull/280). This follow-up adds overlapping Spam activations, direct icon activation, selectable rack columns, draggable camera with center-lock, and challenge retry/back actions.
+- **Next:** Shared catalog publishing and broader visual review remain. Leave PR #280 open for the user to arrange review; do not merge it.
+
+## Implementation decisions for this pass
+
+- The Weapon Rack is a permanent 750 LokToken rare-tier LokShop feature unlock. The catalog SQL still needs to be applied to the shared economy before purchases can complete for real accounts.
+- Each weapon earns final-hit kills during normal runs, with persistent `x/616` progress committed only when the run ends. Burn/acid ticks inherit the weapon that applied the status when available. Training Arena kills do not count.
+- Multi-Weapon Testing unlocks from 1,000,000 cumulative Training Arena damage.
+- Base tests at weapon level 1; Level tests at level 8. The operator bar is separate Training Arena XP, awarded 0.1 per hit and 0.3 total for a critical hit.
+- The damage challenge uses a visible-tab 24-second timer. Spam turns on automatically, and players may activate additional weapons from the rack during the challenge; those activations overlap without clearing previous attacks. The final score's saved loadout key includes every weapon activated during that attempt. The target temporarily has infinite HP during a challenge, so target durability does not cap the score. The result panel offers Retry with the challenge's weapon set and Back to Arena.
+- Opening the mailbox marks items read; keeping is optional, delete is permanent, and at most 100 items are retained.
+- The six placeholder damage achievements use 0, 1,000, 5,000, 1,000,000, 5,000,000, and 100,000,000 damage thresholds in one challenge. Challenge tiers below 5,000 use “At Least You Tried.”
+
+## Implemented in this branch
+
+- LokShop rack purchase and arena access gate; per-weapon kill progression and unlock notices.
+- Persistent Notifications mailbox with unread badge, weapon icons, read/keep/delete actions.
+- Arena stats/effect readout, Base/Level weapon toggle, operator Training XP bar, and durability/non-lethal/infinite target options.
+- Cumulative dummy damage, multi-weapon selection, 24-second challenge, saved best per loadout/level, celebrations, and achievement milestones.
+- Clicking a rack icon activates that weapon directly. Spam allows rapid activations to append attacks to the current simulation, preserving existing projectiles, effects, and target damage. Outside Spam, a running attack remains protected from interruption.
+- The rack density can be set to 2, 3, or 4 columns. The player can drag the arena canvas to pan the view; Center is on by default and eases the camera back to its starting position, while Recenter resets it immediately.
+- Challenge results use a styled score card with Retry and Back to Arena controls.
+- Player-facing copy is in the English catalog and all seven configured locales. The initial local auto-localization attempt reported translation failures; the workflow's translation commit then arrived on the branch. This follow-up adds translations and lock hashes for its nine new labels. Review machine-generated locale wording during normal QA.
+- Reducer and combat tests are included in the branch. Typecheck passed after the keyboard-accessibility follow-up. Manual preview checks covered the challenge result keyboard flow, Spam overlap, target modes, saved Classic layout, and representative weapons; broader viewport and weapon-family coverage remains.
 
 ## Reviewed requirements
 
@@ -74,26 +96,21 @@
 - Weapon unlock at run end, icon toast, mailbox badge, read/keep/delete actions, and persistence after leaving and reopening the hideout.
 - Keyboard navigation, focus visibility, reduced-motion behavior, and screen-reader names for rack entries, progress, timer, and stat values.
 
-## Decisions still needed
+## Remaining work
 
-1. **LokShop price:** Which LokToken tier/price buys Weapon Rack access?
-2. **616 kill attribution:** Does the weapon that deals the final damage get credit, including burn/status/evolved attacks? How should kills from a combined attack or companion be attributed? Do all normal run modes count?
-3. **Counter timing:** The user decided progress only unlocks after the run ends. Confirm whether the HUD shows provisional `run kills + saved kills` during the run while the durable counter stays unchanged, or shows only saved progress until results.
-4. **Multi-weapon requirement:** Is 1,000,000 dummy damage cumulative lifetime damage (recommended), or a single arena visit? Does it count every target mode and every weapon level?
-5. **Base / Level:** Does this choose weapon level 1 versus a chosen weapon upgrade level, the operator's base versus current run level, or both? What is the maximum level and should evolved forms be selectable?
-6. **Arena XP:** Does XP count each activation, each landed hit, or each target hit? Does a critical receive 0.3 total XP or 0.3 plus the base 0.1? Does arena XP use existing operator mastery progression or a separate level bar? Add a rate limit if the feature can be spammed indefinitely.
-7. **Challenge rules:** Wall-clock versus simulation time; one weapon versus a multi-weapon loadout per attempt; whether the player may swap during a trial; and best-only versus complete result history.
-8. **Tier table:** Confirm exact inclusive ranges and names, especially how 0, 1–999, 1,000, and 5,000 are grouped. Confirm whether milestones grant only achievements or also rewards.
-9. **Mailbox behavior:** Whether opening auto-marks read, whether keep is the default, whether delete is permanent, and whether old notifications have a storage cap.
-10. **Visual approval:** Complete the checklist above in a live browser before marking the feature complete.
+1. **Visual approval:** Complete desktop and mobile browser review. Check one weapon from every attack family and all mailbox/progression flows.
+2. **Catalog publishing:** Generate and apply the updated Lok registry SQL so the Weapon Rack SKU can be purchased in the shared economy.
+3. **Localization:** Run the repo localization flow for non-English locales.
+4. **Spam/challenge:** Rapidly activate different rack icons and repeat the same icon during Spam and during the 24-second challenge; confirm earlier attacks continue, damage remains cumulative, and Retry restarts the recorded challenge weapon set.
+5. **Camera/rack:** Pan with mouse and touch, with Center enabled and disabled; check Recenter and the 2/3/4-column rack options at desktop and narrow mobile sizes.
+4. **Combat limits:** The rack lists all base, character-specific, evolved, and relic definitions. Some definitions may rely on run-state or companion prerequisites that the isolated arena cannot reproduce; record these during the weapon-family pass.
+The progression choices above are implementation assumptions for user review. The shared Lok economy publish and full visual review remain incomplete; do not describe the end-to-end purchase and arena experience as fully verified until those are done.
 
-## Recommended implementation order
+## Follow-up review notes
 
-1. Add persisted progression types and the LokShop rack unlock; show ownership and each weapon's `x/616` progress.
-2. Add combat kill attribution and credit only when a completed run is committed; add icon-bearing unlock announcements and persistent mailbox entries.
-3. Improve the fixed arena layout, stats/effect panel, target modes, Base/Level control, and operator XP bar.
-4. Add cumulative dummy damage and the one-million-damage multi-weapon gate after the accumulation rule is approved.
-5. Add the 24-second challenge, saved results, tier celebration, and one-time threshold achievements.
-6. Localize the new interface, then complete the visual review checklist at desktop and mobile widths.
-
-Do not merge implementation while the unresolved rules above change progression credit, saved data shape, or achievement boundaries. Small visual work that does not depend on those rules can proceed after this spec is reviewed.
+- The 24-second challenge completed in the local preview. The result card focused **Retry** on open, kept Tab and Shift+Tab within the dialog, closed on Escape, and returned focus to **Challenge**. The result screen has visible focus rings on its controls.
+- With Spam enabled, repeated and different rack activations overlapped while the simulation continued accumulating hits, criticals, effects, and damage. Representative families observed: wave, hazard, convert, projectile, laser, orbit, homing, nova, teleport, melee, aura, punch, and sweep.
+- Infinite HP continued tracking damage without lowering the target's displayed HP. Non-lethal mode left the target alive at 4,936 / 5,000 HP after a hit. The Classic layout persisted after leaving and re-entering the arena; Main was restored as the saved default.
+- The mailbox opened and displayed its empty state. Weapon unlock notification delivery was not exercised because the visual-review profile had no 616-kill progress to complete. A full view of all 189 rack entries confirmed the catalog count, but did not verify every weapon individually.
+- Glitch, meteor, DVD bounce, and arc-tether attacks still need a focused visual pass, as do desktop and mobile camera dragging, every rack density, actual 616-kill unlock delivery, and the real purchase flow.
+- The registry SQL for the Weapon Rack has not been applied to the shared Lok economy. This checkout exposes no Supabase/database publishing tool or configured project credentials, and the repository handoff says this shared-catalog publish requires owner approval. The generated SQL is preserved under `work/lok-registry-review/` for the owner or an authorized database session.
