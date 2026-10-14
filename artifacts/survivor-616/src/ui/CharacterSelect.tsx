@@ -323,9 +323,9 @@ function CharacterDetail({
           {skins.map((skin) => {
             const locked = !isCharacterSkinUnlocked(skin, meta.rescuedAllyIds.length, status === 'completed', meta.totalKills);
             const selected = selectedSkinId === skin.id;
-            const unlockLabel = skin.totalKillsRequired
+            const killProgress = skin.totalKillsRequired
               ? `${Math.min(meta.totalKills, skin.totalKillsRequired).toLocaleString()} / ${skin.totalKillsRequired.toLocaleString()} KILLS`
-              : locked ? 'LOCKED' : skin.name;
+              : '';
             return (
               <button
                 key={skin.id}
@@ -340,7 +340,8 @@ function CharacterDetail({
                 <span className="flex h-5 overflow-hidden border border-white/10">
                   {[skin.palette.body, skin.palette.accent, skin.palette.glow].map((color) => <span key={color} className="flex-1" style={{ backgroundColor: color }} />)}
                 </span>
-                <span className={`mt-1 block truncate font-mono text-[7px] font-black uppercase ${skin.tier === 'ultimate' ? 'text-amber-100' : 'text-white/75'}`}>{skin.tier === 'ultimate' && !locked ? 'ULTIMATE · ' : ''}{unlockLabel}</span>
+                <span className={`mt-1 block truncate font-mono text-[7px] font-black uppercase ${skin.tier === 'ultimate' ? 'text-amber-100' : 'text-white/75'}`}>{skin.name}</span>
+                {skin.tier === 'ultimate' ? <span className="block truncate font-mono text-[6px] font-bold uppercase text-white/55">{locked ? killProgress : 'ULTIMATE SKIN'}</span> : null}
               </button>
             );
           })}
