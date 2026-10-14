@@ -8,9 +8,17 @@ The existing local save key `survivor616.forge.v1`, `FORGE1` share code, saved o
 
 ## Project data and validation
 
-`src/game/studio/v3Project.ts` owns format version 3. It records kind, base kit or enemy ID, seed and prompt choices, 16-color palette, named layers with pivots and draw order, eight editable directions, animation frames with per-frame timing and layer pixels, revision lineage, remix choice, and review state. Logical art is 48 × 48 pixels. The six generator rig families are humanoid, quadruped, blob, insectoid, floating, and winged. Style choices are cute, creepy, street, industrial, whimsical, and Null. Prompts select within this curated system; no image is fetched or uploaded.
+`src/game/studio/v3Project.ts` owns format version 3. It records kind, base kit or enemy ID, seed and prompt choices, 16-color palette, named layers with pivots and draw order, eight editable directions, animation frames with per-frame timing and layer pixels, revision lineage, remix choice, and review state. Logical art is 48 × 48 pixels. The editor provides a toggleable pixel grid, X/Y placement from the top-left origin, and a square brush from 1 to 8 pixels; 4 pixels is suggested for blocking larger shapes. Drawing and erasing are clipped to the map, brush stamps replace pixels at the same coordinates, and each pointer stroke is one undo step. Opening a different project clears the old undo history. These controls do not change the V3 project format. The six generator rig families are humanoid, quadruped, blob, insectoid, floating, and winged. Style choices are cute, creepy, street, industrial, whimsical, and Null. Prompts select within this curated system; no image is fetched or uploaded.
+
+Creators can start with generated art or a blank 48 × 48 project. The pointer canvas accepts touch, mouse, and pen input; fast movements fill every cell between sampled points. Right click and a stylus eraser erase. The selected palette color is editable, and creators can add, name, reorder, show, hide, clear, or remove layers. Shared palette and layer changes clear all frame approvals because they can alter every view. The editor supports up to 16 layers, matching the account validator.
 
 Every direction requires idle 4, walk 6, attack 4, hurt 2, and death 8 frames, for 192 reviewed frames. Generation prefills editable art but never approves it. Editing a frame revokes that frame's approval. A complete project has all required frames approved and no structural validation errors. Only complete reviewed revisions may enter runs, submission, adoption, or public profile art. Operators retain the selected unlocked kit's gameplay. Enemy work replaces only the selected base enemy's appearance and retains its authored behavior and stats.
+
+The frame timeline can copy the current clip from the selected direction to the other seven directions. This replaces those clips, clears their approvals, and counts as one undoable edit; the source direction remains unchanged.
+
+It can also copy the selected frame's art and layer transforms to the other frames in that clip. Each destination keeps its timing, needs fresh review, and can be restored with one undo.
+
+After reviewing a clip, its frames can be approved together. A project with all 192 frames approved and visible art can be submitted from the editor. Submission saves the device draft, syncs it to the account, then queues an immutable revision for staff review. Approved revisions feed the Survivor 616 and GSix.online galleries; rejected or removed revisions stay out of public queries.
 
 ## Account and publication boundary
 

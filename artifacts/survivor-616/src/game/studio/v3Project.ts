@@ -118,6 +118,16 @@ export function generateStudioProject(options: GenerateOptions): StudioProject {
   };
 }
 
+export function generateBlankStudioProject(options: GenerateOptions): StudioProject {
+  const project = generateStudioProject(options);
+  for (const direction of DIRECTIONS) for (const clip of Object.keys(CLIPS) as ClipName[]) {
+    for (const frame of project.views[direction][clip]) {
+      for (const layer of project.layers) frame.layers[layer.id] = [];
+    }
+  }
+  return project;
+}
+
 /** Copy a v1/v2 design into an editable v3 draft without changing its legacy record. */
 export function projectFromForgedOperator(operator: ForgedOperator, id: string): StudioProject {
   const project = generateStudioProject({ id, kind: 'operator', sourceId: operator.kitId, seed: operator.id, name: operator.name, prompt: `${operator.design.species} ${operator.design.flavor}` });
@@ -139,7 +149,7 @@ export function studioErrors(project: StudioProject): string[] {
   if (project.version !== STUDIO_VERSION) errors.push('Unsupported project version');
   if (!project.name.trim() || !project.sourceId.trim()) errors.push('Name and source are required');
   if (project.palette.length !== 16 || project.palette.some((color) => !/^#[0-9a-fA-F]{6}$/.test(color))) errors.push('Palette must have 16 valid colors');
-  if (!project.layers.length || new Set(project.layers.map((layer) => layer.id)).size !== project.layers.length) errors.push('Layers must have unique IDs');
+  if (!project.layers.length || project.layers.length > 16 || new Set(project.layers.map((layer) => layer.id)).size !== project.layers.length || project.layers.some((layer) => !layer.name.trim())) errors.push('Use 1 to 16 named layers with unique IDs');
   for (const direction of DIRECTIONS) for (const clip of Object.keys(CLIPS) as ClipName[]) {
     const frames = project.views[direction]?.[clip];
     if (!frames || frames.length !== CLIPS[clip]) { errors.push(`${direction} ${clip} needs ${CLIPS[clip]} frames`); continue; }
@@ -148,6 +158,8 @@ export function studioErrors(project: StudioProject): string[] {
       for (const row of Object.values(frame.layers)) for (const [x, y, color] of row) if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= 48 || y >= 48 || !Number.isInteger(color) || color < 0 || color > 15) { errors.push(`${direction} ${clip} has pixels outside the canvas`); break; }
     }
   }
+  if (!project.layers.some((layer) => layer.visible && DIRECTIONS.some((direction) => (Object.keys(CLIPS) as ClipName[]).some((clip) =>
+    project.views[direction]?.[clip]?.some((frame) => (frame.layers[layer.id]?.length ?? 0) > 0))))) errors.push('Add visible art before submitting');
   return [...new Set(errors)];
 }
 export function isStudioComplete(project: StudioProject): boolean { return studioErrors(project).length === 0 && approvalCount(project) === REQUIRED_FRAMES; }
@@ -193,6 +205,88 @@ export function editStudioFrame(project: StudioProject, direction: Direction, cl
   });
   return { ...next, approvalState: 'draft', revision: next.revision + 1 };
 }
+/** Changes to the shared palette or layer stack require every frame to be reviewed again. */
+export function editStudioAppearance(project: StudioProject, edit: (draft: StudioProject) => void): StudioProject {
+  const draft = structuredClone(project);
+  edit(draft);
+  for (const direction of DIRECTIONS) for (const clip of Object.keys(CLIPS) as ClipName[]) {
+    for (const frame of draft.views[direction][clip]) frame.approved = false;
+  }
+  draft.approvalState = 'draft';
+  draft.revision = project.revision + 1;
+  draft.updatedAt = Date.now();
+  return draft;
+}
+/** Copy one animation clip to the other directions. Copies always need fresh review. */
+export function copyStudioClipToDirections(project: StudioProject, sourceDirection: Direction, clip: ClipName): StudioProject {
+  const views = { ...project.views };
+  for (const direction of DIRECTIONS) {
+    if (direction === sourceDirection) continue;
+    views[direction] = {
+      ...project.views[direction],
+      [clip]: project.views[sourceDirection][clip].map((frame) => ({ ...structuredClone(frame), approved: false })),
+    };
+  }
+  return { ...project, views, approvalState: 'draft', revision: project.revision + 1, updatedAt: Date.now() };
+}
+/** Copy one frame's pose to every other frame in its clip, keeping target timing. */
+export function copyStudioFrameToClip(project: StudioProject, direction: Direction, clip: ClipName, sourceIndex: number): StudioProject {
+  const source = project.views[direction]?.[clip]?.[sourceIndex];
+  if (!source) throw new Error('Frame does not exist');
+  const frames = project.views[direction][clip].map((frame, index) => index === sourceIndex
+    ? frame
+    : { ...structuredClone(source), ms: frame.ms, approved: false });
+  return {
+    ...project,
+    views: { ...project.views, [direction]: { ...project.views[direction], [clip]: frames } },
+    approvalState: 'draft',
+    revision: project.revision + 1,
+    updatedAt: Date.now(),
+  };
+}
+/** Paint or erase a square brush. x/y identify the brush's top-left logical pixel. */
+export function paintStudioBrush(frame: StudioFrame, layerId: string, x: number, y: number, color: number, size = 1, erase = false): void {
+  const brushSize = Math.max(1, Math.min(8, Math.floor(size)));
+  const left = Math.floor(x);
+  const top = Math.floor(y);
+  const pixels = frame.layers[layerId] ?? [];
+  const touched = new Set<string>();
+  for (let py = top; py < top + brushSize; py++) for (let px = left; px < left + brushSize; px++) {
+    if (px >= 0 && py >= 0 && px < STUDIO_SIZE && py < STUDIO_SIZE) touched.add(`${px},${py}`);
+  }
+  frame.layers[layerId] = pixels.filter(([px, py]) => !touched.has(`${px},${py}`));
+  if (!erase) for (const key of touched) {
+    const [px, py] = key.split(',').map(Number);
+    frame.layers[layerId]!.push([px!, py!, color]);
+  }
+}
+/** Fill every logical cell between two input points so quick pen or touch strokes stay continuous. */
+export function paintStudioLine(frame: StudioFrame, layerId: string, fromX: number, fromY: number, toX: number, toY: number, color: number, size = 1, erase = false): void {
+  let x = fromX;
+  let y = fromY;
+  const dx = Math.abs(toX - fromX);
+  const dy = Math.abs(toY - fromY);
+  const stepX = fromX < toX ? 1 : -1;
+  const stepY = fromY < toY ? 1 : -1;
+  let error = dx - dy;
+  while (true) {
+    paintStudioBrush(frame, layerId, x, y, color, size, erase);
+    if (x === toX && y === toY) break;
+    const twiceError = 2 * error;
+    if (twiceError > -dy) { error -= dy; x += stepX; }
+    if (twiceError < dx) { error += dx; y += stepY; }
+  }
+}
 export function approveStudioFrame(project: StudioProject, direction: Direction, clip: ClipName, index: number): StudioProject {
-  return replaceFrame(project, direction, clip, index, (frame) => ({ ...frame, approved: true }));
+  const next = replaceFrame(project, direction, clip, index, (frame) => ({ ...frame, approved: true }));
+  return { ...next, revision: next.revision + 1 };
+}
+export function approveStudioClip(project: StudioProject, direction: Direction, clip: ClipName): StudioProject {
+  const frames = project.views[direction][clip].map((frame) => ({ ...frame, approved: true }));
+  return {
+    ...project,
+    views: { ...project.views, [direction]: { ...project.views[direction], [clip]: frames } },
+    revision: project.revision + 1,
+    updatedAt: Date.now(),
+  };
 }

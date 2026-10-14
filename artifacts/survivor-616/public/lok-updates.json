@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 136,
+      "version": "0.40.0",
+      "date": "2026-10-14",
+      "publishedAt": "2026-10-14T12:30:24Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Draw your own Character Studio art",
+      "body": [
+        "Start with a blank 48 × 48 pixel map or a generated pose. Draw with a finger, mouse, or pen; place colors at X/Y coordinates and choose a brush from one to eight pixels.",
+        "Edit the 16-color palette and layer stack. Copy poses through clips and directions, then review frames before saving and submitting a creation.",
+        "Staff-approved creations appear in the Survivor 616 and GSix community galleries, where players can preview, adopt, remix, and report them."
+      ]
+    },
+    {
       "number": 135,
       "version": "0.39.1",
       "date": "2026-10-14",

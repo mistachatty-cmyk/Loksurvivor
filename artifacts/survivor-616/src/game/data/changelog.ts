@@ -1555,6 +1555,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'A Weapon Rack bought with LokTokens now opens the Training Arena as soon as account inventory loads, even if you go straight to the hideout after signing in or reloading.',
     ],
   },
+  {
+    version: '0.40.0',
+    date: '2026-10-14',
+    publishedAt: '2026-10-14T12:30:24Z',
+    kind: 'update',
+    title: 'Draw your own Character Studio art',
+    body: [
+      'Start with a blank 48 × 48 pixel map or a generated pose. Draw with a finger, mouse, or pen; place colors at X/Y coordinates and choose a brush from one to eight pixels.',
+      'Edit the 16-color palette and layer stack. Copy poses through clips and directions, then review frames before saving and submitting a creation.',
+      'Staff-approved creations appear in the Survivor 616 and GSix community galleries, where players can preview, adopt, remix, and report them.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
