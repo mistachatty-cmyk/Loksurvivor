@@ -57,7 +57,7 @@ export function CommunityGalleryV3({ onRemix }: { onRemix?: (project: StudioProj
     if (!lokClient) { setFeedError('The community gallery is waiting for the shared account connection.'); return; }
     let active = true;
     setLoading(true); setFeedError('');
-    let request = lokClient.from('gsix_creation_revisions').select('id,creation_id,title,description,poster,submitted_at,gsix_creations!inner(owner_id,kind,remix_allowed,parent_revision_id)').eq('state', 'approved').order('submitted_at', { ascending: false });
+    let request = lokClient.from('gsix_creation_revisions').select('id,creation_id,title,description,poster,submitted_at,gsix_creations!gsix_creation_revisions_creation_id_fkey!inner(owner_id,kind,remix_allowed,parent_revision_id)').eq('state', 'approved').order('submitted_at', { ascending: false });
     if (kind !== 'all') request = request.eq('gsix_creations.kind', kind);
     if (query) request = request.ilike('title', `%${query}%`);
     void request.range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE).then(({ data, error }) => {

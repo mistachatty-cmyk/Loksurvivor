@@ -7,61 +7,34 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
-      "number": 138,
-      "version": "0.43.0",
+      "number": 136,
+      "version": "0.40.0",
       "date": "2026-10-14",
-      "publishedAt": "2026-10-14T04:38:59Z",
+      "publishedAt": "2026-10-14T12:30:24Z",
       "kind": "update",
       "categoryLabel": "Major Update",
       "categoryColor": "#22d3ee",
       "categoryLore": "The city finds a brighter rhythm.",
       "title": "Draw your own Character Studio art",
       "body": [
-        "Start from a blank pixel map or a generated pose. Touch, mouse, and pen strokes now paint every pixel along the path and undo in one step.",
-        "Edit all 16 palette colors, build and arrange layers, and approve a reviewed clip together. Account submissions queue for staff review before appearing in the Survivor 616 and GSix creator galleries."
-      ]
-    },
-    {
-      "number": 137,
-      "version": "0.42.0",
-      "date": "2026-10-14",
-      "publishedAt": "2026-10-14T04:12:05Z",
-      "kind": "update",
-      "categoryLabel": "Major Update",
-      "categoryColor": "#22d3ee",
-      "categoryLore": "The city finds a brighter rhythm.",
-      "title": "Copy poses through an animation",
-      "body": [
-        "Character Studio can copy the selected frame’s art and layer transforms into the other frames in that clip. Frame timing stays in place, and copied frames need fresh review."
-      ]
-    },
-    {
-      "number": 136,
-      "version": "0.41.0",
-      "date": "2026-10-14",
-      "publishedAt": "2026-10-14T03:22:47Z",
-      "kind": "update",
-      "categoryLabel": "Major Update",
-      "categoryColor": "#22d3ee",
-      "categoryLore": "The city finds a brighter rhythm.",
-      "title": "Copy animation clips across directions",
-      "body": [
-        "Character Studio can copy the current animation clip into the other seven directions. Copied frames need review, and one undo restores every replaced clip."
+        "Start with a blank 48 × 48 pixel map or a generated pose. Draw with a finger, mouse, or pen; place colors at X/Y coordinates and choose a brush from one to eight pixels.",
+        "Edit the 16-color palette and layer stack. Copy poses through clips and directions, then review frames before saving and submitting a creation.",
+        "Staff-approved creations appear in the Survivor 616 and GSix community galleries, where players can preview, adopt, remix, and report them."
       ]
     },
     {
       "number": 135,
-      "version": "0.40.0",
+      "version": "0.39.1",
       "date": "2026-10-14",
-      "publishedAt": "2026-10-14T02:20:36Z",
-      "kind": "update",
-      "categoryLabel": "Major Update",
-      "categoryColor": "#22d3ee",
-      "categoryLore": "The city finds a brighter rhythm.",
-      "title": "Pixel map tools for Character Studio",
+      "publishedAt": "2026-10-14T05:05:56Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "Weapon Rack account sync",
       "body": [
-        "Character Studio now shows a toggleable 48 × 48 pixel grid with direct X/Y placement, a color palette, and a brush that scales from one pixel to eight. Four pixels is the suggested brush for larger shapes.",
-        "Painting and erasing stay inside the map, and one drag is now a single undo step. Switching drafts clears the old edit history. Existing Forge designs and V3 drafts keep their format."
+        "LokShop purchases can now reach the shared LokToken purchase service.",
+        "A Weapon Rack bought with LokTokens now opens the Training Arena as soon as account inventory loads, even if you go straight to the hideout after signing in or reloading."
       ]
     },
     {
