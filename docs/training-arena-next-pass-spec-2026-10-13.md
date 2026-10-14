@@ -5,9 +5,9 @@
 - **Owner:** Codex implementation; user review next.
 - **Goal:** Add progression, notifications, stats, and damage challenges to the Training Arena.
 - **Scope:** LokShop access, per-weapon progression, persistent notifications, training stats and target options, operator XP, multi-weapon testing, and a timed damage challenge.
-- **Current baseline:** Training Arena is on `main` after PRs #273, #274, #275, and #276. The current arena has a dedicated stationary test scene, Dust Mite target, weapon dock, and in-screen controls. See [the original handoff](training-arena-handoff-2026-10-13.md).
-- **This change:** The progression system merged in PR #280. Its follow-up places Spam beside Search/Lock, makes weapon cards activate on click, adds persistent bottom-bar loadouts in up to four groups and theme-colored weapon favorites, reserves a separate control for weapon details, adds stat/effect details, and gives the dummy soft rubber-band return under a fixed midpoint camera. The next PR adds overlapping Spam activations, selectable rack columns, draggable camera with center-lock, and challenge retry/back actions.
-- **Next:** Shared catalog publishing and broader visual review remain.
+- **Current baseline:** The dedicated stationary arena, Dust Mite, weapon dock, and in-screen controls are on `main` after PRs #273–#281. Related ultimate character looks and animated themes shipped in #282. See [the original handoff](training-arena-handoff-2026-10-13.md).
+- **This change:** Progression and mailbox systems merged in PR #280. PR #281 added overlapping Spam activations, rack density controls, draggable/center-lock camera, retry/back challenge actions, loadout groups, weapon favorites, level controls, and the evolutions page. Spam defaults off both in the arena and at challenge start.
+- **Next:** Finish the visual review with a dedicated QA save, and publish the LokShop registry only through an authorized owner session.
 
 ## Implementation decisions for this pass
 
@@ -19,7 +19,7 @@
 - Opening the mailbox marks items read; keeping is optional, delete is permanent, and at most 100 items are retained.
 - The six placeholder damage achievements use 0, 1,000, 5,000, 1,000,000, 5,000,000, and 100,000,000 damage thresholds in one challenge. Challenge tiers below 5,000 use “At Least You Tried.”
 
-## Implemented in this branch
+## Implemented and merged
 
 - LokShop rack purchase and arena access gate; per-weapon kill progression and unlock notices.
 - Persistent Notifications mailbox with unread badge, weapon icons, read/keep/delete actions.
@@ -27,8 +27,9 @@
 - Cumulative dummy damage, multi-weapon selection, 24-second challenge, saved best per loadout/level, celebrations, and achievement milestones.
 - Clicking a rack icon activates that weapon directly. Spam allows rapid activations to append attacks to the current simulation, preserving existing projectiles, effects, and target damage. Outside Spam, a running attack remains protected from interruption.
 - The rack density can be set to 2, 3, or 4 columns. The player can drag the arena canvas to pan the view; Center is on by default and eases the camera back to its starting position, while Recenter resets it immediately.
+- PR #281 adds saved weapon loadouts in up to four groups, theme-colored favorites, per-weapon levels, and a separate evolutions page with its own kill gate.
 - Challenge results use a styled score card with Retry and Back to Arena controls.
-- Player-facing copy is in the English catalog and all seven configured locales. The initial local auto-localization attempt reported translation failures; the workflow's translation commit then arrived on the branch. This follow-up adds translations and lock hashes for its nine new labels. Review machine-generated locale wording during normal QA.
+- Player-facing copy is in the English catalog and all seven configured locales. The translation checks passed on PRs #281 and #282; review machine-generated locale wording during normal QA.
 - Reducer and combat tests are included in the branch. Typecheck passed after the keyboard-accessibility follow-up. Manual preview checks covered the challenge result keyboard flow, Spam overlap, target modes, saved Classic layout, and representative weapons; broader viewport and weapon-family coverage remains.
 
 ## Reviewed requirements
@@ -101,13 +102,13 @@
 
 ## Remaining work
 
-1. **Visual approval:** Complete desktop and mobile browser review. Check one weapon from every attack family and all mailbox/progression flows.
-2. **Catalog publishing:** Generate and apply the updated Lok registry SQL so the Weapon Rack SKU can be purchased in the shared economy.
-3. **Localization:** Run the repo localization flow for non-English locales.
-4. **Spam/challenge:** Rapidly activate different rack icons and repeat the same icon during Spam and during the 24-second challenge; confirm earlier attacks continue, damage remains cumulative, and Retry restarts the recorded challenge weapon set.
-5. **Camera/rack:** Pan with mouse and touch, with Center enabled and disabled; check Recenter and the 2/3/4-column rack options at desktop and narrow mobile sizes.
-4. **Combat limits:** The rack lists all base, character-specific, evolved, and relic definitions. Some definitions may rely on run-state or companion prerequisites that the isolated arena cannot reproduce; record these during the weapon-family pass.
-The progression choices above are implementation assumptions for user review. The shared Lok economy publish and full visual review remain incomplete; do not describe the end-to-end purchase and arena experience as fully verified until those are done.
+1. **Visual review:** Complete desktop and mobile review of the dock, actor readability, 2/3/4-column layouts, mouse/touch camera pan, Center/Recenter, keyboard focus, and reduced motion. A local preview currently reaches first-time companion setup; use a dedicated QA save rather than selecting a permanent companion just to enter the arena.
+2. **Weapon coverage:** One preview confirmed 189 rack entries; this is not a check of every weapon. Glitch, meteor, DVD bounce, and arc-tether still need focused review, along with every weapon family and attacks with companion/run-state prerequisites.
+3. **Progression flows:** Exercise an actual run-end 616-kill unlock, weapon-icon notification, mailbox keep/delete/persistence, and the 6,166-kill evolution gate with a QA profile. The earlier manual review opened the mailbox empty state but did not complete a weapon unlock.
+4. **LokShop publishing:** The Weapon Rack is in the local catalog, but no generated SQL is present in this checkout and no shared-economy publish has been applied. From `artifacts/survivor-616`, generate a review copy with `pnpm exec tsx scripts/export-lok-registry.ts <outDir>`. Apply the resulting catalog SQL only through an authorized owner session; until then, the real cross-account purchase path is unverified.
+5. **Localization QA:** All configured locales and lock hashes are present, and the GitHub translation checks passed. Review machine-generated non-English wording during the full UI pass.
+
+The implementation is merged. Shared-economy publishing and the full visual/progression review remain incomplete, so the end-to-end purchase and unlock experience is not yet fully verified.
 
 ## Follow-up review notes
 
@@ -116,4 +117,5 @@ The progression choices above are implementation assumptions for user review. Th
 - Infinite HP continued tracking damage without lowering the target's displayed HP. Non-lethal mode left the target alive at 4,936 / 5,000 HP after a hit. The Classic layout persisted after leaving and re-entering the arena; Main was restored as the saved default.
 - The mailbox opened and displayed its empty state. Weapon unlock notification delivery was not exercised because the visual-review profile had no 616-kill progress to complete. A full view of all 189 rack entries confirmed the catalog count, but did not verify every weapon individually.
 - Glitch, meteor, DVD bounce, and arc-tether attacks still need a focused visual pass, as do desktop and mobile camera dragging, every rack density, actual 616-kill unlock delivery, and the real purchase flow.
-- The registry SQL for the Weapon Rack has not been applied to the shared Lok economy. This checkout exposes no Supabase/database publishing tool or configured project credentials, and the repository handoff says this shared-catalog publish requires owner approval. The generated SQL is preserved under `work/lok-registry-review/` for the owner or an authorized database session.
+- The registry SQL for the Weapon Rack has not been applied to the shared Lok economy. No generated SQL is present in this checkout. Regenerate a review copy with the repo export script and apply it only through an authorized owner session, as described above.
+- The current local browser review reached the first-time companion choice but stopped there to avoid storing a permanent choice in the QA save. No Training Arena visual check was performed during this pass.
