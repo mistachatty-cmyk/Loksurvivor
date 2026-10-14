@@ -101,6 +101,7 @@ import { BATTLE_DECK_SLOTS, CARD_SALVAGE_COST, CARD_SALVAGE_EARN_RUNS } from '@/
 import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
+import { ALL_WEAPON_DEFS } from '@/game/data/weaponPixelModels';
 import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, grpdEndgameWeaponEarned, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
 import { activeEventBuff, applyEventBuff, normalizeEventBuff } from '@/game/data/eventBuffs';
 import { AMBIENT_PICKUPS_BY_ID } from '@/game/data/hideoutAmbient';
@@ -145,6 +146,7 @@ import type {
   ThreatEventId,
   DigiTowerProgress,
   DigiTowerPetCondition,
+  TrainingArenaLoadoutGroup,
   LokPetTrainingStat,
 } from '@/game/types';
 
@@ -340,6 +342,16 @@ export function createInitialMeta(): MetaState {
     lokPetCollectorAccessUnlocked: false,
     factionRacesUnlocked: false,
     lokPackVisualizerUnlocked: false,
+    trainingWeaponRackOwned: false,
+    trainingArenaLoadoutGroups: [{ id: 'training-group-1', activeLoadoutId: null, loadouts: [] }],
+    trainingArenaActiveGroupId: 'training-group-1',
+    trainingFavoriteWeaponIds: [],
+    trainingWeaponKills: {},
+    trainingDummyDamage: 0,
+    trainingOperatorXp: {},
+    trainingChallengeBests: {},
+    trainingChallengeMilestones: [],
+    trainingMailbox: [],
     lokShopPerks: [],
     lokShopRapport: 0,
     lokShopStamps: 0,
@@ -1155,6 +1167,31 @@ function replenishPetElixirs(meta: MetaState, now = Date.now()): Pick<MetaState,
 }
 
 /** Coerce an untrusted save payload into a usable MetaState. */
+function normalizeTrainingArenaLoadoutGroups(value: unknown): TrainingArenaLoadoutGroup[] {
+  if (!Array.isArray(value)) return [{ id: 'training-group-1', activeLoadoutId: null, loadouts: [] }];
+  const groups = value.slice(0, 4).flatMap((rawGroup): TrainingArenaLoadoutGroup[] => {
+    if (!rawGroup || typeof rawGroup !== 'object') return [];
+    const candidate = rawGroup as Partial<TrainingArenaLoadoutGroup>;
+    if (typeof candidate.id !== 'string' || !candidate.id) return [];
+    const loadouts = Array.isArray(candidate.loadouts)
+      ? candidate.loadouts.slice(0, 100).flatMap((rawLoadout) => {
+        if (!rawLoadout || typeof rawLoadout !== 'object') return [];
+        const loadout = rawLoadout as { id?: unknown; name?: unknown; weaponIds?: unknown };
+        if (typeof loadout.id !== 'string' || !loadout.id || typeof loadout.name !== 'string' || !Array.isArray(loadout.weaponIds)) return [];
+        const weaponIds = [...new Set(loadout.weaponIds.filter((id): id is string => typeof id === 'string' && id.length > 0))].slice(0, 128);
+        if (weaponIds.length === 0) return [];
+        return [{ id: loadout.id.slice(0, 80), name: loadout.name.trim().slice(0, 40) || 'Loadout', weaponIds }];
+      })
+      : [];
+    const activeLoadoutId = typeof candidate.activeLoadoutId === 'string' && loadouts.some((loadout) => loadout.id === candidate.activeLoadoutId)
+      ? candidate.activeLoadoutId
+      : null;
+    return [{ id: candidate.id.slice(0, 80), activeLoadoutId, loadouts }];
+  });
+  const uniqueGroups = groups.filter((group, index) => groups.findIndex((candidate) => candidate.id === group.id) === index);
+  return uniqueGroups.length > 0 ? uniqueGroups : [{ id: 'training-group-1', activeLoadoutId: null, loadouts: [] }];
+}
+
 export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const defaults = createInitialMeta();
   const liveModeEnabled = parsed.liveModeEnabled === true;
@@ -1234,6 +1271,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       ? parsed.selectedCharacterId
       : (unlockedCharacterIds[0] ?? defaults.selectedCharacterId);
   const rescuedAllyIds = idList(parsed.rescuedAllyIds, allyIds, []);
+  const savedTotalKills = counter(parsed.totalKills);
   const crewActivityByAlly = normalizeCrewActivities(
     parsed.crewActivityByAlly,
     rescuedAllyIds,
@@ -1246,7 +1284,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       const requested = parsed.characterSkinByCharacterId[character.id];
       const skin = getCharacterSkins(character).find((entry) => entry.id === requested);
       const characterEpisode = CHARACTER_EPISODES.find((entry) => entry.characterId === character.id);
-      if (skin && isCharacterSkinUnlocked(skin, rescuedAllyIds.length, Boolean(characterEpisode && completedEpisodeIds.includes(characterEpisode.id)))) {
+      if (skin && isCharacterSkinUnlocked(skin, rescuedAllyIds.length, Boolean(characterEpisode && completedEpisodeIds.includes(characterEpisode.id)), savedTotalKills)) {
         characterSkinByCharacterId[character.id] = skin.id;
       }
     }
@@ -1324,7 +1362,6 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     generatorAccrualAt: Math.max(0, typeof parsed.generatorAccrualAt === 'number' ? parsed.generatorAccrualAt : Date.now()),
   });
   const clearedAreaIds = idList(parsed.clearedAreaIds, areaIds, []);
-  const savedTotalKills = counter(parsed.totalKills);
   const fabricatedGrpdIds = idList(parsed.grpdUnlockedWeaponIds, GRPD_PLAYABLE_WEAPON_IDS, []).filter((id) => !isGrpdEndgameWeapon(id));
   const earnedEndgameGrpdIds = [...GRPD_PLAYABLE_WEAPON_IDS].filter((id) => grpdEndgameWeaponEarned(id, savedTotalKills, endgameReached({ clearedAreaIds })));
   const activeGrpdIds = idList(parsed.grpdActiveWeaponIds, new Set([...fabricatedGrpdIds, ...earnedEndgameGrpdIds]), []);
@@ -1399,6 +1436,47 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     lokPetCollectorAccessUnlocked: parsed.lokPetCollectorAccessUnlocked === true,
     factionRacesUnlocked: parsed.factionRacesUnlocked === true,
     lokPackVisualizerUnlocked: parsed.lokPackVisualizerUnlocked === true,
+    trainingWeaponRackOwned: parsed.trainingWeaponRackOwned === true,
+    trainingArenaLoadoutGroups: normalizeTrainingArenaLoadoutGroups(parsed.trainingArenaLoadoutGroups),
+    trainingArenaActiveGroupId: (() => {
+      const groups = normalizeTrainingArenaLoadoutGroups(parsed.trainingArenaLoadoutGroups);
+      return groups.some((group) => group.id === parsed.trainingArenaActiveGroupId)
+        ? parsed.trainingArenaActiveGroupId!
+        : groups[0]!.id;
+    })(),
+    trainingFavoriteWeaponIds: Array.isArray(parsed.trainingFavoriteWeaponIds)
+      ? [...new Set(parsed.trainingFavoriteWeaponIds.filter((id): id is string => typeof id === 'string' && id.length > 0))].slice(0, 512)
+      : [],
+    trainingWeaponKills: parsed.trainingWeaponKills && typeof parsed.trainingWeaponKills === 'object'
+      ? Object.fromEntries(Object.entries(parsed.trainingWeaponKills).filter(([id, value]) => id.length > 0 && typeof value === 'number' && Number.isFinite(value)).map(([id, value]) => [id, Math.max(0, Math.min(6_166, Math.floor(value as number)))]))
+      : {},
+    trainingDummyDamage: Math.max(0, Number.isFinite(parsed.trainingDummyDamage) ? Math.floor(parsed.trainingDummyDamage!) : 0),
+    trainingOperatorXp: parsed.trainingOperatorXp && typeof parsed.trainingOperatorXp === 'object'
+      ? Object.fromEntries(Object.entries(parsed.trainingOperatorXp).filter(([id, value]) => id.length > 0 && typeof value === 'number' && Number.isFinite(value)).map(([id, value]) => [id, Math.max(0, value as number)]))
+      : {},
+    trainingChallengeBests: parsed.trainingChallengeBests && typeof parsed.trainingChallengeBests === 'object'
+      ? Object.fromEntries(Object.entries(parsed.trainingChallengeBests).filter(([id, value]) => id.length > 0 && typeof value === 'number' && Number.isFinite(value)).map(([id, value]) => [id, Math.max(0, Math.floor(value as number))]))
+      : {},
+    trainingChallengeMilestones: Array.isArray(parsed.trainingChallengeMilestones)
+      ? [...new Set(parsed.trainingChallengeMilestones.filter((value): value is number => [0, 1000, 5000, 1_000_000, 5_000_000, 100_000_000].includes(value)))]
+      : [],
+    trainingMailbox: Array.isArray(parsed.trainingMailbox)
+      ? parsed.trainingMailbox
+        .filter((entry): entry is NonNullable<typeof parsed.trainingMailbox>[number] => Boolean(entry && typeof entry.id === 'string' && entry.id.length > 0 && typeof entry.title === 'string' && typeof entry.body === 'string' && Number.isFinite(entry.createdAt)))
+        .slice(-100)
+        .map((entry) => ({
+          id: entry.id,
+          title: entry.title,
+          body: entry.body,
+          createdAt: Math.max(0, Math.floor(entry.createdAt)),
+          read: entry.read === true,
+          kept: entry.kept === true,
+          ...(typeof entry.iconId === 'string' ? { iconId: entry.iconId } : {}),
+          ...(typeof entry.titleKey === 'string' ? { titleKey: entry.titleKey } : {}),
+          ...(typeof entry.bodyKey === 'string' ? { bodyKey: entry.bodyKey } : {}),
+          ...(entry.variables && typeof entry.variables === 'object' ? { variables: Object.fromEntries(Object.entries(entry.variables).filter(([, value]) => typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value)))) } : {}),
+        }))
+      : [],
     lokShopPerks: Array.isArray(parsed.lokShopPerks) ? parsed.lokShopPerks.filter((v): v is string => typeof v === 'string') : [],
     lokShopRapport: typeof parsed.lokShopRapport === 'number' && parsed.lokShopRapport >= 0 ? Math.floor(parsed.lokShopRapport) : 0,
     lokShopStamps: typeof parsed.lokShopStamps === 'number' && parsed.lokShopStamps >= 0 ? Math.floor(parsed.lokShopStamps) : 0,
@@ -2224,6 +2302,13 @@ type Action =
   | { type: 'setMirrorModeEnabled'; enabled: boolean }
   | { type: 'toggleRunModifier'; key: keyof RunModifiers }
   | { type: 'dismissNotifications'; ids: string[] }
+  | { type: 'grantTrainingWeaponRack' }
+  | { type: 'setTrainingArenaLoadoutGroups'; groups: TrainingArenaLoadoutGroup[]; activeGroupId: string }
+  | { type: 'toggleFavoriteTrainingWeapon'; id: string }
+  | { type: 'recordTrainingSession'; characterId: string; damage: number; xp: number; challenge?: { key: string; damage: number } }
+  | { type: 'markTrainingMailboxRead'; id: string }
+  | { type: 'keepTrainingMailboxEntry'; id: string; kept: boolean }
+  | { type: 'deleteTrainingMailboxEntry'; id: string }
   | { type: 'announceEndgame'; ids: string[]; now: number }
   | { type: 'acknowledgeChangelog' }
   | { type: 'setUpdatePopupKind'; kind: ChangelogKind; enabled: boolean }
@@ -2327,7 +2412,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       if (!character) return state;
       const skin = getCharacterSkins(character).find((entry) => entry.id === action.skinId);
       const characterEpisode = CHARACTER_EPISODES.find((entry) => entry.characterId === character.id);
-      if (!skin || !isCharacterSkinUnlocked(skin, state.meta.rescuedAllyIds.length, Boolean(characterEpisode && state.meta.completedEpisodeIds.includes(characterEpisode.id)))) return state;
+      if (!skin || !isCharacterSkinUnlocked(skin, state.meta.rescuedAllyIds.length, Boolean(characterEpisode && state.meta.completedEpisodeIds.includes(characterEpisode.id)), state.meta.totalKills)) return state;
       return {
         ...state,
         meta: {
@@ -3601,6 +3686,67 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'grantLokPackVisualizer':
       if (state.meta.lokPackVisualizerUnlocked) return state;
       return { ...state, meta: { ...state.meta, lokPackVisualizerUnlocked: true } };
+    case 'grantTrainingWeaponRack':
+      if (state.meta.trainingWeaponRackOwned) return state;
+      return { ...state, meta: { ...state.meta, trainingWeaponRackOwned: true } };
+    case 'setTrainingArenaLoadoutGroups': {
+      const groups = normalizeTrainingArenaLoadoutGroups(action.groups);
+      const activeGroupId = groups.some((group) => group.id === action.activeGroupId) ? action.activeGroupId : groups[0]!.id;
+      return { ...state, meta: { ...state.meta, trainingArenaLoadoutGroups: groups, trainingArenaActiveGroupId: activeGroupId } };
+    }
+    case 'toggleFavoriteTrainingWeapon': {
+      if (!action.id) return state;
+      const favoriteIds = state.meta.trainingFavoriteWeaponIds;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          trainingFavoriteWeaponIds: favoriteIds.includes(action.id)
+            ? favoriteIds.filter((id) => id !== action.id)
+            : [...favoriteIds, action.id].slice(-512),
+        },
+      };
+    }
+    case 'recordTrainingSession': {
+      const damage = Math.max(0, Math.floor(action.damage));
+      const xp = Math.max(0, action.xp);
+      const previousTotal = state.meta.trainingDummyDamage;
+      const nextTotal = previousTotal + damage;
+      const multiWeaponUnlockedBefore = previousTotal >= 1_000_000;
+      const multiWeaponUnlockedAfter = nextTotal >= 1_000_000;
+      const challengeDamage = action.challenge ? Math.max(0, Math.floor(action.challenge.damage)) : undefined;
+      const challengeBest = action.challenge && challengeDamage !== undefined
+        ? Math.max(state.meta.trainingChallengeBests[action.challenge.key] ?? 0, challengeDamage)
+        : undefined;
+      const milestones = action.challenge && challengeDamage !== undefined
+        ? [...new Set([...state.meta.trainingChallengeMilestones, ...[0, 1_000, 5_000, 1_000_000, 5_000_000, 100_000_000].filter((threshold) => challengeDamage >= threshold)])]
+        : state.meta.trainingChallengeMilestones;
+      const multiNotice = !multiWeaponUnlockedBefore && multiWeaponUnlockedAfter
+        ? { id: 'training-multi-weapon-unlocked', title: 'Multi-Weapon Testing unlocked', body: 'The Training Arena rack can now test more than one weapon at a time.', titleKey: 'training.notification.multi.title', bodyKey: 'training.notification.multi.body', createdAt: Date.now() }
+        : null;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          trainingDummyDamage: nextTotal,
+          trainingOperatorXp: { ...state.meta.trainingOperatorXp, [action.characterId]: (state.meta.trainingOperatorXp[action.characterId] ?? 0) + xp },
+          trainingChallengeBests: action.challenge && challengeBest !== undefined
+            ? { ...state.meta.trainingChallengeBests, [action.challenge.key]: challengeBest }
+            : state.meta.trainingChallengeBests,
+          trainingChallengeMilestones: milestones,
+          pendingNotifications: multiNotice ? [...state.meta.pendingNotifications, multiNotice] : state.meta.pendingNotifications,
+          trainingMailbox: multiNotice
+            ? [...state.meta.trainingMailbox, { ...multiNotice, read: false, kept: false }].slice(-100)
+            : state.meta.trainingMailbox,
+        },
+      };
+    }
+    case 'markTrainingMailboxRead':
+      return { ...state, meta: { ...state.meta, trainingMailbox: state.meta.trainingMailbox.map((entry) => entry.id === action.id ? { ...entry, read: true } : entry) } };
+    case 'keepTrainingMailboxEntry':
+      return { ...state, meta: { ...state.meta, trainingMailbox: state.meta.trainingMailbox.map((entry) => entry.id === action.id ? { ...entry, kept: action.kept } : entry) } };
+    case 'deleteTrainingMailboxEntry':
+      return { ...state, meta: { ...state.meta, trainingMailbox: state.meta.trainingMailbox.filter((entry) => entry.id !== action.id) } };
     case 'grantLokShopPerk': {
       if (state.meta.lokShopPerks.includes(action.id)) return state;
       return { ...state, meta: { ...state.meta, lokShopPerks: [...state.meta.lokShopPerks, action.id], ...(action.id === 'ball' ? { ownsBall: true } : {}) } };
@@ -4132,6 +4278,16 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       const collectorPetsFound = collectorRun
         ? result.lokPets.filter((pet) => pet.origin === 'chest').length
         : 0;
+      const trainingWeaponKills = { ...prev.trainingWeaponKills };
+      const newlyTrainingWeapons: string[] = [];
+      if (prev.trainingWeaponRackOwned && result.areaId !== 'training-arena') {
+        for (const [weaponId, count] of Object.entries(result.weaponKills ?? {})) {
+          const oldCount = trainingWeaponKills[weaponId] ?? 0;
+          const nextCount = Math.min(6_166, oldCount + Math.max(0, Math.floor(count)));
+          trainingWeaponKills[weaponId] = nextCount;
+          if (oldCount < 616 && nextCount >= 616) newlyTrainingWeapons.push(weaponId);
+        }
+      }
 
       const bestiary = { ...prev.bestiary };
       for (const [enemyId, count] of Object.entries(result.killsByEnemy)) {
@@ -4214,6 +4370,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         bestRunStreak,
         ownedUiThemeIds: discoveryIds.includes('breach-616-plate') ? addUnique(prev.ownedUiThemeIds, 'breach-616') : prev.ownedUiThemeIds,
         bestiary,
+        trainingWeaponKills,
         fieldCreatureSeeds,
         rescuedAllyIds,
         discoveryIds,
@@ -4288,6 +4445,23 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         dailyContractProgressById: dailyContracts.progressById,
         completedDailyContractIds: dailyContracts.completedIds,
       };
+
+      for (const weaponId of newlyTrainingWeapons) {
+        const weapon = ALL_WEAPON_DEFS.find((candidate) => candidate.id === weaponId) ?? WEAPONS_BY_ID[weaponId];
+        if (!weapon) continue;
+        const notice = {
+          id: `training-weapon-${weaponId}-${runNow}`,
+          title: `${weapon.name} training unlocked`,
+          body: `${weapon.name} can now be tested in the Training Arena.`,
+          iconId: weaponId,
+          titleKey: 'training.notification.weaponUnlocked.title',
+          bodyKey: 'training.notification.weaponUnlocked.body',
+          variables: { weapon: weapon.name },
+          createdAt: runNow,
+        };
+        next.pendingNotifications = [...next.pendingNotifications, notice];
+        next.trainingMailbox = [...next.trainingMailbox, { ...notice, read: false, kept: false }].slice(-100);
+      }
 
       const episodeDefinition = validEpisodeResult(result);
       if (episodeDefinition && result.episode) {
@@ -4529,6 +4703,13 @@ export interface MetaContextValue {
   grantLokPetCollectorAccess: () => void;
   grantFactionRacesUnlock: () => void;
   grantLokPackVisualizer: () => void;
+  grantTrainingWeaponRack: () => void;
+  setTrainingArenaLoadoutGroups: (groups: TrainingArenaLoadoutGroup[], activeGroupId: string) => void;
+  toggleFavoriteTrainingWeapon: (id: string) => void;
+  recordTrainingSession: (characterId: string, damage: number, xp: number, challenge?: { key: string; damage: number }) => void;
+  markTrainingMailboxRead: (id: string) => void;
+  keepTrainingMailboxEntry: (id: string, kept: boolean) => void;
+  deleteTrainingMailboxEntry: (id: string) => void;
   grantLokShopPerk: (id: string) => void;
   lokShopVisit: (day: string, stamped: boolean) => void;
   lokShopHaggle: (day: string, rapport: number, charmId: string | null) => void;
@@ -4768,6 +4949,13 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const grantLokPetCollectorAccess = useCallback(() => dispatch({ type: 'grantLokPetCollectorAccess' }), []);
   const grantFactionRacesUnlock = useCallback(() => dispatch({ type: 'grantFactionRacesUnlock' }), []);
   const grantLokPackVisualizer = useCallback(() => dispatch({ type: 'grantLokPackVisualizer' }), []);
+  const grantTrainingWeaponRack = useCallback(() => dispatch({ type: 'grantTrainingWeaponRack' }), []);
+  const setTrainingArenaLoadoutGroups = useCallback((groups: TrainingArenaLoadoutGroup[], activeGroupId: string) => dispatch({ type: 'setTrainingArenaLoadoutGroups', groups, activeGroupId }), []);
+  const toggleFavoriteTrainingWeapon = useCallback((id: string) => dispatch({ type: 'toggleFavoriteTrainingWeapon', id }), []);
+  const recordTrainingSession = useCallback((characterId: string, damage: number, xp: number, challenge?: { key: string; damage: number }) => dispatch({ type: 'recordTrainingSession', characterId, damage, xp, challenge }), []);
+  const markTrainingMailboxRead = useCallback((id: string) => dispatch({ type: 'markTrainingMailboxRead', id }), []);
+  const keepTrainingMailboxEntry = useCallback((id: string, kept: boolean) => dispatch({ type: 'keepTrainingMailboxEntry', id, kept }), []);
+  const deleteTrainingMailboxEntry = useCallback((id: string) => dispatch({ type: 'deleteTrainingMailboxEntry', id }), []);
   const grantLokShopPerk = useCallback((id: string) => dispatch({ type: 'grantLokShopPerk', id }), []);
   const lokShopVisit = useCallback((day: string, stamped: boolean) => dispatch({ type: 'lokShopVisit', day, stamped }), []);
   const lokShopHaggle = useCallback((day: string, rapport: number, charmId: string | null) => dispatch({ type: 'lokShopHaggle', day, rapport, charmId }), []);
@@ -5084,6 +5272,13 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       grantLokPetCollectorAccess,
       grantFactionRacesUnlock,
       grantLokPackVisualizer,
+      grantTrainingWeaponRack,
+      setTrainingArenaLoadoutGroups,
+      toggleFavoriteTrainingWeapon,
+      recordTrainingSession,
+      markTrainingMailboxRead,
+      keepTrainingMailboxEntry,
+      deleteTrainingMailboxEntry,
       grantLokShopPerk,
       lokShopVisit,
       lokShopHaggle,
@@ -5271,6 +5466,13 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     grantLokPetCollectorAccess,
     grantFactionRacesUnlock,
     grantLokPackVisualizer,
+    grantTrainingWeaponRack,
+    setTrainingArenaLoadoutGroups,
+    toggleFavoriteTrainingWeapon,
+    recordTrainingSession,
+    markTrainingMailboxRead,
+    keepTrainingMailboxEntry,
+    deleteTrainingMailboxEntry,
     grantLokShopPerk,
     lokShopVisit,
     lokShopHaggle,

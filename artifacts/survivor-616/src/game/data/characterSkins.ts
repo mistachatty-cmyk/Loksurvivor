@@ -1,7 +1,7 @@
-import type { CharacterDef, SpritePalette } from '@/game/types';
+import type { CharacterDef, PaletteEffectDef, SpritePalette } from '@/game/types';
 import { applyPaletteStyle, mixColor, seedFromId, type PaletteStyleId } from '@/game/sprites/paletteStyles';
 
-export type CharacterSkinStyle = PaletteStyleId | 'episode' | 'ember-guard' | 'moon-runner';
+export type CharacterSkinStyle = PaletteStyleId | 'episode' | 'ember-guard' | 'moon-runner' | 'null-crowned' | 'solar-ascendant' | 'prism-overdrive';
 
 export interface CharacterSkinDef {
   id: string;
@@ -11,6 +11,9 @@ export interface CharacterSkinDef {
   style: CharacterSkinStyle;
   episodeRequired: boolean;
   crewRequired?: number;
+  totalKillsRequired?: number;
+  tier?: 'ultimate';
+  effect?: PaletteEffectDef;
   palette: SpritePalette;
 }
 
@@ -33,6 +36,21 @@ function paletteVariant(base: SpritePalette, style: CharacterSkinStyle, seed: nu
     bodyDark: mixColor(base.bodyDark, '#0c1945', 0.55), accent: mixColor(base.accent, '#7ed9ff', 0.7),
     accentBright: '#e5f7ff', skin: base.skin, glow: '#a0bbff',
   };
+  if (style === 'null-crowned') return {
+    ink: mixColor(base.ink, '#050816', 0.74), body: mixColor(base.body, '#243263', 0.72),
+    bodyDark: mixColor(base.bodyDark, '#10122d', 0.78), accent: mixColor(base.accentBright, '#a78bfa', 0.7),
+    accentBright: '#f2eaff', skin: mixColor(base.skin, '#a5b4fc', 0.38), glow: '#75e7ff',
+  };
+  if (style === 'solar-ascendant') return {
+    ink: mixColor(base.ink, '#221000', 0.7), body: mixColor(base.body, '#c16b12', 0.72),
+    bodyDark: mixColor(base.bodyDark, '#5b2607', 0.72), accent: '#ffd34e',
+    accentBright: '#fff8ce', skin: mixColor(base.skin, '#ffc46b', 0.32), glow: '#fff06b',
+  };
+  if (style === 'prism-overdrive') return {
+    ink: mixColor(base.ink, '#12051f', 0.7), body: mixColor(base.body, '#53258e', 0.72),
+    bodyDark: mixColor(base.bodyDark, '#211043', 0.76), accent: seed % 2 === 0 ? '#4df4d5' : '#ff62c7',
+    accentBright: '#f4f5ff', skin: mixColor(base.skin, '#d6b3ff', 0.28), glow: seed % 2 === 0 ? '#ff64b5' : '#55e7ff',
+  };
   return {
     ink: mixColor(base.ink, '#000000', 0.3),
     body: mixColor(base.body, hot, 0.34),
@@ -50,7 +68,7 @@ export function characterSkinId(characterId: string, style: CharacterSkinStyle):
 
 export function getCharacterSkins(character: CharacterDef): CharacterSkinDef[] {
   const seed = seedFromId(character.id);
-  const variants: Array<Pick<CharacterSkinDef, 'style' | 'name' | 'description' | 'episodeRequired' | 'crewRequired'>> = [
+  const variants: Array<Pick<CharacterSkinDef, 'style' | 'name' | 'description' | 'episodeRequired' | 'crewRequired' | 'totalKillsRequired' | 'tier' | 'effect'>> = [
     { style: 'original', name: 'Original', description: 'The character’s authored street colors.', episodeRequired: false },
     { style: 'nocturne', name: 'Nocturne', description: 'A cool late-night version of the original look.', episodeRequired: false },
     { style: 'countertone', name: 'Countertone', description: 'A loud complementary remix unique to this fighter.', episodeRequired: false },
@@ -59,6 +77,9 @@ export function getCharacterSkins(character: CharacterDef): CharacterSkinDef[] {
     { style: 'episode', name: 'Afterstory', description: 'The personal colorway earned by completing this character’s episode.', episodeRequired: true },
     { style: 'ember-guard', name: 'Ember Guard', description: 'Earned by rescuing three crew. Warm copper and firelight.', episodeRequired: false, crewRequired: 3 },
     { style: 'moon-runner', name: 'Moon Runner', description: 'Earned by rescuing eight crew. Cool midnight and moonlight.', episodeRequired: false, crewRequired: 8 },
+    { style: 'null-crowned', name: 'Null-Crowned', description: 'An ultimate void-forged look. Unlocked after 616 lifetime defeats.', episodeRequired: false, totalKillsRequired: 616, tier: 'ultimate', effect: { kind: 'prism', label: 'Null crown', speed: 0.72, intensity: 0.82 } },
+    { style: 'solar-ascendant', name: 'Solar Ascendant', description: 'A radiant championship finish. Unlocked after 6,160 lifetime defeats.', episodeRequired: false, totalKillsRequired: 6160, tier: 'ultimate', effect: { kind: 'wave', label: 'Solar crest', speed: 0.54, intensity: 0.82 } },
+    { style: 'prism-overdrive', name: 'Prism Overdrive', description: 'A full-spectrum endgame finish. Unlocked after 16,160 lifetime defeats.', episodeRequired: false, totalKillsRequired: 16160, tier: 'ultimate', effect: { kind: 'pulse', label: 'Prism drive', speed: 1.1, intensity: 0.88 } },
   ];
   return variants.map((skin) => ({
     ...skin,
@@ -73,8 +94,10 @@ export function getCharacterSkin(character: CharacterDef, skinId?: string): Char
   return skins.find((skin) => skin.id === skinId) ?? skins[0]!;
 }
 
-export function isCharacterSkinUnlocked(skin: CharacterSkinDef, crewCount: number, episodeComplete: boolean): boolean {
-  return (!skin.episodeRequired || episodeComplete) && crewCount >= (skin.crewRequired ?? 0);
+export function isCharacterSkinUnlocked(skin: CharacterSkinDef, crewCount: number, episodeComplete: boolean, totalKills = 0): boolean {
+  return (!skin.episodeRequired || episodeComplete)
+    && crewCount >= (skin.crewRequired ?? 0)
+    && totalKills >= (skin.totalKillsRequired ?? 0);
 }
 
 export function blendSpritePalettes(personal: SpritePalette, world: SpritePalette, amount = 0.42): SpritePalette {

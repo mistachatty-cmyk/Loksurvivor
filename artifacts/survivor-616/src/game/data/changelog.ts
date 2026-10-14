@@ -1457,6 +1457,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.33.0',
     date: '2026-10-13',
+    publishedAt: '2026-10-13T12:00:00Z',
     kind: 'update',
     title: 'Field Specimens and Clearer Arena Rooms',
     body: [
@@ -1521,7 +1522,30 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: '0.38.1',
+    date: '2026-10-13',
+    publishedAt: '2026-10-13T20:55:46Z',
+    kind: 'update',
+    title: 'Training Arena mobile header fix',
+    body: [
+      'The floating Looks & LokPets shortcut no longer covers the Training Arena title while the arena is open on a narrow screen.',
+    ],
+  },
+  {
     version: '0.39.0',
+    date: '2026-10-13',
+    publishedAt: '2026-10-13T21:32:41Z',
+    kind: 'update',
+    title: 'Ultimate Looks and Training Arena Updates',
+    body: [
+      'Every fighter now has three mastery skins: Null-Crowned at 616 lifetime defeats, Solar Ascendant at 6,160, and Prism Overdrive at 16,160. Their animated finish follows the selected skin into the run and the roster preview.',
+      'The customization shop adds four animated menu atmospheres and six high-tier animated palettes. Each new backdrop has its own colors and scene treatment, and reduced-motion settings keep the atmosphere still.',
+      'Buy a permanent Training Arena Weapon Rack in LokShop, then earn 616 defeats with each weapon to unlock its test slot. Unlock notices are saved in the new Notifications mailbox.',
+      'The arena adds multi-weapon testing, operator Training XP, damage and effect readouts, target durability modes, and a 24-second damage challenge with personal bests and achievements.',
+    ],
+  },
+  {
+    version: '0.40.0',
     date: '2026-10-14',
     publishedAt: '2026-10-14T02:20:36Z',
     kind: 'update',
@@ -1532,7 +1556,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.40.0',
+    version: '0.41.0',
     date: '2026-10-14',
     publishedAt: '2026-10-14T03:22:47Z',
     kind: 'update',
@@ -1542,7 +1566,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.41.0',
+    version: '0.42.0',
     date: '2026-10-14',
     publishedAt: '2026-10-14T04:12:05Z',
     kind: 'update',
@@ -1552,7 +1576,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.42.0',
+    version: '0.43.0',
     date: '2026-10-14',
     publishedAt: '2026-10-14T04:38:59Z',
     kind: 'update',

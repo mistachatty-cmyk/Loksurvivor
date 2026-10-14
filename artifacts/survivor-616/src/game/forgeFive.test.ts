@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { CHARACTERS, CHARACTERS_BY_ID } from '@/game/data/characters';
-import { AREAS } from '@/game/data/areas';
-import { FORGE_FIVE } from '@/game/data/forgeFive';
-import { WEAPONS } from '@/game/data/weapons';
-import { createWorld, stepWorld } from '@/game/engine/world';
-import { FORGE_FIVE_WEAPON_IDS } from '@/game/render/forgeFiveVfx';
+import { CHARACTERS, CHARACTERS_BY_ID } from './data/characters';
+import { AREAS } from './data/areas';
+import { CHARACTER_CREATOR_OPERATORS } from './data/forgeFive';
+import { WEAPONS } from './data/weapons';
+import { createWorld, stepWorld } from './engine/world';
+import { FORGE_FIVE_WEAPON_IDS } from './render/forgeFiveVfx';
+
+const FORGE_FIVE = CHARACTER_CREATOR_OPERATORS.slice(0, 5);
 
 test('five new operators have unique designs and exclusive signature weapon VFX', () => {
   assert.equal(FORGE_FIVE.length, 5);

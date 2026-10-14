@@ -7,8 +7,8 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
-      "number": 136,
-      "version": "0.42.0",
+      "number": 138,
+      "version": "0.43.0",
       "date": "2026-10-14",
       "publishedAt": "2026-10-14T04:38:59Z",
       "kind": "update",
@@ -22,8 +22,8 @@
       ]
     },
     {
-      "number": 135,
-      "version": "0.41.0",
+      "number": 137,
+      "version": "0.42.0",
       "date": "2026-10-14",
       "publishedAt": "2026-10-14T04:12:05Z",
       "kind": "update",
@@ -36,8 +36,8 @@
       ]
     },
     {
-      "number": 134,
-      "version": "0.40.0",
+      "number": 136,
+      "version": "0.41.0",
       "date": "2026-10-14",
       "publishedAt": "2026-10-14T03:22:47Z",
       "kind": "update",
@@ -50,8 +50,8 @@
       ]
     },
     {
-      "number": 133,
-      "version": "0.39.0",
+      "number": 135,
+      "version": "0.40.0",
       "date": "2026-10-14",
       "publishedAt": "2026-10-14T02:20:36Z",
       "kind": "update",
@@ -62,6 +62,37 @@
       "body": [
         "Character Studio now shows a toggleable 48 × 48 pixel grid with direct X/Y placement, a color palette, and a brush that scales from one pixel to eight. Four pixels is the suggested brush for larger shapes.",
         "Painting and erasing stay inside the map, and one drag is now a single undo step. Switching drafts clears the old edit history. Existing Forge designs and V3 drafts keep their format."
+      ]
+    },
+    {
+      "number": 134,
+      "version": "0.39.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T21:32:41Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Ultimate Looks and Training Arena Updates",
+      "body": [
+        "Every fighter now has three mastery skins: Null-Crowned at 616 lifetime defeats, Solar Ascendant at 6,160, and Prism Overdrive at 16,160. Their animated finish follows the selected skin into the run and the roster preview.",
+        "The customization shop adds four animated menu atmospheres and six high-tier animated palettes. Each new backdrop has its own colors and scene treatment, and reduced-motion settings keep the atmosphere still.",
+        "Buy a permanent Training Arena Weapon Rack in LokShop, then earn 616 defeats with each weapon to unlock its test slot. Unlock notices are saved in the new Notifications mailbox.",
+        "The arena adds multi-weapon testing, operator Training XP, damage and effect readouts, target durability modes, and a 24-second damage challenge with personal bests and achievements."
+      ]
+    },
+    {
+      "number": 133,
+      "version": "0.38.1",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T20:55:46Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Training Arena mobile header fix",
+      "body": [
+        "The floating Looks & LokPets shortcut no longer covers the Training Arena title while the arena is open on a narrow screen."
       ]
     },
     {
@@ -144,6 +175,7 @@
       "number": 127,
       "version": "0.33.0",
       "date": "2026-10-13",
+      "publishedAt": "2026-10-13T12:00:00Z",
       "kind": "update",
       "categoryLabel": "Major Update",
       "categoryColor": "#22d3ee",

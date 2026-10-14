@@ -655,6 +655,8 @@ export interface StatusEffectInstance {
   appliedAt: number;
   expiresAt: number;
   nextTickAt?: number;
+  /** Weapon that applied this effect, for run-end kill attribution. */
+  sourceWeaponId?: string;
 }
 
 export interface RunWeapon {
@@ -1658,6 +1660,36 @@ export interface PendingNotification {
   title: string;
   body: string;
   createdAt: number;
+  /** Optional icon identifier for the persistent mailbox card. */
+  iconId?: string;
+  titleKey?: string;
+  bodyKey?: string;
+  variables?: Record<string, string | number>;
+}
+
+export interface TrainingMailboxEntry {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: number;
+  iconId?: string;
+  titleKey?: string;
+  bodyKey?: string;
+  variables?: Record<string, string | number>;
+  read: boolean;
+  kept: boolean;
+}
+
+export interface TrainingArenaSavedLoadout {
+  id: string;
+  name: string;
+  weaponIds: string[];
+}
+
+export interface TrainingArenaLoadoutGroup {
+  id: string;
+  activeLoadoutId: string | null;
+  loadouts: TrainingArenaSavedLoadout[];
 }
 
 export type HordeSpinTierId = '1x' | '2x' | '3x' | '4x' | '5x5' | '666';
@@ -2659,6 +2691,25 @@ export interface MetaState {
   factionRacesUnlocked: boolean;
   /** LOK Shop unlock: lets the Sleeve Counter sell the animated Live pack wraps. */
   lokPackVisualizerUnlocked: boolean;
+  /** Permanent LokShop purchase required to enter the Training Arena. */
+  trainingWeaponRackOwned: boolean;
+  /** Saved weapon sets, organized into four starter groups; more groups are a future LokShop expansion. */
+  trainingArenaLoadoutGroups: TrainingArenaLoadoutGroup[];
+  trainingArenaActiveGroupId: string;
+  /** Weapon ids pinned to the top of the Training Arena rack. */
+  trainingFavoriteWeaponIds: string[];
+  /** Weapon id -> kills credited only when a run result is committed. */
+  trainingWeaponKills: Record<string, number>;
+  /** Cumulative damage dealt to the arena dummy across all visits. */
+  trainingDummyDamage: number;
+  /** Persistent arena-only operator training XP, kept separate from run mastery. */
+  trainingOperatorXp: Record<string, number>;
+  /** Best 24-second challenge result by weapon/loadout key. */
+  trainingChallengeBests: Record<string, number>;
+  /** One-time damage threshold milestones awarded by the arena challenge. */
+  trainingChallengeMilestones: number[];
+  /** Durable notification mailbox. */
+  trainingMailbox: TrainingMailboxEntry[];
   /** LokShop perks owned (ids from `lokShopPerks.ts`): ball, Lok Pass, Passports. */
   lokShopPerks: string[];
   /** How well LokServer knows you; raised by daily visits and the feather game. */
@@ -2797,6 +2848,8 @@ export interface RunResult {
   level: number;
   cred: number;
   killsByEnemy: Record<string, number>;
+  /** Player kills by the weapon that landed the final damaging hit. */
+  weaponKills?: Record<string, number>;
   /** Kills of quirked enemies this run, by quirk id. */
   killsByQuirk?: Record<string, number>;
   /** This run used a quirk's Everywhere option / Take it on option. */

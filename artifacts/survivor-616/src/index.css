@@ -332,6 +332,18 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 [data-ui-theme='breach-616'] { --background: 216 39% 6%; --foreground: 190 42% 96%; --card: 213 34% 10%; --card-foreground: 190 42% 96%; --primary: 42 96% 63%; --primary-foreground: 216 39% 6%; --secondary: 210 29% 15%; --secondary-foreground: 190 42% 96%; --muted: 210 22% 13%; --muted-foreground: 190 19% 67%; --accent: 178 56% 15%; --accent-foreground: 184 88% 67%; --border: 186 43% 31%; --input: 186 43% 31%; --ring: 42 96% 63%; background-image: radial-gradient(circle at 78% 9%, hsl(171 80% 50% / .1), transparent 36%), linear-gradient(145deg, hsl(42 96% 63% / .035), transparent 46%); }
 [data-ui-theme='breach-616']::before { content: '616'; position: fixed; inset: 7% -4% auto auto; z-index: 0; pointer-events: none; font: 900 clamp(12rem, 42vw, 44rem)/1 sans-serif; letter-spacing: -.12em; color: hsl(42 96% 63% / .055); transform: rotate(-8deg); }
 [data-ui-theme='breach-616'][data-ui-swatch='root-cyan'] { --primary: 184 88% 67%; --ring: 184 88% 67%; }
+[data-ui-theme='starfall-rooftops'] { --background: 228 50% 5%; --foreground: 216 48% 96%; --card: 229 43% 9%; --card-foreground: 216 48% 96%; --primary: 201 100% 70%; --primary-foreground: 228 50% 5%; --secondary: 229 34% 15%; --secondary-foreground: 216 48% 96%; --muted: 229 25% 12%; --muted-foreground: 218 24% 67%; --accent: 201 65% 15%; --accent-foreground: 201 100% 70%; --border: 220 48% 32%; --input: 220 48% 32%; --ring: 201 100% 70%; }
+[data-ui-theme='deep-current'] { --background: 219 60% 5%; --foreground: 176 46% 95%; --card: 217 52% 9%; --card-foreground: 176 46% 95%; --primary: 174 95% 58%; --primary-foreground: 219 60% 5%; --secondary: 215 42% 15%; --secondary-foreground: 176 46% 95%; --muted: 215 32% 12%; --muted-foreground: 184 22% 66%; --accent: 174 58% 14%; --accent-foreground: 174 95% 58%; --border: 185 48% 30%; --input: 185 48% 30%; --ring: 174 95% 58%; }
+[data-ui-theme='sunbreak-cathedral'] { --background: 276 34% 6%; --foreground: 45 60% 96%; --card: 278 29% 10%; --card-foreground: 45 60% 96%; --primary: 44 100% 66%; --primary-foreground: 276 34% 6%; --secondary: 278 24% 16%; --secondary-foreground: 45 60% 96%; --muted: 278 20% 13%; --muted-foreground: 42 25% 68%; --accent: 44 60% 15%; --accent-foreground: 44 100% 66%; --border: 31 48% 32%; --input: 31 48% 32%; --ring: 44 100% 66%; }
+[data-ui-theme='glimmerwild'] { --background: 250 38% 5%; --foreground: 138 45% 95%; --card: 251 34% 9%; --card-foreground: 138 45% 95%; --primary: 145 90% 63%; --primary-foreground: 250 38% 5%; --secondary: 250 26% 15%; --secondary-foreground: 138 45% 95%; --muted: 250 22% 12%; --muted-foreground: 145 22% 67%; --accent: 145 58% 14%; --accent-foreground: 145 90% 63%; --border: 263 40% 32%; --input: 263 40% 32%; --ring: 145 90% 63%; }
+[data-ui-theme='starfall-rooftops'][data-ui-swatch='roof-rose'] { --primary: 337 100% 72%; --ring: 337 100% 72%; }
+[data-ui-theme='starfall-rooftops'][data-ui-swatch='window-gold'] { --primary: 42 100% 65%; --ring: 42 100% 65%; }
+[data-ui-theme='deep-current'][data-ui-swatch='coral-glow'] { --primary: 8 100% 69%; --ring: 8 100% 69%; }
+[data-ui-theme='deep-current'][data-ui-swatch='abyss-violet'] { --primary: 267 100% 74%; --ring: 267 100% 74%; }
+[data-ui-theme='sunbreak-cathedral'][data-ui-swatch='plum-glass'] { --primary: 286 85% 72%; --ring: 286 85% 72%; }
+[data-ui-theme='sunbreak-cathedral'][data-ui-swatch='rose-window'] { --primary: 351 100% 72%; --ring: 351 100% 72%; }
+[data-ui-theme='glimmerwild'][data-ui-swatch='violet-petal'] { --primary: 280 100% 75%; --ring: 280 100% 75%; }
+[data-ui-theme='glimmerwild'][data-ui-swatch='moon-cream'] { --primary: 49 88% 84%; --ring: 49 88% 84%; }
 [data-ui-theme='midnight-reliquary'][data-ui-swatch='moon-violet'] { --primary: 267 100% 76%; --accent-foreground: 267 100% 76%; --ring: 267 100% 76%; }
 [data-ui-theme='midnight-reliquary'][data-ui-swatch='relic-gold'] { --primary: 45 100% 68%; --accent-foreground: 45 100% 68%; --ring: 45 100% 68%; }
 [data-ui-theme='mirror-carnival'][data-ui-swatch='electric-mint'] { --primary: 167 100% 67%; --accent-foreground: 167 100% 67%; --ring: 167 100% 67%; }
@@ -348,7 +360,9 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
    layer instead, which has no descendants to capture. */
 [data-ui-theme='midnight-reliquary']::before, [data-ui-theme='mirror-carnival']::before,
 [data-ui-theme='aurora-transit']::before, [data-ui-theme='chrome-vespers']::before,
-[data-ui-theme='paper-lantern']::before, [data-ui-theme='greenhouse-glass']::before {
+[data-ui-theme='paper-lantern']::before, [data-ui-theme='greenhouse-glass']::before,
+[data-ui-theme='starfall-rooftops']::before, [data-ui-theme='deep-current']::before,
+[data-ui-theme='sunbreak-cathedral']::before, [data-ui-theme='glimmerwild']::before {
   content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
 }
 [data-ui-theme='midnight-reliquary']::before { background-image: radial-gradient(circle at 50% 100%, hsl(196 100% 68% / .16), transparent 48%); animation: reliquary-breathe 5.5s ease-in-out infinite; }
@@ -357,6 +371,14 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 [data-ui-theme='chrome-vespers']::before { background-image: linear-gradient(160deg, hsl(35 90% 55% / .07), transparent 45%, hsl(255 55% 45% / .08)); animation: vespers-breathe 6s ease-in-out infinite; }
 [data-ui-theme='paper-lantern']::before { background-image: radial-gradient(circle at 50% 0%, hsl(28 90% 60% / .1), transparent 40%); animation: lantern-flicker 4.2s ease-in-out infinite; }
 [data-ui-theme='greenhouse-glass']::before { background-image: radial-gradient(circle at 30% 20%, hsl(150 60% 55% / .12), transparent 42%); animation: greenhouse-fog 7s ease-in-out infinite; }
+[data-ui-theme='starfall-rooftops']::before { background-image: radial-gradient(1px 1px at 12% 18%, hsl(201 100% 85% / .75) 98%, transparent), radial-gradient(1px 1px at 76% 62%, hsl(337 100% 85% / .65) 98%, transparent), radial-gradient(2px 2px at 44% 82%, hsl(42 100% 76% / .55) 98%, transparent), linear-gradient(145deg, hsl(224 70% 30% / .18), transparent 52%, hsl(337 75% 40% / .1)); background-size: 190px 150px, 220px 180px, 270px 210px, 100% 100%; animation: starfall-drift 18s linear infinite; }
+[data-ui-theme='deep-current']::before { background-image: radial-gradient(ellipse at 18% 80%, hsl(174 95% 42% / .13), transparent 48%), radial-gradient(ellipse at 82% 10%, hsl(267 100% 58% / .11), transparent 40%), repeating-linear-gradient(164deg, transparent 0 72px, hsl(176 95% 72% / .025) 74px 76px, transparent 78px 142px); animation: deep-current-drift 16s ease-in-out infinite alternate; }
+[data-ui-theme='sunbreak-cathedral']::before { background-image: radial-gradient(ellipse at 50% 0%, hsl(44 100% 60% / .17), transparent 40%), linear-gradient(158deg, transparent 38%, hsl(286 85% 68% / .07) 58%, transparent 82%); animation: sunbreak-glow 8s ease-in-out infinite; }
+[data-ui-theme='glimmerwild']::before { background-image: radial-gradient(2px 2px at 20% 36%, hsl(145 90% 75% / .72) 98%, transparent), radial-gradient(2px 2px at 76% 26%, hsl(280 100% 80% / .66) 98%, transparent), radial-gradient(ellipse at 25% 85%, hsl(145 80% 42% / .12), transparent 42%), radial-gradient(ellipse at 76% 5%, hsl(280 100% 60% / .12), transparent 46%); background-size: 240px 200px, 300px 240px, 100% 100%, 100% 100%; animation: glimmerwild-drift 12s ease-in-out infinite alternate; }
+@keyframes starfall-drift { to { background-position: 190px 150px, -220px 180px, 270px -210px, 0 0; } }
+@keyframes deep-current-drift { to { background-position: 8% 88%, 74% 18%, 0 28px; } }
+@keyframes sunbreak-glow { 50% { filter: brightness(1.14) saturate(1.12); } }
+@keyframes glimmerwild-drift { to { background-position: -240px 200px, 300px -240px, 0 0, 0 0; } }
 
 /* Night Drive: a cool, cinematic chrome that still uses the same UI tokens. */
 [data-ui-theme='night-drive'] {
@@ -656,6 +678,8 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-motion='full']) .palette-preview-glow, :root:not([data-motion='full']) .palette-preview-pulse, :root:not([data-motion='full']) .palette-preview-prism, :root:not([data-motion='full']) .palette-preview-flicker, :root:not([data-motion='full']) .palette-preview-wave { animation: none; }
+  :root:not([data-motion='full']) [data-ui-theme='starfall-rooftops']::before, :root:not([data-motion='full']) [data-ui-theme='deep-current']::before,
+  :root:not([data-motion='full']) [data-ui-theme='sunbreak-cathedral']::before, :root:not([data-motion='full']) [data-ui-theme='glimmerwild']::before { animation: none; }
 }
 
 /* Hideout credits chip: a small pulse while at least one passive generator is owned. */
@@ -700,6 +724,25 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .training-arena-weapon-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
 .training-arena-weapon-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.06); }
 .training-arena-weapon-scroll::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: #a3e635; background-clip: padding-box; }
+.training-tier-pop { animation: training-tier-pop 180ms cubic-bezier(.2,.9,.3,1.25) both; transform-origin: center; }
+@keyframes training-tier-pop {
+  0% { opacity: .45; transform: translateY(2px) scale(.78); }
+  58% { opacity: 1; transform: translateY(-2px) scale(1.16); }
+  82% { transform: translateY(1px) scale(.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.training-favorite-pop { display: inline-flex; animation: training-favorite-pop 260ms cubic-bezier(.2,.9,.3,1.25) both; transform-origin: center; }
+@keyframes training-favorite-pop {
+  0% { transform: translateY(1px) scale(.7); }
+  62% { transform: translateY(-3px) scale(1.24); }
+  100% { transform: translateY(0) scale(1); }
+}
+.training-rack-nav-indicator { position: absolute; inset: 0; pointer-events: none; border-bottom: 1px solid hsl(var(--primary)); background: hsl(var(--primary) / .12); animation: training-rack-nav-in 180ms cubic-bezier(.2,.8,.2,1) both; transform-origin: left center; }
+.training-rack-nav-indicator--evolution { transform-origin: right center; }
+@keyframes training-rack-nav-in { from { opacity: .4; transform: scaleX(.55); } to { opacity: 1; transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .training-tier-pop, .training-favorite-pop, .training-rack-nav-indicator { animation: none; }
+}
 :root[data-scrollbar-tint='neutral'] * { scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent; }
 :root[data-scrollbar='standard'] * { scrollbar-width: auto; scrollbar-color: auto; }
 :root[data-scrollbar='hidden'] * { scrollbar-width: none; }

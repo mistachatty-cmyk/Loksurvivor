@@ -8,10 +8,14 @@
 import { useEffect } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useMeta } from '@/game/state/metaStore';
+import { ALL_WEAPON_DEFS } from '@/game/data/weaponPixelModels';
+import { WeaponIcon } from './WeaponIcon';
+import { useT, type MessageKey } from '@/lib/i18n';
 
 const AUTO_DISMISS_MS = 6000;
 
 export function NotificationToasts() {
+  const t = useT();
   const { meta, dismissNotifications } = useMeta();
   const notifications = meta.pendingNotifications;
 
@@ -38,10 +42,12 @@ export function NotificationToasts() {
           className="pointer-events-auto flex w-full max-w-md items-start gap-3 border border-primary/40 bg-black/90 px-4 py-3 text-left shadow-lg backdrop-blur"
           data-testid={`notification-toast-${notification.id}`}
         >
-          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          {notification.iconId && ALL_WEAPON_DEFS.find((weapon) => weapon.id === notification.iconId)
+            ? (() => { const weapon = ALL_WEAPON_DEFS.find((candidate) => candidate.id === notification.iconId)!; return <WeaponIcon kind={weapon.kind} weaponId={notification.iconId} color={weapon.color} size={30} label={weapon.name} />; })()
+            : <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
           <span className="min-w-0">
-            <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-primary">{notification.title}</span>
-            <span className="block text-xs leading-snug text-white">{notification.body}</span>
+            <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-primary">{notification.titleKey ? t(notification.titleKey as MessageKey, notification.variables) : notification.title}</span>
+            <span className="block text-xs leading-snug text-white">{notification.bodyKey ? t(notification.bodyKey as MessageKey, notification.variables) : notification.body}</span>
           </span>
         </button>
       ))}

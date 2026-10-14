@@ -17,6 +17,7 @@ import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
+import { NotificationMailbox } from './NotificationMailbox';
 import { CollapsibleSection } from './CollapsibleSection';
 import { HideoutPreview, type HideoutPetInfo, type HideoutPropInfo, type PlayCue, type StripNotice } from './HideoutPreview';
 import { HideoutPlayBar } from './HideoutPlayBar';
@@ -564,6 +565,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
     >
       <NotificationToasts />
+      <NotificationMailbox />
       {chromeLayout === 'classic' ? <>
       {/* Classic corner controls remain available in Settings. */}
       <button
@@ -1180,7 +1182,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                     <ArrowRight className="h-3.5 w-3.5 text-pink-300/80" />
                   </button>
                 )}
-                {activeRoom.id === 'main-floor' && (meta.totalKills >= 616 || meta.devModeAllUnlocks) ? (
+                {activeRoom.id === 'main-floor' && (meta.trainingWeaponRackOwned || meta.devModeAllUnlocks) ? (
                   <button
                     type="button"
                     onClick={onOpenTrainingArena}
@@ -1189,19 +1191,19 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   >
                     <Swords className="h-5 w-5 text-cyan-200 transition group-hover:text-white" />
                     <span>
-                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100">Training Arena</span>
-                      <span className="block text-[10px] text-cyan-100/70">Test the full weapon rack · Dust Mite target</span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100">{t('training.hub.title')}</span>
+                      <span className="block text-[10px] text-cyan-100/70">{t('training.hub.open')}</span>
                     </span>
                     <ArrowRight className="h-3.5 w-3.5 text-cyan-200/80" />
                   </button>
                 ) : activeRoom.id === 'main-floor' ? (
                   <div className="flex items-center gap-3 border border-white/10 bg-black/25 px-3 py-2 opacity-70" data-testid="training-arena-locked">
                     <Swords className="h-5 w-5 text-white/35" />
-                    <span className="min-w-0">
-                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-white/55">Training Arena · Locked</span>
-                      <span className="block text-[10px] text-white/40">Defeat 616 enemies · {Math.min(meta.totalKills, 616)} / 616</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-white/55">{t('training.hub.locked')}</span>
+                      <span className="block text-[10px] text-white/40">{t('training.hub.shopHint')}</span>
                     </span>
-                    <Lock className="h-3.5 w-3.5 text-white/35" />
+                    <button type="button" onClick={() => onOpen('lok-shop')} className="border border-violet-300/40 px-2 py-1 font-mono text-[8px] font-bold uppercase tracking-widest text-violet-200 hover:bg-violet-200/10" data-testid="button-training-arena-shop">{t('training.hub.shop')}</button>
                   </div>
                 ) : null}
                 {activeRoom.id === 'main-floor' && (

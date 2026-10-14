@@ -29,13 +29,15 @@ test('run auras cover eight paid styles across multiple cosmetic tiers', () => {
   assert.deepEqual(new Set(RUN_AURAS.map((aura) => aura.tier)), new Set(['standard', 'uncommon', 'rare', 'legendary']));
 });
 
-test('every fighter has eight distinct personal skins with episode and crew earnables', () => {
+test('every fighter has eleven distinct personal skins with episode, crew, and lifetime mastery earnables', () => {
   for (const character of CHARACTERS) {
     const skins = getCharacterSkins(character);
-    assert.equal(skins.length, 8);
-    assert.equal(new Set(skins.map((skin) => skin.id)).size, 8);
+    assert.equal(skins.length, 11);
+    assert.equal(new Set(skins.map((skin) => skin.id)).size, 11);
     assert.equal(skins.filter((skin) => skin.episodeRequired).length, 1);
     assert.deepEqual(skins.filter((skin) => skin.crewRequired).map((skin) => skin.crewRequired), [3, 8]);
+    assert.deepEqual(skins.filter((skin) => skin.totalKillsRequired).map((skin) => skin.totalKillsRequired), [616, 6160, 16160]);
+    assert.equal(skins.filter((skin) => skin.tier === 'ultimate').length, 3);
   }
 
   const character = CHARACTERS[0]!;

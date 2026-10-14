@@ -293,10 +293,11 @@ function CharacterDetail({
   const status = episode ? episodeStatus(episode.id, meta) : 'locked';
   const progress = episode ? episodeProgress(episode.id, meta) : 0;
   const skins = getCharacterSkins(character);
-  const selectedSkinId = meta.characterSkinByCharacterId[character.id] ?? skins[0]!.id;
+  const selectedSkin = skins.find((skin) => skin.id === meta.characterSkinByCharacterId[character.id]) ?? skins[0]!;
+  const selectedSkinId = selectedSkin.id;
   const worldPalette = meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId);
   const displayPalette = resolveCharacterCosmeticPalette(character, selectedSkinId, worldPalette, meta.worldPaletteBlendEnabled);
-  const paletteEffect = meta.paletteAnimationsEnabled ? getThemePalette(meta.activePaletteId)?.effect?.kind : undefined;
+  const paletteEffect = meta.paletteAnimationsEnabled ? selectedSkin.effect?.kind ?? getThemePalette(meta.activePaletteId)?.effect?.kind : undefined;
 
   return (
     <div
@@ -318,10 +319,13 @@ function CharacterDetail({
           <p className="font-mono text-[9px] font-bold uppercase tracking-widest text-primary">Personal skins</p>
           <span className="font-mono text-[8px] uppercase text-muted-foreground">{meta.worldPaletteBlendEnabled ? 'World blend on' : 'Personal only'}</span>
         </div>
-        <div className="mt-2 grid grid-cols-4 gap-1.5">
+        <div className="mt-2 grid grid-cols-3 gap-1.5 sm:grid-cols-4">
           {skins.map((skin) => {
-            const locked = !isCharacterSkinUnlocked(skin, meta.rescuedAllyIds.length, status === 'completed');
+            const locked = !isCharacterSkinUnlocked(skin, meta.rescuedAllyIds.length, status === 'completed', meta.totalKills);
             const selected = selectedSkinId === skin.id;
+            const killProgress = skin.totalKillsRequired
+              ? `${Math.min(meta.totalKills, skin.totalKillsRequired).toLocaleString()} / ${skin.totalKillsRequired.toLocaleString()} KILLS`
+              : '';
             return (
               <button
                 key={skin.id}
@@ -329,14 +333,15 @@ function CharacterDetail({
                 onClick={() => { if (!locked) onSelectSkin(character.id, skin.id); }}
                 disabled={locked}
                 aria-pressed={selected}
-                aria-label={`${skin.name}${locked ? skin.crewRequired ? `, rescue ${skin.crewRequired} crew to unlock` : ', complete episode to unlock' : ''}`}
-                className={`min-w-0 border p-1.5 text-left transition-colors ${selected ? 'border-primary bg-primary/10' : 'border-white/15 bg-black/25'} disabled:opacity-35`}
+                aria-label={`${skin.name}${locked ? skin.totalKillsRequired ? `, ${skin.totalKillsRequired.toLocaleString()} lifetime defeats required` : skin.crewRequired ? `, rescue ${skin.crewRequired} crew to unlock` : ', complete episode to unlock' : ''}`}
+                className={`min-w-0 border p-1.5 text-left transition-colors ${skin.tier === 'ultimate' ? 'border-amber-200/35 bg-gradient-to-br from-violet-950/65 via-black/35 to-amber-950/55 hover:border-amber-100/70' : 'border-white/15 bg-black/25'} ${selected ? 'ring-1 ring-primary' : ''} disabled:opacity-55`}
                 data-testid={`button-character-skin-${skin.style}`}
               >
                 <span className="flex h-5 overflow-hidden border border-white/10">
                   {[skin.palette.body, skin.palette.accent, skin.palette.glow].map((color) => <span key={color} className="flex-1" style={{ backgroundColor: color }} />)}
                 </span>
-                <span className="mt-1 block truncate font-mono text-[7px] font-bold uppercase text-white/75">{locked ? 'Locked' : skin.name}</span>
+                <span className={`mt-1 block truncate font-mono text-[7px] font-black uppercase ${skin.tier === 'ultimate' ? 'text-amber-100' : 'text-white/75'}`}>{skin.name}</span>
+                {skin.tier === 'ultimate' ? <span className="block truncate font-mono text-[6px] font-bold uppercase text-white/55">{locked ? killProgress : 'ULTIMATE SKIN'}</span> : null}
               </button>
             );
           })}

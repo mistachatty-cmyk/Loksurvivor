@@ -22,6 +22,7 @@ import { CosmeticPreview } from './CosmeticPreview';
 import { ScreenLayout } from './ScreenLayout';
 import { useLokEconomy } from '@/state/lokEconomyStore';
 import { LOKTOKEN_ONLY_KINDS, LOKTOKEN_PRICE_BY_TIER, catalogSku } from '@/lib/lokStoreCatalog';
+import { useT } from '@/lib/i18n';
 
 /** The roster hero -- red/black, full stats/weapon/ultimate -- who occasionally takes over the shop as "Artisan Valor Prime". */
 const PRIME = getCharacter('artisanvalor');
@@ -107,7 +108,8 @@ function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (categ
 }
 
 export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
-  const { meta, buyPalette, grantPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, grantDropPack, equipDropPack, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer, grantFactionRacesUnlock, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
+  const t = useT();
+  const { meta, buyPalette, grantPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, grantDropPack, equipDropPack, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer, grantFactionRacesUnlock, grantTrainingWeaponRack, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const { signedIn, balance: lokBalance, ownedSkus, priceOf, spend } = useLokEconomy();
   // LokToken-only applies per palette, and only once the live catalog actually lists it. Until then
@@ -161,7 +163,8 @@ export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
     if (ownedSkus.has(catalogSku('collectorAccess', 'collector-access')) && !meta.lokPetCollectorAccessUnlocked) grantLokPetCollectorAccess();
     if (ownedSkus.has(catalogSku('factionRacesUnlock', 'faction-races')) && !meta.factionRacesUnlocked) grantFactionRacesUnlock();
     if (ownedSkus.has(catalogSku('packVisualizerUnlock', 'lokpack-visualizer')) && !meta.lokPackVisualizerUnlocked) grantLokPackVisualizer();
-  }, [ownedSkus, meta.lokPetFieldGuideUnlocked, meta.lokPetCollectorAccessUnlocked, meta.factionRacesUnlocked, meta.lokPackVisualizerUnlocked, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantFactionRacesUnlock, grantLokPackVisualizer]);
+    if (ownedSkus.has(catalogSku('weaponRackUnlock', 'weapon-rack')) && !meta.trainingWeaponRackOwned) grantTrainingWeaponRack();
+  }, [ownedSkus, meta.lokPetFieldGuideUnlocked, meta.lokPetCollectorAccessUnlocked, meta.factionRacesUnlocked, meta.lokPackVisualizerUnlocked, meta.trainingWeaponRackOwned, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantFactionRacesUnlock, grantLokPackVisualizer, grantTrainingWeaponRack]);
 
   const primeShowing = takeoverActive || flickerActive;
   const vendorRig = primeShowing ? PRIME.rig : ARTISAN_VALOR_RIG;
@@ -242,12 +245,14 @@ export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
     'collector-access': meta.lokPetCollectorAccessUnlocked,
     'faction-races': meta.factionRacesUnlocked,
     'lokpack-visualizer': meta.lokPackVisualizerUnlocked,
+    'weapon-rack': meta.trainingWeaponRackOwned,
   };
   const UNLOCK_GRANT_BY_ID: Record<string, () => void> = {
     'field-guide': grantLokPetFieldGuide,
     'collector-access': grantLokPetCollectorAccess,
     'faction-races': grantFactionRacesUnlock,
     'lokpack-visualizer': grantLokPackVisualizer,
+    'weapon-rack': grantTrainingWeaponRack,
   };
   const unlockOwned = (unlock: (typeof LOK_SHOP_UNLOCKS)[number]) => UNLOCK_OWNED_BY_ID[unlock.id] ?? false;
   const unlockPrice = (unlock: (typeof LOK_SHOP_UNLOCKS)[number]) =>
@@ -460,11 +465,11 @@ export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
                     return (
                       <article key={unlock.id} className={`border p-4 ${owned ? 'border-primary bg-primary/5' : 'border-border bg-background'}`} data-testid={`card-lok-shop-unlock-${unlock.id}`}>
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="text-sm font-black uppercase tracking-wide text-white">{unlock.name}</h3>
+                          <h3 className="text-sm font-black uppercase tracking-wide text-white">{unlock.id === 'weapon-rack' ? t('training.shop.name') : unlock.name}</h3>
                           {owned ? <Check className="h-4 w-4 shrink-0 text-primary" aria-label="Unlocked" /> : null}
                         </div>
                         <span className={`mt-2 inline-block border px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-widest ${TIER_BADGE_CLASS[unlock.tier]}`}>{unlock.tier}</span>
-                        <p className="mt-2 min-h-16 text-xs leading-relaxed text-muted-foreground">{unlock.description}</p>
+                        <p className="mt-2 min-h-16 text-xs leading-relaxed text-muted-foreground">{unlock.id === 'weapon-rack' ? t('training.shop.description') : unlock.description}</p>
                         {owned ? (
                           <div className="mt-3 w-full border border-primary/40 px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-widest text-primary/70" data-testid={`status-lok-shop-unlock-${unlock.id}`}>Unlocked</div>
                         ) : (
