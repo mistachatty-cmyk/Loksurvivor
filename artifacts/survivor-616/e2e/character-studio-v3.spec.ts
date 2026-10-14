@@ -6,7 +6,7 @@ const ALL_EARNED = ['forge', 'inspector', 'factionRaces', 'foil', 'aura', 'slot-
 
 async function openStudio(page: Page) {
   await page.addInitScript(([metaKey, forgeKey, earned]) => {
-    localStorage.setItem(metaKey!, JSON.stringify({ version: 25, onboarded: true, totalRuns: 3, hideoutArrivalEnabled: false }));
+    localStorage.setItem(metaKey!, JSON.stringify({ version: 26, onboarded: true, totalRuns: 3, hideoutArrivalEnabled: false }));
     localStorage.setItem(forgeKey!, JSON.stringify({ unlocked: false, operators: [], earned, toggles: { forge: true } }));
   }, [META_KEY, FORGE_KEY, ALL_EARNED] as [string, string, string[]]);
   await page.goto('/?screen=settings');
