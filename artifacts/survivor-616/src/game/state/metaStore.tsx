@@ -1271,6 +1271,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       ? parsed.selectedCharacterId
       : (unlockedCharacterIds[0] ?? defaults.selectedCharacterId);
   const rescuedAllyIds = idList(parsed.rescuedAllyIds, allyIds, []);
+  const savedTotalKills = counter(parsed.totalKills);
   const crewActivityByAlly = normalizeCrewActivities(
     parsed.crewActivityByAlly,
     rescuedAllyIds,
@@ -1283,7 +1284,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       const requested = parsed.characterSkinByCharacterId[character.id];
       const skin = getCharacterSkins(character).find((entry) => entry.id === requested);
       const characterEpisode = CHARACTER_EPISODES.find((entry) => entry.characterId === character.id);
-      if (skin && isCharacterSkinUnlocked(skin, rescuedAllyIds.length, Boolean(characterEpisode && completedEpisodeIds.includes(characterEpisode.id)))) {
+      if (skin && isCharacterSkinUnlocked(skin, rescuedAllyIds.length, Boolean(characterEpisode && completedEpisodeIds.includes(characterEpisode.id)), savedTotalKills)) {
         characterSkinByCharacterId[character.id] = skin.id;
       }
     }
@@ -1361,7 +1362,6 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     generatorAccrualAt: Math.max(0, typeof parsed.generatorAccrualAt === 'number' ? parsed.generatorAccrualAt : Date.now()),
   });
   const clearedAreaIds = idList(parsed.clearedAreaIds, areaIds, []);
-  const savedTotalKills = counter(parsed.totalKills);
   const fabricatedGrpdIds = idList(parsed.grpdUnlockedWeaponIds, GRPD_PLAYABLE_WEAPON_IDS, []).filter((id) => !isGrpdEndgameWeapon(id));
   const earnedEndgameGrpdIds = [...GRPD_PLAYABLE_WEAPON_IDS].filter((id) => grpdEndgameWeaponEarned(id, savedTotalKills, endgameReached({ clearedAreaIds })));
   const activeGrpdIds = idList(parsed.grpdActiveWeaponIds, new Set([...fabricatedGrpdIds, ...earnedEndgameGrpdIds]), []);
@@ -2412,7 +2412,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       if (!character) return state;
       const skin = getCharacterSkins(character).find((entry) => entry.id === action.skinId);
       const characterEpisode = CHARACTER_EPISODES.find((entry) => entry.characterId === character.id);
-      if (!skin || !isCharacterSkinUnlocked(skin, state.meta.rescuedAllyIds.length, Boolean(characterEpisode && state.meta.completedEpisodeIds.includes(characterEpisode.id)))) return state;
+      if (!skin || !isCharacterSkinUnlocked(skin, state.meta.rescuedAllyIds.length, Boolean(characterEpisode && state.meta.completedEpisodeIds.includes(characterEpisode.id)), state.meta.totalKills)) return state;
       return {
         ...state,
         meta: {

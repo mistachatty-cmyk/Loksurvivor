@@ -18,7 +18,7 @@ import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
-import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
+import { getCharacterSkin, resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { getRunAuraStyle } from '@/game/data/runAuras';
 import { getCelebrationStyle } from '@/game/data/celebrations';
 import { getHatStyle } from '@/game/data/hats';
@@ -377,6 +377,7 @@ export function RunScreen({
 
   const area = missionArea ?? areaOverride ?? getArea(areaId);
   const baseCharacter = getCharacter(characterId);
+  const activeCharacterSkin = getCharacterSkin(baseCharacter, meta.characterSkinByCharacterId[baseCharacter.id]);
   const activeWorldPalette = meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId);
   const character = {
     ...baseCharacter,
@@ -445,7 +446,7 @@ export function RunScreen({
         minimapHazardSense: minimapUnlockTiers(meta).hazardSense,
         runAuraStyle: getRunAuraStyle(meta.activeRunAuraId),
         hatStyle: getHatStyle(meta.activeHatId),
-        paletteEffect: prefersReducedMotion || !meta.paletteAnimationsEnabled ? undefined : getThemePalette(meta.activePaletteId)?.effect,
+        paletteEffect: prefersReducedMotion || !meta.paletteAnimationsEnabled ? undefined : activeCharacterSkin.effect ?? getThemePalette(meta.activePaletteId)?.effect,
         effectMotionEnabled: !prefersReducedMotion && meta.paletteAnimationsEnabled,
         rescueAllyId,
         startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && (pet.starter || pet.stamina > 0)).map((pet) => {
