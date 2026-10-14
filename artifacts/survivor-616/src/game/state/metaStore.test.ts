@@ -108,14 +108,14 @@ test('Training Arena progression is backward-compatible and mailbox actions pers
   const normalized = normalizeMeta({
     version: 1,
     trainingWeaponRackOwned: true,
-    trainingWeaponKills: { 'void-slash': 619, invalid: Number.NaN },
+    trainingWeaponKills: { 'void-slash': 6_169, invalid: Number.NaN },
     trainingMailbox: [
       { id: 'notice', title: 'Unlocked', body: 'Ready', createdAt: 10, read: 'yes', kept: false },
       { id: '', title: 'Invalid', body: 'Bad id', createdAt: 11 },
     ],
   });
   assert.equal(normalized.trainingWeaponRackOwned, true);
-  assert.deepEqual(normalized.trainingWeaponKills, { 'void-slash': 616 });
+  assert.deepEqual(normalized.trainingWeaponKills, { 'void-slash': 6_166 });
   assert.deepEqual(normalized.trainingMailbox.map(({ id, read, kept }) => ({ id, read, kept })), [
     { id: 'notice', read: false, kept: false },
   ]);

@@ -146,6 +146,7 @@ import type {
   ThreatEventId,
   DigiTowerProgress,
   DigiTowerPetCondition,
+  TrainingArenaLoadoutGroup,
   LokPetTrainingStat,
 } from '@/game/types';
 
@@ -342,6 +343,9 @@ export function createInitialMeta(): MetaState {
     factionRacesUnlocked: false,
     lokPackVisualizerUnlocked: false,
     trainingWeaponRackOwned: false,
+    trainingArenaLoadoutGroups: [{ id: 'training-group-1', activeLoadoutId: null, loadouts: [] }],
+    trainingArenaActiveGroupId: 'training-group-1',
+    trainingFavoriteWeaponIds: [],
     trainingWeaponKills: {},
     trainingDummyDamage: 0,
     trainingOperatorXp: {},
@@ -1163,6 +1167,31 @@ function replenishPetElixirs(meta: MetaState, now = Date.now()): Pick<MetaState,
 }
 
 /** Coerce an untrusted save payload into a usable MetaState. */
+function normalizeTrainingArenaLoadoutGroups(value: unknown): TrainingArenaLoadoutGroup[] {
+  if (!Array.isArray(value)) return [{ id: 'training-group-1', activeLoadoutId: null, loadouts: [] }];
+  const groups = value.slice(0, 4).flatMap((rawGroup): TrainingArenaLoadoutGroup[] => {
+    if (!rawGroup || typeof rawGroup !== 'object') return [];
+    const candidate = rawGroup as Partial<TrainingArenaLoadoutGroup>;
+    if (typeof candidate.id !== 'string' || !candidate.id) return [];
+    const loadouts = Array.isArray(candidate.loadouts)
+      ? candidate.loadouts.slice(0, 100).flatMap((rawLoadout) => {
+        if (!rawLoadout || typeof rawLoadout !== 'object') return [];
+        const loadout = rawLoadout as { id?: unknown; name?: unknown; weaponIds?: unknown };
+        if (typeof loadout.id !== 'string' || !loadout.id || typeof loadout.name !== 'string' || !Array.isArray(loadout.weaponIds)) return [];
+        const weaponIds = [...new Set(loadout.weaponIds.filter((id): id is string => typeof id === 'string' && id.length > 0))].slice(0, 128);
+        if (weaponIds.length === 0) return [];
+        return [{ id: loadout.id.slice(0, 80), name: loadout.name.trim().slice(0, 40) || 'Loadout', weaponIds }];
+      })
+      : [];
+    const activeLoadoutId = typeof candidate.activeLoadoutId === 'string' && loadouts.some((loadout) => loadout.id === candidate.activeLoadoutId)
+      ? candidate.activeLoadoutId
+      : null;
+    return [{ id: candidate.id.slice(0, 80), activeLoadoutId, loadouts }];
+  });
+  const uniqueGroups = groups.filter((group, index) => groups.findIndex((candidate) => candidate.id === group.id) === index);
+  return uniqueGroups.length > 0 ? uniqueGroups : [{ id: 'training-group-1', activeLoadoutId: null, loadouts: [] }];
+}
+
 export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const defaults = createInitialMeta();
   const liveModeEnabled = parsed.liveModeEnabled === true;
@@ -1408,8 +1437,18 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     factionRacesUnlocked: parsed.factionRacesUnlocked === true,
     lokPackVisualizerUnlocked: parsed.lokPackVisualizerUnlocked === true,
     trainingWeaponRackOwned: parsed.trainingWeaponRackOwned === true,
+    trainingArenaLoadoutGroups: normalizeTrainingArenaLoadoutGroups(parsed.trainingArenaLoadoutGroups),
+    trainingArenaActiveGroupId: (() => {
+      const groups = normalizeTrainingArenaLoadoutGroups(parsed.trainingArenaLoadoutGroups);
+      return groups.some((group) => group.id === parsed.trainingArenaActiveGroupId)
+        ? parsed.trainingArenaActiveGroupId!
+        : groups[0]!.id;
+    })(),
+    trainingFavoriteWeaponIds: Array.isArray(parsed.trainingFavoriteWeaponIds)
+      ? [...new Set(parsed.trainingFavoriteWeaponIds.filter((id): id is string => typeof id === 'string' && id.length > 0))].slice(0, 512)
+      : [],
     trainingWeaponKills: parsed.trainingWeaponKills && typeof parsed.trainingWeaponKills === 'object'
-      ? Object.fromEntries(Object.entries(parsed.trainingWeaponKills).filter(([id, value]) => id.length > 0 && typeof value === 'number' && Number.isFinite(value)).map(([id, value]) => [id, Math.max(0, Math.min(616, Math.floor(value as number)))]))
+      ? Object.fromEntries(Object.entries(parsed.trainingWeaponKills).filter(([id, value]) => id.length > 0 && typeof value === 'number' && Number.isFinite(value)).map(([id, value]) => [id, Math.max(0, Math.min(6_166, Math.floor(value as number)))]))
       : {},
     trainingDummyDamage: Math.max(0, Number.isFinite(parsed.trainingDummyDamage) ? Math.floor(parsed.trainingDummyDamage!) : 0),
     trainingOperatorXp: parsed.trainingOperatorXp && typeof parsed.trainingOperatorXp === 'object'
@@ -2264,6 +2303,8 @@ type Action =
   | { type: 'toggleRunModifier'; key: keyof RunModifiers }
   | { type: 'dismissNotifications'; ids: string[] }
   | { type: 'grantTrainingWeaponRack' }
+  | { type: 'setTrainingArenaLoadoutGroups'; groups: TrainingArenaLoadoutGroup[]; activeGroupId: string }
+  | { type: 'toggleFavoriteTrainingWeapon'; id: string }
   | { type: 'recordTrainingSession'; characterId: string; damage: number; xp: number; challenge?: { key: string; damage: number } }
   | { type: 'markTrainingMailboxRead'; id: string }
   | { type: 'keepTrainingMailboxEntry'; id: string; kept: boolean }
@@ -3648,6 +3689,24 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'grantTrainingWeaponRack':
       if (state.meta.trainingWeaponRackOwned) return state;
       return { ...state, meta: { ...state.meta, trainingWeaponRackOwned: true } };
+    case 'setTrainingArenaLoadoutGroups': {
+      const groups = normalizeTrainingArenaLoadoutGroups(action.groups);
+      const activeGroupId = groups.some((group) => group.id === action.activeGroupId) ? action.activeGroupId : groups[0]!.id;
+      return { ...state, meta: { ...state.meta, trainingArenaLoadoutGroups: groups, trainingArenaActiveGroupId: activeGroupId } };
+    }
+    case 'toggleFavoriteTrainingWeapon': {
+      if (!action.id) return state;
+      const favoriteIds = state.meta.trainingFavoriteWeaponIds;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          trainingFavoriteWeaponIds: favoriteIds.includes(action.id)
+            ? favoriteIds.filter((id) => id !== action.id)
+            : [...favoriteIds, action.id].slice(-512),
+        },
+      };
+    }
     case 'recordTrainingSession': {
       const damage = Math.max(0, Math.floor(action.damage));
       const xp = Math.max(0, action.xp);
@@ -4224,7 +4283,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       if (prev.trainingWeaponRackOwned && result.areaId !== 'training-arena') {
         for (const [weaponId, count] of Object.entries(result.weaponKills ?? {})) {
           const oldCount = trainingWeaponKills[weaponId] ?? 0;
-          const nextCount = Math.min(616, oldCount + Math.max(0, Math.floor(count)));
+          const nextCount = Math.min(6_166, oldCount + Math.max(0, Math.floor(count)));
           trainingWeaponKills[weaponId] = nextCount;
           if (oldCount < 616 && nextCount >= 616) newlyTrainingWeapons.push(weaponId);
         }
@@ -4645,6 +4704,8 @@ export interface MetaContextValue {
   grantFactionRacesUnlock: () => void;
   grantLokPackVisualizer: () => void;
   grantTrainingWeaponRack: () => void;
+  setTrainingArenaLoadoutGroups: (groups: TrainingArenaLoadoutGroup[], activeGroupId: string) => void;
+  toggleFavoriteTrainingWeapon: (id: string) => void;
   recordTrainingSession: (characterId: string, damage: number, xp: number, challenge?: { key: string; damage: number }) => void;
   markTrainingMailboxRead: (id: string) => void;
   keepTrainingMailboxEntry: (id: string, kept: boolean) => void;
@@ -4889,6 +4950,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const grantFactionRacesUnlock = useCallback(() => dispatch({ type: 'grantFactionRacesUnlock' }), []);
   const grantLokPackVisualizer = useCallback(() => dispatch({ type: 'grantLokPackVisualizer' }), []);
   const grantTrainingWeaponRack = useCallback(() => dispatch({ type: 'grantTrainingWeaponRack' }), []);
+  const setTrainingArenaLoadoutGroups = useCallback((groups: TrainingArenaLoadoutGroup[], activeGroupId: string) => dispatch({ type: 'setTrainingArenaLoadoutGroups', groups, activeGroupId }), []);
+  const toggleFavoriteTrainingWeapon = useCallback((id: string) => dispatch({ type: 'toggleFavoriteTrainingWeapon', id }), []);
   const recordTrainingSession = useCallback((characterId: string, damage: number, xp: number, challenge?: { key: string; damage: number }) => dispatch({ type: 'recordTrainingSession', characterId, damage, xp, challenge }), []);
   const markTrainingMailboxRead = useCallback((id: string) => dispatch({ type: 'markTrainingMailboxRead', id }), []);
   const keepTrainingMailboxEntry = useCallback((id: string, kept: boolean) => dispatch({ type: 'keepTrainingMailboxEntry', id, kept }), []);
@@ -5210,6 +5273,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       grantFactionRacesUnlock,
       grantLokPackVisualizer,
       grantTrainingWeaponRack,
+      setTrainingArenaLoadoutGroups,
+      toggleFavoriteTrainingWeapon,
       recordTrainingSession,
       markTrainingMailboxRead,
       keepTrainingMailboxEntry,
@@ -5402,6 +5467,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     grantFactionRacesUnlock,
     grantLokPackVisualizer,
     grantTrainingWeaponRack,
+    setTrainingArenaLoadoutGroups,
+    toggleFavoriteTrainingWeapon,
     recordTrainingSession,
     markTrainingMailboxRead,
     keepTrainingMailboxEntry,
