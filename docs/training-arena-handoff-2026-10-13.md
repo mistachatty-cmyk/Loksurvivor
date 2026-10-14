@@ -46,7 +46,7 @@ Key implementation files:
 4. **Unlock choices:** The user requested 616 total defeats for the hideout entry and 616 credited kills per base weapon; evolutions use a 6,166-kill gate. Progress commits at run end, and arena kills do not count. The real run-end unlock and mailbox flow still needs a QA-profile pass.
 5. **Localization:** All configured locales and lock hashes are present, and GitHub translation checks passed on #281 and #282. Review generated non-English wording during the full UI pass.
 6. **Visual and input review:** Full desktop/mobile review remains. Recheck camera drag/center-lock, rack densities, individual and All tier counters, reduced motion, icon activation under Spam, challenge retry/back, target readability, keyboard focus, and saved Classic layout. The browser preview for this handoff reached the first-companion choice and stopped without saving a permanent choice; it did not reach the arena.
-7. **Shared economy:** The Weapon Rack is in the local catalog, but its shared registry SQL has not been generated in this checkout or applied. The export command and owner-session requirement are recorded in [the next-pass spec](training-arena-next-pass-spec-2026-10-13.md).
+7. **Shared economy:** The Weapon Rack is in the local catalog. A generated, unapplied catalog review copy is linked from [the next-pass spec](training-arena-next-pass-spec-2026-10-13.md); an authorized owner must confirm the target project/tenant and publish it before cross-account purchases can work.
 
 The target stays defeated after a lethal test until Reset Dummy or another weapon test recreates it. Damage is bounded by the target's remaining HP, so a lethal test will not report theoretical overkill damage.
 
