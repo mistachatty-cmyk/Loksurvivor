@@ -176,6 +176,8 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
   const testStartCritsRef = useRef(0);
   const challengeModeRef = useRef(false);
   const challengeStopRef = useRef(false);
+  const challengeTriggerRef = useRef<HTMLButtonElement>(null);
+  const challengeDialogRef = useRef<HTMLDivElement>(null);
   const continuousModeRef = useRef(false);
   const continuousStopRef = useRef(false);
   const challengeKeyRef = useRef('');
@@ -217,6 +219,38 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
     : [selectedWeapon]);
   const challengeKey = selectedWeapons.map((weapon) => weapon.id).sort().join('+') + `@${weaponLevel}`;
   const mainLayout = layout === 'main';
+
+  useEffect(() => {
+    if (!challengeResult) return;
+    const dialog = challengeDialogRef.current;
+    const retryButton = dialog?.querySelector<HTMLButtonElement>('[data-challenge-retry]');
+    retryButton?.focus();
+
+    const handleDialogKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setChallengeResult(null);
+        return;
+      }
+      if (event.key !== 'Tab' || !dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      if (focusable.length === 0) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleDialogKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleDialogKeyDown);
+      challengeTriggerRef.current?.focus();
+    };
+  }, [Boolean(challengeResult)]);
 
   useEffect(() => {
     try {
@@ -818,14 +852,14 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
                 <div className="flex flex-wrap items-center gap-1.5">
                   <button type="button" onClick={() => setSpam((value) => !value)} aria-pressed={spam} className={`inline-flex min-h-8 items-center gap-1 border px-2 font-mono text-[8px] font-bold uppercase tracking-wider ${spam ? 'border-amber-200/50 bg-amber-200/10 text-amber-100' : 'border-white/15 text-white/55'}`}>{t('training.controls.spam')} {spam && <Check size={11} />}</button>
                   <button type="button" onClick={resetDummy} className="inline-flex min-h-8 items-center gap-1 border border-white/15 px-2 text-[8px] font-bold uppercase tracking-wider text-white/70 hover:bg-white/10"><RotateCcw size={12} /> {t('training.controls.reset')}</button>
-                  <button type="button" onClick={startChallenge} disabled={testRunning || (!multiUnlocked && multiWeaponIds.length > 1)} className="inline-flex min-h-8 items-center gap-1 border border-violet-200/40 px-2 font-mono text-[8px] font-black uppercase tracking-wider text-violet-100 hover:bg-violet-100/10 disabled:opacity-45">{challengeRunning ? t('training.controls.challengeRunning') : `${t('training.controls.challenge')} · ${challengeSeconds || 24}s`}</button>
+                  <button ref={challengeTriggerRef} type="button" onClick={startChallenge} disabled={testRunning || (!multiUnlocked && multiWeaponIds.length > 1)} className="inline-flex min-h-8 items-center gap-1 border border-violet-200/40 px-2 font-mono text-[8px] font-black uppercase tracking-wider text-violet-100 hover:bg-violet-100/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-200 disabled:opacity-45">{challengeRunning ? t('training.controls.challengeRunning') : `${t('training.controls.challenge')} · ${challengeSeconds || 24}s`}</button>
                   {challengeRunning && <span className="font-mono text-[9px] font-black text-amber-200">{t('training.controls.remaining', { seconds: challengeSeconds })}</span>}
                   <button type="button" onClick={() => testRunning ? stopTest() : testWeapon(selectedWeapons, false, spam)} disabled={!testRunning && !meta.devModeAllUnlocks && selectedWeapons.some((weapon) => (meta.trainingWeaponKills[weapon.id] ?? 0) < 616)} className="inline-flex min-h-8 items-center gap-1 bg-cyan-200 px-2.5 text-[8px] font-black uppercase tracking-wider text-slate-950 hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"><Crosshair size={12} /> {testRunning ? t(challengeRunning ? 'training.controls.challengeRunning' : 'training.controls.testing') : t('training.controls.test')}</button>
                 </div>
               </div>
               <p className="mt-1 text-right font-mono text-[7px] text-white/35">{t('training.controls.best', { damage: (meta.trainingChallengeBests[challengeKey] ?? 0).toLocaleString() })}</p>
             </div>
-            {challengeResult && <div className="absolute inset-0 z-20 grid place-items-center bg-slate-950/75 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-label={t('training.challenge.celebration', { tier: t(challengeResult.tier as never), damage: challengeResult.damage.toLocaleString() })}>
+            {challengeResult && <div ref={challengeDialogRef} className="absolute inset-0 z-20 grid place-items-center bg-slate-950/75 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-label={t('training.challenge.celebration', { tier: t(challengeResult.tier as never), damage: challengeResult.damage.toLocaleString() })}>
               <div className="relative w-full max-w-sm overflow-hidden border border-amber-200/60 bg-gradient-to-b from-[#302517] via-slate-950 to-slate-950 p-5 text-center shadow-[0_24px_80px_rgba(0,0,0,.7)] sm:p-7">
                 <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-amber-200 to-transparent" />
                 <p className="text-4xl text-amber-200 drop-shadow-[0_0_18px_rgba(253,230,138,.6)]">✦</p>
@@ -834,8 +868,8 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
                 <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-white/75">{t('training.challenge.celebration', { tier: t(challengeResult.tier as never), damage: challengeResult.damage.toLocaleString() })}</p>
                 <div className="mx-auto mt-4 max-w-[220px] border-y border-amber-100/15 py-2"><p className="font-mono text-[8px] uppercase tracking-[.2em] text-white/45">{t('training.stats.damage')}</p><p className="font-mono text-2xl font-black tabular-nums text-white">{challengeResult.damage.toLocaleString()}</p></div>
                 <div className="mt-5 grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setChallengeResult(null)} className="min-h-10 border border-white/20 bg-white/[.04] px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-white/75 hover:bg-white/10">{t('training.challenge.close')}</button>
-                  <button type="button" onClick={retryChallenge} className="inline-flex min-h-10 items-center justify-center gap-1.5 border border-cyan-200/60 bg-cyan-200 px-3 font-mono text-[10px] font-black uppercase tracking-wider text-slate-950 shadow-lg hover:bg-white"><RotateCcw size={12} />{t('training.challenge.retry')}</button>
+                  <button type="button" onClick={() => setChallengeResult(null)} className="min-h-10 border border-white/20 bg-white/[.04] px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-white/75 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">{t('training.challenge.close')}</button>
+                  <button type="button" data-challenge-retry onClick={retryChallenge} className="inline-flex min-h-10 items-center justify-center gap-1.5 border border-cyan-200/60 bg-cyan-200 px-3 font-mono text-[10px] font-black uppercase tracking-wider text-slate-950 shadow-lg hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200"><RotateCcw size={12} />{t('training.challenge.retry')}</button>
                 </div>
               </div>
             </div>}
