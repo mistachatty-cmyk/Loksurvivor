@@ -80,6 +80,7 @@ test('blank canvas connects a fast mouse stroke across every logical pixel', asy
   const editor = page.getByTestId('studio-v3-editor');
   const canvas = editor.locator('canvas[aria-label^="48 by 48 pixel art map"]');
   await editor.getByRole('button', { name: 'Color 1', exact: true }).click();
+  await canvas.scrollIntoViewIfNeeded();
   const bounds = await canvas.boundingBox();
   expect(bounds).not.toBeNull();
   const scale = bounds!.width / 48;
