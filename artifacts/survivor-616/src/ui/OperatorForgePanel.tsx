@@ -377,20 +377,20 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
   const freeSlots = Math.max(0, slotsEarned - saved.length);
 
   return createPortal(
-    <div className="fixed inset-0 z-[110] overflow-y-auto bg-background text-white" data-testid="panel-operator-forge" role="dialog" aria-label="Operator Forge">
+    <div className="fixed inset-0 z-[110] overflow-y-auto bg-background text-white" data-testid="panel-operator-forge" role="dialog" aria-label={tab === 'studio' ? 'Character Studio' : 'Operator Forge'}>
       <div className="mx-auto max-w-6xl px-4 pb-24 pt-5 sm:px-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">End game workshop</p>
-            <h1 className="mt-1 text-2xl font-black uppercase">Operator Forge</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            <h1 className="mt-1 text-2xl font-black uppercase">{tab === 'studio' ? 'Character Studio' : 'Operator Forge'}</h1>
+            {tab === 'studio' ? <p className="mt-1 text-sm text-muted-foreground">Create, animate, and share a character of your own.</p> : <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
               Design new operators from scratch or generate them. Forged operators are extra roster entries: your existing
               operators are never changed. Each one borrows the stats, weapon and ultimate of a kit you have already unlocked.
-            </p>
+            </p>}
           </div>
           <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" onClick={undo} disabled={past.length === 0} className={BUTTON} data-testid="button-forge-undo">Undo</button>
-            <button type="button" onClick={redo} disabled={future.length === 0} className={BUTTON} data-testid="button-forge-redo">Redo</button>
+            {tab !== 'studio' && <button type="button" onClick={undo} disabled={past.length === 0} className={BUTTON} data-testid="button-forge-undo">Undo</button>}
+            {tab !== 'studio' && <button type="button" onClick={redo} disabled={future.length === 0} className={BUTTON} data-testid="button-forge-redo">Redo</button>}
             <button type="button" onClick={close} className={BUTTON} data-testid="button-forge-close">Close</button>
           </div>
         </div>
@@ -404,7 +404,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
           </div>
         ) : null}
 
-        <nav className="mt-4 flex gap-2 border-b border-border pb-2" role="tablist" aria-label={t('forge.nav.aria')} data-testid="forge-nav">
+        <nav className="mt-4 grid grid-cols-4 gap-1 border-b border-border pb-2 sm:flex sm:gap-2" role="tablist" aria-label={t('forge.nav.aria')} data-testid="forge-nav">
           {FORGE_TABS.map((id) => (
             <button
               key={id}
@@ -414,7 +414,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               aria-selected={tab === id}
               aria-controls={`forge-screen-${id}`}
               onClick={() => setTab(id)}
-              className={`min-h-10 flex-1 border px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest sm:flex-none ${tab === id ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:text-white'}`}
+              className={`min-h-10 min-w-0 border px-1 py-2 font-mono text-[10px] font-bold uppercase tracking-tight sm:flex-none sm:px-4 sm:text-xs sm:tracking-widest ${tab === id ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:text-white'}`}
               data-testid={`forge-tab-${id}`}
             >
               {id === 'studio' ? 'Studio v3' : t(`forge.nav.${id}` as const)}
