@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CLIPS, DIRECTIONS, REQUIRED_FRAMES, approvalCount, approveStudioClip, approveStudioFrame, copyStudioClipToDirections, copyStudioFrameToClip, editStudioAppearance, editStudioFrame, generateBlankStudioProject, generateStudioProject, isStudioComplete, paintStudioBrush, paintStudioLine, projectFromForgedOperator, studioErrors } from './v3Project';
+import { CLIPS, DIRECTIONS, REQUIRED_FRAMES, approvalCount, approveStudioClip, approveStudioFrame, copyStudioClipToDirections, copyStudioFrameToClip, editStudioAppearance, editStudioFrame, emptyStudioFrameCount, generateBlankStudioProject, generateStudioProject, isStudioComplete, paintStudioBrush, paintStudioLine, projectFromForgedOperator, seedEmptyStudioFrames, studioErrors } from './v3Project';
 import { exportForgedOperator, generateForgedOperator, importForgedOperator } from '@/game/data/operatorForge';
 
 const options = { id: 'fixture-v3', kind: 'operator' as const, sourceId: 'starter', seed: 'fixture-seed', prompt: 'creepy winged' };
@@ -59,6 +59,25 @@ test('blank projects begin empty and need visible art before submission', () => 
   assert.ok(!studioErrors(drawn).includes('Add visible art before submitting'));
   const hidden = editStudioAppearance(drawn, (draft) => { draft.layers[0]!.visible = false; });
   assert.ok(studioErrors(hidden).includes('Add visible art before submitting'));
+});
+
+test('first-pose seeding fills only empty frames and keeps existing art, timing, and reviews', () => {
+  const blank = generateBlankStudioProject(options);
+  assert.equal(emptyStudioFrameCount(blank), REQUIRED_FRAMES);
+  assert.equal(seedEmptyStudioFrames(blank, 'S', 'idle', 0), blank);
+  let project = editStudioFrame(blank, 'S', 'idle', 0, (frame) => { frame.layers['layer-0'] = [[5, 6, 3]]; frame.offsets['layer-0'] = [1, 2]; });
+  project = editStudioFrame(project, 'E', 'walk', 0, (frame) => { frame.layers['layer-0'] = [[9, 10, 4]]; frame.ms = 250; });
+  project = approveStudioFrame(project, 'E', 'walk', 0);
+  const filled = seedEmptyStudioFrames(project, 'S', 'idle', 0);
+  assert.equal(emptyStudioFrameCount(filled), 0);
+  assert.equal(filled.revision, project.revision + 1);
+  assert.deepEqual(filled.views.E.walk[0], project.views.E.walk[0]);
+  assert.equal(approvalCount(filled), 1);
+  assert.deepEqual(filled.views.N.death[7]!.layers['layer-0'], [[5, 6, 3]]);
+  assert.deepEqual(filled.views.N.death[7]!.offsets['layer-0'], [1, 2]);
+  filled.views.N.death[7]!.layers['layer-0']!.push([8, 8, 2]);
+  assert.deepEqual(filled.views.S.idle[0]!.layers['layer-0'], [[5, 6, 3]]);
+  assert.equal(seedEmptyStudioFrames(filled, 'S', 'idle', 0), filled);
 });
 
 test('interpolated strokes leave no gaps and palette changes revoke all approvals', () => {

@@ -98,3 +98,45 @@ test('blank canvas connects a fast mouse stroke across every logical pixel', asy
   const reverted = await canvas.evaluate((element) => Array.from((element as HTMLCanvasElement).getContext('2d')!.getImageData(125, 155, 1, 1).data));
   expect(reverted[3]).toBe(0);
 });
+
+test('first character guide seeds blank frames and automatically restores the device draft', async ({ page }) => {
+  test.setTimeout(90_000);
+  await openStudio(page);
+  await page.getByRole('button', { name: 'Start with blank canvas' }).click();
+  const editor = page.getByTestId('studio-v3-editor');
+  const guide = editor.getByRole('region', { name: 'First character guide' });
+  await expect(guide).toBeVisible();
+  await expect(guide.getByRole('button', { name: 'Seed empty frames from first pose' })).toBeDisabled();
+  await editor.getByLabel('Creation name').fill('My first 616 character');
+  await editor.getByRole('button', { name: 'Color 1', exact: true }).click();
+  await editor.getByLabel('Pixel X').fill('7');
+  await editor.getByLabel('Pixel Y').fill('9');
+  await editor.getByRole('button', { name: 'Place at XY' }).click();
+  await guide.getByRole('button', { name: 'Seed empty frames from first pose' }).click();
+  await expect(guide.getByText('Every frame has art.', { exact: false })).toBeVisible();
+  await expect(editor.getByText('Saved on this device', { exact: true })).toBeVisible();
+  await page.reload();
+  await openStudio(page);
+  await expect(page.getByText('Continue your last character')).toBeVisible();
+  await page.getByRole('button', { name: 'Continue editing' }).click();
+  await expect(editor.getByLabel('Creation name')).toHaveValue('My first 616 character');
+  await editor.getByRole('button', { name: 'Approve this frame' }).click();
+  await guide.getByRole('button', { name: 'Next unreviewed frame' }).click();
+  await expect(editor.getByRole('button', { name: '2', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await guide.getByRole('button', { name: 'Hide guide' }).click();
+  await expect(guide).toBeHidden();
+  await editor.getByRole('button', { name: 'Show first character guide' }).click();
+  await expect(guide).toBeVisible();
+});
+
+test('switching away immediately keeps the latest unsaved edit on this device', async ({ page }) => {
+  test.setTimeout(90_000);
+  await openStudio(page);
+  await page.getByRole('button', { name: 'Generate editable project' }).click();
+  await page.getByTestId('studio-v3-editor').getByLabel('Creation name').fill('Quick switch draft');
+  await page.getByTestId('forge-tab-operators').click();
+  await page.getByTestId('forge-tab-studio').click();
+  await expect(page.getByText('Continue your last character')).toBeVisible();
+  await page.getByRole('button', { name: 'Continue editing' }).click();
+  await expect(page.getByTestId('studio-v3-editor').getByLabel('Creation name')).toHaveValue('Quick switch draft');
+});

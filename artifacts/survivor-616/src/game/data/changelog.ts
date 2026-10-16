@@ -1567,6 +1567,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Staff-approved creations appear in the Survivor 616 and GSix community galleries, where players can preview, adopt, remix, and report them.',
     ],
   },
+  {
+    version: '0.41.0',
+    date: '2026-10-16',
+    publishedAt: '2026-10-16T23:01:37Z',
+    kind: 'update',
+    title: 'A smoother first character',
+    body: [
+      'A new optional guide walks you from the first pixel pose through animation frames, previews, review, and submission.',
+      'Blank projects can copy the first pose into empty frames without replacing art you already made. Every copied frame still needs your own animation work and review.',
+      'Studio drafts now save automatically on this device, show their save status, and offer a quick way to continue your latest character.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

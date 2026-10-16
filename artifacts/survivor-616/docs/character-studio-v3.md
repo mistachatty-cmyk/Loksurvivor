@@ -12,6 +12,8 @@ The existing local save key `survivor616.forge.v1`, `FORGE1` share code, saved o
 
 Creators can start with generated art or a blank 48 × 48 project. The pointer canvas accepts touch, mouse, and pen input; fast movements fill every cell between sampled points. Right click and a stylus eraser erase. The selected palette color is editable, and creators can add, name, reorder, show, hide, clear, or remove layers. Shared palette and layer changes clear all frame approvals because they can alter every view. The editor supports up to 16 layers, matching the account validator.
 
+The optional first-character guide links the first south idle pose, empty-frame seeding, review navigation, and publication requirements. Seeding copies the first pose only into frames with no art, preserves frame timing and existing art, and leaves the new frames unapproved. It is a rough starting point: the creator should redraw the directions and actions before approving them. Generated projects already have art in every frame and skip the seeding action. The guide can be hidden and reopened without altering the draft.
+
 Every direction requires idle 4, walk 6, attack 4, hurt 2, and death 8 frames, for 192 reviewed frames. Generation prefills editable art but never approves it. Editing a frame revokes that frame's approval. A complete project has all required frames approved and no structural validation errors. Only complete reviewed revisions may enter runs, submission, adoption, or public profile art. Operators retain the selected unlocked kit's gameplay. Enemy work replaces only the selected base enemy's appearance and retains its authored behavior and stats.
 
 The frame timeline can copy the current clip from the selected direction to the other seven directions. This replaces those clips, clears their approvals, and counts as one undoable edit; the source direction remains unchanged.
@@ -19,6 +21,8 @@ The frame timeline can copy the current clip from the selected direction to the 
 It can also copy the selected frame's art and layer transforms to the other frames in that clip. Each destination keeps its timing, needs fresh review, and can be restored with one undo.
 
 After reviewing a clip, its frames can be approved together. A project with all 192 frames approved and visible art can be submitted from the editor. Submission saves the device draft, syncs it to the account, then queues an immutable revision for staff review. Approved revisions feed the Survivor 616 and GSix.online galleries; rejected or removed revisions stay out of public queries.
+
+Each project edit is saved to the device's IndexedDB after a short idle delay; hiding the page or leaving the editor requests an immediate write. Pending writes finish before a reopened Studio lists drafts. The editor shows pending, saving, saved, and failure states. The most recent draft has a prominent Continue editing entry, and a failed exit keeps the editor open. Opening an account draft with an older matching device copy selects the newer device work. Device autosave does not make network calls or sync an account draft. Save draft to account and submission remain explicit actions.
 
 ## Account and publication boundary
 
