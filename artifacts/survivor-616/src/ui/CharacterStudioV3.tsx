@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CLIPS, DIRECTIONS, REQUIRED_FRAMES, RIG_FAMILIES, STYLE_FAMILIES, STUDIO_SIZE, approvalCount, approveStudioClip, approveStudioFrame, copyStudioClipToDirections, copyStudioFrameToClip, editStudioAppearance, editStudioFrame, generateBlankStudioProject, generateStudioProject, paintStudioBrush, paintStudioLine, projectFromForgedOperator, studioErrors, transformStudioPixel, type ClipName, type Direction, type StudioProject } from '@/game/studio/v3Project';
+import { CLIPS, DIRECTIONS, REQUIRED_FRAMES, RIG_FAMILIES, STYLE_FAMILIES, STUDIO_SIZE, approvalCount, approveStudioClip, approveStudioFrame, copyStudioClipToDirections, copyStudioFrameToClip, editStudioAppearance, editStudioFrame, emptyStudioFrameCount, generateBlankStudioProject, generateStudioProject, paintStudioBrush, paintStudioLine, projectFromForgedOperator, seedEmptyStudioFrames, studioErrors, transformStudioPixel, type ClipName, type Direction, type StudioProject } from '@/game/studio/v3Project';
 import type { ForgedOperator } from '@/game/data/operatorForge';
 import { listStudioDrafts, saveStudioDraft } from '@/game/studio/v3Store';
 import { lokClient } from '@/lib/lokClient';
@@ -9,6 +9,12 @@ import { CommunityGalleryV3 } from './CommunityGalleryV3';
 type Tool = 'pen' | 'erase' | 'fill' | 'select';
 const CONTROL = 'min-h-10 border border-border bg-background px-3 py-2 text-xs text-white hover:border-primary disabled:opacity-40';
 const PIXEL_SCALE = 10;
+let queuedDeviceWrite: Promise<void> = Promise.resolve();
+function queueDeviceWrite(project: StudioProject): Promise<void> {
+  const write = queuedDeviceWrite.then(() => saveStudioDraft(project));
+  queuedDeviceWrite = write.catch(() => {});
+  return write;
+}
 interface ActiveStroke {
   pointerId: number;
   working: StudioProject;
@@ -85,6 +91,8 @@ export function CharacterStudioV3({ operatorSources, enemySources, v2Operators }
   const [onion, setOnion] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [message, setMessage] = useState('');
+  const [deviceSave, setDeviceSave] = useState<'pending' | 'saving' | 'saved' | 'error'>('pending');
+  const [showGuide, setShowGuide] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [layerNameDraft, setLayerNameDraft] = useState('');
@@ -93,15 +101,44 @@ export function CharacterStudioV3({ operatorSources, enemySources, v2Operators }
   const canvas = useRef<HTMLCanvasElement>(null);
   const activeStroke = useRef<ActiveStroke | null>(null);
   const selectionPointer = useRef<number | null>(null);
+  const latestProject = useRef<StudioProject | null>(null);
+  const autoSaveTimer = useRef<number | null>(null);
   const sources = kind === 'operator' ? operatorSources : enemySources;
   const selectedLayerName = project?.layers.find((layer) => layer.id === layerId)?.name ?? '';
   const errors = useMemo(() => project ? studioErrors(project) : [], [project]);
   const approvedFrames = useMemo(() => project ? approvalCount(project) : 0, [project]);
+  const emptyFrames = useMemo(() => project ? emptyStudioFrameCount(project) : 0, [project]);
+  const firstPoseHasArt = useMemo(() => project ? Object.values(project.views.S.idle[0]?.layers ?? {}).some((pixels) => pixels.length > 0) : false, [project]);
+  const recentDraft = useMemo(() => [...drafts].sort((a, b) => b.updatedAt - a.updatedAt)[0], [drafts]);
+  const reviewFrames = useMemo(() => project ? DIRECTIONS.flatMap((view) => (Object.keys(CLIPS) as ClipName[]).flatMap((animation) =>
+    project.views[view][animation].map((frame, index) => ({ direction: view, clip: animation, index, approved: frame.approved })).filter((frame) => !frame.approved))) : [], [project]);
   const complete = errors.length === 0 && approvedFrames === REQUIRED_FRAMES;
 
   useEffect(() => { setLayerNameDraft(selectedLayerName); }, [layerId, selectedLayerName]);
 
-  useEffect(() => { listStudioDrafts().then(setDrafts).catch(() => setMessage('IndexedDB is unavailable on this device.')); }, []);
+  useEffect(() => { queuedDeviceWrite.then(() => listStudioDrafts()).then(setDrafts).catch(() => setMessage('IndexedDB is unavailable on this device.')); }, []);
+  useEffect(() => {
+    latestProject.current = project;
+    if (!project) return;
+    setDeviceSave('pending');
+    autoSaveTimer.current = window.setTimeout(() => { autoSaveTimer.current = null; void persistDeviceDraft(project).catch(() => {}); }, 700);
+    return () => { if (autoSaveTimer.current !== null) window.clearTimeout(autoSaveTimer.current); autoSaveTimer.current = null; };
+  }, [project]);
+  useEffect(() => {
+    const saveWhenHidden = () => {
+      const latest = activeStroke.current?.working ?? latestProject.current;
+      if (!document.hidden || !latest) return;
+      if (autoSaveTimer.current !== null) window.clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = null;
+      void persistDeviceDraft(latest).catch(() => {});
+    };
+    document.addEventListener('visibilitychange', saveWhenHidden);
+    return () => document.removeEventListener('visibilitychange', saveWhenHidden);
+  }, []);
+  useEffect(() => () => {
+    const latest = activeStroke.current?.working ?? latestProject.current;
+    if (latest) void queueDeviceWrite(latest).catch(() => {});
+  }, []);
   useEffect(() => {
     if (!lokClient || !session) { setCloudDrafts([]); return; }
     void lokClient.from('gsix_studio_drafts').select('project,revision').eq('owner_id', session.user.id).then(({ data }) => {
@@ -123,12 +160,36 @@ export function CharacterStudioV3({ operatorSources, enemySources, v2Operators }
     return () => window.clearTimeout(timer);
   }, [playing, project, direction, clip, frameIndex]);
 
+  function persistDeviceDraft(next: StudioProject): Promise<void> {
+    setDeviceSave('saving');
+    const write = queueDeviceWrite(next);
+    return write.then(() => {
+      setDrafts((items) => [next, ...items.filter((item) => item.id !== next.id)].sort((a, b) => b.updatedAt - a.updatedAt));
+      if (latestProject.current === next) setDeviceSave('saved');
+    }, (error: unknown) => {
+      if (latestProject.current?.id === next.id) setDeviceSave('error');
+      throw error;
+    });
+  }
+  function flushDeviceDraft(next: StudioProject): Promise<void> {
+    if (autoSaveTimer.current !== null) window.clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = null;
+    return persistDeviceDraft(next);
+  }
   function change(next: StudioProject) { if (project) setPast((items) => [...items.slice(-19), project]); setFuture([]); setProject(next); }
   function openProject(next: StudioProject, note?: string) {
     activeStroke.current = null; selectionPointer.current = null; setPlaying(false);
     setProject(next); setPast([]); setFuture([]); setSelection(null);
+    setShowGuide(true); setDeviceSave('pending');
     setDirection('S'); setClip('idle'); setFrameIndex(0); setLayerId(next.layers[0]?.id ?? 'layer-0');
     if (note) setMessage(note);
+  }
+  function openAccountProject(accountDraft: StudioProject) {
+    const deviceDraft = drafts.find((item) => item.id === accountDraft.id);
+    const newerDeviceDraft = deviceDraft && (deviceDraft.revision > accountDraft.revision || deviceDraft.updatedAt >= accountDraft.updatedAt);
+    const selected = newerDeviceDraft ? deviceDraft : accountDraft;
+    openProject(selected, newerDeviceDraft ? 'Opened the newer device draft. Your account copy remains available until you choose Save draft to account.' : 'Account draft opened and saved on this device.');
+    setKind(selected.kind); setSourceId(selected.sourceId);
   }
   function create(blank = false) {
     if (!sourceId) { setMessage('Choose an unlocked source first.'); return; }
@@ -140,7 +201,7 @@ export function CharacterStudioV3({ operatorSources, enemySources, v2Operators }
     if (!project) return false;
     setSaving(true);
     try {
-      try { await saveStudioDraft(project); setDrafts(await listStudioDrafts()); }
+      try { await flushDeviceDraft(project); }
       catch { setMessage('Could not save this draft on this device.'); return false; }
       if (lokClient && session) {
         const existing = cloudDrafts.find((draft) => draft.project.id === project.id);
@@ -155,6 +216,21 @@ export function CharacterStudioV3({ operatorSources, enemySources, v2Operators }
       setMessage(`Saved on this device. Account sync: ${error instanceof Error ? error.message : 'Connection failed'}`);
       return false;
     } finally { setSaving(false); }
+  }
+  async function leaveEditor() {
+    if (!project) return;
+    try { await flushDeviceDraft(activeStroke.current?.working ?? project); }
+    catch { setMessage('Could not save this draft on this device. Stay in the editor and try again.'); return; }
+    activeStroke.current = null; selectionPointer.current = null; setProject(null); setPast([]); setFuture([]); setSelection(null); setPlaying(false);
+  }
+  function nextUnreviewedFrame() {
+    if (!reviewFrames.length) return;
+    const currentPosition = DIRECTIONS.indexOf(direction) * REQUIRED_FRAMES / DIRECTIONS.length
+      + (Object.keys(CLIPS) as ClipName[]).slice(0, (Object.keys(CLIPS) as ClipName[]).indexOf(clip)).reduce((sum, name) => sum + CLIPS[name], 0) + frameIndex;
+    const positionOf = (frame: (typeof reviewFrames)[number]) => DIRECTIONS.indexOf(frame.direction) * REQUIRED_FRAMES / DIRECTIONS.length
+      + (Object.keys(CLIPS) as ClipName[]).slice(0, (Object.keys(CLIPS) as ClipName[]).indexOf(frame.clip)).reduce((sum, name) => sum + CLIPS[name], 0) + frame.index;
+    const next = reviewFrames.find((frame) => positionOf(frame) > currentPosition) ?? reviewFrames[0]!;
+    setPlaying(false); setDirection(next.direction); setClip(next.clip); setFrameIndex(next.index);
   }
   async function submit() {
     if (!project || !complete || !lokClient || !session || submitting) return;
@@ -316,24 +392,33 @@ export function CharacterStudioV3({ operatorSources, enemySources, v2Operators }
   if (!project) return <section className="mt-5 space-y-4 border border-border bg-card p-4" data-testid="studio-v3">
     <h2 className="text-xl font-black">Character Studio v3</h2>
     <p className="text-sm text-muted-foreground">Eight-direction layered pixel art. Original Forge designs and share codes remain available in their tabs.</p>
+    {recentDraft && <div className="rounded border border-primary/60 bg-primary/10 p-3"><h3 className="font-bold">Continue your last character</h3><p className="text-xs text-muted-foreground">{recentDraft.name} · {approvalCount(recentDraft)}/{REQUIRED_FRAMES} frames reviewed · saved on this device</p><button type="button" className={CONTROL} onClick={() => { openProject(recentDraft); setKind(recentDraft.kind); setSourceId(recentDraft.sourceId); }}>Continue editing</button></div>}
     <div className="flex flex-wrap gap-2"><select aria-label="Kind" className={CONTROL} value={kind} onChange={(event) => { const next = event.target.value as typeof kind; setKind(next); setSourceId((next === 'operator' ? operatorSources : enemySources)[0]?.id ?? ''); }}><option value="operator">Operator</option><option value="enemy">Enemy appearance</option></select>
       <select aria-label="Source" className={CONTROL} value={sourceId} onChange={(event) => setSourceId(event.target.value)}>{sources.map((source) => <option key={source.id} value={source.id}>{source.name}</option>)}</select>
       <select aria-label="Rig family" className={CONTROL} value={rigFamily} onChange={(event) => setRigFamily(event.target.value as typeof rigFamily)}>{RIG_FAMILIES.map((family) => <option key={family}>{family}</option>)}</select>
       <select aria-label="Style family" className={CONTROL} value={styleFamily} onChange={(event) => setStyleFamily(event.target.value as typeof styleFamily)}>{STYLE_FAMILIES.map((style) => <option key={style}>{style}</option>)}</select></div>
     <div className="flex flex-wrap gap-2"><input aria-label="Seed" className={CONTROL} value={seed} onChange={(event) => setSeed(event.target.value)} /><input aria-label="Prompt choices" placeholder="Optional curated prompt" className={CONTROL} value={prompt} onChange={(event) => setPrompt(event.target.value)} /><button type="button" className={CONTROL} onClick={() => create()}>Generate editable project</button><button type="button" className={CONTROL} onClick={() => create(true)}>Start with blank canvas</button></div>
-    {drafts.length > 0 && <div><h3 className="font-bold">Device drafts</h3>{drafts.map((draft) => <button key={draft.id} type="button" className={CONTROL} onClick={() => { openProject(draft); setKind(draft.kind); setSourceId(draft.sourceId); }}>{draft.name} · {approvalCount(draft)}/{REQUIRED_FRAMES}</button>)}</div>}
+    {drafts.length > 0 && <div><h3 className="font-bold">Device drafts</h3>{[...drafts].sort((a, b) => b.updatedAt - a.updatedAt).map((draft) => <button key={draft.id} type="button" className={CONTROL} onClick={() => { openProject(draft); setKind(draft.kind); setSourceId(draft.sourceId); }}>{draft.name} · {approvalCount(draft)}/{REQUIRED_FRAMES}</button>)}</div>}
     {v2Operators.length > 0 && <div><h3 className="font-bold">Start from a Forge v1/v2 operator</h3>{v2Operators.map((operator) => <button key={operator.id} type="button" className={CONTROL} onClick={() => { openProject(projectFromForgedOperator(operator, crypto.randomUUID()), 'Copied into a new v3 draft. Your original Forge design stays saved.'); }}>{operator.name}</button>)}</div>}
-    {cloudDrafts.length > 0 && <div><h3 className="font-bold">Account drafts</h3>{cloudDrafts.map(({ project: draft }) => <button key={draft.id} type="button" className={CONTROL} onClick={() => { openProject(draft); setKind(draft.kind); setSourceId(draft.sourceId); }}>{draft.name} · {approvalCount(draft)}/{REQUIRED_FRAMES}</button>)}</div>}
+    {cloudDrafts.length > 0 && <div><h3 className="font-bold">Account drafts</h3>{cloudDrafts.map(({ project: draft }) => <button key={draft.id} type="button" className={CONTROL} onClick={() => openAccountProject(draft)}>{draft.name} · {approvalCount(draft)}/{REQUIRED_FRAMES}</button>)}</div>}
     <CommunityGalleryV3 onRemix={(draft) => { openProject(draft, 'Remix draft opened. Review all 192 frames before publishing.'); setKind(draft.kind); setSourceId(draft.sourceId); }} />
     {message && <p role="status">{message}</p>}
   </section>;
   const current = project.views[direction][clip][frameIndex]!;
   return <section className="mt-5 space-y-4 border border-border bg-card p-4" data-testid="studio-v3-editor">
-    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-black">Character Studio v3</h2><button type="button" className={CONTROL} onClick={() => { activeStroke.current = null; selectionPointer.current = null; setProject(null); setPast([]); setFuture([]); setSelection(null); setPlaying(false); }}>All drafts</button></div>
-    <input aria-label="Creation name" className={CONTROL} value={project.name} onChange={(event) => change({ ...project, name: event.target.value, approvalState: 'draft' })} />
-    <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={project.remixAllowed} onChange={(event) => change({ ...project, remixAllowed: event.target.checked })} />Allow adopters to remix this creation with credit to you</label>
+    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-black">Character Studio v3</h2><button type="button" className={CONTROL} onClick={() => { void leaveEditor(); }}>All drafts</button></div>
+    <div className="flex flex-wrap items-center gap-2"><p role="status" className="text-xs">{deviceSave === 'saved' ? 'Saved on this device' : deviceSave === 'saving' ? 'Saving on this device…' : deviceSave === 'error' ? 'Device save failed. Use Save now to retry.' : 'Device save pending…'}</p><p className="text-xs text-muted-foreground">Account sync happens when you use Save draft or submit.</p></div>
+    <input aria-label="Creation name" className={CONTROL} value={project.name} onChange={(event) => change({ ...project, name: event.target.value, approvalState: 'draft', updatedAt: Date.now() })} />
+    <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={project.remixAllowed} onChange={(event) => change({ ...project, remixAllowed: event.target.checked, updatedAt: Date.now() })} />Allow adopters to remix this creation with credit to you</label>
     {project.parentRevisionId && <p className="text-xs text-muted-foreground">Remix of reviewed revision {project.parentRevisionId.slice(0, 8)}. The original creator will be credited.</p>}
     <p className="text-sm">{approvedFrames}/{REQUIRED_FRAMES} frames approved. {complete ? 'Ready to submit for staff review.' : 'Private draft.'}</p>
+    <div className="h-2 overflow-hidden rounded bg-background" role="progressbar" aria-label="Frame review progress" aria-valuenow={approvedFrames} aria-valuemin={0} aria-valuemax={REQUIRED_FRAMES}><div className="h-full bg-primary" style={{ width: `${approvedFrames / REQUIRED_FRAMES * 100}%` }} /></div>
+    {showGuide ? <section aria-label="First character guide" className="space-y-2 rounded border border-primary/60 bg-primary/10 p-3"><div className="flex items-center justify-between gap-2"><h3 className="font-bold">Make your first character</h3><button type="button" className={CONTROL} onClick={() => setShowGuide(false)}>Hide guide</button></div><ol className="space-y-2 text-xs">
+      <li><strong>1. Shape the first pose.</strong> Draw or change the south idle frame with a finger, mouse, pen, or the XY controls. <button type="button" className={CONTROL} onClick={() => { setPlaying(false); setDirection('S'); setClip('idle'); setFrameIndex(0); }}>Go to first pose</button></li>
+      <li><strong>2. Fill empty frames.</strong> {emptyFrames ? `${emptyFrames} frames are empty. Seed them from your first pose, then redraw movement, attacks, hurt, and death so the character feels alive.` : 'Every frame has art. You can still change each pose and direction.'} {emptyFrames > 0 && <button type="button" className={CONTROL} disabled={!firstPoseHasArt} onClick={() => { const next = seedEmptyStudioFrames(project, 'S', 'idle', 0); if (next !== project) change(next); }}>Seed empty frames from first pose</button>}</li>
+      <li><strong>3. Preview and review.</strong> Check each direction and animation, then approve the frames you have inspected. {reviewFrames.length > 0 && <button type="button" className={CONTROL} onClick={nextUnreviewedFrame}>Next unreviewed frame</button>}</li>
+      <li><strong>4. Share when ready.</strong> {complete ? 'All 192 frames are approved and this creation is ready for staff review.' : `${REQUIRED_FRAMES - approvedFrames} frames still need review.`} Save draft to sync with your account; submission needs a sign-in.</li>
+    </ol></section> : <button type="button" className={CONTROL} onClick={() => setShowGuide(true)}>Show first character guide</button>}
     <div className="flex flex-wrap items-center gap-2"><button type="button" className={CONTROL} onClick={() => rotate(-1)} aria-label="Previous direction">←</button><strong>{direction}</strong><button type="button" className={CONTROL} onClick={() => rotate(1)} aria-label="Next direction">→</button>
       <select aria-label="Animation" className={CONTROL} value={clip} onChange={(event) => { setClip(event.target.value as ClipName); setFrameIndex(0); }}>{Object.keys(CLIPS).map((name) => <option key={name}>{name}</option>)}</select>
       <button type="button" className={CONTROL} onClick={() => setPlaying(!playing)}>{playing ? 'Pause' : 'Play preview'}</button><label className="text-xs"><input type="checkbox" checked={onion} onChange={(event) => setOnion(event.target.checked)} /> Onion skin</label></div>
@@ -349,11 +434,11 @@ export function CharacterStudioV3({ operatorSources, enemySources, v2Operators }
     <div className="flex flex-wrap items-center gap-1" aria-label="Frame timeline">{project.views[direction][clip].map((frame, index) => <button key={index} type="button" className={CONTROL} aria-pressed={frameIndex === index} onClick={() => setFrameIndex(index)}>{index + 1}{frame.approved ? ' ✓' : ''}</button>)}<button type="button" className={CONTROL} title={`Replace the other ${CLIPS[clip] - 1} frames in this ${clip} clip with frame ${frameIndex + 1}. Their timing stays the same and they need review.`} onClick={() => change(copyStudioFrameToClip(project, direction, clip, frameIndex))}>Copy frame to {clip}</button><button type="button" className={CONTROL} title={`Replace the ${clip} clip in the other seven directions with this ${direction} clip. Copied frames need review.`} onClick={() => change(copyStudioClipToDirections(project, direction, clip))}>Copy {clip} to all directions</button></div>
     <div className="flex flex-wrap gap-2"><label className="text-xs">Frame milliseconds <input type="number" min={30} max={1000} className={CONTROL} value={current.ms} onChange={(event) => change(editStudioFrame(project, direction, clip, frameIndex, (frame) => { frame.ms = Number(event.target.value); }))} /></label>
       <button type="button" className={CONTROL} onClick={() => change(approveStudioFrame(project, direction, clip, frameIndex))}>Approve this frame</button><button type="button" className={CONTROL} onClick={() => change(approveStudioClip(project, direction, clip))}>Approve {direction} {clip} clip</button>
-      <button type="button" className={CONTROL} disabled={!past.length} onClick={() => { const previous = past.at(-1)!; setPast(past.slice(0, -1)); setFuture([...future, project]); setProject(previous); }}>Undo</button>
-      <button type="button" className={CONTROL} disabled={!future.length} onClick={() => { const next = future.at(-1)!; setFuture(future.slice(0, -1)); setPast([...past, project]); setProject(next); }}>Redo</button>
-      <button type="button" className={CONTROL} disabled={saving || submitting} onClick={() => { void save(); }}>{saving ? 'Saving…' : 'Save draft'}</button>
+      <button type="button" className={CONTROL} disabled={!past.length} onClick={() => { const previous = past.at(-1)!; setPast(past.slice(0, -1)); setFuture([...future, project]); setProject({ ...previous, updatedAt: Date.now() }); }}>Undo</button>
+      <button type="button" className={CONTROL} disabled={!future.length} onClick={() => { const next = future.at(-1)!; setFuture(future.slice(0, -1)); setPast([...past, project]); setProject({ ...next, updatedAt: Date.now() }); }}>Redo</button>
+      <button type="button" className={CONTROL} disabled={saving || submitting} onClick={() => { void save(); }}>{saving ? 'Saving…' : session ? 'Save draft to account' : 'Save now'}</button>
       <button type="button" className={CONTROL} disabled={!complete || !session || !lokClient || saving || submitting} onClick={() => { void submit(); }}>{submitting ? 'Submitting…' : 'Submit for review'}</button></div>
-    {!session && <p className="text-xs text-muted-foreground">Sign in to sync a draft and submit it for staff review. Device drafts can be saved now.</p>}
+    {!session && <p className="text-xs text-muted-foreground">Sign in to sync a draft and submit it for staff review. Edits save automatically on this device.</p>}
     {errors.map((error) => <p key={error} className="text-xs text-red-300">{error}</p>)}{message && <p role="status" className="text-xs">{message}</p>}
   </section>;
 }

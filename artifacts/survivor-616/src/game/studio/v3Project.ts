@@ -144,6 +144,27 @@ export function projectFromForgedOperator(operator: ForgedOperator, id: string):
 export function approvalCount(project: StudioProject): number {
   return DIRECTIONS.reduce((total, direction) => total + (Object.keys(CLIPS) as ClipName[]).reduce((n, clip) => n + project.views[direction][clip].filter((frame) => frame.approved).length, 0), 0);
 }
+export function emptyStudioFrameCount(project: StudioProject): number {
+  return DIRECTIONS.reduce((total, direction) => total + (Object.keys(CLIPS) as ClipName[]).reduce((count, clip) =>
+    count + project.views[direction][clip].filter((frame) => !Object.values(frame.layers).some((pixels) => pixels.length > 0)).length, 0), 0);
+}
+
+/** Seed only untouched, empty frames from a first pose. Existing art and frame timing stay intact. */
+export function seedEmptyStudioFrames(project: StudioProject, sourceDirection: Direction, sourceClip: ClipName, sourceIndex: number): StudioProject {
+  const pose = project.views[sourceDirection][sourceClip][sourceIndex];
+  if (!pose || !Object.values(pose.layers).some((pixels) => pixels.length > 0)) return project;
+  const views = structuredClone(project.views);
+  let filled = 0;
+  for (const direction of DIRECTIONS) for (const clip of Object.keys(CLIPS) as ClipName[]) for (const frame of views[direction][clip]) {
+    if (Object.values(frame.layers).some((pixels) => pixels.length > 0)) continue;
+    frame.layers = structuredClone(pose.layers);
+    frame.offsets = structuredClone(pose.offsets);
+    frame.rotations = structuredClone(pose.rotations ?? {});
+    frame.approved = false;
+    filled++;
+  }
+  return filled ? { ...project, views, approvalState: 'draft', revision: project.revision + 1, updatedAt: Date.now() } : project;
+}
 export function studioErrors(project: StudioProject): string[] {
   const errors: string[] = [];
   if (project.version !== STUDIO_VERSION) errors.push('Unsupported project version');
