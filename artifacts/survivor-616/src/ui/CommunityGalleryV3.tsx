@@ -1,26 +1,27 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { lokClient } from '@/lib/lokClient';
 import { useAuth } from '@/state/authStore';
 import { activateStudioAppearance } from '@/game/studio/v3Appearances';
 import { studioFrame } from '@/game/render/sprite';
 import { CLIPS, DIRECTIONS, renderStudioPixels, type ClipName, type Direction, type StudioProject } from '@/game/studio/v3Project';
 import { exportStudioMp4, shareOrDownload } from '@/game/studio/rosterExport';
+import { createLokOriginal, LOK_ORIGINALS } from '@/game/studio/lokOriginals';
 
 interface GalleryEntry { id: string; creation_id: string; title: string; description: string; poster: StudioProject; submitted_at: string; gsix_creations: { owner_id: string; kind: 'operator' | 'enemy'; remix_allowed: boolean; parent_revision_id: string | null } }
 const BUTTON = 'min-h-10 border border-border bg-background px-3 py-2 text-xs text-white hover:border-primary disabled:opacity-40';
 const PAGE_SIZE = 24;
 
-function GalleryPoster({ poster, title }: { poster: StudioProject; title: string }) {
+function GalleryPoster({ poster, title, className = 'h-12 w-12' }: { poster: StudioProject; title: string; className?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const ctx = ref.current?.getContext('2d');
     const frame = poster?.views?.S?.idle?.[0];
     if (ctx && frame) renderStudioPixels(ctx, poster, frame);
   }, [poster]);
-  return <canvas ref={ref} width={48} height={48} className="h-12 w-12 shrink-0 [image-rendering:pixelated]" aria-label={`${title} portrait`} role="img" />;
+  return <canvas ref={ref} width={48} height={48} className={`${className} shrink-0 [image-rendering:pixelated]`} aria-label={`${title} portrait`} role="img" />;
 }
 
-export function CommunityGalleryV3({ onRemix }: { onRemix?: (project: StudioProject) => void } = {}) {
+export function CommunityGalleryV3({ onRemix, operatorSourceId, enemySourceId }: { onRemix?: (project: StudioProject) => void; operatorSourceId?: string; enemySourceId?: string } = {}) {
   const { session } = useAuth();
   const [entries, setEntries] = useState<GalleryEntry[]>([]);
   const [selected, setSelected] = useState<GalleryEntry | null>(null);
@@ -45,6 +46,7 @@ export function CommunityGalleryV3({ onRemix }: { onRemix?: (project: StudioProj
   const [videoProgress, setVideoProgress] = useState(0);
   const [exportedVideo, setExportedVideo] = useState<Blob | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
+  const originalPreviews = useMemo(() => LOK_ORIGINALS.map((original) => ({ original, project: createLokOriginal(original, `lok-preview:${original.key}`) })), []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -153,6 +155,10 @@ export function CommunityGalleryV3({ onRemix }: { onRemix?: (project: StudioProj
   }
   return <section className="mt-6 space-y-3 border border-border bg-card p-4" data-testid="community-gallery-v3">
     <div className="flex flex-wrap items-end justify-between gap-2"><div><h3 className="text-lg font-black">Community Gallery</h3><p className="text-xs text-muted-foreground">Reviewed creations shared with GSix.online.</p></div><button type="button" className={BUTTON} onClick={() => { setEntries([]); setPage(0); setRefresh((value) => value + 1); }}>Refresh gallery</button></div>
+    <div id="lok-originals" className="rounded-xl border border-cyan-300/25 bg-[#101e2a] p-3">
+      <div className="mb-3"><p className="text-[11px] font-black uppercase tracking-widest text-cyan-200">Lok originals · Studio inspiration</p><p className="mt-1 text-xs text-slate-300">Try these first-party pixel designs. Your copy starts as a private draft and needs all 192 frames reviewed before publication.</p></div>
+      <div className="grid gap-2 sm:grid-cols-3">{originalPreviews.map(({ original, project }) => <article key={original.key} className="flex flex-col gap-2 rounded-lg border border-white/15 bg-white/[0.04] p-3"><div className="flex items-center gap-3"><div className="rounded-lg border border-white/10 bg-black/35 p-1"><GalleryPoster poster={project} title={original.name} className="h-20 w-20" /></div><div><strong className="block text-sm text-white">{original.name}</strong><span className="text-[11px] uppercase tracking-wider text-cyan-200">{original.kind} · Lok original</span></div></div><p className="flex-1 text-xs leading-relaxed text-slate-300">{original.description}</p>{onRemix && <button type="button" className={`${BUTTON} rounded-lg border-cyan-300/45 text-cyan-100`} onClick={() => { const sourceId = original.kind === 'operator' ? operatorSourceId : enemySourceId; if (!sourceId) { setMessage('Choose an available source kit before opening this design.'); return; } onRemix(createLokOriginal(original, crypto.randomUUID(), sourceId)); }}>Start from this art</button>}</article>)}</div>
+    </div>
     <div className="flex flex-wrap gap-2"><input aria-label="Search creations" placeholder="Search approved creations" className={BUTTON} value={search} onChange={(event) => setSearch(event.target.value)} /><select aria-label="Creation kind" className={BUTTON} value={kind} onChange={(event) => { setKind(event.target.value as typeof kind); setEntries([]); setSelected(null); setPage(0); }}><option value="all">All</option><option value="operator">Operators</option><option value="enemy">Enemies</option></select></div>
     {loading && <p className="text-sm" role="status">Loading reviewed creations…</p>}
     {feedError && <p className="text-sm text-red-300" role="status">{feedError}</p>}
