@@ -1579,6 +1579,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Studio drafts now save automatically on this device, show their save status, and offer a quick way to continue your latest character.',
     ],
   },
+  {
+    version: '0.42.0',
+    date: '2026-10-17',
+    publishedAt: '2026-10-17T19:46:01Z',
+    kind: 'update',
+    title: 'Demo Day run records',
+    body: [
+      'Runs launched inside Demo Day can now send a personal score and finish record to the shared hub.',
+      'The regular Survivor game and its own save progress continue to work as before.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

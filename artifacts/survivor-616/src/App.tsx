@@ -8,6 +8,7 @@ import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
 import { Sparkles } from 'lucide-react';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
+import { abortDemoDayRun, completeDemoDayRun, onDemoDayInventory, pickUpDemoDayFragment, startDemoDayRun } from '@/game/demoDayBridge';
 import { AuthProvider } from '@/state/authStore';
 import { CloudSyncProvider } from '@/state/cloudSyncStore';
 import { LokEconomyProvider, useLokEconomy } from '@/state/lokEconomyStore';
@@ -252,6 +253,7 @@ function Game() {
   const prepareRun = useCallback((run: Omit<Extract<Screen, { name: 'run' }>, 'name'>) => {
     // Looks & LokPets is a persistent preference surface, not a mandatory
     // pre-match interruption. The floating hideout control can reopen it.
+    startDemoDayRun();
     setScreen({ name: 'run', ...run });
   }, []);
 
@@ -365,7 +367,12 @@ function Game() {
           rewardKeys: contract.rewardKeys,
         })),
       };
+      const killedBoss = Object.keys(result.killsByEnemy).some(
+        (enemyId) => getEnemy(enemyId).family === 'Boss',
+      );
+      if (killedBoss) pickUpDemoDayFragment();
       completeRun(resultWithFatigue);
+      completeDemoDayRun(result.kills, result.level, result.survivedSec);
       // Campaign credit follows the mission's own objectives, not the run's
       // generic `cleared` -- otherwise idling out the clock banks the mission.
       if (result.missionId && result.missionComplete) completeSectorMission(result.missionId);
@@ -373,9 +380,6 @@ function Game() {
       const runRef = { refType: 'run', refId: `${result.areaId}-${Date.now()}` };
       earnLokTokens('run_complete', runRef);
       if (result.cleared) earnLokTokens('area_cleared', runRef);
-      const killedBoss = Object.keys(result.killsByEnemy).some(
-        (enemyId) => getEnemy(enemyId).family === 'Boss',
-      );
       if (killedBoss) earnLokTokens('boss_kill', runRef);
 
       setScreen({ name: 'summary', result: resultWithFatigue });
@@ -741,7 +745,7 @@ function Game() {
               startingWeaponLevel={startingWeaponLevel(meta)}
               utilityRewardMultiplier={rewardCredMultiplier(meta)}
               physicsObjectClicksEnabled={meta.physicsObjectClicksEnabled}
-              onAbort={goHub}
+              onAbort={() => { abortDemoDayRun(); goHub(); }}
               onFinish={handleFinish}
             />
           </Suspense>
@@ -857,6 +861,8 @@ function Providers({ children }: { children: ReactNode }) {
 function ThemedGame() {
   const { meta } = useMeta();
   const visitTheme = useVisitTheme();
+  const [demoDayFragment, setDemoDayFragment] = useState(false);
+  useEffect(() => onDemoDayInventory(setDemoDayFragment), []);
   return (
     <div
       style={visitTheme ? visitThemeStyle(visitTheme) : undefined}
@@ -869,6 +875,7 @@ function ThemedGame() {
       className="min-h-[100dvh]"
     >
       <Game />
+      {demoDayFragment && <div aria-label="Demo Day inventory: Rift Fragment" style={{ position: 'fixed', right: 12, bottom: 12, zIndex: 9999, pointerEvents: 'none', padding: '6px 10px', borderRadius: 8, background: 'rgba(16, 20, 38, .9)', border: '1px solid #bda8ff', color: '#eee6ff', font: '600 11px system-ui' }}>✦ Demo Day inventory: Rift Fragment</div>}
       <SupporterBar />
     </div>
   );
