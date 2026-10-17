@@ -8,6 +8,7 @@ import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
 import { Sparkles } from 'lucide-react';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
+import { abortDemoDayRun, completeDemoDayRun, startDemoDayRun } from '@/game/demoDayBridge';
 import { AuthProvider } from '@/state/authStore';
 import { CloudSyncProvider } from '@/state/cloudSyncStore';
 import { LokEconomyProvider, useLokEconomy } from '@/state/lokEconomyStore';
@@ -252,6 +253,7 @@ function Game() {
   const prepareRun = useCallback((run: Omit<Extract<Screen, { name: 'run' }>, 'name'>) => {
     // Looks & LokPets is a persistent preference surface, not a mandatory
     // pre-match interruption. The floating hideout control can reopen it.
+    startDemoDayRun();
     setScreen({ name: 'run', ...run });
   }, []);
 
@@ -366,6 +368,7 @@ function Game() {
         })),
       };
       completeRun(resultWithFatigue);
+      completeDemoDayRun(result.kills, result.level, result.survivedSec);
       // Campaign credit follows the mission's own objectives, not the run's
       // generic `cleared` -- otherwise idling out the clock banks the mission.
       if (result.missionId && result.missionComplete) completeSectorMission(result.missionId);
@@ -741,7 +744,7 @@ function Game() {
               startingWeaponLevel={startingWeaponLevel(meta)}
               utilityRewardMultiplier={rewardCredMultiplier(meta)}
               physicsObjectClicksEnabled={meta.physicsObjectClicksEnabled}
-              onAbort={goHub}
+              onAbort={() => { abortDemoDayRun(); goHub(); }}
               onFinish={handleFinish}
             />
           </Suspense>
