@@ -17,10 +17,13 @@ import {
   type ReactNode,
 } from 'react';
 
+import { ledgerFingerprint, reportAchievements, toUnlocks } from '@workspace/lok-client';
 import { useAuth } from '@/state/authStore';
 import { useMeta } from '@/game/state/metaStore';
 import type { MetaState } from '@/game/types';
 import { buildLokDexSnapshot, lokDexSnapshotFingerprint } from '@/lib/lokDexSnapshot';
+import { ACHIEVEMENTS_APP_KEY, syncAchievementLedger } from '@/lib/lokAchievements';
+import { lokClient } from '@/lib/lokClient';
 import { musicObjectives } from '@/lib/lokMusicProgress';
 
 /** Bookkeeping only -- not part of MetaState/normalizeMeta -- when this device's save was last known to match the cloud. */
@@ -63,6 +66,8 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
   const dexTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastDexFingerprint = useRef<string | null>(null);
   const lastMusicObjectives = useRef<number | null>(null);
+  const achievementTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAchievementFingerprint = useRef<string | null>(null);
 
   // Runs once per sign-in: cloud wins only if it's strictly newer than this
   // device's last known-synced timestamp, otherwise this device's current
@@ -154,6 +159,30 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       if (dexTimer.current) clearTimeout(dexTimer.current);
     };
   }, [meta, session, syncSettled, saveLokDex]);
+
+  // Remembers when each achievement was first earned (they are computed from the
+  // save, which does not know), and while signed in reports them to the account
+  // so the GSix hub's Achievements page can show what is earned and when. The
+  // ledger is kept signed out too, so dates are right when a player signs in later.
+  useEffect(() => {
+    if (achievementTimer.current) clearTimeout(achievementTimer.current);
+    achievementTimer.current = setTimeout(() => {
+      const ledger = syncAchievementLedger(meta, window.localStorage);
+      if (!session || !syncSettled || !lokClient) {
+        lastAchievementFingerprint.current = null;
+        return;
+      }
+      const fingerprint = ledgerFingerprint(ledger);
+      if (fingerprint === lastAchievementFingerprint.current || Object.keys(ledger).length === 0) return;
+      void reportAchievements(lokClient, ACHIEVEMENTS_APP_KEY, toUnlocks(ACHIEVEMENTS_APP_KEY, ledger)).then(({ error }) => {
+        // On failure leave the fingerprint unset so the next change retries.
+        if (!error) lastAchievementFingerprint.current = fingerprint;
+      });
+    }, LOKDEX_SYNC_DEBOUNCE_MS);
+    return () => {
+      if (achievementTimer.current) clearTimeout(achievementTimer.current);
+    };
+  }, [meta, session, syncSettled]);
 
   // Publishes soundtrack progress so the GSix site's player opens the same
   // songs. One small number; sent only when it goes up.

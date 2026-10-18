@@ -289,6 +289,11 @@ content or lore here, do the matching sync as part of the same update.**
   (`node --import tsx scripts/export-lokdex-art.ts <Gsixhub>/apps/hub/public/lokdex/survivor616.art.json`),
   next to `export-lokdex-catalog.ts` for names/rarity. Procedural rigs only,
   never `public/art` sheets.
+- **Achievements added or reworded** -> from `artifacts/survivor-616/`:
+  `node --import tsx scripts/export-achievements-catalog.ts <Gsixhub>/apps/hub/lib/achievements/catalog-survivor616.json`
+  so the hub's Achievements page lists them (unlocks themselves report from
+  `src/lib/lokAchievements.ts`, kept in a localStorage ledger because 616 computes
+  achievements and never stores when they were earned).
 - **Lore changed** (`src/game/data/lore.ts`) -> run
   `pnpm exec tsx scripts/export-public-lore.ts <outDir>` and copy
   `survivor616.lore.json` to `Gsixhub/apps/hub/content/lore/` so

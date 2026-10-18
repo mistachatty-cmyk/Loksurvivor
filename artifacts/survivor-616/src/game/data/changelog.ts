@@ -388,6 +388,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'It only counts while the game is open and in front of you. Play inside the GSix website is counted by the site, so no minute is ever counted twice.',
     ],
   },
+  {
+    version: '0.12.4',
+    date: '2026-10-18',
+    kind: 'update',
+    title: 'Achievements Travel With You',
+    body: [
+      'Signed in, your 616 achievements now show up on your GSix account at gsix.online, on a new Achievements page next to every other game. Each one lists what it takes to earn it, what it gives you, and the day you earned it.',
+      'Achievements you had already earned before this update are shown as earned, with the date marked as unknown. From now on, each new one is stamped with the day you get it.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
