@@ -3,9 +3,10 @@ import { lokClient } from '@/lib/lokClient';
 import { useAuth } from '@/state/authStore';
 import { activateStudioAppearance } from '@/game/studio/v3Appearances';
 import { studioFrame } from '@/game/render/sprite';
-import { CLIPS, DIRECTIONS, renderStudioPixels, type ClipName, type Direction, type StudioProject } from '@/game/studio/v3Project';
+import { renderStudioPixels, type StudioProject } from '@/game/studio/v3Project';
 import { exportStudioMp4, shareOrDownload } from '@/game/studio/rosterExport';
 import { createLokOriginal, LOK_ORIGINALS } from '@/game/studio/lokOriginals';
+import { StudioAnimationStage } from './StudioAnimationStage';
 
 interface GalleryEntry { id: string; creation_id: string; title: string; description: string; poster: StudioProject; submitted_at: string; gsix_creations: { owner_id: string; kind: 'operator' | 'enemy'; remix_allowed: boolean; parent_revision_id: string | null } }
 const BUTTON = 'min-h-10 border border-border bg-background px-3 py-2 text-xs text-white hover:border-primary disabled:opacity-40';
@@ -38,15 +39,13 @@ export function CommunityGalleryV3({ onRemix, operatorSourceId, enemySourceId }:
   const [feedError, setFeedError] = useState('');
   const [refresh, setRefresh] = useState(0);
   const [reportReason, setReportReason] = useState('');
-  const [direction, setDirection] = useState<Direction>('S');
-  const [clip, setClip] = useState<ClipName>('idle');
-  const [elapsed, setElapsed] = useState(0);
+  const [selectedOriginalKey, setSelectedOriginalKey] = useState(LOK_ORIGINALS[0]!.key);
   const [message, setMessage] = useState('');
   const [exporting, setExporting] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
   const [exportedVideo, setExportedVideo] = useState<Blob | null>(null);
-  const canvas = useRef<HTMLCanvasElement>(null);
   const originalPreviews = useMemo(() => LOK_ORIGINALS.map((original) => ({ original, project: createLokOriginal(original, `lok-preview:${original.key}`) })), []);
+  const selectedOriginal = originalPreviews.find(({ original }) => original.key === selectedOriginalKey) ?? originalPreviews[0]!;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -76,7 +75,7 @@ export function CommunityGalleryV3({ onRemix, operatorSourceId, enemySourceId }:
   useEffect(() => {
     if (!selected || !lokClient) return;
     let active = true;
-    setProject(null); setAdopted(false); setCreatorHandle(''); setParentHandle(''); setExportedVideo(null); setReportReason(''); setElapsed(0);
+    setProject(null); setAdopted(false); setCreatorHandle(''); setParentHandle(''); setExportedVideo(null); setReportReason('');
     void lokClient.from('gsix_creation_revisions').select('project').eq('id', selected.id).eq('state', 'approved').maybeSingle().then(({ data, error }) => {
       if (!active) return;
       if (error || !data?.project) { setMessage(error?.message ?? 'This creation is no longer in the gallery.'); setEntries((items) => items.filter((item) => item.id !== selected.id)); setSelected(null); return; }
@@ -93,20 +92,6 @@ export function CommunityGalleryV3({ onRemix, operatorSourceId, enemySourceId }:
     if (session) void lokClient.from('gsix_adoptions').select('id').eq('creation_id', selected.creation_id).eq('adopter_id', session.user.id).maybeSingle().then(({ data }) => { if (active) setAdopted(Boolean(data)); });
     return () => { active = false; };
   }, [selected?.id, session?.user.id]);
-  useEffect(() => {
-    if (!project || !canvas.current) return;
-    const ctx = canvas.current.getContext('2d');
-    if (!ctx) return;
-    canvas.current.width = 48; canvas.current.height = 48;
-    ctx.clearRect(0, 0, 48, 48);
-    const image = studioFrame(project, direction, clip, elapsed);
-    if (image) ctx.drawImage(image, 0, 0);
-  }, [project, direction, clip, elapsed]);
-  useEffect(() => {
-    if (!project || document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const timer = window.setInterval(() => setElapsed((value) => value + 80), 80);
-    return () => window.clearInterval(timer);
-  }, [project]);
 
   async function adopt() {
     if (!selected || !session || !lokClient) return;
@@ -157,7 +142,8 @@ export function CommunityGalleryV3({ onRemix, operatorSourceId, enemySourceId }:
     <div className="flex flex-wrap items-end justify-between gap-2"><div><h3 className="text-lg font-black">Community Gallery</h3><p className="text-xs text-muted-foreground">Reviewed creations shared with GSix.online.</p></div><button type="button" className={BUTTON} onClick={() => { setEntries([]); setPage(0); setRefresh((value) => value + 1); }}>Refresh gallery</button></div>
     <div id="lok-originals" className="rounded-xl border border-cyan-300/25 bg-[#101e2a] p-3">
       <div className="mb-3"><p className="text-[11px] font-black uppercase tracking-widest text-cyan-200">Lok originals · Studio inspiration</p><p className="mt-1 text-xs text-slate-300">Try these first-party pixel designs. Your copy starts as a private draft and needs all 192 frames reviewed before publication.</p></div>
-      <div className="grid gap-2 sm:grid-cols-3">{originalPreviews.map(({ original, project }) => <article key={original.key} className="flex flex-col gap-2 rounded-lg border border-white/15 bg-white/[0.04] p-3"><div className="flex items-center gap-3"><div className="rounded-lg border border-white/10 bg-black/35 p-1"><GalleryPoster poster={project} title={original.name} className="h-20 w-20" /></div><div><strong className="block text-sm text-white">{original.name}</strong><span className="text-[11px] uppercase tracking-wider text-cyan-200">{original.kind} · Lok original</span></div></div><p className="flex-1 text-xs leading-relaxed text-slate-300">{original.description}</p>{onRemix && <button type="button" className={`${BUTTON} rounded-lg border-cyan-300/45 text-cyan-100`} onClick={() => { const sourceId = original.kind === 'operator' ? operatorSourceId : enemySourceId; if (!sourceId) { setMessage('Choose an available source kit before opening this design.'); return; } onRemix(createLokOriginal(original, crypto.randomUUID(), sourceId)); }}>Start from this art</button>}</article>)}</div>
+      <div className="grid gap-2 sm:grid-cols-3">{originalPreviews.map(({ original, project }) => <article key={original.key} className={`flex flex-col gap-2 rounded-lg border p-3 ${selectedOriginalKey === original.key ? 'border-cyan-300/65 bg-cyan-300/10' : 'border-white/15 bg-white/[0.04]'}`}><div className="flex items-center gap-3"><div className="rounded-lg border border-white/10 bg-black/35 p-1"><GalleryPoster poster={project} title={original.name} className="h-20 w-20" /></div><div><strong className="block text-sm text-white">{original.name}</strong><span className="text-[11px] uppercase tracking-wider text-cyan-200">{original.kind} · Lok original</span></div></div><p className="flex-1 text-xs leading-relaxed text-slate-300">{original.description}</p><div className="flex flex-wrap gap-2"><button type="button" className={`${BUTTON} flex-1 rounded-lg border-white/25`} aria-pressed={selectedOriginalKey === original.key} onClick={() => setSelectedOriginalKey(original.key)}>Preview animations</button>{onRemix && <button type="button" className={`${BUTTON} flex-1 rounded-lg border-cyan-300/45 text-cyan-100`} onClick={() => { const sourceId = original.kind === 'operator' ? operatorSourceId : enemySourceId; if (!sourceId) { setMessage('Choose an available source kit before opening this design.'); return; } onRemix(createLokOriginal(original, crypto.randomUUID(), sourceId)); }}>Start from this art</button>}</div></article>)}</div>
+      <StudioAnimationStage key={selectedOriginalKey} project={selectedOriginal.project} title={selectedOriginal.original.name} />
     </div>
     <div className="flex flex-wrap gap-2"><input aria-label="Search creations" placeholder="Search approved creations" className={BUTTON} value={search} onChange={(event) => setSearch(event.target.value)} /><select aria-label="Creation kind" className={BUTTON} value={kind} onChange={(event) => { setKind(event.target.value as typeof kind); setEntries([]); setSelected(null); setPage(0); }}><option value="all">All</option><option value="operator">Operators</option><option value="enemy">Enemies</option></select></div>
     {loading && <p className="text-sm" role="status">Loading reviewed creations…</p>}
@@ -167,8 +153,7 @@ export function CommunityGalleryV3({ onRemix, operatorSourceId, enemySourceId }:
     {more && <button type="button" className={BUTTON} disabled={loading} onClick={() => setPage((value) => value + 1)}>Load more creations</button>}
     {selected && <div className="space-y-2 border border-border p-3"><h4 className="font-bold">{selected.title}</h4><p className="text-sm">{selected.description}</p><p className="text-xs">Created by <a className="underline" href={`https://gsix.online/profile/${encodeURIComponent(creatorHandle)}`} target="_blank" rel="noreferrer">@{creatorHandle}</a></p>
       {selected.gsix_creations.parent_revision_id && <p className="text-xs">Remixed from <a className="underline" href={`https://gsix.online/creators/${selected.gsix_creations.parent_revision_id}`} target="_blank" rel="noreferrer">a reviewed creation</a>{parentHandle && <> by <a className="underline" href={`https://gsix.online/profile/${encodeURIComponent(parentHandle)}`} target="_blank" rel="noreferrer">@{parentHandle}</a></>}.</p>}
-      <canvas ref={canvas} className="h-64 w-64 border border-border bg-black [image-rendering:pixelated]" aria-label={`${selected.title} animation preview`} role="img" />
-      <div className="flex flex-wrap gap-2"><button type="button" className={BUTTON} onClick={() => setDirection(DIRECTIONS[(DIRECTIONS.indexOf(direction) + 7) % 8]!)}>←</button><span>{direction}</span><button type="button" className={BUTTON} onClick={() => setDirection(DIRECTIONS[(DIRECTIONS.indexOf(direction) + 1) % 8]!)}>→</button><select aria-label="Preview animation" className={BUTTON} value={clip} onChange={(event) => setClip(event.target.value as ClipName)}>{Object.keys(CLIPS).map((value) => <option key={value}>{value}</option>)}</select></div>
+      {project ? <StudioAnimationStage key={selected.id} project={project} title={selected.title} /> : <p role="status" className="text-xs text-muted-foreground">Loading animation…</p>}
       <div className="flex flex-wrap gap-2"><a className={BUTTON} href={`https://gsix.online/creators/${encodeURIComponent(selected.id)}`} target="_blank" rel="noreferrer">Open on GSix.online</a><button type="button" className={BUTTON} disabled={!session || selected.gsix_creations.owner_id === session?.user.id || adopted} onClick={() => { void adopt(); }}>{adopted ? 'In your Locker' : 'Adopt · 100 LokTokens'}</button><button type="button" className={BUTTON} disabled={!project || (!adopted && selected.gsix_creations.owner_id !== session?.user.id)} onClick={() => { void useInRun(); }}>Use in run</button>{onRemix && <button type="button" className={BUTTON} disabled={!project || (!adopted && selected.gsix_creations.owner_id !== session?.user.id) || !selected.gsix_creations.remix_allowed} onClick={() => { if (!project) return; const draft = structuredClone(project); draft.id = crypto.randomUUID(); draft.name = `${selected.title} remix`; draft.parentRevisionId = selected.id; draft.revision = 1; draft.approvalState = 'draft'; draft.remixAllowed = false; draft.updatedAt = Date.now(); for (const view of Object.values(draft.views)) for (const frames of Object.values(view)) for (const frame of frames) frame.approved = false; onRemix(draft); }}>Remix in Studio</button>}<button type="button" className={BUTTON} onClick={() => { void exportCard(false); }}>Download PNG card</button><button type="button" className={BUTTON} onClick={() => { void exportCard(true); }}>Share PNG card</button><button type="button" className={BUTTON} disabled={exporting} onClick={() => { void exportVideo(false); }}>{exporting ? `Making MP4 ${videoProgress}%` : 'Download 9:16 MP4'}</button><button type="button" className={BUTTON} disabled={exporting} onClick={() => { void exportVideo(true); }}>Share MP4</button></div>
       {session && <div className="flex flex-wrap items-end gap-2"><label className="min-w-60 flex-1 text-xs">Report a concern<textarea aria-label="Report a concern" className={`${BUTTON} mt-1 w-full`} maxLength={500} rows={2} value={reportReason} onChange={(event) => setReportReason(event.target.value)} placeholder="Tell staff what needs review" /></label><button type="button" className={BUTTON} onClick={() => { void report(); }}>Send report</button></div>}
     </div>}

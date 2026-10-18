@@ -1,4 +1,4 @@
-import { CLIPS, DIRECTIONS, generateStudioProject, type Pixel, type StudioProject } from './v3Project';
+import { CLIPS, DIRECTIONS, generateStudioProject, type Direction, type Pixel, type StudioProject } from './v3Project';
 
 export interface LokOriginal {
   key: string;
@@ -24,34 +24,51 @@ function rect(out: Pixel[], x: number, y: number, width: number, height: number,
   }
 }
 
-function details(key: string, frame: number, clip: keyof typeof CLIPS): Pixel[] {
+function details(key: string, direction: Direction, frame: number, clip: keyof typeof CLIPS): Pixel[] {
   const out: Pixel[] = [];
   const bounce = clip === 'walk' ? frame % 2 : 0;
+  const fall = clip === 'death' ? Math.min(frame * 2, 12) : 0;
+  const back = direction === 'N' || direction === 'NW' || direction === 'NE';
+  const side = direction === 'E' || direction === 'W' || direction === 'NE' || direction === 'NW' || direction === 'SE' || direction === 'SW';
+  const leftFacing = direction === 'W' || direction === 'NW' || direction === 'SW';
+  const directionMark: Record<Direction, number> = { S: 22, SW: 19, W: 17, NW: 20, N: 24, NE: 27, E: 30, SE: 27 };
   if (key === 'patchlight') {
-    rect(out, 18, 11 + bounce, 12, 3, 1);
-    rect(out, 19, 16 + bounce, 10, 3, 5);
-    rect(out, 20, 16 + bounce, 6, 1, 3);
-    rect(out, 9, 23 + bounce, 3, 13, 2);
-    rect(out, 10, 27 + bounce, 2, 5, 4);
-    rect(out, 20, 29 + bounce, 8, 2, 4);
-    rect(out, 21, 30 + bounce, 6, 1, 5);
+    rect(out, 18, 11 + bounce + fall, 12, 3, 1);
+    if (!back) { rect(out, side ? (leftFacing ? 19 : 24) : 19, 16 + bounce + fall, side ? 5 : 10, 3, 5); rect(out, side ? (leftFacing ? 20 : 25) : 20, 16 + bounce + fall, side ? 3 : 6, 1, 3); }
+    rect(out, 9, 23 + bounce + fall, 3, Math.max(3, 13 - fall), 2);
+    rect(out, 10, 27 + bounce + fall, 2, Math.max(2, 5 - Math.floor(fall / 3)), 4);
+    rect(out, 20, 29 + bounce + fall, 8, 2, 4);
+    rect(out, directionMark[direction], 24 + bounce + fall, 2, 2, 5);
+    if (clip === 'walk') rect(out, 14 + frame, 38 + bounce, 2, 1, 5);
+    if (clip === 'attack') rect(out, 35 + frame, 19 + fall, 2 + frame, 2, 5);
+    if (clip === 'hurt') rect(out, 16, 20 + frame + fall, 3, 2, 5);
+    if (clip === 'idle') rect(out, 30 + frame, 14 - (frame % 2), 2, 2, 5);
   } else if (key === 'mossbyte') {
-    rect(out, 22, 12 + bounce, 4, 8, 2);
-    rect(out, 18, 12 + bounce, 5, 3, 4);
-    rect(out, 25, 10 + bounce, 5, 3, 4);
-    rect(out, 18, 25 + bounce, 3, 4, 3);
-    rect(out, 27, 25 + bounce, 3, 4, 3);
-    rect(out, 20, 34 + bounce, 8, 2, 5);
+    const sway = clip === 'idle' ? [0, 1, 0, -1][frame]! : 0;
+    rect(out, 22 + sway, 12 + bounce + fall, 4, Math.max(2, 8 - Math.floor(fall / 2)), 2);
+    rect(out, 18, 12 + bounce + fall, 5, 3, 4);
+    rect(out, 25, 10 + bounce + fall, 5, 3, 4);
+    if (!back) { rect(out, side ? (leftFacing ? 19 : 26) : 18, 25 + bounce + fall, 3, clip === 'hurt' ? 1 : 4, 3); if (!side) rect(out, 27, 25 + bounce + fall, 3, clip === 'hurt' ? 1 : 4, 3); }
+    rect(out, 20, 34 + bounce + fall, 8, 2, 5);
+    rect(out, directionMark[direction], 21 + bounce + fall, 2, 2, 4);
+    if (clip === 'walk') rect(out, 14 + frame * 3, 37 + fall, 4, 2, 4);
+    if (clip === 'attack') rect(out, 31 + frame, 25 + fall, 3, 3, 4);
+    if (clip === 'idle') rect(out, 20 + frame * 2, 8, 2, 2, 5);
   } else {
-    rect(out, 18, 7 + bounce, 2, 7, 5);
-    rect(out, 28, 7 + bounce, 2, 7, 5);
-    rect(out, 16, 6 + bounce, 3, 2, 4);
-    rect(out, 29, 6 + bounce, 3, 2, 4);
-    rect(out, 5, 23 + bounce, 8, 2, 4);
-    rect(out, 35, 23 + bounce, 8, 2, 4);
-    rect(out, 7, 27 + bounce, 6, 2, 5);
-    rect(out, 35, 27 + bounce, 6, 2, 5);
-    rect(out, 21, 27 + bounce, 6, 2, 4);
+    const wingLift = clip === 'idle' ? [0, 1, 2, 1][frame]! : clip === 'walk' ? [0, 2, 4, 2, 0, 1][frame]! : clip === 'attack' ? frame : 0;
+    rect(out, 18, 7 + bounce + fall, 2, 7, 5);
+    rect(out, 28, 7 + bounce + fall, 2, 7, 5);
+    rect(out, 16, 6 + bounce + fall, 3, 2, 4);
+    rect(out, 29, 6 + bounce + fall, 3, 2, 4);
+    rect(out, 5, 23 - wingLift + bounce + fall, 8, 2, 4);
+    rect(out, 35, 23 - wingLift + bounce + fall, 8, 2, 4);
+    rect(out, 7, 27 - wingLift + bounce + fall, 6, 2, 5);
+    rect(out, 35, 27 - wingLift + bounce + fall, 6, 2, 5);
+    rect(out, directionMark[direction], 19 + bounce + fall, 2, 2, 5);
+    if (!back) rect(out, 21, 27 + bounce + fall, 6, clip === 'hurt' ? 1 : 2, 4);
+    if (clip === 'walk') rect(out, 16 + frame * 2, 39, 2, 1, 5);
+    if (clip === 'attack') rect(out, 22 + frame, 33 + fall, 4, 2, 5);
+    if (clip === 'idle') { rect(out, 4 + frame, 20, 2, 2, 5); rect(out, 42 - frame, 20, 2, 2, 5); }
   }
   return out;
 }
@@ -66,7 +83,7 @@ export function createLokOriginal(original: LokOriginal, id: string, sourceId = 
   project.palette[9] = original.palette[5];
   project.layers.push({ id: 'lok-details', name: 'Lok details', pivot: [24, 32], order: project.layers.length, visible: true });
   for (const direction of DIRECTIONS) for (const clip of Object.keys(CLIPS) as (keyof typeof CLIPS)[]) {
-    project.views[direction][clip].forEach((frame, index) => { frame.layers['lok-details'] = details(original.key, index, clip); });
+    project.views[direction][clip].forEach((frame, index) => { frame.layers['lok-details'] = details(original.key, direction, index, clip); });
   }
   project.remixAllowed = true;
   return project;
