@@ -49,6 +49,51 @@ const COOKIE_PATH = "/";
 const COOKIE_MAX_AGE = 604800; // 7 days
 
 /**
+ * Browsers silently drop any single cookie over ~4096 bytes (name + value +
+ * attributes). A Google sign-in session carries provider tokens, identity
+ * records and a profile blob, and once URL-encoded it can go past that — the
+ * cookie is rejected, nothing is stored, and sign-in never completes. Keep the
+ * encoded value comfortably under the limit.
+ */
+const MAX_COOKIE_VALUE = 3600;
+
+/**
+ * Shrinks a supabase-js session so it fits in one cookie, keeping everything
+ * other apps need to read it back (access/refresh token, expiry, user id and
+ * email). Provider tokens, identity records and large profile metadata are
+ * dropped — they are re-fetched from the server by `getUser()` when needed.
+ * Values that are not a session (the PKCE code verifier, for example) are
+ * returned untouched.
+ */
+function slimSession(value: string): string {
+  let session: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object" || !("access_token" in parsed)) return value;
+    session = parsed as Record<string, unknown>;
+  } catch {
+    return value;
+  }
+
+  delete session.provider_token;
+  delete session.provider_refresh_token;
+
+  const user = session.user as Record<string, unknown> | undefined;
+  if (user && typeof user === "object") {
+    delete user.identities;
+    const meta = user.user_metadata as Record<string, unknown> | undefined;
+    if (meta && typeof meta === "object") {
+      const keep: Record<string, unknown> = {};
+      for (const key of ["full_name", "name", "avatar_url", "picture", "email"]) {
+        if (typeof meta[key] === "string") keep[key] = meta[key];
+      }
+      user.user_metadata = keep;
+    }
+  }
+  return JSON.stringify(session);
+}
+
+/**
  * Local development runs on localhost, where a `Domain=.gsix.online` attribute
  * makes the browser silently reject the cookie, and `Secure` does the same over
  * plain http.
@@ -107,12 +152,13 @@ export class LokSessionAdapter implements SupportedStorage {
     return null;
   }
 
-  async setItem(key: string, value: string): Promise<void> {
+  async setItem(key: string, rawValue: string): Promise<void> {
+    const value = encodeURIComponent(rawValue).length > MAX_COOKIE_VALUE ? slimSession(rawValue) : rawValue;
     if (typeof document !== "undefined") {
       document.cookie = this.serialize(key, value, COOKIE_MAX_AGE);
       if (isGsixDomain(window.location.hostname)) {
         if (await this.getItem(key) !== value) {
-          throw new Error("The shared GSix session cookie could not be saved.");
+          throw new Error("Your browser blocked the GSix sign-in cookie. Allow cookies for gsix.online and try again.");
         }
         return;
       }
