@@ -378,6 +378,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'It is early access: desktop browsers and keyboard only, and it skips sign-in, payment, banking, health and government pages. When you stop, a card shows how much of the page you took down, with a link to save and share it.',
     ],
   },
+  {
+    version: '0.12.3',
+    date: '2026-10-18',
+    kind: 'update',
+    title: 'Your Play Time Counts',
+    body: [
+      'When you are signed in, the time you spend in 616 Survivor is now saved to your GSix account. You can see it on your profile at gsix.online, next to the time you spend in every other game.',
+      'It only counts while the game is open and in front of you. Play inside the GSix website is counted by the site, so no minute is ever counted twice.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

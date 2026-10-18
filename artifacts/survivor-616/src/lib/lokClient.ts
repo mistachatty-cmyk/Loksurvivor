@@ -9,3 +9,6 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
  * case rather than crashing the whole app on import.
  */
 export const lokClient = url && anonKey ? createLokClient({ url, anonKey }) : undefined;
+
+/** The same project URL and key, for the few calls that go straight to the API (play-time reports). */
+export const lokClientConfig = url && anonKey ? { url, anonKey } : undefined;
