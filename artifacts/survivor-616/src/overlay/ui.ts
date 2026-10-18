@@ -95,7 +95,7 @@ export function buildSettingsPanel(doc: Doc, settings: Settings, onCycle: (id: S
 }
 
 /** Three upgrade cards; click or press 1, 2, 3. */
-export function buildLevelUp(doc: Doc, level: number, choices: readonly UpgradeDef[], onPick: (choice: UpgradeDef) => void): HTMLElement {
+export function buildLevelUp(doc: Doc, level: number, choices: readonly UpgradeDef[], onPick: (choice: UpgradeDef) => void, onLeave: () => void): HTMLElement {
   const { root, body } = panel(doc, `${t('overlay.levelup.title')} ${t('overlay.level', { level })}`);
   body.append(el(doc, 'p', 'hint-line', t('overlay.levelup.pick')));
   const row = el(doc, 'div', 'choices');
@@ -105,6 +105,7 @@ export function buildLevelUp(doc: Doc, level: number, choices: readonly UpgradeD
     row.append(card);
   });
   body.append(row);
+  body.append(button(doc, t('overlay.complete.leave'), onLeave));
   return root;
 }
 
