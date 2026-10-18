@@ -284,6 +284,11 @@ content or lore here, do the matching sync as part of the same update.**
   and apply the SQL to the shared project (prices only seed new items; live
   `lok_catalog` prices win). Palettes are LokToken-only (`LOKTOKEN_ONLY_KINDS`
   in `src/lib/lokStoreCatalog.ts`).
+- **Cards or character/enemy/ally/LokPet rigs changed** -> the hub LokDex draws
+  them from `artifacts/survivor-616/scripts/export-lokdex-art.ts`
+  (`node --import tsx scripts/export-lokdex-art.ts <Gsixhub>/apps/hub/public/lokdex/survivor616.art.json`),
+  next to `export-lokdex-catalog.ts` for names/rarity. Procedural rigs only,
+  never `public/art` sheets.
 - **Lore changed** (`src/game/data/lore.ts`) -> run
   `pnpm exec tsx scripts/export-public-lore.ts <outDir>` and copy
   `survivor616.lore.json` to `Gsixhub/apps/hub/content/lore/` so
