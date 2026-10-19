@@ -126,3 +126,42 @@ Ordered roughly by value for effort.
       sarge, patch-mercer, mara-vance, latch-brooks).
 - [ ] Run `pnpm typecheck` and `pnpm test` from `artifacts/survivor-616/`.
 - [ ] Bump `CHANGELOG`, re-export public updates, keep the banned-word test.
+
+## LOK Chat (v0.42.0): the conversational layer
+
+Crew chatter above is one-way (they say a line when you walk up). LOK Chat is the two-way
+version: a messenger-style window in the hideout (`ui/LokChat.tsx`, opened from the hub dock) where
+you write to any rescued crew member and they answer in their own voice. No model is involved
+(`docs/LOK_COST_DISCIPLINE.md`: no LLM at runtime); it is the same template expander plus intent
+matching and live game facts, so it is free, works offline and is testable.
+
+| File | Role |
+| --- | --- |
+| `src/game/engine/lokChat.ts` | Pure rules: `detectIntent` (keyword rules + "who did you mention"), `composeReply` / `replyToIntent`, affinity tiers, `quickReplies`, `chooseProactive`. Seeded, no clock. |
+| `src/game/data/lokChatData.ts` | Authored content: intent rules, templates per intent and tone, run lines, proactive lines, `CREW_RELATIONS` (opinions of each other), `CREW_CONFIDES` (two personal lines per ally). |
+| `src/game/state/lokChatStore.ts` | Device-local conversations (`survivor616.lokchat.v1`, not the meta save). Pure reducers plus a tiny external store and `useLokChat(selector)`. |
+| `src/game/state/lokChatActions.ts` | Sending, delivering a reply after a typing pause, crew starting conversations, logging strip chatter to `#hideout`. |
+| `src/ui/LokChat.tsx` | Launcher (with unread badge) and the overlay. List and conversation take turns on a phone. |
+| `src/game/lokChat.test.ts`, `e2e/lok-chat.spec.ts` | Rules, store, actions; browser flows. |
+
+Behavior worth knowing:
+
+- **Intents:** greet, howAreYou, work, room, crew (about another ally), run, pet, weather, advice, joke,
+  story (their existing voice topics), confide, thanks, bye, unknown. A mention of another crew member
+  wins unless the message is clearly a thanks, goodbye, joke, run/pet/weather question or a confidence.
+- **Facts used:** the speaker's room and who is with them, weather, local hour, last run (area and
+  outcome), the lead LokPet's name, tone (the Family/Wry crew-talk setting) and relationship tier.
+- **Relationship:** affinity points per person (`new` < 12 <= `friend` < 40 <= `close`). New topics earn
+  more than repeats; nonsense earns nothing. Friends unlock "Tell me something real" (`CREW_CONFIDES`).
+- **Safety:** replies never echo what the player typed. The banned-word test scans every authored string
+  and every rendered reply (all allies, intents, tones, many seeds). Extend the list rather than loosening it.
+- **They write first:** after a finished run (once per run), after three days of silence, and good morning /
+  good evening to friends, at most one such message per person every six hours.
+- **#hideout channel:** every line `crewLineFor` produces (taps and strip chatter) is logged
+  (`logCrewLine`), so the strip and the chat stay one conversation.
+
+Adding to it: a new ally needs a `CREW_CONFIDES` entry (the test fails otherwise); opinions about other
+crew are optional (a role-based line is the fallback). A new intent is a row in `INTENT_RULES`, a
+template set in `INTENT_TEMPLATES` (or a branch in `oneReply`), and a quick reply in `quickReplies`.
+Open ideas: per-ally intent overrides, group chats, remembering what you asked for callbacks, run-specific
+details (best weapon, area records), localized fragments.
