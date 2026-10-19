@@ -131,7 +131,10 @@ export function scanPage(win: Window, ignore: readonly Element[] = []): ScanResu
     fixedCache.set(el, result);
     return result;
   };
-  const isIgnored = (el: Element) => ignore.some((root) => root === el || root.contains(el));
+  // Presentation-only game choices and their descendants stay outside the
+  // reversible page destruction target set.
+  const isIgnored = (el: Element) => ignore.some((root) => root === el || root.contains(el))
+    || !!el.closest('[data-lok-nondestructible],.lok-choice');
   const isShown = (el: Element): boolean => {
     const check = (el as Element & { checkVisibility?: (o?: object) => boolean }).checkVisibility;
     if (typeof check === 'function') return check.call(el, { opacityProperty: true, visibilityProperty: true });
