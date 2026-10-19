@@ -489,6 +489,44 @@ export interface Pickup {
   bornAt: number;
 }
 
+/** A burst of key pickups shown as one short stack above the player. */
+export interface KeyStack {
+  count: number;
+  startedAt: number;
+  lastAt: number;
+}
+
+/** Keys collected closer together than this share one stack. */
+export const KEY_STACK_JOIN_MS = 1100;
+/** How long a stack lingers after the last key before it is gone. */
+export const KEY_STACK_LIFE_MS = 1000;
+const KEY_ALERT_COOLDOWN_MS = 8000;
+const KEY_SFX_COOLDOWN_MS = 120;
+const LOCKED_HINT_COOLDOWN_MS = 1800;
+
+/**
+ * Skeleton key pickup. Several keys at once (a magnet pull, a prop cluster) merge into one
+ * stacking effect instead of a popup, alert and sound per key.
+ */
+export function collectSkeletonKey(w: World, value: number) {
+  w.skeletonKeysGained += value;
+  const stack = w.keyStack;
+  if (stack && w.now - stack.lastAt <= KEY_STACK_JOIN_MS) {
+    stack.count += value;
+    stack.lastAt = w.now;
+  } else {
+    w.keyStack = { count: value, startedAt: w.now, lastAt: w.now };
+  }
+  if (w.now - w.lastKeyAlertAt > KEY_ALERT_COOLDOWN_MS) {
+    pushAlert(w, 'Skeleton key found');
+    w.lastKeyAlertAt = w.now;
+  }
+  if (w.now - w.lastKeySfxAt > KEY_SFX_COOLDOWN_MS) {
+    pushSfx(w, 'pickupKey');
+    w.lastKeySfxAt = w.now;
+  }
+}
+
 export interface Popup {
   x: number;
   y: number;
@@ -1410,6 +1448,12 @@ export interface World {
   lootTokensGained: number;
   /** Rare currency (skeleton keys) earned this run, found by breaking street props. */
   skeletonKeysGained: number;
+  /** Keys picked up within the last second or so, drawn as one stacking effect (no per-key popups). */
+  keyStack: KeyStack | null;
+  /** w.now of the last 'Skeleton key found' alert, and of the last key sfx / locked-chest hint (spam guards). */
+  lastKeyAlertAt: number;
+  lastKeySfxAt: number;
+  lockedHintAt: number;
   cardPacksFound: import('@/game/types').CardPackId[];
   cardEffects: ActiveCardEffects;
 
@@ -1988,6 +2032,10 @@ export function createWorld(
     openedPrizes: [],
     lootTokensGained: 0,
     skeletonKeysGained: 0,
+    keyStack: null,
+    lastKeyAlertAt: -Infinity,
+    lastKeySfxAt: -Infinity,
+    lockedHintAt: -Infinity,
     cardPacksFound: [],
     cardEffects: setup.cardEffects ?? { statMults: {}, lokPetDamageMult: 1, lokPetHasteMult: 1, magnetMult: 1, creditMult: 1, packDropBonus: 0, propBounceMult: 1, unbreakableProps: false, allElementLokPets: false, clockworkSlow: false, enemyHpMult: 1 },
     disabledEnemyIds: setup.disabledEnemyIds ?? [],
@@ -11312,10 +11360,7 @@ function updatePickups(w: World, dt: number) {
           pushSfx(w, 'pickupCred');
           break;
         case 'coin':
-          w.skeletonKeysGained += pickup.value;
-          w.popups.push({ x: p.x, y: p.y - 20, text: `+${pickup.value} KEY`, color: '#e8d48a', bornAt: w.now, vy: 30 });
-          pushAlert(w, 'Skeleton key found');
-          pushSfx(w, 'pickupKey');
+          collectSkeletonKey(w, pickup.value);
           break;
         case 'loot-box': {
           // The prize is deliberately not granted until its reel lands. RunScreen
@@ -11379,7 +11424,11 @@ function updatePickups(w: World, dt: number) {
         case 'relic-vault-chest': {
           const hasKey = w.skeletonKeysGained > 0 || w.craftedRelicIds?.includes('overflow-service-key');
           if (!hasKey) {
-            w.popups.push({ x: p.x, y: p.y - 20, text: 'LOCKED (NEED SKELETON KEY)', color: '#f59e0b', bornAt: w.now, vy: 20 });
+            // The chest stays put while the player stands on it, so this runs every frame: show the hint once per beat, over the chest.
+            if (w.now - w.lockedHintAt > LOCKED_HINT_COOLDOWN_MS) {
+              w.lockedHintAt = w.now;
+              w.popups.push({ x: pickup.x, y: pickup.y - 24, text: 'LOCKED (NEED SKELETON KEY)', color: '#f59e0b', bornAt: w.now, vy: 20 });
+            }
             continue;
           }
           if (w.skeletonKeysGained > 0 && !w.craftedRelicIds?.includes('overflow-service-key')) {
@@ -11636,6 +11685,8 @@ function updateParticles(w: World, dt: number) {
     popups[keep++] = popup;
   }
   popups.length = keep;
+
+  if (w.keyStack && w.now - w.keyStack.lastAt > KEY_STACK_LIFE_MS) w.keyStack = null;
 
   for (let i = w.alerts.length - 1; i >= 0; i -= 1) {
     if (w.now - w.alerts[i]!.bornAt > 2600) w.alerts.splice(i, 1);

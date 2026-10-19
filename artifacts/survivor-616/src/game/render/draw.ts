@@ -9,7 +9,7 @@
 import { shakeScale } from '@/anim/motion';
 import { ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
 import { drawStyledPickup } from './pickupArtStyles';
-import { LANDED_HEAT_RADIUS, fogAt, type FluidKind, type Pickup, type Popup, type World } from '@/game/engine/world';
+import { KEY_STACK_LIFE_MS, LANDED_HEAT_RADIUS, fogAt, type FluidKind, type Pickup, type Popup, type World } from '@/game/engine/world';
 import { DAMAGE_TIERS, GLOW_FROM_TIER } from '@/game/data/damageNumbers';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
@@ -6506,6 +6506,62 @@ function drawCascadePopup(ctx: CanvasRenderingContext2D, w: World, popup: Popup,
   ctx.font = 'bold 13px ui-monospace, SFMono-Regular, Menlo, monospace';
 }
 
+const KEY_GLYPHS_MAX = 5;
+
+/**
+ * Keys picked up together stack above the player for about a second: each new key pops in
+ * with a small spring, the stack trails the player slightly (so it never reads as glued to
+ * the sprite), then it rises and fades. One "xN KEY" label replaces a popup per key.
+ */
+function drawKeyStack(ctx: CanvasRenderingContext2D, w: World, visualBudget: NonNullable<Viewport['visualBudget']>) {
+  const stack = w.keyStack;
+  if (!stack) return;
+  const sinceLast = w.now - stack.lastAt;
+  const fade = sinceLast > KEY_STACK_LIFE_MS - 250 ? Math.max(0, (KEY_STACK_LIFE_MS - sinceLast) / 250) : 1;
+  if (fade <= 0) return;
+  const rise = sinceLast > KEY_STACK_LIFE_MS - 250 ? (1 - fade) * 10 : 0;
+  const p = w.player;
+  // Trail behind the player's motion.
+  const baseX = p.x - p.vx * 0.09;
+  const baseY = p.y - p.radius - 20 - rise - Math.abs(p.vy) * 0.03;
+  const shown = Math.min(stack.count, KEY_GLYPHS_MAX);
+  ctx.save();
+  ctx.globalAlpha = fade;
+  if (visualBudget !== 'minimal') {
+    for (let i = 0; i < shown; i += 1) {
+      // Newest key pops: scale overshoots then settles over 180 ms.
+      const isNewest = i === shown - 1;
+      const pop = isNewest ? Math.min(1, sinceLast / 180) : 1;
+      const scale = isNewest ? 1 + Math.sin(pop * Math.PI) * 0.45 : 1;
+      const x = baseX + (i - (shown - 1) / 2) * 7;
+      const y = baseY - i * 5;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate((i - (shown - 1) / 2) * 0.28);
+      ctx.scale(scale, scale);
+      ctx.shadowColor = '#fde68a';
+      ctx.shadowBlur = 8;
+      ctx.strokeStyle = '#e8d48a';
+      ctx.fillStyle = '#0b0a07';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(0, -5, 2.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -2.4); ctx.lineTo(0, 6); ctx.moveTo(0, 4); ctx.lineTo(2.6, 4); ctx.moveTo(0, 6); ctx.lineTo(2.2, 6); ctx.stroke();
+      ctx.restore();
+    }
+  }
+  if (stack.count > 1) {
+    ctx.font = 'bold 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.textAlign = 'center';
+    const labelY = baseY - shown * 5 - 8;
+    ctx.fillStyle = '#000000';
+    ctx.fillText(`x${stack.count} KEY`, baseX + 1, labelY + 1);
+    ctx.fillStyle = '#fde68a';
+    ctx.fillText(`x${stack.count} KEY`, baseX, labelY);
+    ctx.textAlign = 'left';
+  }
+  ctx.restore();
+}
+
 function drawPopups(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds, visualBudget: NonNullable<Viewport['visualBudget']>) {
   ctx.font = 'bold 13px ui-monospace, SFMono-Regular, Menlo, monospace';
   ctx.textAlign = 'center';
@@ -6942,6 +6998,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawPendingMeteors(ctx, w);
   drawParticles(ctx, w, viewBounds, visualBudget);
   drawPopups(ctx, w, viewBounds, visualBudget);
+  drawKeyStack(ctx, w, visualBudget);
   if (sky !== 'roofed' && !overlay) {
     if (showBirds) drawBirds(ctx, w, left, top, right, bottom);
     drawClouds(ctx, w, cloudPuffs, profile);
