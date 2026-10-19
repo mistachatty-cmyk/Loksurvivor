@@ -1579,6 +1579,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Studio drafts now save automatically on this device, show their save status, and offer a quick way to continue your latest character.',
     ],
   },
+  {
+    version: '0.41.1',
+    date: '2026-10-19',
+    publishedAt: '2026-10-19T12:00:00Z',
+    kind: 'hotfix',
+    title: 'Skeleton Keys Stack, Not Spam',
+    body: [
+      'Standing on a locked Relic Vault chest no longer buries your character in LOCKED popups; the hint shows once, over the chest. Skeleton keys picked up together now stack above you for a second as one little ×N KEY flourish, with a single alert and sound, instead of a pile of overlapping text.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

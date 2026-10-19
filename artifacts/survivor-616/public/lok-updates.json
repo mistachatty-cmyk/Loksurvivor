@@ -7,6 +7,36 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 138,
+      "version": "0.41.1",
+      "date": "2026-10-19",
+      "publishedAt": "2026-10-19T12:00:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Skeleton Keys Stack, Not Spam",
+      "body": [
+        "Standing on a locked Relic Vault chest no longer buries your character in LOCKED popups; the hint shows once, over the chest. Skeleton keys picked up together now stack above you for a second as one little ×N KEY flourish, with a single alert and sound, instead of a pile of overlapping text."
+      ]
+    },
+    {
+      "number": 137,
+      "version": "0.41.0",
+      "date": "2026-10-16",
+      "publishedAt": "2026-10-16T23:01:37Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "A smoother first character",
+      "body": [
+        "A new optional guide walks you from the first pixel pose through animation frames, previews, review, and submission.",
+        "Blank projects can copy the first pose into empty frames without replacing art you already made. Every copied frame still needs your own animation work and review.",
+        "Studio drafts now save automatically on this device, show their save status, and offer a quick way to continue your latest character."
+      ]
+    },
+    {
       "number": 136,
       "version": "0.40.0",
       "date": "2026-10-14",
