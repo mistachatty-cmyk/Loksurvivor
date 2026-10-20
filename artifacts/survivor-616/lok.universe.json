@@ -19,5 +19,6 @@
   },
   "supporterBar": { "mount": ["shell", "shop"], "theme": "hologram" },
   "walletStrip": { "mount": ["shop"] },
+  "artistSubmit": { "mount": ["music"] },
   "sdkVersion": "1.2.0"
 }

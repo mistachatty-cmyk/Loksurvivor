@@ -14,6 +14,7 @@
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "@lok/artist-submit": "workspace:*",
     "@lok/auto-l10n": "workspace:*",
     "@lok/recap": "workspace:*",
     "@playwright/test": "^1.62.1",

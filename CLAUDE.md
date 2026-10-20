@@ -318,6 +318,10 @@ content or lore here, do the matching sync as part of the same update.**
 - **SDK** lives in `lib/lok-universe` and is **vendored: never edit it here**.
   Change `Lok-EcoSystsem/universe-sdk` and run its `sync-sdk.sh`.
 - Platform manifest: `artifacts/survivor-616/lok.universe.json`.
+- **Ecosystem plugins** are opted into through that manifest, like `supporterBar`. First one:
+  `packages/lok-artist-submit` ("Submit your music", manifest key `artistSubmit`, 616's shell is
+  `src/ui/ArtistSubmitCta.tsx`). Read its README and `.agents/memory/lok-artist-submit.md` before
+  touching it or adding a second host.
 - Future games follow the same pattern (manifest, publisher, public lore).
 
 ## Localization

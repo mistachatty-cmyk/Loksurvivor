@@ -1,0 +1,23 @@
+{
+  "name": "@lok/artist-submit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lok ecosystem plugin: lets artists and creatives offer songs, music and projects for any Lok or GSix app or game. A framework-free core (validation, email builder, manifest opt-in) plus a small animation stylesheet; each host app supplies its own dialog.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --import tsx --test src/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

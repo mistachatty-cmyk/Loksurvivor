@@ -7,6 +7,7 @@
 import { useRef, useState } from 'react';
 import { formatBytes } from '@/game/audio/localTrackLibrary';
 import { formatTime, useMusicPlayer, type Track } from '@/game/audio/musicPlayer';
+import { ArtistSubmitCta } from './ArtistSubmitCta';
 import { ScreenLayout } from './ScreenLayout';
 import {
   Play,
@@ -265,6 +266,8 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
               </span>
             </div>
           </section>
+
+          <ArtistSubmitCta mount="music" />
 
           {player.streamingEmbeds.length > 0 && (
             <section className="mb-6 border border-primary/35 bg-card/70 p-4" aria-labelledby="streaming-shelf-title">
