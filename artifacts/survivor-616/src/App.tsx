@@ -1,7 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import { ErrorBoundary } from '@/components/error-boundary';
+import { AppCrashBoundary } from '@/components/lok-crash-boundary';
+import { setCrashScreen } from '@/lib/lokErrorReport';
 import { Toaster } from '@/components/ui/toaster';
 import { MusicProvider } from '@/game/audio/musicPlayer';
 import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
@@ -472,6 +473,7 @@ function Game() {
   }, [goHub]);
   useEffect(() => {
     screenRef.current = screen;
+    setCrashScreen(screen.name);
     if (lastPushedScreen.current === screen.name) return;
     const isFirst = lastPushedScreen.current === null;
     lastPushedScreen.current = screen.name;
@@ -876,11 +878,11 @@ function ThemedGame() {
 
 function App() {
   return (
-    <ErrorBoundary>
+    <AppCrashBoundary>
       <Providers>
         <ThemedGame />
       </Providers>
-    </ErrorBoundary>
+    </AppCrashBoundary>
   );
 }
 

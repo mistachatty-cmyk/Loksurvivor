@@ -1,0 +1,52 @@
+{
+  "name": "@lok/error-report",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LokErrorReport: catches crashes in a game or app, explains what went wrong in plain language (exact code line in dev), and stores the report wherever you want. A LOK Ecosystem plugin, built to be lifted into its own repo.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./sinks": "./src/sinks.ts",
+    "./react": "./src/react/index.ts",
+    "./vite": "./src/vite.ts",
+    "./ci": "./src/ci.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\" \"src/**/*.test.tsx\"",
+    "errors:docs": "tsx scripts/errors-docs.ts",
+    "ci-report": "tsx scripts/ci-report.ts"
+  },
+  "dependencies": {
+    "@jridgewell/trace-mapping": "^0.3.25"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "vite": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "vite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "tsx": "^4.23.13",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.2"
+  },
+  "bin": {
+    "lok-error-docs": "scripts/errors-docs.ts",
+    "lok-ci-report": "scripts/ci-report.ts"
+  }
+}

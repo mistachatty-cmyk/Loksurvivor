@@ -320,6 +320,10 @@ content or lore here, do the matching sync as part of the same update.**
 - Platform manifest: `artifacts/survivor-616/lok.universe.json`.
 - Future games follow the same pattern (manifest, publisher, public lore).
 
+## Crash reports
+
+Crashes are captured by LokErrorReport (`packages/lok-error-report`, spec in `docs/LOK_ERROR_REPORT.md`, memory `.agents/memory/lok-error-report.md`). In dev they are written to `docs/errors/`; check `docs/ERRORS.md` (`pnpm errors:docs`) for known crashes.
+
 ## Localization
 
 Player-facing text goes in `artifacts/survivor-616/src/locales/en.json` and is

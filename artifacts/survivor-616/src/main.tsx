@@ -1,7 +1,9 @@
 import { createRoot } from 'react-dom/client';
 
 import App from './App';
-import { ErrorBoundary } from '@/components/error-boundary';
+import { AppCrashBoundary, AppCrashHost } from '@/components/lok-crash-boundary';
+import { installCrashTestHooks, reporter } from '@/lib/lokErrorReport';
+import { LokCrashProbe } from '@/ui/LokCrashProbe';
 
 import './index.css';
 import { restoreUiTransparency } from '@/ui/UiTransparencyControls';
@@ -69,6 +71,9 @@ function installRuntimeDiagnostics(): void {
   );
 }
 
+// LokErrorReport listens first so it sees the errors the diagnostics below swallow.
+reporter.install();
+installCrashTestHooks();
 installRuntimeDiagnostics();
 restoreUiTransparency();
 applyMotionMode();
@@ -78,16 +83,27 @@ registerLiveFeedLoad();
 
 function mount(): void {
   createRoot(document.getElementById('root')!, {
-    // Keeps caught errors off reportError(), which would raise the dev overlay.
+    // Keeps caught errors off reportError(), which would raise the dev overlay. (The boundary has
+    // already filed the report in componentDidCatch.)
     onCaughtError: (error, errorInfo) => {
       console.error(error, errorInfo.componentStack);
     },
+    // Not caught by any boundary: still a crash worth a report.
+    onUncaughtError: (error, errorInfo) => {
+      reporter.report({ error, kind: 'render', componentStack: errorInfo.componentStack });
+      console.error(error, errorInfo.componentStack);
+    },
+    onRecoverableError: (error) => {
+      reporter.breadcrumb('log', `Recovered: ${error instanceof Error ? error.message : String(error)}`);
+    },
   }).render(
-    <ErrorBoundary>
+    <AppCrashBoundary>
       <MotionConfig reducedMotion={getMotionMode() === 'full' ? 'never' : 'user'}>
         <App />
+        {import.meta.env.DEV ? <LokCrashProbe /> : null}
       </MotionConfig>
-    </ErrorBoundary>,
+      <AppCrashHost />
+    </AppCrashBoundary>,
   );
 }
 

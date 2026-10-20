@@ -1,0 +1,170 @@
+import { useState, type CSSProperties } from 'react';
+
+import { locationLabel, toMarkdown, toPlainSummary } from '../format';
+import type { ErrorReport } from '../types';
+import { defaultStrings, type LokErrorStrings } from './strings';
+
+export interface LokCrashPopupProps {
+  report: ErrorReport;
+  strings?: LokErrorStrings;
+  /** A render crash replaces the screen and offers Try again; anything else is a closable card. */
+  fatal?: boolean;
+  onClose?: () => void;
+  onRetry?: () => void;
+  /** Present when sending to LOK is available. Resolves when sent, rejects on failure. */
+  onSend?: (report: ErrorReport) => Promise<void>;
+  /** True once the report was already sent (so the button reads Sent). */
+  alreadySent?: boolean;
+  accent?: string;
+}
+
+const FLICKER_CSS = `
+@keyframes lok-flicker { 0%,100%{opacity:1} 46%{opacity:1} 48%{opacity:.25} 50%{opacity:1} 52%{opacity:.4} 54%{opacity:1} }
+.lok-owl-eye { animation: lok-flicker 3.2s infinite; transform-origin: center; }
+@media (prefers-reduced-motion: reduce) { .lok-owl-eye { animation: none; } }
+`;
+
+/** LokServer, drawn in code (no image asset): two round eyes in a tufted body. */
+function Owl({ accent }: { accent: string }) {
+  return (
+    <svg viewBox="0 0 48 48" width="56" height="56" aria-hidden="true">
+      <path d="M8 10l6 4h20l6-4v22a10 10 0 0 1-10 10H18A10 10 0 0 1 8 32z" fill="#1c1630" stroke={accent} strokeWidth="2" strokeLinejoin="round" />
+      <circle className="lok-owl-eye" cx="17" cy="23" r="6" fill="#0b0816" stroke={accent} strokeWidth="2" />
+      <circle className="lok-owl-eye" cx="31" cy="23" r="6" fill="#0b0816" stroke={accent} strokeWidth="2" />
+      <circle cx="17" cy="23" r="2.2" fill={accent} />
+      <circle cx="31" cy="23" r="2.2" fill={accent} />
+      <path d="M22 30l2 3 2-3z" fill="#e879f9" />
+    </svg>
+  );
+}
+
+const box: CSSProperties = { border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.04)', padding: '8px 10px', marginTop: 10 };
+const label: CSSProperties = { font: '700 10px ui-monospace, monospace', letterSpacing: '.18em', textTransform: 'uppercase', opacity: 0.55, margin: '0 0 4px' };
+const btn: CSSProperties = { font: '700 11px ui-monospace, monospace', letterSpacing: '.08em', textTransform: 'uppercase', padding: '8px 12px', border: '1px solid rgba(255,255,255,.28)', background: 'rgba(255,255,255,.06)', color: 'inherit', cursor: 'pointer' };
+
+function download(report: ErrorReport) {
+  try {
+    const blob = new Blob([toMarkdown(report)], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${report.id}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch { /* a blocked download is not worth a second crash */ }
+}
+
+/**
+ * The crash pop-up. In dev (and only when the dev tooling reached the source) it shows the
+ * exact file, line and code. Anywhere else it says LOK has no access to the code, and shows
+ * nothing that could carry private data: no message, no stack.
+ */
+export function LokCrashPopup({ report, strings = defaultStrings, fatal = false, onClose, onRetry, onSend, alreadySent = false, accent = '#22d3ee' }: LokCrashPopupProps) {
+  const [copied, setCopied] = useState(false);
+  const [sendState, setSendState] = useState<'idle' | 'sending' | 'sent' | 'failed'>(alreadySent ? 'sent' : 'idle');
+  const dev = report.mode === 'dev';
+  const resolved = report.source?.frames[0];
+  const cat = strings.categories[report.category] ?? strings.categories.unknown;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(dev ? toMarkdown(report) : toPlainSummary(report));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch { /* clipboard blocked */ }
+  };
+  const send = async () => {
+    if (!onSend) return;
+    setSendState('sending');
+    try { await onSend(report); setSendState('sent'); } catch { setSendState('failed'); }
+  };
+
+  return (
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="lok-crash-title"
+      data-testid="lok-crash-popup"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2147483000, display: 'grid', placeItems: 'center', padding: 12,
+        background: fatal ? 'rgba(6,4,14,.94)' : 'rgba(6,4,14,.7)', color: '#f4f0ff', fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+      }}
+    >
+      <style>{FLICKER_CSS}</style>
+      <div style={{ width: 'min(560px, 100%)', maxHeight: '92dvh', overflowY: 'auto', border: `1px solid ${accent}77`, background: '#0e0a1c', boxShadow: `0 0 40px ${accent}22`, padding: 16 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <Owl accent={accent} />
+          <div>
+            <h2 id="lok-crash-title" style={{ margin: 0, font: '800 20px ui-sans-serif, system-ui', letterSpacing: '.02em' }}>{strings.title}</h2>
+            <p style={{ margin: '2px 0 0', opacity: 0.75, fontSize: 13 }}>{strings.subtitle}</p>
+          </div>
+        </div>
+
+        <div style={box}>
+          <p style={{ ...label, color: accent, opacity: 1 }} data-testid="lok-crash-category">{cat.title}</p>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.4 }}>{cat.body}</p>
+        </div>
+
+        <div style={box} data-testid="lok-crash-where">
+          <p style={label}>{strings.whereTitle}</p>
+          {dev ? (
+            <>
+              <p style={{ margin: 0, font: '600 13px ui-monospace, monospace', wordBreak: 'break-all' }} data-testid="lok-crash-location">{locationLabel(report)}</p>
+              {!resolved ? <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.65 }}>{strings.rawLocation}</p> : null}
+            </>
+          ) : (
+            <p style={{ margin: 0, fontSize: 14 }} data-testid="lok-crash-noaccess">{strings.noAccess}</p>
+          )}
+        </div>
+
+        {dev ? (
+          <div style={box}>
+            <p style={label}>{strings.messageTitle}</p>
+            <p style={{ margin: 0, font: '600 13px ui-monospace, monospace', wordBreak: 'break-word' }}>{report.name}: {report.message}</p>
+          </div>
+        ) : null}
+
+        {dev && resolved?.snippet ? (
+          <div style={box}>
+            <p style={label}>{strings.codeTitle}</p>
+            <pre style={{ margin: 0, overflowX: 'auto', font: '12px/1.5 ui-monospace, monospace' }} data-testid="lok-crash-code">
+              {resolved.snippet.lines.map((text, i) => {
+                const hit = i === resolved.snippet!.highlight;
+                return (
+                  <div key={i} style={{ background: hit ? 'rgba(244,63,94,.22)' : undefined, color: hit ? '#fecdd3' : undefined }}>
+                    <span style={{ opacity: 0.45 }}>{String(resolved.snippet!.startLine + i).padStart(4)} </span>{hit ? '> ' : '  '}{text}
+                  </div>
+                );
+              })}
+            </pre>
+          </div>
+        ) : null}
+
+        {dev && report.componentStack && report.componentStack.length > 0 ? (
+          <div style={box}>
+            <p style={label}>{strings.componentTitle}</p>
+            <p style={{ margin: 0, font: '12px/1.5 ui-monospace, monospace', opacity: 0.8 }}>{report.componentStack.slice(0, 6).join(' › ')}</p>
+          </div>
+        ) : null}
+
+        <p style={{ margin: '10px 0 0', font: '11px ui-monospace, monospace', opacity: 0.55 }}>
+          {strings.reportId(report.id)} · {strings.build(report.appVersion, report.buildId)} · {strings.seen(report.count)}
+        </p>
+        <p style={{ margin: '2px 0 10px', fontSize: 11, opacity: 0.5 }}>{strings.privacy}</p>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {fatal && onRetry ? <button type="button" style={{ ...btn, borderColor: accent, color: accent }} onClick={onRetry} data-testid="lok-crash-retry">{strings.retry}</button> : null}
+          <button type="button" style={btn} onClick={copy} data-testid="lok-crash-copy">{copied ? strings.copied : strings.copy}</button>
+          <button type="button" style={btn} onClick={() => download(report)} data-testid="lok-crash-download">{strings.download}</button>
+          {onSend ? (
+            <button type="button" style={btn} disabled={sendState === 'sending' || sendState === 'sent'} onClick={send} data-testid="lok-crash-send">
+              {sendState === 'sending' ? strings.sending : sendState === 'sent' ? strings.sent : strings.send}
+            </button>
+          ) : null}
+          {!fatal && onClose ? <button type="button" style={{ ...btn, marginLeft: 'auto' }} onClick={onClose} data-testid="lok-crash-close">{strings.close}</button> : null}
+        </div>
+        {sendState === 'failed' ? <p style={{ margin: '8px 0 0', fontSize: 12, color: '#fda4af' }}>{strings.sendFailed}</p> : null}
+      </div>
+    </div>
+  );
+}

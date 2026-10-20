@@ -1632,6 +1632,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Achievements you had already earned before this update are shown as earned, with the date marked as unknown. From now on, each new one is stamped with the day you get it.',
     ],
   },
+  {
+    version: '0.42.4',
+    date: '2026-10-20',
+    publishedAt: '2026-10-20T23:00:00Z',
+    kind: 'update',
+    title: 'LokServer Catches Crashes',
+    body: [
+      'If something breaks, LokServer the owl now catches it and tells you what went wrong in plain words instead of a blank screen. You can copy or download the report, or choose to send it to LOK. Nothing is sent unless you press Send.',
+      'You can turn this off, or see your crash log, in Settings under LOK Error Report.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

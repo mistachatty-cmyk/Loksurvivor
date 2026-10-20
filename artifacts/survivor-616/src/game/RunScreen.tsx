@@ -25,6 +25,7 @@ import { getHatStyle } from '@/game/data/hats';
 import { grpdEndgameWeaponEarned } from '@/game/data/grpdArmory';
 import { callInRoster } from '@/game/data/crewCallIns';
 import { actionForKey, dashDirection, getControls, padMove } from '@/game/input/controls';
+import { registerCrashContext, reporter } from '@/lib/lokErrorReport';
 import { getDisabledRunEvents } from '@/game/state/runEventSetting';
 import { endgameReached, mapsCleared } from '@/game/data/endgameUnlocks';
 import { isFeatureEnabled } from '@/game/state/operatorForgeStore';
@@ -934,7 +935,7 @@ export function RunScreen({
 
     clipRecorderRef.current.start(world.now);
 
-    const frame = (time: number) => {
+    const frameBody = (time: number) => {
       raf = requestAnimationFrame(frame);
       const dt = Math.min((time - last) / 1000, 0.1);
       last = time;
@@ -1294,8 +1295,28 @@ export function RunScreen({
       }
     };
 
+    // The loop runs outside React's error boundaries, so a throw here would otherwise repeat every
+    // frame and never reach the player. File it with LokErrorReport and pause the run so it cannot loop.
+    const frame = (time: number) => {
+      try {
+        frameBody(time);
+      } catch (error) {
+        reporter.report({ error, kind: 'error', extra: { where: 'run-loop' } });
+        if (phaseRef.current === 'playing') setPhaseBoth('paused');
+      }
+    };
+
+    // Tell crash reports what this run was doing; read only when something crashes.
+    const unregisterCrashContext = registerCrashContext(() => ({
+      area: world.area.id,
+      character: world.character.id,
+      elapsedSec: Math.round(world.time),
+      level: world.level,
+      enemies: world.enemies.length,
+    }));
+
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf); unregisterCrashContext(); };
   }, [setPhaseBoth]);
 
   // Hand the result back once the closing beat has played.

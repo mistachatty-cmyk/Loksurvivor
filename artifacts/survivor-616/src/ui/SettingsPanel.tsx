@@ -59,6 +59,7 @@ import { RUN_EVENTS } from '@/game/data/runEvents';
 import { getDisabledRunEvents, setRunEventEnabled } from '@/game/state/runEventSetting';
 import { CREW_TALK_MODES, CREW_TALK_TONES, getCrewTalkMode, getCrewTalkTone, setCrewTalkMode, setCrewTalkTone, type CrewTalkMode } from '@/game/state/crewTalkSetting';
 import type { Tone } from '@/game/engine/crewTalk';
+import { LokErrorSettings } from './LokErrorSettings';
 import { HIDEOUT_NOTICE_SECONDS, getHideoutNoticeSeconds, setHideoutNoticeSeconds, type HideoutNoticeSeconds } from '@/game/state/hideoutNoticeSetting';
 import { FIGHT_STYLES, getFightStyle, setFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
 import {
@@ -87,6 +88,7 @@ const SETTINGS_DESTINATIONS = [
   { id: 'settings-hideout', label: 'Hideout and intro', terms: 'hideout arrival weather pets events notices sticky splash title intro physics' },
   { id: 'settings-controls', label: 'Controls', terms: 'tilt steering gyro sensitivity touch' },
   { id: 'settings-accessibility', label: 'Accessibility', terms: 'motion animation transparency' },
+  { id: 'settings-lok-error-report', label: 'LOK Error Report', terms: 'crash bug error report lokserver send log' },
   { id: 'settings-update-notices', label: 'Update notices', terms: 'popup bugfix hotfix major update expansion' },
   { id: 'settings-scrollbar', label: 'Scrollbar', terms: 'scroll bar slim hidden' },
   { id: 'settings-minimap', label: 'Minimap', terms: 'endless map radar' },
@@ -480,6 +482,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
             {(['new', 'classic'] as const).map((layout) => <button key={layout} type="button" onClick={() => setUiChromeLayout(layout)} aria-pressed={chromeLayout === layout} className={`min-h-11 border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider ${chromeLayout === layout ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:border-primary hover:text-white'}`} data-testid={`button-ui-layout-${layout}`}>{layout === 'new' ? 'New dock' : 'Classic corners'}</button>)}
           </div>
         </section>
+        <LokErrorSettings />
         <section id="settings-update-notices" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="settings-update-notices">
           <h2 className="text-xl font-black uppercase text-white">Update notices</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">

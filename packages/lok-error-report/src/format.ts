@@ -1,0 +1,156 @@
+import type { ErrorReport, ResolvedFrame } from './types';
+
+const iso = (at: number): string => new Date(at).toISOString();
+const oneLine = (text: string): string => text.replace(/\s+/g, ' ').trim();
+
+function locationOf(report: ErrorReport): string {
+  const resolved = report.source?.frames[0];
+  if (resolved) return `${resolved.file}:${resolved.line}:${resolved.col}`;
+  const raw = report.stack.find((f) => f.app) ?? report.stack[0];
+  return raw && raw.file ? `${raw.file}:${raw.line ?? 0}:${raw.col ?? 0}` : 'unknown';
+}
+
+export function locationLabel(report: ErrorReport): string {
+  return locationOf(report);
+}
+
+function snippetBlock(frame: ResolvedFrame): string {
+  if (!frame.snippet) return '';
+  const { startLine, lines, highlight } = frame.snippet;
+  const width = String(startLine + lines.length).length;
+  return ['```', ...lines.map((text, i) => `${i === highlight ? '>' : ' '} ${String(startLine + i).padStart(width)} | ${text}`), '```'].join('\n');
+}
+
+/** A report as a markdown document: front matter (machine-readable) then the human story. */
+export function toMarkdown(report: ErrorReport, opts: { occurrences?: number; firstSeen?: number } = {}): string {
+  const occurrences = opts.occurrences ?? report.count;
+  const first = opts.firstSeen ?? report.at;
+  const head = [
+    '---',
+    `id: ${report.id}`,
+    `fingerprint: ${report.fingerprint}`,
+    `name: ${oneLine(report.name)}`,
+    `message: ${JSON.stringify(oneLine(report.message))}`,
+    `category: ${report.category}`,
+    `kind: ${report.kind}`,
+    `location: ${locationOf(report)}`,
+    `app: ${report.appKey} ${report.appVersion} (${report.buildId})`,
+    `mode: ${report.mode}`,
+    `firstSeen: ${iso(first)}`,
+    `lastSeen: ${iso(report.lastAt)}`,
+    `occurrences: ${occurrences}`,
+    '---',
+    '',
+    `# ${report.id}: ${report.name}`,
+    '',
+    report.message,
+    '',
+  ];
+  const body: string[] = [];
+  const resolved = report.source?.frames ?? [];
+  if (resolved.length > 0) {
+    body.push('## Where it happened', '');
+    for (const frame of resolved.slice(0, 5)) {
+      body.push(`- \`${frame.file}:${frame.line}:${frame.col}\`${frame.fn ? ` in \`${frame.fn}\`` : ''}`);
+    }
+    body.push('');
+    const first = resolved[0];
+    if (first?.snippet) body.push(snippetBlock(first), '');
+  } else {
+    body.push('## Where it happened', '', `\`${locationOf(report)}\` (original code not reachable: no source access for this build)`, '');
+  }
+  if (report.stack.length > 0) {
+    body.push('## Stack', '', '```', ...report.stack.slice(0, 12).map((f) => f.raw), '```', '');
+  }
+  if (report.componentStack && report.componentStack.length > 0) {
+    body.push('## Component stack', '', ...report.componentStack.slice(0, 10).map((c) => `- ${c}`), '');
+  }
+  const ctx = Object.entries(report.context);
+  if (ctx.length > 0) body.push('## Context', '', ...ctx.map(([k, v]) => `- ${k}: ${v}`), '');
+  if (report.breadcrumbs.length > 0) {
+    body.push('## Just before', '', ...report.breadcrumbs.slice(-15).map((b) => `- ${iso(b.at).slice(11, 19)} ${b.type}: ${b.text}`), '');
+  }
+  body.push('## Environment', '', `- Path: ${report.path}`, `- Browser: ${report.userAgent}`, '');
+  return [...head, ...body].join('\n');
+}
+
+export interface ParsedReportDoc {
+  fields: Record<string, string>;
+  body: string;
+}
+
+/** Read back the front matter that `toMarkdown` wrote. Tolerant: anything unreadable becomes an empty doc. */
+export function parseReportDoc(markdown: string): ParsedReportDoc {
+  const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(markdown);
+  if (!match) return { fields: {}, body: markdown };
+  const fields: Record<string, string> = {};
+  for (const line of (match[1] ?? '').split('\n')) {
+    const at = line.indexOf(': ');
+    if (at > 0) fields[line.slice(0, at)] = line.slice(at + 2);
+  }
+  if (fields.message?.startsWith('"')) {
+    try { fields.message = JSON.parse(fields.message) as string; } catch { /* keep as written */ }
+  }
+  return { fields, body: match[2] ?? '' };
+}
+
+/** Add `more` occurrences to a report document that already exists on disk (same crash seen again). */
+export function mergeIntoExisting(existing: string, report: ErrorReport, more: number): string {
+  const doc = parseReportDoc(existing);
+  const before = Number(doc.fields.occurrences);
+  const first = Date.parse(doc.fields.firstSeen ?? '');
+  return toMarkdown(report, {
+    occurrences: (Number.isFinite(before) ? before : 0) + Math.max(0, more),
+    firstSeen: Number.isFinite(first) ? Math.min(first, report.at) : report.at,
+  });
+}
+
+/** `docs/ERRORS.md`: one row per crash document, most recent first. */
+export function renderErrorsIndex(docs: ReadonlyArray<ParsedReportDoc>): string {
+  const rows = docs
+    .map((d) => d.fields)
+    .filter((f) => f.fingerprint)
+    .sort((a, b) => (b.lastSeen ?? '').localeCompare(a.lastSeen ?? ''));
+  const lines = [
+    '# Crash log',
+    '',
+    'Generated by `pnpm errors:docs` from `docs/errors/*.md`. Each crash is written there automatically when it',
+    'happens in dev (LokErrorReport). Do not edit by hand.',
+    '',
+  ];
+  if (rows.length === 0) {
+    lines.push('No crashes recorded.', '');
+    return lines.join('\n');
+  }
+  lines.push('| Report | Error | Where | Seen | Last seen |', '| --- | --- | --- | --- | --- |');
+  for (const f of rows) {
+    const message = (f.message ?? '').replace(/\|/g, '\\|').slice(0, 90);
+    lines.push(`| [${f.id}](errors/${f.fingerprint}.md) | ${f.name}: ${message} | \`${f.location ?? '?'}\` | ${f.occurrences ?? '1'}x | ${(f.lastSeen ?? '').slice(0, 10)} |`);
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+/** A compact report for places with a size limit (a feedback row, an issue title). */
+export function toFeedbackMessage(report: ErrorReport, maxLength = 3500): string {
+  const compact = {
+    id: report.id, fp: report.fingerprint, kind: report.kind, cat: report.category,
+    app: `${report.appKey}@${report.appVersion}`, build: report.buildId, mode: report.mode,
+    at: iso(report.at), n: report.count, path: report.path, ctx: report.context,
+    frames: report.stack.filter((f) => f.app).slice(0, 6).map((f) => `${f.fn ?? '?'} ${f.file}:${f.line}:${f.col}`),
+    crumbs: report.breadcrumbs.slice(-8).map((b) => `${b.type}:${b.text}`),
+  };
+  const head = `[${report.id}] ${report.name}: ${oneLine(report.message)}`.slice(0, 300);
+  const text = `${head}\n${JSON.stringify(compact)}`;
+  return text.length > maxLength ? text.slice(0, maxLength - 1) + '…' : text;
+}
+
+/** Plain text a player can paste into a chat or a bug report. */
+export function toPlainSummary(report: ErrorReport): string {
+  return [
+    `${report.id} · ${report.name}`,
+    report.mode === 'dev' ? oneLine(report.message) : `(${report.category})`,
+    `${report.appKey} ${report.appVersion} (${report.buildId}) · ${iso(report.at)}`,
+    report.mode === 'dev' ? locationOf(report) : '',
+  ].filter(Boolean).join('\n');
+}

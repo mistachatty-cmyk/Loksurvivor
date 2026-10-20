@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 143,
+      "version": "0.42.4",
+      "date": "2026-10-20",
+      "publishedAt": "2026-10-20T23:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "LokServer Catches Crashes",
+      "body": [
+        "If something breaks, LokServer the owl now catches it and tells you what went wrong in plain words instead of a blank screen. You can copy or download the report, or choose to send it to LOK. Nothing is sent unless you press Send.",
+        "You can turn this off, or see your crash log, in Settings under LOK Error Report."
+      ]
+    },
+    {
       "number": 142,
       "version": "0.42.3",
       "date": "2026-10-20",

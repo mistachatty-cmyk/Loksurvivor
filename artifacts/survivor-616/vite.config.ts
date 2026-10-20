@@ -2,6 +2,9 @@ import path from 'path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
+// Relative on purpose: Node loads this config directly, and the package ships TypeScript source (extensionless imports),
+// so Vite has to bundle it in. (The published product will ship compiled JS.)
+import { lokErrorReportPlugin } from '../../packages/lok-error-report/src/vite';
 
 const rawPort = process.env.PORT ?? '3000';
 
@@ -18,7 +21,13 @@ export default defineConfig(async () => ({
   plugins: [
     react(),
     tailwindcss(),
+    // Dev only: locates the exact code for crashes and writes them to docs/errors/ (LokErrorReport).
+    lokErrorReportPlugin({ outDir: '../../docs/errors' }),
   ],
+  define: {
+    // Short commit id shown in crash reports so a report names the exact build.
+    __LOK_BUILD_ID__: JSON.stringify((process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA ?? 'local').slice(0, 7)),
+  },
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, 'src'),

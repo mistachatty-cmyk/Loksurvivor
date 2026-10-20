@@ -23,7 +23,9 @@
     "Pulse Jukebox",
     "GSix",
     "Demo Day",
-    "LOK Chat"
+    "LOK Chat",
+    "LokServer",
+    "LokErrorReport"
   ],
   "keep": [],
   "delayMs": 1300

@@ -19,5 +19,6 @@
   },
   "supporterBar": { "mount": ["shell", "shop"], "theme": "hologram" },
   "walletStrip": { "mount": ["shop"] },
+  "lokErrorReport": { "enabled": true, "source": "616_survivor" },
   "sdkVersion": "1.2.0"
 }
