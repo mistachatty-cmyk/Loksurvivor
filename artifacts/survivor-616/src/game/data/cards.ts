@@ -13,6 +13,7 @@ import type { EndlessBandId, MetaState, UnlockRule } from '@/game/types';
 import type { LokAssetAcquisitionMethod, LokAssetManifest, LokAssetRarity, LokPetCardMetadata } from '@/game/lok/types';
 import { G6_616_SURVIVOR_NAMESPACE, lokAssetId } from '@/game/lok/types';
 import { CHARACTERS } from './characters';
+import { FORGE_ID_PREFIX } from './operatorForge';
 import { ENEMIES } from './enemies';
 import { ALLIES } from './progression';
 import { LOKPET_VARIANTS } from './lokPets';
@@ -89,7 +90,10 @@ const DISTANCE_MILESTONES: Array<{ px: number; rarity: LokAssetRarity; slug: str
 ];
 
 /** Character roster, one card per playable operative. */
-export const CHARACTER_CARDS: LokAssetManifest<LokDeckCardMetadata>[] = CHARACTERS.map((character, index) => ({
+export const CHARACTER_CARDS: LokAssetManifest<LokDeckCardMetadata>[] = CHARACTERS
+  // Player-made Forge operators stay out of card packs for now (an explicit decision, see operator-forge.md).
+  .filter((character) => !character.id.startsWith(FORGE_ID_PREFIX))
+  .map((character, index) => ({
   schema: 'lok.asset',
   schemaVersion: 1,
   id: lokAssetId(NS, `character-${character.id}`),

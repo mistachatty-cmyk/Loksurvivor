@@ -67,6 +67,7 @@ export interface BattlePet {
   equippedTrinket?: string;
   starter?: boolean;
   evolutionStage?: 1 | 2 | 3;
+  specialAbility?: string;
   evolutionTitle?: string;
   /** Overlay parts from a chosen evolution branch (see engine/petEvolution.ts). */
   evolutionOverlays?: EvolutionOverlayId[];
@@ -100,7 +101,7 @@ export interface BattleAnimationState {
   durationMs: number;
 }
 
-export type BattleGameMode = 'test-sparring' | 'league' | 'endless-gauntlet' | 'quick-fight';
+export type BattleGameMode = 'test-sparring' | 'league' | 'endless-gauntlet' | 'quick-fight' | 'digi-tower';
 
 export interface LeagueTierDef {
   id: string;
@@ -149,6 +150,11 @@ export interface BattleState {
   gameMode: BattleGameMode;
   tierId?: string;
   floor?: number;
+  digiTowerRule?: { title: string; description: string; elementBoost?: LokPetElement; elementRotation?: LokPetElement[] };
+  /** Practice replays have no Tower risk/progress and award only quarter pet XP. */
+  digiTowerPractice?: boolean;
+  /** Re-clearing a previously beaten floor after a checkpoint wipe has reduced rewards. */
+  digiTowerRepeat?: boolean;
   playerTeam: BattlePet[];
   activePlayerIndex: number;
   enemyTeam: BattlePet[];

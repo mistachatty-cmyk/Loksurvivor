@@ -10,7 +10,7 @@
  * Only ever read from `game/travelEncounter.ts` and the travel-encounter UI;
  * `engine/world.ts` never touches any of this.
  */
-import type { CardVariant, OwnedCardRecord } from '@/game/types';
+import type { CardVariant, OwnedCardRecord, SavedLokPet } from '@/game/types';
 import type { LokAssetRarity } from '@/game/lok/types';
 import { CARD_MANIFESTS_BY_ID, type LokDeckCardMetadata } from './cards';
 import { PASSIVE_CARDS_BY_ID, type PassiveCardRarity } from './passiveCards';
@@ -29,17 +29,19 @@ export interface TravelEncounterTrigger {
 }
 
 /**
- * More city-location triggers get added here over time -- this is a data
- * table specifically so a new destination is a new entry, not a new `if`
- * check wired into HubScreen/AreaSelect. Deliberately excludes every other
- * hideout room.
+ * One entry per room whose `HubRoomDef.kind` is `'travel'` -- the places out in
+ * the city -- plus the "Head out" run launch. Hideout rooms (the Sanctum, the
+ * Perch, the Cellar, the Alley Annex, the Back Room, the Sound Booth) are the
+ * safe base and deliberately have no trigger; `travelEncounter.test.ts` fails if
+ * a travel room is missing one or a hideout room gains one. A new destination is
+ * a new entry here, never a new `if` in HubScreen/AreaSelect.
  */
 export const TRAVEL_ENCOUNTER_TRIGGERS: TravelEncounterTrigger[] = [
   { id: 'storefront-entry', source: 'hub-room', roomId: 'the-storefront', chance: 0.25, label: 'Someone by the Neon Sleeve wants a piece of your deck.' },
-  { id: 'perch-entry', source: 'hub-room', roomId: 'rooftop-perch', chance: 0.25, label: 'Wind drafts swirl across the antennas as an aerial Digi-Pet swoops down.' },
-  { id: 'cellar-entry', source: 'hub-room', roomId: 'the-cellar', chance: 0.25, label: 'A strange data frequency resonates near the mining rigs in the dark cellar.' },
-  { id: 'alley-entry', source: 'hub-room', roomId: 'the-alley', chance: 0.25, label: 'Someone lurking by the fire escape steps forward to test your companion.' },
+  { id: 'studio-28-entry', source: 'hub-room', roomId: 'studio-28', chance: 0.25, label: 'A figure under the Studio 28 marquee steps out of the box-office glow, looking for a scrap.' },
   { id: 'grpd-entry', source: 'hub-room', roomId: 'grpd-station', chance: 0.25, label: 'A Division St. K9 patrol unit approaches for a sudden field duel.' },
+  { id: 'vault-entry', source: 'hub-room', roomId: 'grpd-vault', chance: 0.25, label: 'Something loose in the evidence corridor catches your scent on the way to the Vault.' },
+  { id: 'shelter-entry', source: 'hub-room', roomId: 'rapid-shelter', chance: 0.25, label: 'A stray Data-Gob blocks the pressure door on the way into Rapid Shelter.' },
   { id: 'head-out', source: 'run-launch', chance: 0.25, label: 'Something crosses your path on the way out into the city.' },
 ];
 
@@ -99,6 +101,27 @@ export const CARD_SALVAGE_COST = 40;
  * "classic version" simplification, not a bug. See travel-encounters.md.
  */
 export const PET_ASSIST_DAMAGE_MULT = 1.4;
+
+/**
+ * The LokPets that go with the player when they travel: the selected loadout
+ * in selection order, lead first. A pet can only come along while it has
+ * stamina (starter partners never run out), matching what a run brings.
+ * Every travel fight style and the hideout companion badge use this, so they
+ * always agree on who the lead is.
+ */
+export function travelTeam(
+  meta: { savedLokPets: SavedLokPet[]; selectedLokPetIds: string[] },
+  maxSize = Number.POSITIVE_INFINITY,
+): SavedLokPet[] {
+  return meta.selectedLokPetIds
+    .map((id) => meta.savedLokPets.find((pet) => pet.id === id))
+    .filter((pet): pet is SavedLokPet => Boolean(pet) && (Boolean(pet!.starter) || pet!.stamina > 0))
+    .slice(0, maxSize);
+}
+
+export function travelLeadPet(meta: { savedLokPets: SavedLokPet[]; selectedLokPetIds: string[] }): SavedLokPet | undefined {
+  return travelTeam(meta, 1)[0];
+}
 
 /** Minimum real-world ms between two travel encounters firing in one session -- prevents rapid-fire spam from bouncing between the storefront and other rooms. */
 export const TRAVEL_ENCOUNTER_COOLDOWN_MS = 45_000;

@@ -72,15 +72,35 @@ database. Version 2 adds shared media-assets and Studio-project stores without
 renaming the database, so existing version-1 soundtrack files migrate in place.
 
 `audio/localMediaStore.ts` hashes owned media with SHA-256. Soundtrack records
-and Studio workspace records reference the same asset id, so moving the same
+and Studio project records reference the same asset id, so moving the same
 bytes between those systems does not require another stored Blob. The active
-Studio workspace autosaves after edits and restores both its plain project
-model and its imported clip library on refresh.
+Studio project autosaves after edits and restores both its plain project model
+and imported clip library on refresh.
+
+The project store holds multiple stable `project:*` records plus one small
+`workspace-index` record naming the active project. The earlier single record
+with id `active` migrates in place on first read. Creating, opening, renaming,
+duplicating, and deleting projects must go through `studio/persistence.ts` so
+the index and project records change atomically. Duplicate projects reuse asset
+ids. Project deletion removes a media Blob only when no remaining Studio
+project and no Soundtrack record references it; never delete an asset by
+looking at one project alone.
 
 The old `survivor616.studio.v1` localStorage document remains a small synchronous
 recovery/migration fallback. It is not the authoritative media store and cannot
 carry audio. A quota or IndexedDB failure must leave the current session usable,
 show a visible session-only warning, and recommend exporting a backup.
+
+Project documents now use version 2. Tracks can hold audio, MIDI, and drum-pattern
+clips. Older track-wide notes are moved into MIDI clips when loaded. Kits reference
+shared media asset ids for imported pad sounds; the three built-in palettes are
+generated locally. Portable `.616project` backups include the document and every
+owned source. Keep legacy `.616song` import available and report missing audio.
+
+The authored BPM and downbeat offset for a Studio render are stored with its
+Soundtrack entry. The soundtrack analyser uses those values for the beat grid
+while continuing to read actual frequency energy from playback. Other local
+tracks continue using tempo detection.
 
 ## Never hard-wire a connection
 

@@ -6,8 +6,11 @@
  */
 
 import type { AnimName, FrameDelta, SpritePalette, SpriteRig } from '@/game/types';
+import type { Direction, StudioProject } from '@/game/studio/v3Project';
+import { renderStudioPixels, studioFrameAt } from '@/game/studio/v3Project';
 
 export interface DrawRigOptions {
+  direction?: Direction;
   /** Flash the whole silhouette white (hit reaction). */
   flash?: boolean;
   /** 0..1 -- eats away pixels for the depixelating death sequence. */
@@ -18,6 +21,50 @@ export interface DrawRigOptions {
   alpha?: number;
   /** Extra tint drawn over the sprite at this alpha. */
   tint?: { color: string; alpha: number };
+}
+
+const studioFrameCache = new WeakMap<StudioProject, Map<string, HTMLCanvasElement>>();
+export function studioDirection(vx: number, vy: number, facing: 1 | -1): Direction {
+  if (Math.hypot(vx, vy) < 0.1) return facing === 1 ? 'E' : 'W';
+  const directions: Direction[] = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'];
+  const index = (Math.round(Math.atan2(vy, vx) / (Math.PI / 4)) + 8) % 8;
+  return directions[index]!;
+}
+export function studioFrame(project: StudioProject, direction: Direction, anim: AnimName, elapsedMs: number): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  const clip = project.views[direction]?.[anim];
+  if (!clip?.length) return null;
+  const index = studioFrameAt(project, direction, anim, elapsedMs);
+  const key = `${direction}:${anim}:${index}`;
+  let frames = studioFrameCache.get(project);
+  if (!frames) { frames = new Map(); studioFrameCache.set(project, frames); }
+  const cached = frames.get(key);
+  if (cached) return cached;
+  const canvas = document.createElement('canvas'); canvas.width = 48; canvas.height = 48;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  renderStudioPixels(ctx, project, clip[index]!);
+  frames.set(key, canvas);
+  return canvas;
+}
+
+function drawStudioRig(ctx: CanvasRenderingContext2D, rig: SpriteRig, anim: AnimName, elapsedMs: number, screenX: number, screenY: number, facing: 1 | -1, scale: number, options: DrawRigOptions): boolean {
+  const project = rig.studioV3;
+  if (!project || project.approvalState !== 'approved') return false;
+  const frame = studioFrame(project, options.direction ?? (facing === 1 ? 'E' : 'W'), anim, elapsedMs);
+  if (!frame) return false;
+  const oldAlpha = ctx.globalAlpha;
+  const oldSmooth = ctx.imageSmoothingEnabled;
+  const oldFilter = ctx.filter;
+  ctx.globalAlpha *= (options.alpha ?? 1) * (1 - (options.dissolve ?? 0));
+  ctx.imageSmoothingEnabled = false;
+  if (options.flash) ctx.filter = 'brightness(5)';
+  const extent = 48 * scale * rig.pixelHeight / 48;
+  ctx.drawImage(frame, screenX - extent / 2, screenY - extent, extent, extent);
+  ctx.filter = oldFilter;
+  ctx.imageSmoothingEnabled = oldSmooth;
+  ctx.globalAlpha = oldAlpha;
+  return true;
 }
 
 function frameIndex(rig: SpriteRig, anim: AnimName, elapsedMs: number): number {
@@ -70,14 +117,19 @@ function drawPartsSlow(
 
     if (dissolve > 0) {
       // Break the rectangle into cells and drop them as the sequence runs.
+      // All surviving cells of a part share one colour, so they go into a
+      // single path and one fill: a mass kill dissolves hundreds of sprites
+      // at once, and a fillRect per cell was thousands of draw commands.
       const cell = Math.max(2, Math.round(scale));
+      ctx.fillStyle = flash ? '#ffffff' : palette[part.color];
+      ctx.beginPath();
       for (let cy = 0; cy < h; cy += cell) {
         for (let cx = 0; cx < w; cx += cell) {
           if (hash2(x + cx, y + cy) < dissolve) continue;
-          ctx.fillStyle = flash ? '#ffffff' : palette[part.color];
-          ctx.fillRect(x + cx, y + cy, Math.min(cell, w - cx), Math.min(cell, h - cy));
+          ctx.rect(x + cx, y + cy, Math.min(cell, w - cx), Math.min(cell, h - cy));
         }
       }
+      ctx.fill();
       continue;
     }
 
@@ -122,7 +174,7 @@ interface BakedFrame {
   originY: number;
 }
 
-const rigCache = new WeakMap<SpriteRig, WeakMap<SpritePalette, Map<string, BakedFrame | null>>>();
+const rigCache = new WeakMap<SpriteRig, WeakMap<SpritePalette, Map<number, BakedFrame | null>>>();
 
 function bakeFrame(
   rig: SpriteRig,
@@ -130,6 +182,7 @@ function bakeFrame(
   delta: FrameDelta,
   outline: boolean,
   flash: boolean,
+  mirror: boolean,
 ): BakedFrame | null {
   if (typeof document === 'undefined') return null;
 
@@ -149,10 +202,13 @@ function bakeFrame(
     const py = part.y + (d?.dy ?? 0);
     const pw = Math.max(1, part.w + (d?.dw ?? 0));
     const ph = Math.max(1, part.h + (d?.dh ?? 0));
-    const x = px * BAKE_SCALE;
-    const y = -(py + ph) * BAKE_SCALE;
     const w = Math.max(1, Math.round(pw * BAKE_SCALE));
     const h = Math.max(1, Math.round(ph * BAKE_SCALE));
+    // A mirrored bake flips each rect around the origin column, which is the
+    // same geometry the old runtime `scale(-1, 1)` produced -- baked once so
+    // the per-sprite blit needs no transform or save/restore.
+    const x = mirror ? -(px * BAKE_SCALE) - w : px * BAKE_SCALE;
+    const y = -(py + ph) * BAKE_SCALE;
     const pad = outline ? 1 : 0;
     minX = Math.min(minX, x - pad);
     minY = Math.min(minY, y - pad);
@@ -187,6 +243,8 @@ function bakeFrame(
   return { canvas, originX, originY };
 }
 
+const ANIM_IDS: Record<AnimName, number> = { idle: 0, walk: 1, attack: 2, hurt: 3, death: 4 };
+
 function getBakedFrame(
   rig: SpriteRig,
   palette: SpritePalette,
@@ -195,6 +253,7 @@ function getBakedFrame(
   delta: FrameDelta,
   outline: boolean,
   flash: boolean,
+  mirror: boolean,
 ): BakedFrame | null {
   let byPalette = rigCache.get(rig);
   if (!byPalette) {
@@ -206,12 +265,14 @@ function getBakedFrame(
     byKey = new Map();
     byPalette.set(palette, byKey);
   }
-  const key = `${anim}|${index}|${outline ? 1 : 0}|${flash ? 1 : 0}`;
-  if (byKey.has(key)) return byKey.get(key)!;
-  const baked = bakeFrame(rig, palette, delta, outline, flash);
+  // Numeric key (no per-sprite string building): frame index in the high bits.
+  const key = (((index * 8 + ANIM_IDS[anim]) * 2 + (outline ? 1 : 0)) * 2 + (flash ? 1 : 0)) * 2 + (mirror ? 1 : 0);
+  const cached = byKey.get(key);
+  if (cached !== undefined) return cached;
+  const baked = bakeFrame(rig, palette, delta, outline, flash, mirror);
   // Cap so a pathological caller (rig data authored with per-instance-unique
   // objects instead of shared definitions) can't grow this without bound.
-  if (byKey.size < 512) byKey.set(key, baked);
+  if (byKey.size < 1024) byKey.set(key, baked);
   return baked;
 }
 
@@ -227,6 +288,7 @@ export function drawRig(
   scale: number,
   options: DrawRigOptions = {},
 ) {
+  if (drawStudioRig(ctx, rig, anim, elapsedMs, screenX, screenY, facing, scale, options)) return;
   const { flash = false, dissolve = 0, outline = false, alpha = 1, tint } = options;
   const clip = rig.anims[anim];
   const index = frameIndex(rig, anim, elapsedMs);
@@ -241,7 +303,7 @@ export function drawRig(
     return;
   }
 
-  const baked = getBakedFrame(rig, palette, anim, index, delta, outline, flash);
+  const baked = getBakedFrame(rig, palette, anim, index, delta, outline, flash, facing === -1);
   if (!baked) {
     // No `document` (e.g. a non-browser test importing this module) -- the
     // per-part path works anywhere a CanvasRenderingContext2D exists.
@@ -267,16 +329,16 @@ export function drawRig(
     return;
   }
 
-  ctx.save();
   // Every rig part is a flat-color axis-aligned rectangle -- force nearest-
   // neighbor scaling so blitting the baked bitmap reproduces the same crisp,
   // un-antialiased edges `drawPartsSlow`'s fillRect calls always had, at any
   // scale factor. (The shadow blit below is a gradient and wants smoothing.)
-  ctx.imageSmoothingEnabled = false;
-  ctx.translate(screenX, screenY);
-  if (facing === -1) ctx.scale(-1, 1);
-  ctx.drawImage(baked.canvas, -baked.originX * k, -baked.originY * k, dw, dh);
-  ctx.restore();
+  // Toggled in place rather than via save/restore + translate + scale: this
+  // runs once per visible sprite, and those state ops dominated the blit.
+  const smoothing = ctx.imageSmoothingEnabled;
+  if (smoothing) ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(baked.canvas, screenX - baked.originX * k, screenY - baked.originY * k, dw, dh);
+  if (smoothing) ctx.imageSmoothingEnabled = true;
 
   ctx.globalAlpha = previousAlpha;
 }

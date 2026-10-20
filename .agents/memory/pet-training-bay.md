@@ -1,0 +1,8 @@
+# LokPet Training Bay
+
+- The DIGI-Tower's every-fifth-floor Rest is the current Training Bay entry point. The visit is free and remains available until the player claims the Rest choice and advances.
+- `SavedLokPet.training` stores ranks for Vigor/Fury/Guard/Pace/Spirit. Unspent points are derived from pet level: one per gained level and one extra at the pet's natural stage-2/stage-3 thresholds (non-starters 15/30; starters 33/66). This means saved level-ups, including Ranch Kibble levels, grant points without a second mutable counter.
+- Each rank cap is 10, or 20 for the starter partner. Vigor/Fury/Guard/Pace each add 2% to max HP/attack/defense/speed. Spirit boosts skill/ultimate move power 1% per rank, starts battles with 1.5 energy per rank, and gives one additional bond point at every 5 ranks, still within the normal daily bond cap.
+- Training Data is earned (never bought): first-cleared battle floors pay `3 + ceil(floor / 5)` and each Rest choice pays 10. Respec costs 25 Data and clears training ranks only; level-earned point allowance is retained. This resource currently comes from the Tower only; runs and achievements remain planned sources.
+- Battle application belongs in `engine/lokPetBattle.ts`'s `convertSavedPetToBattlePet`; keep the saved roll/base stat record untouched. UI training/respec actions must validate that the requested rest floor is still the active unclaimed floor inside `metaStore.tsx`, not trust the client.
+- Normalization bounds every rank to its starter/non-starter cap and missing ranks to zero so old saves retain their original untrained behavior. When adding alternate training locations, reuse the same point/cap helpers and don't permit extra spends per level.

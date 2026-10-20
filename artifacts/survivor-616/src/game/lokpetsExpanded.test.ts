@@ -78,8 +78,8 @@ test('companion evolution stages and digi-thematic titles progress with level', 
 });
 
 test('assignBattleMoves scales skills dynamically based on pet level and evolution', () => {
-  const lowMoves = assignBattleMoves('cinder-pouncer', 'fire', 5, 1);
-  const highMoves = assignBattleMoves('cinder-pouncer', 'fire', 20, 2);
+  const lowMoves = assignBattleMoves('cinder-pouncer', 'animal', 'fire', 5, 1);
+  const highMoves = assignBattleMoves('cinder-pouncer', 'animal', 'fire', 20, 2);
 
   // Level 5 fire skill is basic ember-spit
   assert.equal(lowMoves[1].id, 'ember-spit');
@@ -87,10 +87,37 @@ test('assignBattleMoves scales skills dynamically based on pet level and evoluti
   assert.equal(highMoves[1].id, 'pyro-burst');
 
   // Terra move assigned for terra pet
-  const terraMoves = assignBattleMoves('terra-gargoyle', 'terra', 20, 2);
+  const terraMoves = assignBattleMoves('terra-gargoyle', 'mechanical', 'terra', 20, 2);
   assert.equal(terraMoves[1].id, 'silicon-shard');
   assert.equal(terraMoves[2].id, 'tectonic-firewall');
   assert.equal(terraMoves[3].id, 'granite-avalanche');
+});
+
+test('assignBattleMoves no longer falls back to the generic move for every family', () => {
+  // mote/blob/bat/ghoul previously had no step-3 branch for a 'none'-element,
+  // un-named-variant pet, and fell through to the fully generic barrier-shield.
+  const mote = assignBattleMoves('signal-mote', 'mote', 'none', 1, 1);
+  const blob = assignBattleMoves('plum-jelly', 'blob', 'none', 1, 1);
+  const ghoul = assignBattleMoves('chalk-grin', 'ghoul', 'none', 1, 1);
+  assert.notEqual(mote[2].id, 'barrier-shield');
+  assert.notEqual(blob[2].id, 'barrier-shield');
+  assert.notEqual(ghoul[2].id, 'barrier-shield');
+});
+
+test('ordinary rolls lean toward their family\'s elemental bias without ever losing other elements', () => {
+  // mechanical leans volt/terra; roll enough times that the lean reliably shows,
+  // while confirming at least one other element still appears (never an override).
+  const counts: Record<string, number> = {};
+  for (let i = 0; i < 400; i += 1) {
+    const roll = rollLokPet(createRng(2000 + i));
+    const variant = LOKPET_VARIANTS.find((v) => v.id === roll.variantId);
+    if (variant?.family === 'mechanical') counts[roll.element] = (counts[roll.element] ?? 0) + 1;
+  }
+  const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+  assert.ok(total > 0, 'expected at least one mechanical-family roll in 400 tries');
+  const leanShare = ((counts.volt ?? 0) + (counts.terra ?? 0)) / total;
+  assert.ok(leanShare > 0.3, `expected mechanical's volt/terra lean to show up more than baseline, got ${leanShare}`);
+  assert.ok(Object.keys(counts).length > 2, 'expected other elements to still appear, not just the biased ones');
 });
 
 test('elemental multiplier matrix handles full 10-element digital rock-paper-scissors', () => {

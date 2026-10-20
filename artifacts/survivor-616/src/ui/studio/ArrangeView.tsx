@@ -7,14 +7,29 @@
  * driven from a ref at 60fps without React seeing it at all.
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { StudioProject } from '@/game/audio/studio/project';
+import { getBuffer } from '@/game/audio/studio/importer';
+import { projectLengthBeats, secondsPerBeat, type StudioProject } from '@/game/audio/studio/project';
 
 const LANE_HEIGHT = 56;
 const LANE_GAP = 6;
 const HEADER_HEIGHT = 22;
-const PIXELS_PER_BEAT = 26;
+const peakCache = new WeakMap<AudioBuffer, Float32Array>();
+function peaksFor(buffer: AudioBuffer): Float32Array {
+  const cached = peakCache.get(buffer);
+  if (cached) return cached;
+  const data = buffer.getChannelData(0);
+  const peaks = new Float32Array(1024);
+  for (let bin = 0; bin < peaks.length; bin += 1) {
+    const start = Math.floor(bin * data.length / peaks.length);
+    const end = Math.floor((bin + 1) * data.length / peaks.length);
+    const stride = Math.max(1, Math.floor((end - start) / 16));
+    for (let sample = start; sample < end; sample += stride) peaks[bin] = Math.max(peaks[bin]!, Math.abs(data[sample] ?? 0));
+  }
+  peakCache.set(buffer, peaks);
+  return peaks;
+}
 /** Leftmost column showing track names, outside the scrolling grid. */
 const GUTTER = 96;
 
@@ -47,6 +62,8 @@ export function ArrangeView({
   onDropBuffer,
 }: ArrangeViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [pixelsPerBeat, setPixelsPerBeat] = useState(26);
+  const [snapBeats, setSnapBeats] = useState(1);
   const dragRef = useRef<DragState | null>(null);
   /** Live pointer position during a drag, so the ghost follows without state. */
   const dragPositionRef = useRef<{ beat: number; laneIndex: number } | null>(null);
@@ -61,7 +78,7 @@ export function ArrangeView({
     [laneCount],
   );
 
-  const beatAt = useCallback((x: number) => Math.max(0, (x - GUTTER) / PIXELS_PER_BEAT), []);
+  const beatAt = useCallback((x: number) => Math.max(0, (x - GUTTER) / pixelsPerBeat), [pixelsPerBeat]);
 
   /* --- drawing ------------------------------------------------------ */
 
@@ -87,13 +104,13 @@ export function ArrangeView({
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       ctx.clearRect(0, 0, width, height);
 
-      const beatsVisible = (width - GUTTER) / PIXELS_PER_BEAT;
+      const beatsVisible = (width - GUTTER) / pixelsPerBeat;
 
       // --- bar grid ---
       ctx.font = '9px ui-monospace, monospace';
       ctx.textBaseline = 'top';
       for (let beat = 0; beat <= beatsVisible; beat += 1) {
-        const x = GUTTER + beat * PIXELS_PER_BEAT;
+        const x = GUTTER + beat * pixelsPerBeat;
         const isBar = beat % project.beatsPerBar === 0;
         ctx.strokeStyle = isBar ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.07)';
         ctx.beginPath();
@@ -119,17 +136,19 @@ export function ArrangeView({
         ctx.font = '10px ui-sans-serif, system-ui';
         ctx.fillText(track.name.slice(0, 14), 8, y + LANE_HEIGHT / 2 - 5);
 
-        for (const clip of track.clips) {
+        for (const clip of [...track.clips, ...track.midiClips, ...track.drumClips]) {
           const dragging = dragRef.current?.clipId === clip.id;
           const position = dragging ? dragPositionRef.current : null;
-          const startBeat = position ? Math.max(0, Math.round(position.beat)) : clip.startBeat;
+          const startBeat = position ? Math.max(0, Math.round(position.beat / snapBeats) * snapBeats) : clip.startBeat;
           const laneIndex = position && position.laneIndex >= 0 ? position.laneIndex : index;
           const clipY = HEADER_HEIGHT + laneIndex * (LANE_HEIGHT + LANE_GAP);
-          const x = GUTTER + startBeat * PIXELS_PER_BEAT;
-          const w = Math.max(8, clip.lengthBeats * PIXELS_PER_BEAT - 2);
+          const x = GUTTER + startBeat * pixelsPerBeat;
+          const w = Math.max(8, clip.lengthBeats * pixelsPerBeat - 2);
+          const audio = 'bufferId' in clip;
+          const drum = 'patternId' in clip;
 
           ctx.globalAlpha = dragging ? 0.75 : 1;
-          ctx.fillStyle = clip.id === selectedClipId ? 'rgba(120,205,255,0.5)' : 'rgba(90,140,220,0.38)';
+          ctx.fillStyle = clip.id === selectedClipId ? 'rgba(120,205,255,0.5)' : drum ? 'rgba(239,95,146,0.42)' : audio ? 'rgba(90,140,220,0.38)' : 'rgba(138,196,96,0.4)';
           ctx.fillRect(x, clipY + 4, w, LANE_HEIGHT - 8);
           ctx.strokeStyle = clip.id === selectedClipId ? 'rgba(160,225,255,0.95)' : 'rgba(150,190,255,0.5)';
           ctx.strokeRect(x + 0.5, clipY + 4.5, w - 1, LANE_HEIGHT - 9);
@@ -141,7 +160,24 @@ export function ArrangeView({
           ctx.beginPath();
           ctx.rect(x, clipY + 4, w, LANE_HEIGHT - 8);
           ctx.clip();
-          ctx.fillText(clip.name, x + 5, clipY + 10);
+          ctx.fillText(audio ? clip.name : drum ? project.patterns.find((pattern) => pattern.id === clip.patternId)?.name ?? 'Drums' : clip.name, x + 5, clipY + 10);
+          if (audio) {
+            const buffer = getBuffer(clip.bufferId);
+            if (buffer) {
+              const peaks = peaksFor(buffer);
+              ctx.strokeStyle = 'rgba(215,235,255,0.7)';
+              ctx.beginPath();
+              const center = clipY + LANE_HEIGHT * 0.64;
+              for (let px = 2; px < w - 2; px += 3) {
+                const seconds = (clip.sourceOffsetSeconds ?? 0) + (px / pixelsPerBeat) * secondsPerBeat(project.bpm);
+                const index = Math.min(peaks.length - 1, Math.floor(seconds / buffer.duration * peaks.length));
+                const amplitude = peaks[index]! * 15;
+                ctx.moveTo(x + px, center - amplitude);
+                ctx.lineTo(x + px, center + amplitude);
+              }
+              ctx.stroke();
+            }
+          }
           ctx.restore();
           ctx.globalAlpha = 1;
         }
@@ -149,7 +185,7 @@ export function ArrangeView({
 
       // --- playhead ---
       if (playing) {
-        const x = GUTTER + (playheadRef.current ?? 0) * PIXELS_PER_BEAT;
+        const x = GUTTER + (playheadRef.current ?? 0) * pixelsPerBeat;
         if (x >= GUTTER && x <= width) {
           ctx.strokeStyle = 'rgba(255,120,120,0.9)';
           ctx.lineWidth = 2;
@@ -164,7 +200,7 @@ export function ArrangeView({
 
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [project, playing, selectedClipId, laneCount, playheadRef]);
+  }, [project, playing, selectedClipId, laneCount, playheadRef, pixelsPerBeat, snapBeats]);
 
   /* --- pointer interaction ------------------------------------------ */
 
@@ -180,7 +216,7 @@ export function ArrangeView({
 
     const track = project.tracks[laneIndex]!;
     const beat = beatAt(x);
-    const hit = track.clips.find((clip) => beat >= clip.startBeat && beat <= clip.startBeat + clip.lengthBeats);
+    const hit = [...track.clips, ...track.midiClips, ...track.drumClips].find((clip) => beat >= clip.startBeat && beat <= clip.startBeat + clip.lengthBeats);
     if (!hit) {
       onSelectClip(null);
       return;
@@ -224,16 +260,21 @@ export function ArrangeView({
     }
     if (!drag || !position) return;
     const target = position.laneIndex >= 0 ? project.tracks[position.laneIndex]! : null;
-    onMoveClip(drag.clipId, Math.max(0, position.beat), (target ?? { id: drag.trackId }).id);
+    onMoveClip(drag.clipId, Math.max(0, Math.round(position.beat / snapBeats) * snapBeats), (target ?? { id: drag.trackId }).id);
   };
 
   return (
+    <div className="min-w-0">
+      <div className="mb-2 flex items-center gap-3 text-xs text-muted-foreground">
+        <label>Zoom <input type="range" min="14" max="80" step="2" value={pixelsPerBeat} onChange={(event) => setPixelsPerBeat(Number(event.target.value))} /></label>
+        <label>Snap <select value={snapBeats} onChange={(event) => setSnapBeats(Number(event.target.value))} className="border border-border bg-background px-1 text-white"><option value="1">Beat</option><option value="0.25">Sixteenth</option></select></label>
+      </div>
     <canvas
       ref={canvasRef}
       data-testid="canvas-arrange"
       className="w-full cursor-pointer rounded border border-border bg-black/40"
+      style={{ touchAction: 'none', minWidth: GUTTER + Math.max(16, projectLengthBeats(project)) * pixelsPerBeat }}
       // Without this a drag scrolls the page on touch instead of moving a clip.
-      style={{ touchAction: 'none' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
@@ -249,5 +290,6 @@ export function ArrangeView({
         onDropBuffer(bufferId, project.tracks[laneIndex]!.id, beatAt(event.clientX - rect.left));
       }}
     />
+    </div>
   );
 }

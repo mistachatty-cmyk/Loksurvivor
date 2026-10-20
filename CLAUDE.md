@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+When the user says **“Pullcheck,” read `docs/PULLCHECK.md` before inspecting pull requests**. It lists old PR branches that must be skipped during routine review.
+
 ## What this repo is
 
 A pnpm workspace monorepo. The only real product is **"616 Survivor"**, a browser
@@ -16,6 +18,10 @@ Do not confuse `/home/user/Loksurvivor` (capital L) with `/home/user/loksurvivor
 (lowercase) if both exist on disk — the lowercase one is the real, actively
 developed clone with commit history; the capitalized one is a stale duplicate
 stuck on the initial import commit.
+
+## Cost discipline — mandatory for every AI
+
+We are pre-revenue, so data and AI usage must stay minimal. **Read `docs/LOK_COST_DISCIPLINE.md` before building** (procedural SVG/CSS art only, no new network or image cost, cached shared feeds, no runtime LLM calls, no subagent fan-out unless asked, read docs/memory before searching, batch tool calls). Memory: `.agents/memory/cost-discipline.md`.
 
 ## Naming rule — never use “signal”
 
@@ -270,6 +276,9 @@ just *what*, so the reasoning doesn't need to be re-derived:
   is separate from the allymaker's `convertedUntil`, the mobile rule that the
   movement stick and the RTS pointer grammar never share a pointer-down, and
   the Tier 2/3 economies that are typed but deliberately unbuilt.
+- `hideout-interactables.md` — read before adding a hideout prop, pet play verb, choice event or anything else that
+  pays a reward in the hideout: every payout must go through `engine/hideoutRewards.ts` (daily caps, rare limits), and
+  idle events are a chip on the strip, never a pop-up.
 - `MEMORY.md` — index/entry point for the above.
 
 ## LOK universe, store and gsix.online sync

@@ -13,12 +13,13 @@ import {
   episodeProgress,
   episodeStatus,
   getCharacterFatigueSummary,
+  isUnlocked,
   lokPetTeamCapacity,
   useMeta,
   type CharacterFatigueSummary,
 } from '@/game/state/metaStore';
 import { CHARACTER_EPISODE_BY_CHARACTER_ID } from '@/game/data/episodes';
-import { getCharacterSkins, resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
+import { getCharacterSkins, isCharacterSkinUnlocked, resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
 import { characterMasteryStatBonus, characterRankTitle } from '@/game/data/characterMastery';
 import type { CharacterDef, MetaState } from '@/game/types';
@@ -292,10 +293,11 @@ function CharacterDetail({
   const status = episode ? episodeStatus(episode.id, meta) : 'locked';
   const progress = episode ? episodeProgress(episode.id, meta) : 0;
   const skins = getCharacterSkins(character);
-  const selectedSkinId = meta.characterSkinByCharacterId[character.id] ?? skins[0]!.id;
+  const selectedSkin = skins.find((skin) => skin.id === meta.characterSkinByCharacterId[character.id]) ?? skins[0]!;
+  const selectedSkinId = selectedSkin.id;
   const worldPalette = meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId);
   const displayPalette = resolveCharacterCosmeticPalette(character, selectedSkinId, worldPalette, meta.worldPaletteBlendEnabled);
-  const paletteEffect = meta.paletteAnimationsEnabled ? getThemePalette(meta.activePaletteId)?.effect?.kind : undefined;
+  const paletteEffect = meta.paletteAnimationsEnabled ? selectedSkin.effect?.kind ?? getThemePalette(meta.activePaletteId)?.effect?.kind : undefined;
 
   return (
     <div
@@ -317,10 +319,13 @@ function CharacterDetail({
           <p className="font-mono text-[9px] font-bold uppercase tracking-widest text-primary">Personal skins</p>
           <span className="font-mono text-[8px] uppercase text-muted-foreground">{meta.worldPaletteBlendEnabled ? 'World blend on' : 'Personal only'}</span>
         </div>
-        <div className="mt-2 grid grid-cols-4 gap-1.5">
+        <div className="mt-2 grid grid-cols-3 gap-1.5 sm:grid-cols-4">
           {skins.map((skin) => {
-            const locked = skin.episodeRequired && status !== 'completed';
+            const locked = !isCharacterSkinUnlocked(skin, meta.rescuedAllyIds.length, status === 'completed', meta.totalKills);
             const selected = selectedSkinId === skin.id;
+            const killProgress = skin.totalKillsRequired
+              ? `${Math.min(meta.totalKills, skin.totalKillsRequired).toLocaleString()} / ${skin.totalKillsRequired.toLocaleString()} KILLS`
+              : '';
             return (
               <button
                 key={skin.id}
@@ -328,14 +333,15 @@ function CharacterDetail({
                 onClick={() => { if (!locked) onSelectSkin(character.id, skin.id); }}
                 disabled={locked}
                 aria-pressed={selected}
-                aria-label={`${skin.name}${locked ? ', complete episode to unlock' : ''}`}
-                className={`min-w-0 border p-1.5 text-left transition-colors ${selected ? 'border-primary bg-primary/10' : 'border-white/15 bg-black/25'} disabled:opacity-35`}
+                aria-label={`${skin.name}${locked ? skin.totalKillsRequired ? `, ${skin.totalKillsRequired.toLocaleString()} lifetime defeats required` : skin.crewRequired ? `, rescue ${skin.crewRequired} crew to unlock` : ', complete episode to unlock' : ''}`}
+                className={`min-w-0 border p-1.5 text-left transition-colors ${skin.tier === 'ultimate' ? 'border-amber-200/35 bg-gradient-to-br from-violet-950/65 via-black/35 to-amber-950/55 hover:border-amber-100/70' : 'border-white/15 bg-black/25'} ${selected ? 'ring-1 ring-primary' : ''} disabled:opacity-55`}
                 data-testid={`button-character-skin-${skin.style}`}
               >
                 <span className="flex h-5 overflow-hidden border border-white/10">
                   {[skin.palette.body, skin.palette.accent, skin.palette.glow].map((color) => <span key={color} className="flex-1" style={{ backgroundColor: color }} />)}
                 </span>
-                <span className="mt-1 block truncate font-mono text-[7px] font-bold uppercase text-white/75">{locked ? 'Locked' : skin.name}</span>
+                <span className={`mt-1 block truncate font-mono text-[7px] font-black uppercase ${skin.tier === 'ultimate' ? 'text-amber-100' : 'text-white/75'}`}>{skin.name}</span>
+                {skin.tier === 'ultimate' ? <span className="block truncate font-mono text-[6px] font-bold uppercase text-white/55">{locked ? killProgress : 'ULTIMATE SKIN'}</span> : null}
               </button>
             );
           })}
@@ -533,7 +539,11 @@ function CharacterTile({
   );
 }
 
-function LockedCharacterTile({ character }: { character: CharacterDef }) {
+function LockedCharacterTile({ character, meta }: { character: CharacterDef; meta: MetaState }) {
+  // A Collector character's own progress rule can be met while the separate
+  // LokToken Collector Access purchase is still missing -- say so plainly
+  // rather than repeating a "challenge" description that already reads done.
+  const needsCollectorAccess = Boolean(character.lokPetCollector) && !meta.lokPetCollectorAccessUnlocked && isUnlocked(character.unlock, meta);
   return (
     <div
       className="flex flex-col items-center gap-2 border border-border/60 bg-card/30 p-3 text-center opacity-60"
@@ -543,7 +553,9 @@ function LockedCharacterTile({ character }: { character: CharacterDef }) {
         <LockKeyhole className="h-5 w-5 text-muted-foreground" />
       </div>
       <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">???</span>
-      <p className="text-[9px] leading-tight text-primary/80">{describeUnlock(character.unlock)}</p>
+      <p className="text-[9px] leading-tight text-primary/80">
+        {needsCollectorAccess ? 'Buy Collector Access in the Lok Shop' : describeUnlock(character.unlock)}
+      </p>
     </div>
   );
 }
@@ -552,7 +564,7 @@ const RUN_MODIFIER_OPTIONS: Array<{ key: keyof RunModifiers; name: string; descr
   { key: 'doubleMode', name: '2x Mode', description: 'Doubled spawn rate and a flat hp bump on any run. Stacks with everything else here.' },
   { key: 'quadSpawnMode', name: '4x Spawns', description: 'Optional fourfold wave pressure. If 2x Mode is also on, 4x wins for spawns while its hp bump remains.' },
   { key: 'unleashedMode', name: 'Unleashed 1000', description: 'Up to 1,000 live enemies with optimized 8x pressure. Overrides other spawn-rate toggles, but keeps their hp effects.' },
-  { key: 'millionHordeMode', name: 'Million Horde', description: 'Millions represented at once: a device-sized live battle backed by an aggregated crowd, never millions of allocated actors.' },
+  { key: 'millionHordeMode', name: 'Million Horde', description: 'Millions of real enemies at once: a device-sized live battle backed by a crowd of millions pressing in from off-screen, never millions of heavyweight actors.' },
   { key: 'invertedMap', name: 'Invert', description: 'Mirrors the area layout left-to-right.' },
   { key: 'speedMode', name: 'Speed Mode', description: 'Raises player and enemy movement speed.' },
   { key: 'scalerMode', name: 'Scaler', description: "Enemy hp scales up with your level as the run goes." },
@@ -699,7 +711,19 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
             </div>
           </section>
         ) : null}
-        <LokPetVariantSheet />
+        {meta.lokPetFieldGuideUnlocked || meta.devModeAllUnlocks ? (
+          <LokPetVariantSheet />
+        ) : (
+          <section className="mb-5 border border-pink-400/30 bg-card/70 p-3 sm:p-4" data-testid="lokpet-variant-sheet-locked">
+            <div className="flex items-center gap-2">
+              <LockKeyhole className="h-4 w-4 text-pink-300" />
+              <h2 className="text-sm font-black uppercase tracking-widest text-white">LokPet field guide</h2>
+            </div>
+            <p className="mt-2 max-w-xl text-[11px] leading-relaxed text-muted-foreground">
+              Buy the field guide from the Lok Shop to catalogue every LokPet variant and silhouette.
+            </p>
+          </section>
+        )}
 
         {layout === 'rail' ? (
           <div className="grid gap-4 lg:grid-cols-[20rem_1fr]" data-testid="section-roster-grid">
@@ -722,7 +746,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                       characterLevel={characterLevelProgress(meta, character.id).level}
                     />
                   ))}
-                  {lockedOperatives.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
+                  {lockedOperatives.map((character) => <LockedCharacterTile key={character.id} character={character} meta={meta} />)}
                 </div>
               </section>
               <section aria-labelledby="collector-roster-heading" className="border border-pink-300/25 bg-pink-300/5 p-3" data-testid="section-lokpet-collectors">
@@ -742,7 +766,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                       characterLevel={characterLevelProgress(meta, character.id).level}
                     />
                   ))}
-                  {lockedCollectors.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
+                  {lockedCollectors.map((character) => <LockedCharacterTile key={character.id} character={character} meta={meta} />)}
                 </div>
               </section>
             </div>
@@ -769,7 +793,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
               </Fragment>
             ))}
             {lockedOperatives.map((character) => (
-              <LockedCharacterTile key={character.id} character={character} />
+              <LockedCharacterTile key={character.id} character={character} meta={meta} />
             ))}
             <div className="col-span-full mt-3 border border-pink-300/25 bg-pink-300/5 p-3" data-testid="section-lokpet-collectors">
               <div className="mb-2 flex items-end justify-between gap-3"><div><h2 className="font-black uppercase text-pink-100">LokPet Collectors</h2><p className="text-[9px] text-muted-foreground">Complete collector runs and catch LokPets to climb ranks.</p></div><span className="font-mono text-[9px] text-pink-200">{meta.lokCollectorRuns} runs · {meta.lokCollectorPetsFound} caught</span></div>
@@ -790,7 +814,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                     {character.id === selectedCharacter.id ? <div className="col-span-full"><CharacterDetail character={selectedCharacter} meta={meta} onLaunchEpisode={onLaunchEpisode} onSelectSkin={selectCharacterSkin} inline /></div> : null}
                   </Fragment>
                 ))}
-                {lockedCollectors.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
+                {lockedCollectors.map((character) => <LockedCharacterTile key={character.id} character={character} meta={meta} />)}
               </div>
             </div>
           </div>

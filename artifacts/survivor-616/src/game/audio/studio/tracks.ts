@@ -16,9 +16,10 @@
 import * as Tone from 'tone';
 
 import { findEffect } from './effects';
+import { DrumRack } from './drums';
 import { getBuffer } from './importer';
 import { findInstrument, triggerInstrument, type InstrumentDef } from './instruments';
-import { secondsPerBeat, trackAudible, type StudioProject, type StudioTrack } from './project';
+import { drumEvents, flattenTrackNotes, secondsPerBeat, trackAudible, type StudioProject, type StudioTrack } from './project';
 
 /** Anything that can sit in an insert slot: a Tone effect or a WAM plugin. */
 export type InsertNode = Tone.ToneAudioNode | AudioNode;
@@ -48,6 +49,7 @@ interface TrackNodes {
   effectIds: string[];
   /** One player per clip, keyed by clip id. */
   players: Map<string, Tone.Player>;
+  drumRacks: Map<string, { rack: DrumRack; signature: string }>;
   /** The synth voice, when this is an instrument track. */
   voice: ReturnType<InstrumentDef['create']> | null;
   /** Which instrument `voice` was built from, so a change rebuilds it. */
@@ -81,6 +83,7 @@ export class TrackGraph {
       this.syncClips(nodes, track);
       this.syncVoice(nodes, track);
       this.syncEffects(nodes, track);
+      this.syncDrums(nodes, project, track);
       this.applyMix(nodes, project, track);
     }
 
@@ -101,6 +104,7 @@ export class TrackGraph {
       inserts: [],
       effectIds: [],
       players: new Map(),
+      drumRacks: new Map(),
       voice: null,
       voiceId: null,
       scheduled: [],
@@ -156,13 +160,22 @@ export class TrackGraph {
 
     for (const clip of track.clips) {
       seen.add(clip.id);
-      if (nodes.players.has(clip.id)) continue;
+      const existing = nodes.players.get(clip.id);
+      if (existing) {
+        existing.volume.value = clip.gain === 0 ? -Infinity : 20 * Math.log10(clip.gain ?? 1);
+        existing.fadeIn = clip.fadeInSeconds ?? 0;
+        existing.fadeOut = clip.fadeOutSeconds ?? 0;
+        continue;
+      }
       const buffer = getBuffer(clip.bufferId);
       // A project can outlive its audio -- imports are not persisted, so a
       // reloaded song references buffers that are simply gone. Skipping keeps
       // the rest of the arrangement playable.
       if (!buffer) continue;
       const player = new Tone.Player(buffer);
+      player.volume.value = clip.gain === 0 ? -Infinity : 20 * Math.log10(clip.gain ?? 1);
+      player.fadeIn = clip.fadeInSeconds ?? 0;
+      player.fadeOut = clip.fadeOutSeconds ?? 0;
       nodes.players.set(clip.id, player);
       added = true;
     }
@@ -192,6 +205,22 @@ export class TrackGraph {
 
     if (track.instrumentId) nodes.voice = findInstrument(track.instrumentId).create();
     this.rewire(nodes);
+  }
+
+  private syncDrums(nodes: TrackNodes, project: StudioProject, track: StudioTrack): void {
+    const wanted = new Set(track.drumClips.map((clip) => clip.kitId));
+    for (const [id, current] of nodes.drumRacks) {
+      const kit = project.kits.find((item) => item.id === id);
+      const signature = kit ? JSON.stringify([kit, nodes.effectIds]) : '';
+      if (wanted.has(id) && current.signature === signature) continue;
+      current.rack.dispose();
+      nodes.drumRacks.delete(id);
+    }
+    for (const kit of project.kits) {
+      if (!wanted.has(kit.id) || nodes.drumRacks.has(kit.id)) continue;
+      const head = nodes.inserts[0] ?? nodes.gain;
+      nodes.drumRacks.set(kit.id, { rack: new DrumRack(kit, head as Tone.ToneAudioNode), signature: JSON.stringify([kit, nodes.effectIds]) });
+    }
   }
 
   /**
@@ -261,6 +290,7 @@ export class TrackGraph {
     this.clearSchedule();
     const beatSeconds = secondsPerBeat(project.bpm);
     const transport = Tone.getTransport();
+    const hits = drumEvents(project);
 
     for (const track of project.tracks) {
       const nodes = this.tracks.get(track.id);
@@ -270,7 +300,7 @@ export class TrackGraph {
       const voice = nodes.voice;
       const instrument = track.instrumentId ? findInstrument(track.instrumentId) : null;
       if (voice && instrument) {
-        for (const note of track.notes) {
+        for (const note of flattenTrackNotes(track)) {
           const at = note.startBeat * beatSeconds;
           const duration = note.lengthBeats * beatSeconds;
           const id = transport.schedule((time) => {
@@ -288,9 +318,17 @@ export class TrackGraph {
         const id = transport.schedule((time) => {
           // Clamp to the buffer: a clip trimmed longer than its source would
           // otherwise throw rather than simply running out of audio.
-          player.start(time, 0, Math.min(duration, player.buffer.duration));
+          const offset = Math.min(clip.sourceOffsetSeconds ?? 0, player.buffer.duration);
+          const audibleDuration = Math.min(duration, player.buffer.duration - offset);
+          if (audibleDuration > 0) player.start(time, offset, audibleDuration);
         }, at);
         nodes.scheduled.push(id);
+      }
+      for (const hit of hits) {
+        if (hit.trackId !== track.id) continue;
+        const rack = nodes.drumRacks.get(hit.kit.id)?.rack;
+        if (!rack) continue;
+        nodes.scheduled.push(transport.schedule((time) => rack.trigger(hit.pad, time, hit.velocity), hit.beat * beatSeconds));
       }
     }
   }
@@ -304,6 +342,7 @@ export class TrackGraph {
       for (const player of nodes.players.values()) {
         if (player.state === 'started') player.stop();
       }
+      for (const { rack } of nodes.drumRacks.values()) rack.stop(Tone.now());
       // Cut anything still ringing, or a held pad sustains past stop.
       if (nodes.voice && 'releaseAll' in nodes.voice) nodes.voice.releaseAll();
     }
@@ -313,6 +352,7 @@ export class TrackGraph {
     const transport = Tone.getTransport();
     for (const id of nodes.scheduled) transport.clear(id);
     for (const player of nodes.players.values()) player.dispose();
+    for (const { rack } of nodes.drumRacks.values()) rack.dispose();
     nodes.voice?.dispose();
     for (const insert of nodes.inserts) {
       insert.disconnect();

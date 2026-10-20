@@ -12,7 +12,7 @@
  *    whose box is 900px wide around 200px of text. Breaking one cuts a hole in
  *    the owner element rather than hiding all of it.
  */
-import { blockHp, type PageBlock } from './pageModel';
+import { blockHp, type BlockRole, type PageBlock } from './pageModel';
 
 export interface ScanResult {
   blocks: PageBlock[];
@@ -52,6 +52,45 @@ function hasOwnPaint(cs: CSSStyleDeclaration): boolean {
     border(cs.borderTopWidth, cs.borderTopStyle, cs.borderTopColor) ||
     border(cs.borderBottomWidth, cs.borderBottomStyle, cs.borderBottomColor)
   );
+}
+
+/** The role of a whole-element block, from its tag. */
+export function boxRole(el: Element): BlockRole {
+  switch (el.tagName.toUpperCase()) {
+    case 'IMG':
+    case 'VIDEO':
+    case 'CANVAS':
+    case 'SVG':
+      return 'image';
+    case 'IFRAME':
+      return 'frame';
+    case 'BUTTON':
+      return 'button';
+    case 'INPUT':
+    case 'TEXTAREA':
+    case 'SELECT':
+      return 'input';
+    case 'A':
+      return 'link';
+    default:
+      return el.closest('a[href]') ? 'link' : 'box';
+  }
+}
+
+/** The role of a run of text: a heading, a link, or plain text. */
+export function textRoleOf(parent: Element): BlockRole {
+  if (parent.closest('h1,h2,h3,h4,h5,h6')) return 'heading';
+  if (parent.closest('a[href]')) return 'link';
+  return 'text';
+}
+
+/** Page structure makes blocks tougher or softer: footers and navs are armored, article body is easy. */
+export function semanticArmor(el: Element): number {
+  if (el.closest('footer')) return 2.5;
+  if (el.closest('nav,header')) return 1.5;
+  if (el.closest('aside,form')) return 1.2;
+  if (el.closest('article')) return 0.8;
+  return 1;
 }
 
 /** Split a measured line rectangle into roughly CHUNK_WIDTH-wide pieces. Pure; exported for tests. */
@@ -112,9 +151,9 @@ export function scanPage(win: Window, ignore: readonly Element[] = []): ScanResu
     }
     return idx;
   };
-  const push = (owner: number, kind: PageBlock['kind'], x: number, y: number, w: number, h: number) => {
+  const push = (owner: number, kind: PageBlock['kind'], role: BlockRole, armor: number, x: number, y: number, w: number, h: number) => {
     if (blocks.length >= MAX_BLOCKS) return;
-    blocks.push({ id: -1, owner, kind, x, y, w, h, hp: blockHp(w, h), destroyed: false, skip: false });
+    blocks.push({ id: -1, owner, kind, role, armor, x, y, w, h, hp: Math.round(blockHp(w, h) * armor), destroyed: false, skip: false });
   };
 
   /* ---- whole-element boxes: media, controls, small painted boxes ---- */
@@ -135,7 +174,7 @@ export function scanPage(win: Window, ignore: readonly Element[] = []): ScanResu
     const media = MEDIA_TAGS.has(el.tagName.toUpperCase());
     if (!media && (r.width > MAX_BOX_SIDE || r.height > MAX_BOX_SIDE)) continue;
     if (r.height > vh * 2.5 || r.width > vw * 4) continue;
-    push(ownerOf(el), 'box', r.left + sx, r.top + sy, r.width, r.height);
+    push(ownerOf(el), 'box', boxRole(el), semanticArmor(el), r.left + sx, r.top + sy, r.width, r.height);
   }
 
   /* ---- text: tight per-line chunks, cut out of the nearest block-level owner ---- */
@@ -153,11 +192,13 @@ export function scanPage(win: Window, ignore: readonly Element[] = []): ScanResu
     const rects = range.getClientRects();
     if (rects.length === 0) continue;
     const owner = ownerOf(blockOwner(win, parent, body));
+    const textRole = textRoleOf(parent);
+    const armor = semanticArmor(parent) * (textRole === 'heading' ? 2 : 1);
     for (let i = 0; i < rects.length; i += 1) {
       const r = rects[i]!;
       if (r.width < 4 || r.height < MIN_SIDE) continue;
       for (const chunk of chunkLine({ x: r.left + sx, y: r.top + sy, w: r.width, h: r.height })) {
-        push(owner, 'text', chunk.x, chunk.y, chunk.w, chunk.h);
+        push(owner, 'text', textRole, armor, chunk.x, chunk.y, chunk.w, chunk.h);
       }
     }
   }
@@ -173,15 +214,17 @@ export function scanPage(win: Window, ignore: readonly Element[] = []): ScanResu
 /** Domains where smashing the page would be unwelcome or unsafe: money, health, government. */
 const SENSITIVE_HOST = /(^|\.)(chase|bankofamerica|wellsfargo|citi|capitalone|usbank|paypal|stripe|venmo|coinbase|robinhood|fidelity|schwab|vanguard|mychart|irs)\.(com|org|net|gov)$|\.(gov|mil|bank)$/i;
 
-/** A reason to refuse to start, or null when the page is fine. */
-export function sensitivePageReason(win: Window): string | null {
+export type SensitiveReason = 'finance' | 'signin' | 'payment';
+
+/** A code for why to refuse to start (the overlay words it in the player's language), or null when the page is fine. */
+export function sensitivePageReason(win: Window): SensitiveReason | null {
   const doc = win.document;
   const host = win.location.hostname;
-  if (SENSITIVE_HOST.test(host)) return 'banking, payment, health or government site';
-  if (doc.querySelector('input[type="password"]')) return 'a sign-in form';
+  if (SENSITIVE_HOST.test(host)) return 'finance';
+  if (doc.querySelector('input[type="password"]')) return 'signin';
   for (const frame of Array.from(doc.querySelectorAll('iframe'))) {
     const src = (frame.getAttribute('src') ?? '').toLowerCase();
-    if (/(js\.stripe\.com|paypal\.com|checkout|payment|secure\.)/.test(src)) return 'a payment form';
+    if (/(js\.stripe\.com|paypal\.com|checkout|payment|secure\.)/.test(src)) return 'payment';
   }
   return null;
 }

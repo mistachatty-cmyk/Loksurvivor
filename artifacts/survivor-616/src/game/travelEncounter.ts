@@ -3,7 +3,7 @@
  * Deliberately isolated from engine/world.ts/stepWorld -- this never touches
  * the real-time simulation. See .agents/memory/travel-encounters.md.
  */
-import type { LokPetRoll, SpritePalette, SpriteRig } from '@/game/types';
+import type { EnemyDef, LokPetRoll, SpritePalette, SpriteRig } from '@/game/types';
 import { ENEMIES_BY_ID } from './data/enemies';
 import { lokPetRig, lokPetSpritePalette, rollLokPet } from './data/lokPets';
 import {
@@ -45,6 +45,10 @@ export interface ResolvedTravelEncounterOpponent {
   palette: SpritePalette;
   enemyId?: string;
   lokPetRoll?: LokPetRoll;
+  /** Real EnemyDef identity, carried through so battle-engine opponents can be built from it instead of a name hash. */
+  enemyRole?: EnemyDef['role'];
+  enemyFamily?: string;
+  enemyFaction?: string;
 }
 
 export interface TravelEncounterResult {
@@ -90,6 +94,9 @@ export function resolveTravelEncounterOpponent(opponent: TravelEncounterOpponent
     rig: enemy.rig,
     palette: enemy.palette,
     enemyId: enemy.id,
+    enemyRole: enemy.role,
+    enemyFamily: enemy.family,
+    enemyFaction: enemy.faction,
   };
 }
 

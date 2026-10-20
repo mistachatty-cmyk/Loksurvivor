@@ -1,6 +1,7 @@
 import type {
   LokPetAttackKind,
   LokPetElement,
+  LokPetFamily,
   LokPetPalette,
   LokPetRoll,
   LokPetRarity,
@@ -213,14 +214,36 @@ const SPECIAL_LOKPET_LOADOUTS: Record<string, {
   'quantum-kirin': { attackKind: 'rapid-shot', element: 'volt', elementLabel: 'volt-surge electric', traitLabel: 'Quantum Arc Discharge · phase thunder', stats: { health: 135, moveSpeed: 225, damage: 31, cooldownMs: 460, range: 360, projectileSpeed: 550, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 120000 } },
 };
 
-function pickElement(rng: () => number, attackKind: LokPetAttackKind): { element: LokPetElement; label: string } {
-  // Balanced elemental weighting across attack kinds
+/**
+ * Soft elemental lean per family -- a bias, not an override: every element
+ * stays reachable for every family (default weight 1), this just stops a
+ * roll from being completely variant-blind. Only used by ordinary rolls;
+ * the fixedVariantId/SPECIAL_LOKPET_LOADOUTS branch above is untouched.
+ */
+const FAMILY_ELEMENT_BIAS: Record<LokPetFamily, Partial<Record<LokPetElement, number>>> = {
+  animal: { terra: 2, aero: 1.5, none: 1.3 },
+  ghoul: { dark: 2.5, glitch: 1.5 },
+  bat: { aero: 2.5, volt: 1.3, light: 1.3 },
+  mote: { glitch: 2, volt: 1.5, dark: 1.2 },
+  blob: { freeze: 1.8, slow: 1.8, glitch: 1.3 },
+  mechanical: { volt: 2, terra: 1.5 },
+};
+
+function pickElement(rng: () => number, attackKind: LokPetAttackKind, family: LokPetFamily): { element: LokPetElement; label: string } {
+  // Balanced elemental weighting across attack kinds, leaned by family.
   const options = attackKind === 'pulse'
     ? ELEMENTS.filter((entry) => entry.element !== 'none')
     : attackKind === 'explosion'
       ? ELEMENTS.filter((entry) => entry.element === 'none' || entry.element === 'fire' || entry.element === 'terra' || entry.element === 'dark' || entry.element === 'slow')
       : ELEMENTS;
-  return pick(rng, options);
+  const bias = FAMILY_ELEMENT_BIAS[family] ?? {};
+  const total = options.reduce((sum, entry) => sum + (bias[entry.element] ?? 1), 0);
+  let roll = rng() * total;
+  for (const entry of options) {
+    roll -= bias[entry.element] ?? 1;
+    if (roll <= 0) return entry;
+  }
+  return options[options.length - 1]!;
 }
 
 /** Generate one deterministic, chest-ready LokPet blueprint. */
@@ -254,7 +277,7 @@ export function rollLokPet(
   }
   const sheet = pickWeightedSheet(rng);
   const attack = pick(rng, ATTACKS);
-  const element = pickElement(rng, attack.kind);
+  const element = pickElement(rng, attack.kind, variant.family);
   const name = `${pick(rng, PET_NAMES)} · ${variant.name}`;
   const jitter = 0.92 + rng() * 0.16;
   const cooldownJitter = 0.94 + rng() * 0.12;

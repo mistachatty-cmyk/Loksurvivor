@@ -15,8 +15,8 @@ export function LorePopup({ onClose, initialChapterId }: LorePopupProps) {
 
   const filteredEntries = LORE_CHRONICLES.filter((entry) => {
     if (selectedFilter === 'origins') return entry.id.includes('origin') || entry.id.includes('siphon') || entry.id.includes('invasion');
-    if (selectedFilter === 'digiverse') return entry.id.includes('eclipse') || entry.id.includes('lock-decks');
-    if (selectedFilter === 'data-pets') return entry.id.includes('data-pets') || entry.id.includes('rancher') || entry.id.includes('russel');
+    if (selectedFilter === 'digiverse') return entry.id.includes('eclipse') || entry.id.includes('lock-decks') || entry.id.includes('luvitnot');
+    if (selectedFilter === 'data-pets') return entry.id.includes('data-pets') || entry.id.includes('rancher') || entry.id.includes('russel') || entry.id.includes('frogster');
     if (selectedFilter === 'mines') return entry.id.includes('mines');
     return true;
   });

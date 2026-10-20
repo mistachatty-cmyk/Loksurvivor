@@ -44,6 +44,13 @@ export const FACTIONS: FactionDef[] = [
     roster: ['clampjaw', 'deadlock'],
   },
   {
+    id: 'kennel-patrol',
+    name: 'Kennel Patrol',
+    description: 'A rogue animal-control unit that tracks by floodlight and uses capture hooks to haul survivors into reach.',
+    accent: '#67e8f9',
+    roster: ['kennel-marshal'],
+  },
+  {
     id: 'relay-corps',
     name: 'Relay Corps',
     description: "Commanders that never close the distance themselves -- they just keep detector circles wandering the block until one sticks to you.",
@@ -210,6 +217,13 @@ export const FACTIONS: FactionDef[] = [
     description: 'Underground prospectors and evocators who wrangle volatile incandescent fireflies with pickaxes, resonant staves, and subterranean spike drills.',
     accent: '#f59e0b',
     roster: ['firefly-miner', 'firefly-evoker', 'firefly-spiker', 'firefly-cannon', 'firefly-pyro-duelist'],
+  },
+  {
+    id: 'gen-fitters',
+    name: 'Gen Fitters',
+    description: 'Walking customization: loose paint chips, orphaned auras, shed skins, thrown hats, ungrouped prefabs and undone edits that took over the Fitting Floor.',
+    accent: '#e879f9',
+    roster: ['gen-swatch-mite', 'gen-aura-ringer', 'gen-skin-shedder', 'gen-hat-hurler', 'gen-prefab-brute', 'gen-remix-seed', 'gen-undo-echo', 'gen-tile-warden', 'gen-fit-check-duelist', 'gen-pin-pouncer', 'gen-color-wheel', 'gen-grid-stitcher', 'gen-fan-sampler', 'gen-checkpoint-rewinder'],
   },
 ];
 

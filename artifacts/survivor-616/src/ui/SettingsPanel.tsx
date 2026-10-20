@@ -9,6 +9,7 @@ import {
   Download,
   FlaskConical,
   FlipVertical2,
+  House,
   Languages,
   LayoutDashboard,
   LayoutList,
@@ -27,9 +28,15 @@ import {
 } from 'lucide-react';
 
 import { toast } from '@/hooks/use-toast';
+import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
-import { activeUiThemeSwatchId, parseMetaFile, serializeMeta, useMeta } from '@/game/state/metaStore';
+import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
+import { DAMAGE_NUMBER_STYLES } from '@/game/data/damageNumbers';
+import { importForgeState } from '@/game/state/operatorForgeStore';
+import { parseSaveArchive, serializeSaveArchive } from '@/game/state/saveArchive';
 import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
+import { setUiChromeLayout, useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
+import { CHANGELOG_KIND_META, CHANGELOG_KIND_ORDER } from '@/game/data/changelogKinds';
 import {
   DEV_ACCESS_TAPS_REQUIRED,
   DEV_RUN_TOOL_REGISTRY,
@@ -41,9 +48,18 @@ import { vendorPurchaseCount } from '@/game/data/vendor';
 import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 import { UiTransparencyControls } from './UiTransparencyControls';
-import { MotionSetting } from './MotionToggle';
+import { MotionSetting, ShakeSetting } from './MotionToggle';
+import { ScrollbarSetting } from './ScrollbarSetting';
+import { TextSizeSetting } from './TextSizeSetting';
+import { FullscreenSetting } from './FullscreenSetting';
+import { ControlsSettings } from './ControlsSettings';
 import { EndgameSettings } from './EndgameSettings';
 import { SettingsPager } from './SettingsPager';
+import { RUN_EVENTS } from '@/game/data/runEvents';
+import { getDisabledRunEvents, setRunEventEnabled } from '@/game/state/runEventSetting';
+import { CREW_TALK_MODES, CREW_TALK_TONES, getCrewTalkMode, getCrewTalkTone, setCrewTalkMode, setCrewTalkTone, type CrewTalkMode } from '@/game/state/crewTalkSetting';
+import type { Tone } from '@/game/engine/crewTalk';
+import { HIDEOUT_NOTICE_SECONDS, getHideoutNoticeSeconds, setHideoutNoticeSeconds, type HideoutNoticeSeconds } from '@/game/state/hideoutNoticeSetting';
 import { FIGHT_STYLES, getFightStyle, setFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
 import {
   AUTO_LANGUAGE,
@@ -55,11 +71,97 @@ import {
   useT,
 } from '@/lib/i18n';
 import { BUILDING_ENTRY_STYLES, getBuildingEntryStyle, setBuildingEntryStyle, type BuildingEntryStyle } from '@/game/state/buildingEntrySetting';
+import { getAmbienceVolumePercent, getSfxVolumePercent, setAmbienceVolumePercent, setSfxVolumePercent } from '@/game/state/audioLevelSettings';
 
 export interface SettingsPanelProps {
   onBack: () => void;
   onOpenLooksAndLokPets?: () => void;
 }
+
+const SETTINGS_DESTINATIONS = [
+  { id: 'settings-language', label: 'Language', terms: 'translation device' },
+  { id: 'settings-display', label: 'Display and performance', terms: 'graphics frame rate fog zoom fullscreen' },
+  { id: 'settings-ui-layout', label: 'UI layout', terms: 'new dock classic corners music mission briefing looks companion' },
+  { id: 'settings-audio', label: 'Audio and atmosphere', terms: 'music sound effects ambience weather' },
+  { id: 'settings-gameplay', label: 'Gameplay', terms: 'travel encounter fight style live mode building entrances' },
+  { id: 'settings-hideout', label: 'Hideout and intro', terms: 'hideout arrival weather pets events notices sticky splash title intro physics' },
+  { id: 'settings-controls', label: 'Controls', terms: 'tilt steering gyro sensitivity touch' },
+  { id: 'settings-accessibility', label: 'Accessibility', terms: 'motion animation transparency' },
+  { id: 'settings-update-notices', label: 'Update notices', terms: 'popup bugfix hotfix major update expansion' },
+  { id: 'settings-scrollbar', label: 'Scrollbar', terms: 'scroll bar slim hidden' },
+  { id: 'settings-minimap', label: 'Minimap', terms: 'endless map radar' },
+  { id: 'settings-prop-launches', label: 'Prop launches', terms: 'physics clickable props' },
+  { id: 'settings-chaos', label: 'Chaos toggles', terms: 'invert mirror world palette cheat' },
+  { id: 'settings-wildlife', label: 'Wildlife', terms: 'birds fireflies weather' },
+  { id: 'settings-card-layout', label: 'Card layout', terms: 'grid list density' },
+  { id: 'settings-card-motion', label: 'Card motion', terms: 'pack wrapper card back frame tilt shimmer animation' },
+  { id: 'settings-panel-layout', label: 'Panel layout', terms: 'detail panel side bottom' },
+  { id: 'settings-customization', label: 'Customization', terms: 'theme palette looks skins' },
+  { id: 'settings-data', label: 'Save data', terms: 'backup export import progress forge' },
+  { id: 'settings-advanced', label: 'Advanced', terms: 'developer dev mode' },
+] as const;
+
+function SettingsJumpNav() {
+  const [query, setQuery] = useState('');
+  const matches = SETTINGS_DESTINATIONS.filter((item) => `${item.label} ${item.terms}`.toLowerCase().includes(query.trim().toLowerCase()));
+  return (
+    <nav className="border border-border bg-card p-4 lg:[column-span:all]" aria-label="Settings sections">
+      <label htmlFor="settings-section-search" className="block text-sm font-black uppercase text-white">Find a section</label>
+      <input id="settings-section-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try audio, controls, Forge..." className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm text-white" />
+      <div className="mt-3 flex flex-wrap gap-2">
+        {matches.map((item) => <a key={item.id} href={`#${item.id}`} className="inline-flex min-h-10 items-center border border-border bg-background px-3 py-2 text-xs font-bold uppercase text-white hover:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{item.label}</a>)}
+        {matches.length === 0 ? <p className="text-sm text-muted-foreground">No section matches that search.</p> : null}
+      </div>
+    </nav>
+  );
+}
+
+function MusicVolumeSetting() {
+  const player = useMusicPlayer();
+  return <div className="mt-3 border border-border/70 bg-background/50 p-4">
+    <div className="flex items-center justify-between gap-3">
+      <div><h3 className="text-sm font-black uppercase text-white">Music volume</h3><p className="mt-1 text-xs text-muted-foreground">The same level and mute choice used in the music player.</p></div>
+      <button type="button" className="min-h-10 border border-border px-3 text-xs font-bold uppercase text-white" onClick={player.toggleMute} aria-pressed={player.muted}>{player.muted ? 'Unmute' : 'Mute'}</button>
+    </div>
+    <label className="mt-3 block text-xs text-white" htmlFor="settings-music-volume">Volume {Math.round(player.volume * 100)}%</label>
+    <input id="settings-music-volume" type="range" min={0} max={1} step={0.01} value={player.volume} onChange={(event) => player.setVolume(Number(event.target.value))} className="mt-2 w-full accent-primary" />
+  </div>;
+}
+/**
+ * Device-local volume for one synthesized layer (gameplay SFX or hideout
+ * ambience). Same box and slider as the music volume above it.
+ */
+function LayerVolumeSetting({ id, title, description, read, write, disabled, testId }: {
+  id: string;
+  title: string;
+  description: string;
+  read: () => number;
+  write: (percent: number) => void;
+  disabled: boolean;
+  testId: string;
+}) {
+  const t = useT();
+  const [percent, setPercent] = useState(read);
+  return <div className="mt-3 border border-border/70 bg-background/50 p-4">
+    <h3 className="text-sm font-black uppercase tracking-wide text-white">{title}</h3>
+    <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+    <label className="mt-3 block text-xs text-white" htmlFor={id}>{t('settings.audioLevel.volume')} {percent}%</label>
+    <input
+      id={id}
+      type="range"
+      min={0}
+      max={100}
+      step={1}
+      value={percent}
+      disabled={disabled}
+      onChange={(event) => { const next = Number(event.target.value); write(next); setPercent(next); }}
+      className="mt-2 w-full accent-primary disabled:opacity-40"
+      data-testid={testId}
+    />
+    {disabled ? <p className="mt-2 text-xs text-muted-foreground">{t('settings.audioLevel.turnedOff')}</p> : null}
+  </div>;
+}
+
 /**
  * Language picker. Hidden until at least one translated file exists, so it
  * adds nothing to the screen before the Auto-translate action has run.
@@ -73,7 +175,7 @@ function LanguageSetting() {
     void setLanguagePreference(next);
   };
   return (
-    <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="section-language-settings">
+    <section id="settings-language" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="section-language-settings">
       <div className="flex items-start gap-4">
         <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
           <Languages className="h-5 w-5" />
@@ -103,6 +205,63 @@ function LanguageSetting() {
         </div>
       </div>
     </section>
+  );
+}
+
+function RunEventsSetting() {
+  const t = useT();
+  const [disabled, setDisabled] = useState<string[]>(getDisabledRunEvents);
+  return (
+    <div data-testid="settings-run-events">
+      <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.runEvents.title')}</h3>
+      <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.runEvents.description')}</p>
+      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.runEvents.title')}>
+        {RUN_EVENTS.map((event) => {
+          const on = !disabled.includes(event.id);
+          return (
+            <button key={event.id} type="button" aria-pressed={on}
+              className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${on ? 'border-amber-300/60 bg-amber-400/15 text-amber-100' : 'border-border bg-background text-muted-foreground hover:border-amber-300/60 hover:text-white'}`}
+              onClick={() => setDisabled(setRunEventEnabled(event.id, !on))} data-testid={`button-run-event-${event.id}`}>
+              {event.name}: {on ? t('settings.runEvents.on') : t('settings.runEvents.off')}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CrewTalkSetting() {
+  const t = useT();
+  const [mode, setMode] = useState<CrewTalkMode>(getCrewTalkMode);
+  const [tone, setTone] = useState<Tone>(getCrewTalkTone);
+  const btn = (active: boolean) => `border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${active ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`;
+  return (
+    <div data-testid="settings-crew-talk">
+      <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.crewTalk.title')}</h3>
+      <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.crewTalk.description')}</p>
+      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.crewTalk.title')}>
+        {CREW_TALK_MODES.map((entry) => (
+          <button key={entry} type="button" aria-pressed={mode === entry} className={btn(mode === entry)}
+            onClick={() => { setCrewTalkMode(entry); setMode(entry); }} data-testid={`button-crewtalk-mode-${entry}`}>
+            {t(`settings.crewTalk.mode.${entry}`)}
+          </button>
+        ))}
+      </div>
+      {mode === 'generated' ? (
+        <>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.crewTalk.toneDescription')}</p>
+          <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label={t('settings.crewTalk.toneTitle')}>
+            {CREW_TALK_TONES.map((entry) => (
+              <button key={entry} type="button" aria-pressed={tone === entry} className={btn(tone === entry)}
+                onClick={() => { setCrewTalkTone(entry); setTone(entry); }} data-testid={`button-crewtalk-tone-${entry}`}>
+                {t(`settings.crewTalk.tone.${entry}`)}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
   );
 }
 
@@ -169,15 +328,19 @@ function BuildingEntrySetting() {
 }
 
 export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelProps) {
+  const [noticeSeconds, setNoticeSeconds] = useState<HideoutNoticeSeconds>(getHideoutNoticeSeconds);
   const t = useT();
+  const chromeLayout = useUiChromeLayout();
   const {
     meta,
+    setUpdatePopupKind,
     setPhysicsObjectClicks,
     setLiveMode,
     setLootPresentation,
     setLevelUpPresentation,
     setPauseMapVisible,
     setGraphicsQuality,
+    setDamageNumberStyle,
     setCompanionRevealStyle,
     setFrameRateMode,
     setFogAmbianceMode,
@@ -187,6 +350,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setMinimapVisible,
     setMinimapExpanded,
     setUiDensity,
+    setCardMotion,
     setUiPanelLayout,
     buyUiTheme,
     equipUiTheme,
@@ -204,8 +368,13 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setHideoutWeather,
     setHideoutSectionsCollapsedByDefault,
     setHideoutPreview,
+    setHideoutSceneStyle,
+    setHideoutSpeechBubbles,
     setHideoutPets,
     setHideoutEvents,
+    setHideoutInteractive,
+    setHideoutPetPlay,
+    setHideoutChoiceEvents,
     setHideoutStickyHeadOut,
     setSplashTextEnabled,
     setOneLineTitleEnabled,
@@ -259,14 +428,14 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
   }, [unlockDevModeAccess]);
 
   const handleExportSave = useCallback(() => {
-    const blob = new Blob([serializeMeta(meta)], { type: 'application/json' });
+    const blob = new Blob([serializeSaveArchive(meta)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = `616-survivor-save-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    toast({ title: 'Save exported', description: 'Saved to your downloads.' });
+    toast({ title: 'Save exported', description: 'Progress and forged operators saved to your downloads.' });
   }, [meta]);
 
   const handleImportSave = useCallback(
@@ -275,7 +444,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
       event.target.value = '';
       if (!file) return;
       void file.text().then((text) => {
-        const parsed = parseMetaFile(text);
+        const parsed = parseSaveArchive(text);
         if (!parsed) {
           toast({
             title: "Couldn't import save",
@@ -284,21 +453,81 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           });
           return;
         }
-        if (!window.confirm('Importing will replace your current progress with this save file. Continue?')) return;
-        importMeta(parsed);
-        toast({ title: 'Save imported', description: 'Your progress has been replaced with the imported save.' });
-      });
+        const details = parsed.legacy
+          ? 'This older save contains progress only. Your current forged operators will be kept.'
+          : 'This archive contains progress and forged operators. Both will replace the current data.';
+        if (!window.confirm(`${details} Continue?`)) return;
+        if (parsed.forge && !importForgeState(parsed.forge)) {
+          toast({ title: "Couldn't import save", description: 'This device could not store the forged operators. Your current progress was kept.', variant: 'destructive' });
+          return;
+        }
+        importMeta(parsed.meta);
+        toast({ title: 'Save imported', description: parsed.legacy ? 'Progress imported; existing forged operators kept.' : 'Progress and forged operators imported. Reload to update the roster.' });
+      }).catch(() => toast({ title: "Couldn't read file", variant: 'destructive' }));
     },
     [importMeta],
   );
 
   return (
     <ScreenLayout title={t('settings.title')} subtitle={t('settings.subtitle')} onBack={onBack} action={onOpenLooksAndLokPets ? <button type="button" onClick={onOpenLooksAndLokPets} className="border border-pink-200/40 bg-pink-300/10 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-pink-100" data-testid="button-settings-looks-lokpets">{t('common.looksLokpets')}</button> : undefined}>
-    <SettingsPager endgame={<EndgameSettings />} standard={
-      <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
+    <SettingsPager endgame={<EndgameSettings />} controls={<ControlsSettings />} standard={
+      <div className="mx-auto max-w-5xl lg:columns-2 lg:gap-x-6 [&>*]:mb-6 [&>*]:break-inside-avoid">
+        <SettingsJumpNav />
+        <section id="settings-ui-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="settings-ui-layout">
+          <h2 className="text-xl font-black uppercase text-white">Hideout control layout</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">The new dock keeps Mission Briefing, Looks & LokPets, your companion, and music above the walking scene. Classic keeps the original corner positions.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(['new', 'classic'] as const).map((layout) => <button key={layout} type="button" onClick={() => setUiChromeLayout(layout)} aria-pressed={chromeLayout === layout} className={`min-h-11 border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider ${chromeLayout === layout ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:border-primary hover:text-white'}`} data-testid={`button-ui-layout-${layout}`}>{layout === 'new' ? 'New dock' : 'Classic corners'}</button>)}
+          </div>
+        </section>
+        <section id="settings-update-notices" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="settings-update-notices">
+          <h2 className="text-xl font-black uppercase text-white">Update notices</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Choose which releases open a popup when you return to the hideout. Every release remains in Updates and the Archive, even when its popup is off.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {CHANGELOG_KIND_ORDER.map((kind) => {
+              const category = CHANGELOG_KIND_META[kind];
+              const enabled = meta.updatePopupKinds[kind];
+              return (
+                <div key={kind} className="flex items-start justify-between gap-4 border bg-background/50 p-4" style={{ borderColor: `${category.color}66` }}>
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide" style={{ color: category.color }}>{category.label}</h3>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{category.lore}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUpdatePopupKind(kind, !enabled)}
+                    aria-pressed={enabled}
+                    aria-label={`${category.label} popups`}
+                    className="min-h-10 shrink-0 border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-opacity hover:opacity-80"
+                    style={{ borderColor: enabled ? category.color : '#52525b', backgroundColor: enabled ? `${category.color}26` : 'transparent', color: enabled ? category.color : '#a1a1aa' }}
+                    data-testid={`button-toggle-${kind}-popup`}
+                  >
+                    {enabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
         <LanguageSetting />
-        <UiTransparencyControls />
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
+        <div id="settings-accessibility" className="space-y-4 scroll-mt-24 lg:[column-span:all]">
+          <UiTransparencyControls />
+          <section className="border border-border bg-card p-5 sm:p-6">
+            <TextSizeSetting />
+          </section>
+          <section className="border border-border bg-card p-5 sm:p-6">
+            <h2 className="text-xl font-black uppercase text-white">Motion</h2>
+            <MotionSetting />
+            <ShakeSetting />
+          </section>
+          <section id="settings-scrollbar" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6">
+            <h2 className="text-xl font-black uppercase text-white">Scrollbar</h2>
+            <ScrollbarSetting />
+          </section>
+        </div>
+        <section id="settings-display" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <PauseCircle className="h-5 w-5" />
@@ -328,6 +557,24 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Level ups</p><div className="grid grid-cols-3 gap-1">{(['pause-focus','compact-live','random-live'] as const).map((value) => <button key={value} type="button" onClick={() => setLevelUpPresentation(value)} disabled={meta.liveModeEnabled && value === 'pause-focus'} aria-pressed={meta.levelUpPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.levelUpPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'pause-focus' ? 'Focus' : value === 'compact-live' ? 'Compact' : 'Random reel'}</button>)}</div></div>
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Loot boxes</p><div className="grid grid-cols-2 gap-1">{(['auto-pause','queue'] as const).map((value) => <button key={value} type="button" onClick={() => setLootPresentation(value)} disabled={meta.liveModeEnabled && value === 'auto-pause'} aria-pressed={meta.lootPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.lootPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'queue' ? 'HUD tray' : 'Auto reveal'}</button>)}</div></div>
                 <button type="button" onClick={() => setPauseMapVisible(!meta.pauseMapVisible)} aria-pressed={meta.pauseMapVisible} className="flex w-full items-center justify-between border border-border p-3"><span>Tactical map shown on pause</span><span className="text-primary">{meta.pauseMapVisible ? 'On' : 'Off'}</span></button>
+                <div>
+                  <p className="mb-2 font-mono uppercase tracking-widest text-white/70">{t('settings.damageNumbers.title')}</p>
+                  <div className="grid grid-cols-2 gap-1" role="group" aria-label={t('settings.damageNumbers.title')}>
+                    {DAMAGE_NUMBER_STYLES.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setDamageNumberStyle(option.id)}
+                        aria-pressed={meta.damageNumberStyle === option.id}
+                        className={`border p-2 uppercase ${meta.damageNumberStyle === option.id ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}
+                        data-testid={`button-damage-numbers-${option.id}`}
+                      >
+                        {t(`settings.damageNumbers.${option.id}`)}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">{t('settings.damageNumbers.description')}</p>
+                </div>
                 <div>
                   <p className="mb-2 font-mono uppercase tracking-widest text-white/70">Graphics quality</p>
                   <div className="grid grid-cols-3 gap-1">
@@ -494,9 +741,11 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
+        <FullscreenSetting />
+
         {/* Studio plugins -- off unless deliberately enabled, because this is
             the one feature that runs code from off the device. */}
-        <section className="border border-border bg-card/60 p-6">
+        <section className="border border-border bg-card/60 p-5 sm:p-6">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-amber-300/40 bg-amber-400/10 text-amber-200">
               <Plug className="h-5 w-5" />
@@ -541,7 +790,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-music-reactive-settings">
+        <section id="settings-audio" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-music-reactive-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-300/40 bg-fuchsia-400/10 text-fuchsia-200">
               <Activity className="h-5 w-5" />
@@ -580,6 +829,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   <span>Turn this off and the run plays exactly as it does in silence.</span>
                 </div>
               </div>
+              <MusicVolumeSetting />
               <div className="mt-5 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -605,6 +855,15 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </button>
                 </div>
               </div>
+              <LayerVolumeSetting
+                id="settings-sfx-volume"
+                title={t('settings.audioLevel.sfxTitle')}
+                description={t('settings.audioLevel.sfxDescription')}
+                read={getSfxVolumePercent}
+                write={setSfxVolumePercent}
+                disabled={!meta.sfxEnabled}
+                testId="input-sfx-volume"
+              />
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -628,6 +887,77 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   >
                     {meta.hideoutAmbienceEnabled ? 'On' : 'Off'}
                   </button>
+                </div>
+              </div>
+              <LayerVolumeSetting
+                id="settings-ambience-volume"
+                title={t('settings.audioLevel.ambienceTitle')}
+                description={t('settings.audioLevel.ambienceDescription')}
+                read={getAmbienceVolumePercent}
+                write={setAmbienceVolumePercent}
+                disabled={!meta.hideoutAmbienceEnabled}
+                testId="input-ambience-volume"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section id="settings-gameplay" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-gameplay-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+              <Compass className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Run</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Gameplay</h2>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Travel encounters</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      A short pop-up scrap can trigger when you enter DigiScope or head out on a run --
+                      throw a card from your Battle Deck (or a bare-knuckle punch) for a small reward. Turn this
+                      off to skip it entirely.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTravelEncountersEnabled(!meta.travelEncountersEnabled)}
+                    aria-pressed={meta.travelEncountersEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.travelEncountersEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-travel-encounters"
+                  >
+                    {meta.travelEncountersEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div><FightStyleSetting /></div>
+              <BuildingEntrySetting />
+            </div>
+          </div>
+        </section>
+
+        <section id="settings-hideout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-hideout-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-400/10 text-emerald-200">
+              <House className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-200">Hideout</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Hideout and intro</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    How the hideout looks and what runs in it, plus the title screen and intro you see before a run.
+                  </p>
                 </div>
               </div>
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
@@ -654,7 +984,6 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </button>
                 </div>
               </div>
-              <MotionSetting />
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -756,6 +1085,20 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
               </div>
               {meta.hideoutPreviewEnabled ? (
                 <div className="mt-3 border border-border/70 bg-background/50 p-4" data-testid="settings-hideout-pets">
+                  <h3 className="text-sm font-black uppercase tracking-wide text-white">{t('hideout.scene.title' as never)}</h3>
+                  <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('hideout.scene.description' as never)}</p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('hideout.scene.title' as never)}>
+                    {([['cage', 'hideout.scene.cage'], ['block', 'hideout.scene.oldBlock']] as const).map(([style, labelKey]) => (
+                      <button key={style} type="button" onClick={() => setHideoutSceneStyle(style)} aria-pressed={meta.hideoutSceneStyle === style} className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${meta.hideoutSceneStyle === style ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`} data-testid={`settings-hideout-scene-${style}`}>{t(labelKey as never)}</button>
+                    ))}
+                  </div>
+                  <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('hideout.scene.chat' as never)}</h3>
+                  <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('hideout.scene.chatDescription' as never)}</p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('hideout.scene.chat' as never)}>
+                    {([true, false] as const).map((enabled) => (
+                      <button key={String(enabled)} type="button" onClick={() => setHideoutSpeechBubbles(enabled)} aria-pressed={meta.hideoutSpeechBubblesEnabled === enabled} className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${meta.hideoutSpeechBubblesEnabled === enabled ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`} data-testid={`settings-hideout-chat-${enabled ? 'on' : 'off'}`}>{t(enabled ? ('settings.hideout.on' as never) : ('settings.hideout.off' as never))}</button>
+                    ))}
+                  </div>
                   <h3 className="text-sm font-black uppercase tracking-wide text-white">Pets in the hideout</h3>
                   <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
                     Your LokPets walk the strip with you, bounce to the music, nap and play. Tap one to pet it, tap the ground to call it over.
@@ -789,6 +1132,64 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                         data-testid={`button-hideout-events-${mode}`}
                       >
                         {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {([
+                    ['walk', 'settings.hideout.walk.title', 'settings.hideout.walk.description', meta.hideoutInteractive, setHideoutInteractive],
+                    ['play', 'settings.hideout.play.title', 'settings.hideout.play.description', meta.hideoutPetPlay, setHideoutPetPlay],
+                  ] as const).map(([id, titleKey, descKey, enabled, setEnabled]) => (
+                    <div key={id}>
+                      <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t(titleKey)}</h3>
+                      <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t(descKey)}</p>
+                      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t(titleKey)}>
+                        {([[true, 'settings.hideout.on'], [false, 'settings.hideout.off']] as const).map(([value, labelKey]) => (
+                          <button
+                            key={String(value)}
+                            type="button"
+                            onClick={() => setEnabled(value)}
+                            aria-pressed={enabled === value}
+                            className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${enabled === value ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`}
+                            data-testid={`button-hideout-${id}-${value ? 'on' : 'off'}`}
+                          >
+                            {t(labelKey)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <CrewTalkSetting />
+                  <RunEventsSetting />
+                  <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.hideout.notice.title')}</h3>
+                  <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.hideout.notice.description')}</p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.hideout.notice.title')}>
+                    {HIDEOUT_NOTICE_SECONDS.map((seconds) => (
+                      <button
+                        key={seconds}
+                        type="button"
+                        onClick={() => { setHideoutNoticeSeconds(seconds); setNoticeSeconds(seconds); }}
+                        aria-pressed={noticeSeconds === seconds}
+                        className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${noticeSeconds === seconds ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`}
+                        data-testid={`button-hideout-notice-${seconds}`}
+                      >
+                        {t('settings.hideout.notice.seconds', { n: seconds })}
+                      </button>
+                    ))}
+                  </div>
+                  <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.hideout.choice.title')}</h3>
+                  <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.hideout.choice.description')}</p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.hideout.choice.title')}>
+                    {([['on', 'settings.hideout.normal'], ['quiet', 'settings.hideout.rarely'], ['off', 'settings.hideout.off']] as const).map(([mode, labelKey]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setHideoutChoiceEvents(mode)}
+                        aria-pressed={meta.hideoutChoiceEvents === mode}
+                        className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${meta.hideoutChoiceEvents === mode ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`}
+                        data-testid={`button-hideout-choice-${mode}`}
+                      >
+                        {t(labelKey)}
                       </button>
                     ))}
                   </div>
@@ -908,38 +1309,11 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </label>
                 ) : null}
               </div>
-              <div className="mt-3 border border-border/70 bg-background/50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Travel encounters</h3>
-                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                      A short pop-up scrap can trigger when you enter DigiScope or head out on a run --
-                      throw a card from your Battle Deck (or a bare-knuckle punch) for a small reward. Turn this
-                      off to skip it entirely.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setTravelEncountersEnabled(!meta.travelEncountersEnabled)}
-                    aria-pressed={meta.travelEncountersEnabled}
-                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                      meta.travelEncountersEnabled
-                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
-                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
-                    }`}
-                    data-testid="button-toggle-travel-encounters"
-                  >
-                    {meta.travelEncountersEnabled ? 'On' : 'Off'}
-                  </button>
-                </div>
-              </div>
-              <FightStyleSetting />
-              <BuildingEntrySetting />
             </div>
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-gyro-settings">
+        <section id="settings-controls" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-gyro-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-400/10 text-emerald-200">
               <Compass className="h-5 w-5" />
@@ -1028,7 +1402,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-minimap-settings">
+        <section id="settings-minimap" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-minimap-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-cyan-200/40 bg-cyan-300/10 text-cyan-200">
               <Map className="h-5 w-5" />
@@ -1091,7 +1465,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-physics-settings">
+        <section id="settings-prop-launches" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-physics-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <MousePointer2 className="h-5 w-5" />
@@ -1135,7 +1509,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
         </section>
 
         {vendorPurchaseCount(meta, 'invert-world') > 0 || vendorPurchaseCount(meta, 'invert-palette') > 0 || vendorPurchaseCount(meta, 'mirror-mode') > 0 ? (
-          <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-cheat-settings">
+          <section id="settings-chaos" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-cheat-settings">
             <div className="flex items-start gap-4">
               <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300">
                 <FlipVertical2 className="h-5 w-5" />
@@ -1216,7 +1590,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </section>
         ) : null}
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-wildlife-settings">
+        <section id="settings-wildlife" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-wildlife-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-amber-300/40 bg-amber-300/10 text-amber-200">
               <Bird className="h-5 w-5" />
@@ -1249,7 +1623,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-ui-density-settings">
+        <section id="settings-card-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-ui-density-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-300/10 text-emerald-200">
               <LayoutDashboard className="h-5 w-5" />
@@ -1299,7 +1673,37 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-panel-layout-settings">
+        <section id="settings-card-motion" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-card-motion-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-300/40 bg-fuchsia-300/10 text-fuchsia-200">
+              <LayoutDashboard className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-black uppercase text-white">{t('settings.cardMotion.title')}</h2>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.cardMotion.body')}</p>
+              <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label={t('settings.cardMotion.title')}>
+                {(['full', 'subtle', 'off'] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setCardMotion(option)}
+                    aria-pressed={meta.cardMotion === option}
+                    className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.cardMotion === option
+                        ? 'border-fuchsia-300/60 bg-fuchsia-300/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid={`button-settings-card-motion-${option}`}
+                  >
+                    {t(`sleeve.motion.${option}` as const)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="settings-panel-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-panel-layout-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <PanelRight className="h-5 w-5" />
@@ -1347,7 +1751,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="section-ui-theme-settings">
+        <section id="settings-customization" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="section-ui-theme-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <Palette className="h-5 w-5" />
@@ -1531,7 +1935,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="save-data-panel">
+        <section id="settings-data" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="save-data-panel">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <Save className="h-5 w-5" />
@@ -1545,8 +1949,9 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
               </p>
               <h2 className="mt-1 text-xl font-black uppercase text-white">Back up or transfer your progress</h2>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                Export a save file to keep as a backup or move to another browser or device. Signing in
-                under Account keeps your progress synced automatically instead.
+                Export progress and forged operators to move them to another browser or device. Music files,
+                playlists, Studio projects, and device display preferences are stored separately and are not in this file.
+                Older progress-only saves still import.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
@@ -1570,7 +1975,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
         </section>
 
         {meta.devModeAccessUnlocked ? (
-          <section className="border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-panel">
+          <section id="settings-advanced" className="scroll-mt-24 border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6 lg:[column-span:all]" data-testid="dev-mode-panel">
             <div className="flex items-start gap-4">
               <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
                 <FlaskConical className="h-5 w-5" />
@@ -1581,8 +1986,8 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                     <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Developer access unlocked</p>
                     <h2 className="mt-1 text-xl font-black uppercase text-white">Catalog registry</h2>
                     <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                      Temporarily expose every registered character, area, room, theme, palette, and aura. Turning
-                      this off restores your real progression and never grants permanent ownership.
+                      Temporarily expose every registered character, area, room, theme, palette, aura, and the Operator Forge with five design slots. Turning
+                      this off restores your real progression and never grants permanent ownership. Reload after switching Dev Mode to update forged operators on the roster.
                     </p>
                   </div>
                   <button
@@ -1608,7 +2013,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
             </div>
           </section>
         ) : (
-          <section className="border border-dashed border-border bg-card/60 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-gate">
+          <section id="settings-advanced" className="scroll-mt-24 border border-dashed border-border bg-card/60 p-5 sm:p-6 lg:[column-span:all]" data-testid="dev-mode-gate">
             <button
               type="button"
               onClick={handleDevAccessTap}

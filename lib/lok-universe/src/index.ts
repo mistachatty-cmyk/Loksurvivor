@@ -4,5 +4,7 @@ export * from "./combat";
 export * from "./client";
 export * from "./render";
 export * from "./publish";
+export * from "./supporters";
+export * from "./wallet";
 export * from "./playtime";
 export * from "./achievements";

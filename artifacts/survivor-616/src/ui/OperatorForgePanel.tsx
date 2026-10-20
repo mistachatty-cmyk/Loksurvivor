@@ -4,7 +4,7 @@
  * here is saved as a separate forged operator (see `game/data/operatorForge.ts`
  * and `game/data/forgedOperators.ts`). Revealed from Settings.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { CHARACTERS, CHARACTERS_BY_ID } from '@/game/data/characters';
@@ -17,16 +17,25 @@ import {
   minWidthFor, newForgedId, rerollDesign, speciesById, type FeatureField, type ForgedOperator, type OperatorDesign,
   type OperatorFlavor, type PaletteSpec, type RerollTarget,
 } from '@/game/data/operatorForge';
-import { deleteForgedOperator, earnedEndgameIds, isFeatureEnabled, loadForgedOperators, saveForgedOperator } from '@/game/state/operatorForgeStore';
-import { CUSTOM_SLOTS, endgameReached } from '@/game/data/endgameUnlocks';
+import { bumpForgeStat, deleteForgedOperator, isCustomActive, isSlotTierUnlocked, recordForgeTab, setCustomActive, earnedEndgameIds, earnedSlotCount, isFeatureEnabled, loadForgedOperators, saveForgedOperator } from '@/game/state/operatorForgeStore';
+import { ALL_CUSTOM_SLOTS, endgameReached } from '@/game/data/endgameUnlocks';
 import { useMeta } from '@/game/state/metaStore';
+import { useLokEconomy } from '@/state/lokEconomyStore';
 import type { AnimName } from '@/game/types';
 import { RigPortrait } from './RigPortrait';
+import { OperatorRoster } from './OperatorRoster';
+import type { RosterEntry } from '@/game/data/characterForgeRoster';
+import { ClassicEnemiesTab } from './ClassicEnemiesTab';
+import { ClassicLokPetsTab } from './ClassicLokPetsTab';
+import { ENEMIES } from '@/game/data/enemies';
+import { CharacterStudioV3 } from './CharacterStudioV3';
+import { t } from '@/lib/i18n';
+import { CustomsRunSwitch, Switch } from './EndgameControls';
 
 const BUTTON =
-  'border border-border bg-background px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white transition-colors hover:border-primary disabled:opacity-40';
+  'min-h-10 border border-border bg-background px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white transition-colors hover:border-primary disabled:opacity-40';
 const PRIMARY =
-  'border border-primary bg-primary px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40';
+  'min-h-10 border border-primary bg-primary px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40';
 const FIELD = 'w-full border border-border bg-background px-2 py-2 text-sm text-white';
 const LABEL = 'text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground';
 
@@ -36,23 +45,47 @@ function freshSeed(): string {
   return `${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}${seedCounter}`;
 }
 
+type ForgeTab = 'operators' | 'enemies' | 'lokpets' | 'studio';
+const FORGE_TABS: ForgeTab[] = ['operators', 'enemies', 'lokpets', 'studio'];
+const TAB_KEY = 'survivor616.forge.tab';
+
+function readTab(): ForgeTab {
+  try {
+    const value = localStorage.getItem(TAB_KEY);
+    return FORGE_TABS.includes(value as ForgeTab) ? (value as ForgeTab) : 'operators';
+  } catch {
+    return 'operators';
+  }
+}
+
+type ForgeDraft = { design: OperatorDesign; identity: ReturnType<typeof generateOperatorIdentity>; kitId: string };
+
 export interface OperatorForgePanelProps {
   onClose: () => void;
 }
 
 export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
   const { meta } = useMeta();
+  const { activeSupporterTier } = useLokEconomy();
 
   const kits = useMemo(
     () => CHARACTERS.filter((c) => isForgeKit(c) && (c.unlock.kind === 'default' || meta.unlockedCharacterIds.includes(c.id) || meta.devModeAllUnlocks)),
     [meta.unlockedCharacterIds, meta.devModeAllUnlocks],
   );
 
+  const [tab, setTabState] = useState<ForgeTab>(readTab);
+  const setTab = (next: ForgeTab) => {
+    setTabState(next);
+    recordForgeTab(next);
+    try { localStorage.setItem(TAB_KEY, next); } catch { /* storage is optional */ }
+  };
+  useEffect(() => { recordForgeTab(tab); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const factionRaces = useMemo(() => isFeatureEnabled('factionRaces'), []);
   const [seed, setSeed] = useState(() => freshSeed());
   const [genSpecies, setGenSpecies] = useState('');
   const [genFlavor, setGenFlavor] = useState('');
   const [design, setDesign] = useState<OperatorDesign>(() => generateOperatorDesign(seed));
+  const baseDesign = useRef(design);
   const [identity, setIdentity] = useState(() => generateOperatorIdentity(seed, generateOperatorDesign(seed)));
   const [kitId, setKitId] = useState(() => kits[0]?.id ?? '');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -61,27 +94,92 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
   const [codeText, setCodeText] = useState('');
   const [message, setMessage] = useState('');
   const [dirty, setDirty] = useState(false);
+  const [past, setPast] = useState<ForgeDraft[]>([]);
+  const [future, setFuture] = useState<ForgeDraft[]>([]);
+  const lastDraft = useRef<ForgeDraft>({ design, identity, kitId });
+  const skipHistory = useRef(false);
+
+  useEffect(() => {
+    const previous = lastDraft.current;
+    if (previous.design === design && previous.identity === identity && previous.kitId === kitId) return;
+    lastDraft.current = { design, identity, kitId };
+    if (skipHistory.current) { skipHistory.current = false; return; }
+    setPast((items) => [...items.slice(-29), previous]);
+    setFuture([]);
+  }, [design, identity, kitId]);
+
+  const restoreDraft = (draft: ForgeDraft) => {
+    skipHistory.current = true;
+    setDesign(draft.design);
+    setIdentity(draft.identity);
+    setKitId(draft.kitId);
+    setDirty(true);
+  };
+
+  const undo = () => {
+    const previous = past[past.length - 1];
+    if (!previous) return;
+    setPast((items) => items.slice(0, -1));
+    setFuture((items) => [lastDraft.current, ...items]);
+    restoreDraft(previous);
+  };
+
+  const redo = () => {
+    const next = future[0];
+    if (!next) return;
+    setFuture((items) => items.slice(1));
+    setPast((items) => [...items, lastDraft.current]);
+    restoreDraft(next);
+  };
 
   const rig = useMemo(() => buildOperatorRig(design), [design]);
   const kit = CHARACTERS_BY_ID[kitId];
 
   const notify = useCallback((text: string) => setMessage(text), []);
 
+  const confirmDiscard = () => !dirty || window.confirm('Discard unsaved Forge changes?');
+  const close = () => { if (confirmDiscard()) onClose(); };
+
   const loadSeed = useCallback(
-    (nextSeed: string) => {
-      const options = { species: genSpecies || undefined, flavor: (genFlavor || undefined) as OperatorFlavor | undefined, coreOnly: !factionRaces };
-      const nextDesign = generateOperatorDesign(nextSeed, options);
+    (nextSeed: string, preset?: OperatorFlavor) => {
+      if (dirty && !window.confirm('Replace your unsaved Forge changes with a generated design?')) return;
+      skipHistory.current = true;
+      setPast([]);
+      setFuture([]);
+      const options = { species: preset ? undefined : genSpecies || undefined, flavor: preset ?? (genFlavor || undefined) as OperatorFlavor | undefined, coreOnly: !factionRaces };
+      const generated = generateOperatorDesign(nextSeed, options);
+      const nextDesign: OperatorDesign = design.style === 'classic' ? { ...generated, style: 'classic' } : generated;
+      baseDesign.current = nextDesign;
+      if (preset) { setGenFlavor(preset); setGenSpecies(''); }
       setSeed(nextSeed);
       setDesign(nextDesign);
       setIdentity(generateOperatorIdentity(nextSeed, nextDesign));
       setEditingId(null);
       setDirty(true);
     },
-    [genFlavor, genSpecies, factionRaces],
+    [genFlavor, genSpecies, factionRaces, dirty, design.style],
   );
 
   const reroll = (target: RerollTarget) => {
     setDesign((current) => rerollDesign(current, target, freshSeed()));
+    setDirty(true);
+  };
+
+  const resetSection = (section: 'body' | 'palette' | string) => {
+    const baseline = baseDesign.current;
+    if (section === 'body') setDesign((current) => ({ ...current, body: baseline.body }));
+    else if (section === 'palette') setDesign((current) => ({ ...current, palette: baseline.palette, paletteSpec: baseline.paletteSpec }));
+    else {
+      const categories = FORGE_CATEGORIES.filter((category) => category.group === section);
+      setDesign((current) => {
+        const look = { ...current.look };
+        for (const category of categories) {
+          look[category.field] = baseline.look[category.field];
+          look[category.colorField] = baseline.look[category.colorField];
+        }
+        return { ...current, look };
+      });
+    }
     setDirty(true);
   };
 
@@ -146,8 +244,10 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
       notify('Could not save. Every custom slot you have earned is full (delete one to make room), or this device is out of storage.');
       return;
     }
+    if (!editingId || asNew) bumpForgeStat(design.style === 'classic' ? 'classicSaved' : 'detailedSaved');
     setEditingId(id);
     setDirty(false);
+    baseDesign.current = design;
     refreshSaved();
     notify(`${op.name} saved. Reload to add them to your roster.`);
   };
@@ -173,13 +273,34 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
   };
 
   const edit = (op: ForgedOperator) => {
+    if (!confirmDiscard()) return;
+    skipHistory.current = true;
+    setPast([]);
+    setFuture([]);
     setDesign(op.design);
+    baseDesign.current = op.design;
     setIdentity({ name: op.name, handle: op.handle, tagline: op.tagline, bio: op.bio });
     setKitId(op.kitId);
     setEditingId(op.id);
     setSeed(op.id.replace(/^forge-/, ''));
     setDirty(false);
     notify(`Editing ${op.name}. Save to keep changes, or Save as new to make a copy. Reload afterwards to apply.`);
+  };
+
+  const loadRosterEntry = (entry: RosterEntry) => {
+    if (!confirmDiscard()) return;
+    skipHistory.current = true;
+    setPast([]);
+    setFuture([]);
+    const nextDesign: OperatorDesign = design.style === 'classic' ? { ...entry.design, style: 'classic' as const } : entry.design;
+    baseDesign.current = nextDesign;
+    setDesign(nextDesign);
+    setIdentity(generateOperatorIdentity(`roster:${entry.id}`, nextDesign));
+    setSeed(`roster:${entry.id}`);
+    if (kits.some((k) => k.id === entry.id)) setKitId(entry.id);
+    setEditingId(null);
+    setDirty(true);
+    notify(`Loaded ${entry.name}'s forged look. Edit freely, then Save to keep it.`);
   };
 
   const remove = (op: ForgedOperator) => {
@@ -190,8 +311,34 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
     notify(`${op.name} deleted. Reload to update your roster.`);
   };
 
+  const duplicate = (op: ForgedOperator) => {
+    const existing = new Set(loadForgedOperators().map((item) => item.id));
+    const copy = { ...op, id: newForgedId(`${op.id}:${Date.now()}`, existing), name: `${op.name} Copy`.slice(0, 40), createdAt: Date.now() };
+    if (!saveForgedOperator(copy)) {
+      notify('No free custom slot is available for a copy.');
+      return;
+    }
+    refreshSaved();
+    notify(`${copy.name} saved. Reload to add them to your roster.`);
+  };
+
+  const revertEditing = () => {
+    const original = saved.find((op) => op.id === editingId);
+    if (!original || !window.confirm(`Restore ${original.name} to its last saved design?`)) return;
+    skipHistory.current = true;
+    setPast([]);
+    setFuture([]);
+    setDesign(original.design);
+    baseDesign.current = original.design;
+    setIdentity({ name: original.name, handle: original.handle, tagline: original.tagline, bio: original.bio });
+    setKitId(original.kitId);
+    setDirty(false);
+    notify(`${original.name} restored to the last saved version.`);
+  };
+
   const copyCode = async (op: ForgedOperator) => {
     const code = exportForgedOperator(op);
+    bumpForgeStat('shareCodes');
     try {
       await navigator.clipboard.writeText(code);
       notify(`Share code for ${op.name} copied.`);
@@ -224,22 +371,28 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
 
   const species = speciesById(design.species);
   const earnedIds = earnedEndgameIds();
-  const slotsEarned = CUSTOM_SLOTS.filter((slot) => earnedIds.includes(slot.id)).length;
+  const slotsEarned = earnedSlotCount(activeSupporterTier);
+  const slotAvailable = (slot: (typeof ALL_CUSTOM_SLOTS)[number]) =>
+    (meta.devModeAccessUnlocked && meta.devModeAllUnlocks) || (earnedIds.includes(slot.id) && isSlotTierUnlocked(slot.tier, activeSupporterTier));
   const freeSlots = Math.max(0, slotsEarned - saved.length);
 
   return createPortal(
-    <div className="fixed inset-0 z-[110] overflow-y-auto bg-background text-white" data-testid="panel-operator-forge" role="dialog" aria-label="Operator Forge">
+    <div className="fixed inset-0 z-[110] overflow-y-auto bg-background text-white" data-testid="panel-operator-forge" role="dialog" aria-label={tab === 'studio' ? 'Character Studio' : 'Operator Forge'}>
       <div className="mx-auto max-w-6xl px-4 pb-24 pt-5 sm:px-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">End game workshop</p>
-            <h1 className="mt-1 text-2xl font-black uppercase">Operator Forge</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            <h1 className="mt-1 text-2xl font-black uppercase">{tab === 'studio' ? 'Character Studio' : 'Operator Forge'}</h1>
+            {tab === 'studio' ? <p className="mt-1 text-sm text-muted-foreground">Create, animate, and share a character of your own.</p> : <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
               Design new operators from scratch or generate them. Forged operators are extra roster entries: your existing
               operators are never changed. Each one borrows the stats, weapon and ultimate of a kit you have already unlocked.
-            </p>
+            </p>}
           </div>
-          <button type="button" onClick={onClose} className={BUTTON} data-testid="button-forge-close">Close</button>
+          <div className="flex flex-wrap justify-end gap-2">
+            {tab !== 'studio' && <button type="button" onClick={undo} disabled={past.length === 0} className={BUTTON} data-testid="button-forge-undo">Undo</button>}
+            {tab !== 'studio' && <button type="button" onClick={redo} disabled={future.length === 0} className={BUTTON} data-testid="button-forge-redo">Redo</button>}
+            <button type="button" onClick={close} className={BUTTON} data-testid="button-forge-close">Close</button>
+          </div>
         </div>
 
         {message ? (
@@ -251,10 +404,40 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
           </div>
         ) : null}
 
+        <nav className="mt-4 grid grid-cols-4 gap-1 border-b border-border pb-2 sm:flex sm:gap-2" role="tablist" aria-label={t('forge.nav.aria')} data-testid="forge-nav">
+          {FORGE_TABS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`forge-tab-${id}`}
+              aria-selected={tab === id}
+              aria-controls={`forge-screen-${id}`}
+              onClick={() => setTab(id)}
+              className={`min-h-10 min-w-0 border px-1 py-2 font-mono text-[10px] font-bold uppercase tracking-tight sm:flex-none sm:px-4 sm:text-xs sm:tracking-widest ${tab === id ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:text-white'}`}
+              data-testid={`forge-tab-${id}`}
+            >
+              {id === 'studio' ? 'Studio v3' : t(`forge.nav.${id}` as const)}
+            </button>
+          ))}
+        </nav>
+
+        <div id="forge-screen-enemies" role="tabpanel" aria-labelledby="forge-tab-enemies" hidden={tab !== 'enemies'}><ClassicEnemiesTab /></div>
+        <div id="forge-screen-lokpets" role="tabpanel" aria-labelledby="forge-tab-lokpets" hidden={tab !== 'lokpets'}><ClassicLokPetsTab /></div>
+        <div id="forge-screen-studio" role="tabpanel" aria-labelledby="forge-tab-studio" hidden={tab !== 'studio'}>
+          {tab === 'studio' && <CharacterStudioV3 operatorSources={kits.map((character) => ({ id: character.id, name: character.name }))} enemySources={ENEMIES.map((enemy) => ({ id: enemy.id, name: enemy.name }))} v2Operators={saved} />}
+        </div>
+
+        <div id="forge-screen-operators" role="tabpanel" aria-labelledby="forge-tab-operators" hidden={tab !== 'operators'}>
+        <div className="sticky top-0 z-20 mt-4 flex items-center gap-3 border border-primary/40 bg-card p-2 shadow-lg lg:hidden" data-testid="forge-mobile-preview">
+          <RigPortrait rig={rig} palette={design.palette} anim={anim} size={88} animated={false} />
+          <div className="min-w-0 flex-1"><p className="truncate text-sm font-black uppercase">{identity.name || 'New operator'}</p><p className="text-xs text-muted-foreground">{species.label} · {dirty ? 'Unsaved changes' : editingId ? 'Saved' : 'New design'}</p></div>
+          <button type="button" className={PRIMARY} onClick={() => save(false)} disabled={!kit}>Save</button>
+        </div>
         <div className="mt-5 grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
           {/* Preview and identity */}
           <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-            <section className="border border-border bg-card p-4">
+            <section className="hidden border border-border bg-card p-4 lg:block">
               <div className="grid place-items-center border border-border/60 bg-black/30 py-3" data-testid="forge-preview">
                 <RigPortrait rig={rig} palette={design.palette} anim={anim} size={240} />
               </div>
@@ -325,6 +508,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
                 {editingId ? (
                   <button type="button" className={BUTTON} onClick={() => save(true)} data-testid="button-forge-save-new">Save as new</button>
                 ) : null}
+                {editingId && dirty ? <button type="button" className={BUTTON} onClick={revertEditing}>Revert to saved</button> : null}
               </div>
               {dirty ? <p className="text-xs text-amber-200/80">Unsaved changes.</p> : null}
             </section>
@@ -332,11 +516,21 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
 
           {/* Controls */}
           <div className="space-y-5">
-            <section className="border border-border bg-card p-4" data-testid="section-forge-generate">
+            <nav className="flex flex-wrap gap-2 border border-border bg-card p-3" aria-label="Forge sections">
+              {[['forge-generate', 'Generate'], ['forge-body', 'Body'], ['forge-palette', 'Palette'], ...FORGE_GROUPS.map((group) => [`forge-${group.toLowerCase().replace(/\s+/g, '-')}`, group]), ['forge-saved', 'Saved operators']].map(([id, label]) => (
+                <a key={id} href={`#${id}`} className="inline-flex min-h-10 items-center border border-border px-3 text-xs font-bold uppercase text-white hover:border-primary">{label}</a>
+              ))}
+            </nav>
+            <section id="forge-generate" className="scroll-mt-36 border border-border bg-card p-4" data-testid="section-forge-generate">
               <h2 className="text-sm font-black uppercase tracking-wide">Generate</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Every seed makes the same operator every time, so a seed is a shareable recipe.
               </p>
+              <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Quick start designs">
+                {([['street', 'Street'], ['tech', 'Tech'], ['mystic', 'Mystic'], ['wild', 'Wild']] as const).map(([flavor, label]) => (
+                  <button key={flavor} type="button" className={BUTTON} onClick={() => loadSeed(freshSeed(), flavor)}>Start {label}</button>
+                ))}
+              </div>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <label className="block">
                   <span className={LABEL}>Species</span>
@@ -371,10 +565,32 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               </div>
             </section>
 
-            <section className="border border-border bg-card p-4" data-testid="section-forge-body">
+            <section className="border border-border bg-card p-4" data-testid="section-forge-style">
+              <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('forge.style.label')}>
+                <span className={LABEL}>{t('forge.style.label')}</span>
+                {(['classic', 'detailed'] as const).map((id) => {
+                  const active = (design.style ?? 'detailed') === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => { setDesign((current) => { const { style: _drop, ...rest } = current; return id === 'classic' ? { ...rest, style: 'classic' } : rest; }); setDirty(true); }}
+                      className={`min-h-10 border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${active ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:text-white'}`}
+                      data-testid={`button-forge-style-${id}`}
+                    >
+                      {t(`forge.style.${id}` as const)}
+                    </button>
+                  );
+                })}
+              </div>
+              {design.style === 'classic' ? <p className="mt-2 text-xs text-muted-foreground">{t('forge.style.classicHint')}</p> : null}
+            </section>
+
+            <section id="forge-body" className="scroll-mt-36 border border-border bg-card p-4" data-testid="section-forge-body">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-black uppercase tracking-wide">Body</h2>
-                <button type="button" className={BUTTON} onClick={() => reroll('body')}>Roll body</button>
+                <div className="flex flex-wrap gap-2"><button type="button" className={BUTTON} onClick={() => resetSection('body')}>Reset body</button><button type="button" className={BUTTON} onClick={() => reroll('body')}>Roll body</button></div>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
                 {BODY_BUILDS.map((b) => (
@@ -402,10 +618,11 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               </div>
             </section>
 
-            <section className="border border-border bg-card p-4" data-testid="section-forge-palette">
+            <section id="forge-palette" className="scroll-mt-36 border border-border bg-card p-4" data-testid="section-forge-palette">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-black uppercase tracking-wide">Palette</h2>
                 <div className="flex gap-2">
+                  <button type="button" className={BUTTON} onClick={() => resetSection('palette')}>Reset palette</button>
                   <button type="button" className={BUTTON} onClick={() => reroll('palette')} data-testid="button-forge-roll-palette">Roll palette</button>
                   <button type="button" className={BUTTON} onClick={() => reroll('colors')} data-testid="button-forge-roll-colors">Reshuffle item colors</button>
                 </div>
@@ -454,9 +671,9 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               </div>
             </section>
 
-            {FORGE_GROUPS.map((group) => (
-              <section key={group} className="border border-border bg-card p-4" data-testid={`section-forge-${group.toLowerCase()}`}>
-                <h2 className="text-sm font-black uppercase tracking-wide">{group}</h2>
+            {design.style === 'classic' ? null : FORGE_GROUPS.map((group) => (
+              <section key={group} id={`forge-${group.toLowerCase().replace(/\s+/g, '-')}`} className="scroll-mt-36 border border-border bg-card p-4" data-testid={`section-forge-${group.toLowerCase()}`}>
+                <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-black uppercase tracking-wide">{group}</h2><button type="button" className={BUTTON} onClick={() => resetSection(group)}>Reset section</button></div>
                 <div className="mt-3 space-y-2">
                   {FORGE_CATEGORIES.filter((c) => c.group === group).map((cat) => (
                     <div key={cat.field} className="grid grid-cols-[1fr_auto] items-end gap-2 sm:grid-cols-[130px_1fr_130px_auto]">
@@ -489,20 +706,25 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               </section>
             ))}
 
-            <section className="border border-border bg-card p-4" data-testid="section-forge-saved">
+            <section id="forge-saved" className="scroll-mt-36 border border-border bg-card p-4" data-testid="section-forge-saved">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-black uppercase tracking-wide">Custom slots ({Math.min(saved.length, slotsEarned)}/{slotsEarned} used, {CUSTOM_SLOTS.length} total)</h2>
+                <h2 className="text-sm font-black uppercase tracking-wide">Custom slots ({Math.min(saved.length, slotsEarned)}/{slotsEarned} used, {ALL_CUSTOM_SLOTS.length} total)</h2>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">Each slot holds one operator you made, built on a copy of a premade operator&apos;s kit. Your premade operators are never replaced.</p>
+              <div className="mt-3"><CustomsRunSwitch onChange={refreshSaved} /></div>
               <ul className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="list-forge-saved">
                 {(() => {
                   let cursor = 0;
-                  return CUSTOM_SLOTS.map((slot) => {
-                    if (!earnedIds.includes(slot.id)) {
+                  return ALL_CUSTOM_SLOTS.map((slot) => {
+                    if (!slotAvailable(slot)) {
                       return (
                         <li key={slot.id} className="border border-dashed border-border/70 bg-background/30 p-3 opacity-80" data-testid={`slot-locked-${slot.id}`}>
                           <p className="text-sm font-black uppercase">{slot.label} <span className="font-mono text-[10px] tracking-widest text-muted-foreground">locked</span></p>
-                          <p className="text-xs text-muted-foreground">{slot.how}{endgameReached(meta) ? '' : ' Clear every standard map first.'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {slot.how}
+                            {endgameReached(meta) ? '' : ' Clear every standard map first.'}
+                            {slot.tier !== 'free' && !isSlotTierUnlocked(slot.tier, activeSupporterTier) ? ` This slot requires an active ${slot.tier === 'lokpass' ? 'Lok Pass' : slot.tier === 'passport' ? 'Lok Passport' : 'Lifetime Lok Passport'} supporter tier.` : ''}
+                          </p>
                         </li>
                       );
                     }
@@ -524,7 +746,9 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
                           <p className="truncate text-sm font-black uppercase">{op.name}</p>
                           <p className="truncate text-xs text-muted-foreground">{op.handle} - kit: {CHARACTERS_BY_ID[op.kitId]?.name ?? 'missing'}</p>
                           <div className="mt-2 flex flex-wrap gap-1.5">
+                            <Switch on={isCustomActive('operators', op.id)} label={`Use ${op.name} in runs`} onClick={() => { setCustomActive('operators', op.id, !isCustomActive('operators', op.id)); refreshSaved(); }} testId={`switch-operator-${op.id}`} />
                             <button type="button" className={BUTTON} onClick={() => edit(op)}>Edit</button>
+                            <button type="button" className={BUTTON} onClick={() => duplicate(op)}>Duplicate</button>
                             <button type="button" className={BUTTON} onClick={() => void copyCode(op)}>Copy code</button>
                             <button type="button" className={BUTTON} onClick={() => remove(op)}>Delete</button>
                           </div>
@@ -564,6 +788,8 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               </div>
             </section>
           </div>
+        </div>
+        <OperatorRoster savedOperators={saved} onSelectSaved={edit} onSelectRosterEntry={loadRosterEntry} />
         </div>
       </div>
     </div>,

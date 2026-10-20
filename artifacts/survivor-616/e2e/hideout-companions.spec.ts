@@ -23,6 +23,66 @@ const meta = (extra: Record<string, unknown> = {}) => JSON.stringify({
 });
 
 test.describe('hideout companions', () => {
+  test('hub controls clear each other at phone and browser widths', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.addInitScript((m) => { if (!localStorage.getItem('survivor616.meta.v1')) localStorage.setItem('survivor616.meta.v1', m); }, meta({ selectedLokPetIds: ['starter-1'] }));
+    for (const width of [390, 768, 1280]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto('/?screen=hub');
+      const dock = page.getByTestId('hub-control-dock');
+      const walk = page.getByTestId('hideout-preview-canvas');
+      await expect(dock).toBeVisible();
+      await expect(walk).toBeVisible();
+      const dockBox = await dock.boundingBox();
+      const walkBox = await walk.boundingBox();
+      expect(dockBox!.y + dockBox!.height).toBeLessThanOrEqual(walkBox!.y);
+      const controls = [
+        page.getByTestId('button-hub-mission-briefing'),
+        page.getByTestId('button-open-run-setup'),
+        page.locator('[data-testid="music-now-playing-global"], [data-testid="button-global-random-music"]').first(),
+        page.getByTestId('hideout-lokpet-companion'),
+      ];
+      for (const control of controls) await expect(control).toBeVisible();
+      const boxes = await Promise.all(controls.map((control) => control.boundingBox()));
+      for (let i = 0; i < boxes.length; i += 1) {
+        for (let j = i + 1; j < boxes.length; j += 1) {
+          const a = boxes[i]!;
+          const b = boxes[j]!;
+          const overlaps = a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+          expect(overlaps, `controls ${i} and ${j} overlap at ${width}px`).toBe(false);
+        }
+      }
+      await page.screenshot({ path: test.info().outputPath(`hub-${width}.png`), fullPage: true });
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    if (await page.getByTestId('button-global-random-music').count()) await page.getByTestId('button-global-random-music').click();
+    await page.getByTestId('music-now-playing-global').click();
+    await expect(page.getByTestId('button-global-music-collapse')).toBeVisible();
+    const expandedMusic = await page.getByTestId('music-now-playing-global').boundingBox();
+    const mission = await page.getByTestId('button-hub-mission-briefing').boundingBox();
+    expect(expandedMusic!.y >= mission!.y + mission!.height || expandedMusic!.x >= mission!.x + mission!.width).toBe(true);
+    await page.getByTestId('button-toggle-hub-layout').click();
+    await expect(page.getByTestId('hub-control-dock')).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByTestId('button-toggle-hub-layout')).toContainText('New control dock');
+  });
+
+  test('Looks & LokPets opens from another menu and equips a game theme', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.addInitScript((m) => { if (!localStorage.getItem('survivor616.meta.v1')) localStorage.setItem('survivor616.meta.v1', m); }, meta());
+    await page.goto('/?screen=settings');
+    await expect(page.getByTestId('button-back')).toBeVisible();
+    expect((await page.getByTestId('button-back').boundingBox())!.y).toBeLessThan(20);
+    await page.getByTestId('button-global-looks-lokpets').click();
+    await expect(page.getByTestId('screen-run-setup')).toBeVisible();
+    await page.getByTestId('button-run-setup-next').click();
+    await expect(page.getByTestId('looks-game-theme')).toBeVisible();
+    await page.getByTestId('button-looks-ui-theme-tape-garden').click();
+    await expect(page.locator('[data-ui-theme="tape-garden"]').first()).toBeVisible();
+    await page.getByTestId('button-run-setup-back').click();
+    await expect(page.getByTestId('settings-ui-layout')).toBeVisible();
+  });
+
   test('a pet event shows a one-line corner prompt and saves its cooldown', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));

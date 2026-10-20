@@ -62,7 +62,7 @@ test('Dev Mode derives ownership and disabling restores real equipped assets', (
 
 test('old saves cannot retain enabled Dev Mode without completing the new access gate', () => {
   const migrated = normalizeMeta({ ...createInitialMeta(), version: 10, devModeAllUnlocks: true });
-  assert.equal(migrated.version, 22);
+  assert.equal(migrated.version, createInitialMeta().version);
   assert.equal(migrated.devModeAccessUnlocked, false);
   assert.equal(migrated.devModeAllUnlocks, false);
 });

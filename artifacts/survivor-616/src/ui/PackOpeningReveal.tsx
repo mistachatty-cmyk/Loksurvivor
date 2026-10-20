@@ -8,6 +8,8 @@ import { CARD_SHOP_PACKS_BY_ID, PASSIVE_CARDS_BY_ID, type CardPull } from '@/gam
 import type { CardPackReveal } from '@/game/state/metaStore';
 import type { CardVariant } from '@/game/types';
 import { CardArtwork, RARITY_STYLE } from './LockDeckCollection';
+import { DEFAULT_CARD_BACK, type CardMotion } from '@/game/data/cardCosmetics';
+import { ScaledCardBack } from './CardCosmetics';
 
 const VARIANT_STYLE: Record<CardVariant, { label: string; ring: string; text: string }> = {
   standard: { label: 'Standard', ring: 'ring-white/10', text: 'text-white/45' },
@@ -51,7 +53,14 @@ function PulledCardFace({ pull, size }: { pull: CardPull; size: 'focal' | 'tray'
   );
 }
 
-function PackCardBack() {
+function PackCardBack({ backId, cardMotion }: { backId: string; cardMotion: CardMotion }) {
+  if (backId !== DEFAULT_CARD_BACK) {
+    return (
+      <div className="grid h-full w-full place-items-center [backface-visibility:hidden]">
+        <div className="aspect-[5/7] h-full min-w-0 overflow-hidden"><ScaledCardBack backId={backId} motion={cardMotion} maxWidth={400} /></div>
+      </div>
+    );
+  }
   return (
     <div className="grid h-full w-full place-items-center rounded-[14px] border border-white/15 bg-[linear-gradient(135deg,#1a1a24,#0a0a10)] [backface-visibility:hidden]">
       <span className="font-display text-2xl font-black tracking-tighter text-white/15">616</span>
@@ -59,13 +68,13 @@ function PackCardBack() {
   );
 }
 
-function FocalCard({ pull, flipped, isNew, onTap }: { pull: CardPull; flipped: boolean; isNew: boolean; onTap: () => void }) {
+function FocalCard({ pull, flipped, isNew, onTap, backId, cardMotion }: { pull: CardPull; flipped: boolean; isNew: boolean; onTap: () => void; backId: string; cardMotion: CardMotion }) {
   const variant = VARIANT_STYLE[pull.variant];
   return (
     <button type="button" onClick={onTap} className="relative h-full w-full [perspective:1000px] transition-transform active:scale-[0.97]" data-testid="button-reveal-card" aria-label={flipped ? 'Reveal next card' : 'Reveal card'}>
       <motion.div className="relative h-full w-full [transform-style:preserve-3d]" animate={{ rotateY: flipped ? 180 : 0 }} transition={{ duration: 0.45, ease: 'easeInOut' }}>
         <div className="absolute inset-0 [backface-visibility:hidden]">
-          <PackCardBack />
+          <PackCardBack backId={backId} cardMotion={cardMotion} />
         </div>
         <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)]">
           <PulledCardFace pull={pull} size="focal" />
@@ -92,12 +101,16 @@ function FocalCard({ pull, flipped, isNew, onTap }: { pull: CardPull; flipped: b
 export function PackOpeningReveal({
   reveal,
   cardCredits,
+  backId = DEFAULT_CARD_BACK,
+  cardMotion = 'subtle',
   sfx,
   onOpenAnother,
   onClose,
 }: {
   reveal: CardPackReveal;
   cardCredits: number;
+  backId?: string;
+  cardMotion?: CardMotion;
   sfx?: SfxPlayer;
   onOpenAnother: () => void;
   onClose: () => void;
@@ -189,11 +202,11 @@ export function PackOpeningReveal({
                 className={state === 'focal' ? 'h-40 w-32 sm:h-52 sm:w-40' : state === 'settled' ? 'h-16 w-12 sm:h-20 sm:w-16' : 'h-14 w-10 opacity-40 sm:h-16 sm:w-12'}
               >
                 {state === 'focal' ? (
-                  <FocalCard pull={pull} flipped={focalFlipped} isNew={reveal.newFlags[index] ?? false} onTap={handleFocalTap} />
+                  <FocalCard pull={pull} flipped={focalFlipped} isNew={reveal.newFlags[index] ?? false} onTap={handleFocalTap} backId={backId} cardMotion={cardMotion} />
                 ) : state === 'settled' ? (
                   <PulledCardFace pull={pull} size="tray" />
                 ) : (
-                  <PackCardBack />
+                  <PackCardBack backId={backId} cardMotion={cardMotion} />
                 )}
               </motion.div>
             );

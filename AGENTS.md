@@ -2,6 +2,8 @@
 
 This repository is the shared working space for Loksurvivor. Gemini, Claude, and Replit Agent should use the same handoff rules and GitHub workflow.
 
+When the user says **“Pullcheck,” read `docs/PULLCHECK.md` first**. It records PRs intentionally excluded from routine review and the current triage procedure.
+
 ## Before starting work
 
 1. Read `COLLABORATION.md`.

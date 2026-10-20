@@ -26,6 +26,7 @@ import {
   armArtisteDraw,
   createWorld,
   beginArtisteDraw,
+  damageEnemy,
   dashPlayer,
   buildResult,
   claimLootPrize,
@@ -216,6 +217,94 @@ function addProjectile(
   world.projectiles.push(projectile);
   return projectile;
 }
+
+test('DigiFrog Lance carries a target, throws it, and leaves sticky and grossed-out enemies', () => {
+  const area = { ...testArea({ x: 900, y: 900, w: 20, h: 20, kind: 'cover' as const }), obstacles: [] };
+  const world = createWorld(area, testCharacter('digifrog-lance'), CHARACTERS[0]!.stats, 616);
+  const caught = addEnemy(world, 'nightcrawler', 70, 0);
+  caught.hp = caught.maxHp = 1000;
+  const witness = addEnemy(world, 'nightcrawler', 200, 200);
+  witness.uid = 901;
+  witness.hp = witness.maxHp = 1000;
+  world.weapons[0]!.readyAt = 0;
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(world.frogSwing);
+  for (let frame = 0; frame < 18; frame += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(world.frogSwing, null);
+  assert.ok(world.frogThrows.length > 0);
+  assert.ok(caught.activeEffects.some((effect) => effect.id === 'sticky'));
+  witness.x = caught.x + 8;
+  witness.y = caught.y + 8;
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(witness.activeEffects.some((effect) => effect.id === 'sticky'));
+  assert.ok(witness.activeEffects.some((effect) => effect.id === 'grossed-out'));
+});
+
+test('the Digi-Tana Trinity has three distinct combat paths', () => {
+  const area = { ...testArea({ x: 900, y: 900, w: 20, h: 20, kind: 'cover' as const }), obstacles: [] };
+  const fire = createWorld(area, testCharacter('firewall-verse'), CHARACTERS[0]!.stats, 617);
+  addEnemy(fire, 'nightcrawler', 80, 0);
+  fire.weapons[0]!.readyAt = 0;
+  stepWorld(fire, 1 / 30, neutralInput);
+  assert.ok(fire.effects.some((effect) => effect.weaponId === 'firewall-verse' && effect.kind === 'hazard'));
+
+  const rewind = createWorld(area, testCharacter('rewind-mercy'), CHARACTERS[0]!.stats, 618);
+  const marked = addEnemy(rewind, 'nightcrawler', 80, 0);
+  marked.hp = marked.maxHp = 1000;
+  rewind.weapons[0]!.readyAt = 0;
+  stepWorld(rewind, 1 / 30, neutralInput);
+  assert.equal(rewind.rewindMarks.length, 1);
+  marked.x = 180;
+  for (let frame = 0; frame < 13; frame += 1) stepWorld(rewind, 1 / 30, neutralInput);
+  assert.equal(rewind.rewindMarks.length, 0);
+  assert.ok(marked.x < 130, 'the marked threat returns near its earlier position');
+
+  const eclipse = createWorld(area, testCharacter('eclipse-severance'), CHARACTERS[0]!.stats, 619);
+  addEnemy(eclipse, 'nightcrawler', 80, 0);
+  eclipse.weapons[0]!.readyAt = 0;
+  stepWorld(eclipse, 1 / 30, neutralInput);
+  assert.ok(eclipse.effects.some((effect) => effect.weaponId === 'eclipse-severance' && effect.kind === 'laser'));
+});
+
+test('six Volume I archive weapons create their intended combat patterns', () => {
+  const area = { ...testArea({ x: 900, y: 900, w: 20, h: 20, kind: 'cover' as const }), obstacles: [] };
+  const expectations = [
+    ['cipher-cathedral', 'hazard', 3],
+    ['subwoofer-railstaff', 'laser', 3],
+    ['pitch-reaper', 'wave', 2],
+    ['cache-of-lost-hooks', 'hazard', 3],
+    ['breakpoint-hands', 'slash', 2],
+  ] as const;
+  for (const [id, kind, count] of expectations) {
+    const world = createWorld(area, testCharacter(id), CHARACTERS[0]!.stats, 620);
+    addEnemy(world, 'nightcrawler', 80, 0);
+    world.weapons[0]!.readyAt = 0;
+    stepWorld(world, 1 / 30, neutralInput);
+    assert.equal(world.effects.filter((effect) => effect.weaponId === id && effect.kind === kind).length, count, id);
+  }
+
+  const crown = createWorld(area, testCharacter('commentstorm-crown'), CHARACTERS[0]!.stats, 621);
+  assert.ok(crown.weapons[0]!.def.kind === 'orbit');
+  assert.ok(crown.orbiters.some((orb) => orb.weaponId === 'commentstorm-crown'));
+});
+
+test('new Volume I evolutions add visible combat layers', () => {
+  const area = { ...testArea({ x: 900, y: 900, w: 20, h: 20, kind: 'cover' as const }), obstacles: [] };
+  const cases = [
+    ['cipher-cathedral', 'cipher-sanctuary', 'hazard', 6],
+    ['subwoofer-railstaff', 'bassline-overdrive', 'laser', 5],
+    ['cache-of-lost-hooks', 'chorus-cache', 'hazard', 4],
+    ['breakpoint-hands', 'breakpoint-finale', 'slash', 3],
+  ] as const;
+  for (const [baseId, evolutionId, kind, count] of cases) {
+    const world = createWorld(area, testCharacter(baseId), CHARACTERS[0]!.stats, 622);
+    world.weapons[0]!.def = EVOLUTIONS_BY_ID[evolutionId]!.result;
+    world.weapons[0]!.readyAt = 0;
+    addEnemy(world, 'nightcrawler', 80, 0);
+    stepWorld(world, 1 / 30, neutralInput);
+    assert.equal(world.effects.filter((effect) => effect.weaponId === evolutionId && effect.kind === kind).length, count, evolutionId);
+  }
+});
 
 test('impact travel respects authored force, mass, and resistance', () => {
   const light = resolveImpactTravel(3, 0.6);
@@ -1498,7 +1587,7 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
     };
     const loaded = withStoredMeta(legacySave, loadMeta);
 
-    assert.equal(loaded.version, 22);
+    assert.equal(loaded.version, 26);
     assert.deepEqual(loaded.clearedAreaIds, [AREAS[0]!.id]);
     assert.equal(loaded.totalKills, 17);
     assert.equal(loaded.totalRuns, 3);
@@ -1565,6 +1654,52 @@ test('relic knowledge normalizes safely and clears unlock the matching recipe fo
   const repeat = reducer(first, { type: 'completeRun', result });
   assert.deepEqual(repeat.meta.knownRelicIds, ['mural-pigment']);
   assert.deepEqual(repeat.lastRun?.newlyDiscoveredRelicIds, []);
+});
+
+test('Training Arena target modes retain observed damage and credit lethal hits to their weapon', () => {
+  const world = createWorld(testArea({ x: 300, y: 300, w: 30, h: 30, kind: 'crate' }), testCharacter('spray-can'), CHARACTERS[0]!.stats, 616, [], 1, true);
+  const nonlethal = addEnemy(world);
+  nonlethal.hp = 5;
+  nonlethal.trainingDummyMode = 'nonlethal';
+  damageEnemy(world, nonlethal, 10, 0, 0, 0, undefined, 0, undefined, 'spray-can');
+  assert.equal(nonlethal.hp, 1);
+  assert.equal(nonlethal.dying, false);
+  assert.equal(world.trainingDamage, 10);
+  assert.equal(world.trainingHits, 1);
+
+  const infinite = addEnemy(world, 'nightcrawler', 40, 0);
+  infinite.hp = 100;
+  infinite.trainingDummyMode = 'infinite';
+  damageEnemy(world, infinite, 10, 0, 0, 0, undefined, 0, undefined, 'spray-can');
+  assert.equal(infinite.hp, infinite.maxHp);
+  assert.equal(world.trainingDamage, 20);
+
+  const lethal = addEnemy(world, 'nightcrawler', 60, 0);
+  lethal.hp = 5;
+  damageEnemy(world, lethal, 10, 0, 0, 0, undefined, 0, undefined, 'spray-can');
+  assert.equal(world.weaponKills['spray-can'], 1);
+
+  const environmentalFinish = addEnemy(world, 'nightcrawler', 80, 0);
+  environmentalFinish.hp = 5;
+  damageEnemy(world, environmentalFinish, 1, 0, 0, 0, undefined, 0, undefined, 'spray-can');
+  damageEnemy(world, environmentalFinish, 10, 0, 0, 0);
+  assert.equal(world.weaponKills['spray-can'], 1, 'an uncredited final hit must clear earlier weapon attribution');
+});
+
+test('weapon kill unlock progress commits only when a non-training run ends', () => {
+  const initial = { meta: createInitialMeta(), lastRun: null };
+  const withRack = reducer(initial, { type: 'grantTrainingWeaponRack' });
+  const result = runResult([], true);
+  result.weaponKills = { 'spray-can': 616 };
+  const trainingResult = { ...result, areaId: 'training-arena' };
+  const ignored = reducer(withRack, { type: 'completeRun', result: trainingResult });
+  assert.equal(ignored.meta.trainingWeaponKills['spray-can'], undefined);
+
+  result.areaId = AREAS[0]!.id;
+  const completed = reducer(withRack, { type: 'completeRun', result });
+  assert.equal(completed.meta.trainingWeaponKills['spray-can'], 616);
+  assert.equal(completed.meta.pendingNotifications.some((notification) => notification.iconId === 'spray-can'), true);
+  assert.equal(completed.meta.trainingMailbox.some((notification) => notification.iconId === 'spray-can' && !notification.read), true);
 });
 
 test('known relic recipes enter level-up eligibility, apply once, and keep the normal kill path', () => {
@@ -3802,4 +3937,26 @@ test('Artiste can cancel or discard a short mark without consuming cooldown', ()
   cancelArtisteDraw(world);
   assert.equal(world.artisteDraw?.armed, false);
   assert.equal(world.artisteDraw?.nextReadyAt, 0);
+});
+
+test('cascade damage numbers stack above the enemy, colour by tier and last longer than classic', () => {
+  const area = { ...testArea({ x: 900, y: 900, w: 20, h: 20, kind: 'cover' as const }), obstacles: [] };
+  const classic = createWorld(area, testCharacter('digifrog-lance'), CHARACTERS[0]!.stats, 41);
+  const cascade = createWorld(area, testCharacter('digifrog-lance'), CHARACTERS[0]!.stats, 41, [], 1, true, null, undefined);
+  cascade.damageNumberStyle = 'cascade';
+  for (const w of [classic, cascade]) {
+    w.stats.crit = 0;
+    const e = addEnemy(w, 'nightcrawler', 120, 0);
+    e.hp = e.maxHp = 100000;
+    for (const amount of [3, 30, 300]) damageEnemy(w, e, amount, 0, 0, 0);
+  }
+  assert.ok(classic.popups.every((p) => p.tier === undefined && p.lifeMs === undefined), 'classic popups are unchanged');
+  assert.equal(cascade.popups.length, 3);
+  assert.deepEqual(cascade.popups.map((p) => p.tier), [0, 2, 5]);
+  assert.equal(new Set(cascade.popups.map((p) => p.color)).size, 3, 'each tier has its own color');
+  assert.ok(cascade.popups[0]!.y < cascade.popups[1]!.y && cascade.popups[1]!.y < cascade.popups[2]!.y, 'older numbers sit higher');
+  assert.ok(cascade.popups.every((p) => (p.lifeMs ?? 0) > 700));
+  const e = cascade.enemies[0]!;
+  for (let i = 0; i < 12; i += 1) damageEnemy(cascade, e, 5, 0, 0, 0);
+  assert.ok(cascade.popups.filter((p) => p.ownerUid === e.uid).length <= 6, 'one enemy keeps at most six stacked numbers');
 });

@@ -3,6 +3,7 @@ import { CHARACTERS } from '@/game/data/characters';
 import { RUN_AURAS } from '@/game/data/runAuras';
 import { HATS } from '@/game/data/hats';
 import { CELEBRATIONS } from '@/game/data/celebrations';
+import { DROP_PACKS } from '@/game/data/dropPacks';
 import { THEMED_PALETTES } from '@/game/data/themedPalettes';
 import { SOUND_PACKS } from '@/game/data/soundPacks';
 import { UI_THEMES } from '@/game/data/uiThemes';
@@ -23,6 +24,7 @@ export const DEV_UNLOCK_REGISTRY = {
   runAuras: RUN_AURAS.map((item) => item.id),
   hats: HATS.map((item) => item.id),
   celebrations: CELEBRATIONS.map((item) => item.id),
+  dropPacks: DROP_PACKS.map((item) => item.id),
 } as const;
 
 export type DevUnlockCatalog = keyof typeof DEV_UNLOCK_REGISTRY;

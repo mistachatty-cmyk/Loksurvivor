@@ -6,6 +6,7 @@ import { getEnemy } from '@/game/data/enemies';
 import { LOKPET_VARIANTS_BY_ID, STARTER_LOKPET_IDS, type StarterLokPetId } from '@/game/data/lokPets';
 import { useMeta } from '@/game/state/metaStore';
 import type { CharacterDef, EnemyDef } from '@/game/types';
+import { LokPetEntrance } from '@/ui/LokPetEntrance';
 import { LokPetIcon } from '@/ui/LokPetVariantSheet';
 import { RigPortrait } from '@/ui/RigPortrait';
 
@@ -163,17 +164,12 @@ export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () 
               <div className="flex items-end justify-center gap-2">
                 <FighterModel character={starterCharacter} hits={hits} />
                 {chosenVariant && (
-                  <motion.div
-                    key="partner-beside-fighter"
-                    initial={{ opacity: 0, x: 24, scale: .6 }}
-                    animate={{ opacity: 1, x: 0, scale: 1, y: [0, -4, 0] }}
-                    transition={{ y: { repeat: Infinity, duration: 1.8 } }}
-                    className="relative mb-1"
-                  >
-                    <div className="rounded-full bg-cyan-300/5 p-1 shadow-[0_0_35px_rgba(34,211,238,.22)]">
-                      <LokPetIcon silhouette={chosenVariant.silhouette} palette={chosenVariant.palette} size={56} className="bg-black/55" />
-                    </div>
-                  </motion.div>
+                  <LokPetEntrance
+                    entranceKey="partner-beside-fighter"
+                    silhouette={chosenVariant.silhouette}
+                    palette={chosenVariant.palette}
+                    className="mb-1"
+                  />
                 )}
               </div>
               <p className="mt-3 truncate text-sm font-black uppercase tracking-wide text-white">

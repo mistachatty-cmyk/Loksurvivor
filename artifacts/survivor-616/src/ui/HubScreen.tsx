@@ -2,27 +2,54 @@
  * The hideout. Room navigation plus entry points into every other surface.
  * Owned by the design pass -- keep the export name and props stable.
  */
-import { isPrimeTakeoverActive, useMeta, describeUnlock } from '@/game/state/metaStore';
+import type { PromoTarget } from '@/game/data/promoSlides';
+import { LokPromoCycle } from './LokPromoCycle';
+import { ELIXIR_CAP, isPrimeTakeoverActive, spurShowing, useMeta, describeUnlock } from '@/game/state/metaStore';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getCharacter } from '@/game/data/characters';
 import { getHideoutScene, weatherClass } from '@/game/data/hideout';
-import { allyRig } from '@/game/data/progression';
+import { allyRig, HUB_ROOMS_BY_ID } from '@/game/data/progression';
+import { AREAS } from '@/game/data/areas';
+import type { ChatContext } from '@/game/engine/lokChat';
+import { logCrewLine, startProactive } from '@/game/state/lokChatActions';
+import { crewSpeak } from '@/game/engine/crewSpeak';
+import { getCrewTalkMode, getCrewTalkTone } from '@/game/state/crewTalkSetting';
 import { RigPortrait } from './RigPortrait';
 import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
+import { NotificationMailbox } from './NotificationMailbox';
 import { CollapsibleSection } from './CollapsibleSection';
-import { HideoutPreview, type HideoutPetInfo } from './HideoutPreview';
+import { HideoutPreview, type HideoutPetInfo, type HideoutPropInfo, type PlayCue, type StripNotice } from './HideoutPreview';
+import { HideoutPlayBar } from './HideoutPlayBar';
+import { MusicNowPlaying } from './MusicNowPlaying';
+import { setUiChromeLayout, useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
+import { describeReward } from './hideoutRewardText';
+import { HIDEOUT_PROPS_BY_ID, propReady, propsForRoom, resolvePropReward } from '@/game/data/hideoutProps';
+import { activeEventBuff } from '@/game/data/eventBuffs';
+import { AMBIENT_PICKUPS_BY_ID } from '@/game/data/hideoutAmbient';
+import { CHEST_TIERS } from '@/game/data/chestLoot';
+import { CARD_COSMETICS_BY_ID } from '@/game/data/cardCosmetics';
+import { CARD_MANIFESTS_BY_ID } from '@/game/data/cards';
+import { chestStatus, openLuckyChest as previewLuckyChest } from '@/game/engine/chestOpen';
+import { activeSkyBoost, skyAt, startSkyBoost } from '@/game/data/skyEvents';
+import { JERAMY_FROGSTER, JEREMEY_FROGSTER, LUVITNOT_KEEPER, type NpcCastMember } from '@/game/data/npcCast';
+import { bondLuck, eventsLeftToday, grantWithFallback } from '@/game/engine/hideoutRewards';
+import { eventPetFor, pickChoiceEvent } from '@/game/engine/choiceEvents';
+import { createRng } from '@/game/engine/math';
+import { applyPetCare, PET_CARE_VERBS_BY_ID } from '@/game/data/petCare';
+import { beatBus } from '@/game/audio/beatBus';
 import { petEvolvedLook } from '@/game/engine/petEvolution';
-import { bondRankFor, petCallName } from '@/game/engine/petGrowth';
+import { bondDayKey, bondRankFor, petCallName } from '@/game/engine/petGrowth';
 import { CurrencyGlossary } from './CurrencyGlossary';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords, ScanEye, Dog, HelpCircle, Clapperboard, Bug } from 'lucide-react';
 import { LorePopup } from './LorePopup';
-import type { CrewActivityIcon } from '@/game/types';
+import { LokChatLauncher, LokChatOverlay } from './LokChat';
+import type { CrewActivityIcon, HubPanel } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
@@ -34,13 +61,17 @@ import { LokPetIcon } from './LokPetVariantSheet';
 import { useAuth } from '@/state/authStore';
 import { useLokEconomy } from '@/state/lokEconomyStore';
 import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
-import { useT } from '@/lib/i18n';
+import { useT, useLocale } from '@/lib/i18n';
+import { grpdArmoryLocation, grpdAvailableSeals } from '@/game/data/grpdArmory';
+import { travelLeadPet } from '@/game/data/travelEncounters';
 import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
+import { HideoutDirectionPanel } from './HideoutDirectionPanel';
+import { HideoutEndgameDock } from './HideoutEndgameDock';
 
 /** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
 let hasShownHideoutArrivalThisSession = false;
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher';
+export type { HubPanel };
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -52,10 +83,16 @@ export interface HubScreenProps {
   onOpenSectorCommand: () => void;
   /** Opens the LokPet battle arena & sparring sandbox in the Lit Corner. */
   onOpenLokPetBattle?: () => void;
+  /** Opens the unlockable weapon test chamber. */
+  onOpenTrainingArena?: () => void;
   /** Opens the LokSurvivorArena seat/area picker. */
   onOpenArena: () => void;
   /** Reopens the companion and visual setup screen without starting a run. */
   onOpenRunSetup: () => void;
+  /** The ad slot: jump to a shop tab, an update, or a place in the player's account. */
+  onPromo: (target: PromoTarget) => void;
+  /** Opens a choice event scene (from a prop or the "something is happening" chip). */
+  onStartChoiceEvent?: (eventId: string, propId?: string) => void;
   /** Returns to the cold-open title screen. */
   onBack?: () => void;
 }
@@ -68,12 +105,14 @@ const PANEL_CONFIG: Record<HubPanel, { icon: any; testId: string }> = {
   unlocks: { icon: Unlock, testId: 'button-open-unlocks' },
   music: { icon: Music, testId: 'button-open-music' },
   studio: { icon: RadioTower, testId: 'button-open-studio' },
+  locker: { icon: Paintbrush, testId: 'button-open-locker' },
   recovery: { icon: Waves, testId: 'button-open-recovery' },
   vendor: { icon: Package, testId: 'button-open-vendor' },
   kennel: { icon: Dog, testId: 'button-open-kennel' },
   workshop: { icon: Hammer, testId: 'button-open-workshop' },
   'card-shop': { icon: CreditCard, testId: 'button-open-card-shop' },
   'weapon-bans': { icon: Clapperboard, testId: 'button-open-weapon-bans' },
+  'grpd-armory': { icon: ShieldCheck, testId: 'button-open-grpd-armory' },
   settings: { icon: Settings2, testId: 'button-open-settings' },
   'palette-store': { icon: Palette, testId: 'button-open-palette-store' },
   'sound-booth': { icon: Disc3, testId: 'button-open-sound-booth' },
@@ -81,6 +120,8 @@ const PANEL_CONFIG: Record<HubPanel, { icon: any; testId: string }> = {
   feedback: { icon: MessageSquareHeart, testId: 'button-open-feedback' },
   'threat-matrix': { icon: ShieldAlert, testId: 'button-open-threat-matrix' },
   'dust-mite-rancher': { icon: Bug, testId: 'button-open-dust-mite-rancher' },
+  'frog-ranch': { icon: Zap, testId: 'button-open-frog-ranch' },
+  'lok-shop': { icon: Sparkles, testId: 'button-open-lok-shop' },
   'director-terminal': { icon: ScanEye, testId: 'button-open-director-terminal' },
 };
 
@@ -119,10 +160,18 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   magnet: Magnet,
 };
 
-export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onBack }: HubScreenProps) {
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent } = useMeta();
+const NPC_PROP_CAST: Record<string, NpcCastMember> = {
+  'jeremey-frogster': JEREMEY_FROGSTER,
+  'jeramy-frogster': JERAMY_FROGSTER,
+  'luvitnot-keeper': LUVITNOT_KEEPER,
+};
+
+export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenTrainingArena, onOpenArena, onOpenRunSetup, onPromo, onStartChoiceEvent, onBack }: HubScreenProps) {
+  const chromeLayout = useUiChromeLayout();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet, lookThroughSpyglass, openLuckyChest, collectHideoutPickup, setHideoutSceneStyle, setHideoutSpeechBubbles } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const t = useT();
+  const locale = useLocale();
   const { session } = useAuth();
   const { balance: lokBalance } = useLokEconomy();
   // Memoized so the palette object identity stays stable across re-renders
@@ -153,6 +202,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           overlays: look.overlays,
           sizeScale: (pet.roll.sizeScale ?? 1) * look.scale,
           bondRank: bondRankFor(pet.bond).id,
+          playedToday: pet.careDay === bondDayKey(Date.now()),
           history: pet.hideoutEvents,
         };
       });
@@ -166,7 +216,227 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     ),
     [selectedCharacter, meta.characterSkinByCharacterId, meta.activePaletteId, meta.worldPaletteBlendEnabled],
   );
-  const roomNavRef = useRef<HTMLElement>(null);
+  const activeRoomId = unlockedRooms.find((r) => r.id === roomId)?.id ?? unlockedRooms[0]?.id ?? roomId;
+  const [ballOut, setBallOut] = useState(false);
+  const [summonSeq, setSummonSeq] = useState(0);
+  const [stripNotice, setStripNotice] = useState<StripNotice | undefined>(undefined);
+  const [playCue, setPlayCue] = useState<PlayCue | undefined>(undefined);
+  const [focusPetId, setFocusPetId] = useState<string | undefined>(undefined);
+  const noticeSeqRef = useRef(0);
+  const crewRecentRef = useRef(new Map<string, string[]>());
+  // `anchor` (a prop id, `operator` or `pet:<id>`) draws the note as a speech bubble beside that
+  // thing on the strip; without one it falls back to the small corner note.
+  const showStripNotice = (title: string, line: string, anchor?: string) => {
+    noticeSeqRef.current += 1;
+    setStripNotice({ seq: noticeSeqRef.current, title, line, anchor });
+  };
+  const [crewSay, setCrewSay] = useState<{ seq: number; propId: string; line: string } | undefined>(undefined);
+  // One line from a crew member's own voice. Used when you talk to them and when two of them chat.
+  const crewLineFor = (allyId: string): string | undefined => {
+    const ally = rescuedAllies.find((candidate) => candidate.id === allyId);
+    if (!ally) return undefined;
+    const seen = crewRecentRef.current.get(allyId) ?? [];
+    const line = crewSpeak({
+      allyId,
+      roomName: activeRoom?.name ?? '',
+      weather: getHideoutScene(activeRoomId).weather,
+      crewNames: rescuedAllies.filter((other) => other.id !== allyId).map((other) => other.name),
+      tone: getCrewTalkTone(),
+      rng: Math.random,
+      recent: seen,
+    });
+    crewRecentRef.current.set(allyId, [...seen, line].slice(-12));
+    // Everything the crew say out loud is also kept in LOK Chat's #hideout channel.
+    logCrewLine(allyId, line, activeRoom?.name, Date.now());
+    return line;
+  };
+
+  // LOK Chat: what a crew member knows when you message them.
+  const [showLokChat, setShowLokChat] = useState(false);
+  const buildChatContext = (allyId: string, affinity: number): ChatContext => {
+    const ally = rescuedAllies.find((candidate) => candidate.id === allyId) ?? rescuedAllies[0]!;
+    const run = lastRun ? { cleared: lastRun.cleared, kills: lastRun.kills, areaName: AREAS.find((area) => area.id === lastRun.areaId)?.name ?? lastRun.areaId } : undefined;
+    return {
+      self: { id: ally.id, name: ally.name, role: ally.role },
+      others: rescuedAllies.filter((other) => other.id !== ally.id).map((other) => ({ id: other.id, name: other.name, role: other.role })),
+      roomName: HUB_ROOMS_BY_ID[ally.room]?.name ?? ally.room,
+      crewHere: rescuedAllies.filter((other) => other.room === ally.room && other.id !== ally.id).map((other) => other.name),
+      weather: getHideoutScene(ally.room).weather,
+      hour: new Date().getHours(),
+      lastRun: run,
+      petName: companion ? petCallName(companion) : undefined,
+      tone: getCrewTalkTone(),
+      affinity,
+    };
+  };
+  const proactiveKeyRef = useRef('');
+  useEffect(() => {
+    if (rescuedAllies.length === 0) return;
+    const run = lastRun ? { key: `${lastRun.areaId}|${lastRun.survivedSec}|${lastRun.kills}`, cleared: lastRun.cleared } : undefined;
+    const signature = `${rescuedAllies.map((ally) => ally.id).join(',')}|${run?.key ?? ''}`;
+    if (proactiveKeyRef.current === signature) return;
+    proactiveKeyRef.current = signature;
+    startProactive({ allyIds: rescuedAllies.map((ally) => ally.id), buildContext: buildChatContext, now: Date.now(), hour: new Date().getHours(), rng: Math.random, run });
+    // Rebuilt context reads current props; the signature above is what decides when to run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rescuedAllies, lastRun]);
+
+  // The props standing in this room. Memoized so a poll tick does not rebuild them (the strip
+  // reads them through a ref, but a new array each render would still churn the parent).
+  const hideoutPropInfos = useMemo<HideoutPropInfo[]>(() => {
+    if (!meta.hideoutPreviewEnabled) return [];
+    const now = Date.now();
+    // The cage displays your real rescued crew together. The legacy block keeps
+    // the old room-by-room cast. Crew remain visible when walking/props are off.
+    const crewHere = rescuedAllies.filter((ally) => meta.hideoutSceneStyle === 'cage' || ally.room === activeRoomId);
+    const crewInfos: HideoutPropInfo[] = crewHere.map((ally, i) => ({
+      id: `ally:${ally.id}`,
+      // Spread across the middle of the strip with room for each to move; they roam from here.
+      x: 0.2 + ((i + 0.5) / crewHere.length) * 0.6,
+      art: 'npc',
+      accent: ally.palette.accent,
+      label: ally.name,
+      ready: false,
+      npc: { rig: allyRig(ally), palette: ally.palette },
+    }));
+    const roomProps = meta.hideoutInteractive ? propsForRoom(activeRoomId).map((def) => {
+      const npc = def.npcId ? NPC_PROP_CAST[def.npcId] : undefined;
+      return {
+        id: def.id,
+        x: def.x,
+        art: def.art,
+        accent: def.accent,
+        label: t(def.labelKey),
+        ready: def.action.kind !== 'talk' && def.action.kind !== 'panel' ? propReady(def, meta.hideoutClaims, now) : false,
+        npc: npc ? { rig: npc.rig, palette: npc.palette } : undefined,
+      };
+    }) : [];
+    return [...roomProps, ...crewInfos];
+  // `t` never changes identity, so the locale is what relabels the props.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoomId, meta.hideoutInteractive, meta.hideoutPreviewEnabled, meta.hideoutSceneStyle, meta.hideoutClaims, rescuedAllies, locale]);
+
+  // The pet the play bar is about: the one you last tapped on the strip, else the first walker.
+  const focusPet = meta.savedLokPets.find((pet) => pet.id === (hideoutPets.some((p) => p.id === focusPetId) ? focusPetId : hideoutPets[0]?.id));
+
+  const handlePlay = (verbId: string) => {
+    const def = PET_CARE_VERBS_BY_ID[verbId];
+    if (!def || !focusPet) return;
+    const now = Date.now();
+    const seed = Math.floor(Math.random() * 0x7fffffff);
+    const musicPlaying = beatBus.read().source !== 'none';
+    // Same function the reducer runs, so the toast shows exactly what was paid.
+    const outcome = applyPetCare(meta, focusPet.id, verbId, seed, { now, musicPlaying, elixirCap: ELIXIR_CAP });
+    if (!outcome.ok) return;
+    playWithLokPet(focusPet.id, verbId, seed, musicPlaying);
+    const name = petCallName(focusPet);
+    noticeSeqRef.current += 1;
+    setPlayCue({ seq: noticeSeqRef.current, petId: focusPet.id, move: def.move, emote: def.emote, durationMs: def.durationMs });
+    const line = t(outcome.rareTextKey ?? def.lineKeys[outcome.mood], { pet: name, you: focusPet.names?.callsYou?.trim() || 'you' });
+    const found = describeReward(outcome.applied, t);
+    showStripNotice(t(def.labelKey), found ? `${line} ${t('hideout.life.found', { items: found })}` : line, `pet:${focusPet.id}`);
+  };
+
+  const handlePickup = (kindId: string, _seed: number): boolean => {
+    const def = AMBIENT_PICKUPS_BY_ID[kindId];
+    if (!def) return false;
+    const preview = grantWithFallback(meta, def.reward, undefined, { now: Date.now(), elixirCap: ELIXIR_CAP });
+    if (!preview.paid) return false;
+    collectHideoutPickup(kindId);
+    showStripNotice(t('hideout.ambient.title'), t('hideout.ambient.found', { items: describeReward(preview.applied, t) }), 'operator');
+    return true;
+  };
+
+  const handlePropUse = (propId: string) => {
+    if (propId.startsWith('ally:')) {
+      const ally = rescuedAllies.find((candidate) => candidate.id === propId.slice(5));
+      if (!ally) return;
+      const spoken = getCrewTalkMode() === 'blurb' ? ally.blurb : crewLineFor(ally.id);
+      if (!spoken) return;
+      noticeSeqRef.current += 1;
+      setCrewSay({ seq: noticeSeqRef.current, propId, line: spoken });
+      return;
+    }
+    const def = HIDEOUT_PROPS_BY_ID[propId];
+    if (!def) return;
+    // The bell calls someone over, whether or not it still pays today.
+    if (propId === 'bell-cord') setSummonSeq((seq) => seq + 1);
+    const title = t(def.labelKey);
+    const line = t(def.lineKeys[Math.floor(Math.random() * def.lineKeys.length)] ?? def.lineKeys[0]!);
+    const action = def.action;
+    if (action.kind === 'talk') {
+      showStripNotice(title, line, propId);
+    } else if (action.kind === 'panel') {
+      showStripNotice(title, line, propId);
+      onOpen(action.panel);
+    } else if (action.kind === 'reward') {
+      const now = Date.now();
+      if (!propReady(def, meta.hideoutClaims, now)) {
+        showStripNotice(title, t('hideout.life.usedToday'), propId);
+        return;
+      }
+      // Preview with the same seed the reducer will use, so the toast shows exactly what was paid.
+      const seed = Math.floor(Math.random() * 0x7fffffff);
+      const roll = resolvePropReward(def, createRng(seed), bondLuck(meta.savedLokPets));
+      const preview = roll ? grantWithFallback(meta, roll.reward, roll.fallback, { now, rare: roll.rare, elixirCap: ELIXIR_CAP }) : null;
+      if (!preview?.paid) {
+        // The daily caps would swallow this grant: say so and keep the claim for later.
+        showStripNotice(title, t('hideout.life.capped'), propId);
+        return;
+      }
+      activateHideoutProp(propId, seed);
+      const found = preview ? describeReward(preview.applied, t) : '';
+      const text = roll && roll.rare && preview && !preview.usedFallback && roll.textKey ? t(roll.textKey) : line;
+      showStripNotice(title, found ? `${text} ${t('hideout.life.found', { items: found })}` : text, propId);
+    } else if (action.kind === 'chest') {
+      const now = Date.now();
+      const status = chestStatus(meta, now);
+      if (status !== 'out') {
+        showStripNotice(title, t(status === 'opened' ? 'chest.opened' : 'chest.away'), propId);
+        return;
+      }
+      const seed = Math.floor(Math.random() * 0x7fffffff);
+      const opening = previewLuckyChest(meta, now, seed, ELIXIR_CAP);
+      if (!opening) {
+        showStripNotice(title, t('hideout.life.capped'), propId);
+        return;
+      }
+      openLuckyChest(seed);
+      const { loot } = opening;
+      const tierLabel = t((CHEST_TIERS.find((tier) => tier.id === loot.tier)?.labelKey ?? 'chest.tier.common') as never);
+      const found = loot.cardId
+        ? t('chest.found.card', { name: CARD_MANIFESTS_BY_ID[loot.cardId]?.name ?? loot.cardId })
+        : loot.cosmeticId
+          ? t('chest.found.cosmetic', { name: CARD_COSMETICS_BY_ID[loot.cosmeticId]?.name ?? loot.cosmeticId })
+          : t('hideout.life.found', { items: describeReward(opening.applied, t) });
+      showStripNotice(`${title} - ${tierLabel}`, found, propId);
+    } else if (action.kind === 'sky') {
+      const sky = skyAt(Date.now());
+      const started = startSkyBoost(meta.skyBoost, Date.now());
+      const spur = spurShowing(meta, Date.now());
+      if (started || spur) lookThroughSpyglass();
+      const running = activeSkyBoost(started ?? meta.skyBoost, Date.now());
+      const suffix = started ? t('sky.started') : running ? t('sky.running', { title: t(running.titleKey as never) }) : '';
+      const spurLine = spur ? t('sky.spur', { name: spur.name }) : '';
+      showStripNotice(t(sky.titleKey as never), `${t(sky.lineKey as never)} ${suffix} ${spurLine}`.replace(/\s+/g, ' ').trim(), propId);
+    } else if (action.kind === 'event') {
+      const now = Date.now();
+      if (!propReady(def, meta.hideoutClaims, now)) {
+        showStripNotice(title, t('hideout.life.usedToday'), propId);
+        return;
+      }
+      const pet = eventPetFor(meta);
+      const picked = eventsLeftToday(meta.hideoutLedger, now) > 0
+        ? pickChoiceEvent(action.pool, meta.hideoutClaims, { now, pet, weather: getHideoutScene(activeRoomId).weather, musicPlaying: beatBus.read().source !== 'none' }, Math.random)
+        : null;
+      if (picked && onStartChoiceEvent) onStartChoiceEvent(picked.id, def.id);
+      else showStripNotice(title, line, propId);
+    } else {
+      showStripNotice(title, line, propId);
+    }
+  };
+
+  const roomNavRef = useRef<HTMLDivElement>(null);
   useStaggeredEntrance(roomNavRef, '[data-nav-item]');
 
   const enterRoom = (nextRoomId: string) => {
@@ -175,6 +445,13 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   };
 
   const activeRoom = unlockedRooms.find(r => r.id === roomId) || unlockedRooms[0];
+  const stationFound = unlockedRooms.some((room) => room.id === 'grpd-station');
+  const armoryAnchor = grpdArmoryLocation(meta.grpdArmoryAnchor, stationFound);
+  // Hideout rooms are the safe base; travel rooms are out in the city and can be ambushed on arrival.
+  const hideoutRooms = unlockedRooms.filter((room) => room.kind === 'hideout');
+  const travelRooms = unlockedRooms.filter((room) => room.kind === 'travel');
+  const lockedHideoutRooms = lockedRooms.filter((room) => room.kind === 'hideout');
+  const lockedTravelRooms = lockedRooms.filter((room) => room.kind === 'travel');
   const roomAllies = rescuedAllies.filter(ally => ally.room === activeRoom?.id);
   const newlyRescuedAlly = lastRun?.rescuedAllyId
     ? roomAllies.find((ally) => ally.id === lastRun.rescuedAllyId)
@@ -193,7 +470,16 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     () => meta.hideoutArrivalEnabled && !hasShownHideoutArrivalThisSession,
   );
   const [showLorePopup, setShowLorePopup] = useState(false);
-  const companion = meta.savedLokPets.find((pet) => meta.selectedLokPetIds.includes(pet.id));
+  const [crewCommand, setCrewCommand] = useState<{ seq: number; kind: 'help' | 'encourage'; line: string } | undefined>();
+  const commandCrew = (kind: 'help' | 'encourage') => {
+    noticeSeqRef.current += 1;
+    setCrewCommand({
+      seq: noticeSeqRef.current,
+      kind,
+      line: t(kind === 'help' ? ('hideout.scene.helpReply' as never) : ('hideout.scene.encourageReply' as never)),
+    });
+  };
+  const companion = travelLeadPet(meta);
   const legendaryPoliceDog = meta.savedLokPets.find((pet) => pet.roll.variantId === 'blue-616');
   const blue616 = LOKPET_VARIANTS_BY_ID['blue-616'];
 
@@ -214,6 +500,56 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   useEffect(() => {
     claimDailyLogin();
   }, [claimDailyLogin]);
+
+  // Choice events that find you while you are in the hideout: a "something is happening" chip on
+  // the strip (never a pop-up), and a nudge now and then after you have walked a good way.
+  const [eventChip, setEventChip] = useState<string | null>(null);
+  const eventChipRef = useRef<string | null>(null);
+  eventChipRef.current = eventChip;
+  const metaRef = useRef(meta);
+  metaRef.current = meta;
+  const lastWalkOfferRef = useRef(0);
+
+  const offerChoiceEvent = (pool: string) => {
+    const m = metaRef.current;
+    const now = Date.now();
+    if (eventChipRef.current || eventsLeftToday(m.hideoutLedger, now) <= 0) return;
+    const pet = eventPetFor(m);
+    const picked = pickChoiceEvent(pool, m.hideoutClaims, { now, pet, weather: getHideoutScene(activeRoomId).weather, musicPlaying: beatBus.read().source !== 'none' }, Math.random);
+    if (picked) setEventChip(picked.id);
+  };
+
+  useEffect(() => {
+    if (!meta.hideoutPreviewEnabled || meta.hideoutChoiceEvents === 'off' || showArrival) return undefined;
+    const fast = import.meta.env.DEV && new URLSearchParams(window.location.search).has('fastPetEvents');
+    const slow = meta.hideoutChoiceEvents === 'quiet' ? 3 : 1;
+    let timer = 0;
+    const schedule = (ms: number) => { timer = window.setTimeout(offer, ms); };
+    const offer = () => {
+      if (document.visibilityState === 'visible') offerChoiceEvent('idle');
+      schedule((240_000 + Math.random() * 300_000) * slow);
+    };
+    schedule(fast ? 3000 : 90_000 * slow);
+    return () => window.clearTimeout(timer);
+    // The offer reads the latest meta through a ref, so only the settings restart the timer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meta.hideoutPreviewEnabled, meta.hideoutChoiceEvents, showArrival]);
+
+  // A chip left alone fades after a minute, and a new room starts fresh.
+  useEffect(() => {
+    if (!eventChip) return undefined;
+    const timer = window.setTimeout(() => setEventChip(null), 60_000);
+    return () => window.clearTimeout(timer);
+  }, [eventChip]);
+  useEffect(() => { setEventChip(null); }, [activeRoomId]);
+
+  const handleWalkBeat = () => {
+    const m = metaRef.current;
+    const now = Date.now();
+    if (m.hideoutChoiceEvents === 'off' || now - lastWalkOfferRef.current < 180_000) return;
+    lastWalkOfferRef.current = now;
+    if (Math.random() < 0.3 * (m.hideoutChoiceEvents === 'quiet' ? 0.4 : 1)) offerChoiceEvent('walk');
+  };
 
   /**
    * Optional procedural ambience for the room you are standing in. Off unless
@@ -265,10 +601,14 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
     >
       <NotificationToasts />
-      {/* Mission Briefing / Lore Dossier Button */}
+      <NotificationMailbox />
+      {chromeLayout === 'classic' ? <>
+      {/* Classic corner controls remain available in Settings. */}
       <button
         type="button"
         onClick={() => setShowLorePopup(true)}
+          aria-haspopup="dialog"
+          aria-expanded={showLorePopup}
         className="fixed left-3 top-3 z-50 inline-flex min-h-11 items-center gap-2 rounded-sm border border-red-500/80 bg-red-950/90 px-3.5 font-mono text-[10px] font-bold uppercase tracking-wider text-red-200 shadow-[0_0_15px_rgba(239,68,68,0.25)] backdrop-blur transition hover:border-red-400 hover:bg-red-900/90 hover:text-white sm:left-5 sm:top-5"
         data-testid="button-hub-mission-briefing"
         title={t('hub.missionBriefingTitle')}
@@ -277,34 +617,20 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         <span>{t('hub.missionBriefing')}</span>
       </button>
 
-      <button
-        type="button"
-        onClick={onOpenRunSetup}
-        className="fixed right-3 top-3 z-50 inline-flex min-h-11 items-center gap-2 border border-cyan-200/45 bg-slate-950/90 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-[0_6px_24px_rgba(0,0,0,.36)] backdrop-blur transition hover:border-cyan-100 hover:bg-slate-900 sm:right-5 sm:top-5"
-        data-testid="button-open-run-setup"
-        title={t('hub.looksLokpetsTitle')}
-      >
-        <Sparkles className="h-4 w-4 text-cyan-200" />
-        <span>{t('common.looksLokpets')}</span>
-      </button>
-      {/* Mobile-only: the full Head Out tile lives at the bottom of a screen
-          that can scroll several pages on a phone -- this keeps the primary
-          action reachable without hunting for it. Hidden at sm+ where the
-          desktop layout is short enough that this would be redundant.
-          Optional -- meta.hideoutStickyHeadOutEnabled, Settings > Hideout. */}
-      {meta.hideoutStickyHeadOutEnabled && (
+      {(meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
         <button
           type="button"
-          onClick={() => onOpen('runs')}
-          className="fixed inset-x-3 bottom-3 z-50 flex min-h-12 items-center justify-center gap-2 border border-primary bg-primary px-4 font-mono text-sm font-black uppercase tracking-widest text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,.45)] transition hover:bg-white sm:hidden"
-          data-testid="button-open-runs-sticky"
+          onClick={onOpenRunSetup}
+          className="fixed right-[max(0.75rem,var(--safe-right))] top-[max(0.75rem,var(--safe-top))] z-50 inline-flex min-h-11 active:scale-95 items-center gap-2 border border-cyan-200/45 bg-slate-950/90 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-[0_6px_24px_rgba(0,0,0,.36)] backdrop-blur transition hover:border-cyan-100 hover:bg-slate-900 sm:right-5 sm:top-5"
+          data-testid="button-open-run-setup"
+          title={t('hub.looksLokpetsTitle')}
         >
-          Head out
-          <ArrowRight className="h-4 w-4" />
+          <Sparkles className="h-4 w-4 text-cyan-200" />
+          <span>{t('common.looksLokpets')}</span>
         </button>
       )}
       {companion && (
-        <div className="fixed right-3 top-16 z-40 flex max-w-56 items-center gap-2 border border-pink-200/35 bg-slate-950/90 p-2 shadow-xl backdrop-blur sm:right-5 sm:top-20" data-testid="hideout-lokpet-companion">
+        <div className="fixed right-[max(0.75rem,var(--safe-right))] top-[calc(4rem+var(--safe-top))] z-40 flex max-w-56 items-center gap-2 border border-pink-200/35 bg-slate-950/90 p-2 shadow-xl backdrop-blur sm:right-5 sm:top-20" data-testid="hideout-lokpet-companion">
           <LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={42} />
           <div className="min-w-0">
             <p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p>
@@ -314,6 +640,19 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           </div>
         </div>
       )}
+      </> : null}
+      {meta.hideoutStickyHeadOutEnabled && (
+        <button type="button" onClick={() => onOpen('runs')} className="fixed inset-x-3 bottom-[max(0.75rem,var(--safe-bottom))] z-50 flex min-h-12 active:scale-[0.98] items-center justify-center gap-2 border border-primary bg-primary px-4 font-mono text-sm font-black uppercase tracking-widest text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,.45)] transition hover:bg-white sm:hidden" data-testid="button-open-runs-sticky">Head out <ArrowRight className="h-4 w-4" /></button>
+      )}
+      <HideoutDirectionPanel
+        hideoutRooms={hideoutRooms}
+        travelRooms={travelRooms}
+        lockedHideoutRooms={lockedHideoutRooms}
+        lockedTravelRooms={lockedTravelRooms}
+        roomId={roomId}
+        onEnterRoom={enterRoom}
+        travelEncountersEnabled={meta.travelEncountersEnabled}
+      />
       <AnimatePresence mode="wait">
         <motion.div 
           key={activeRoom.id}
@@ -328,7 +667,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           {/* CSS background, not an <img>: reference art must never render as a
               raw document image if the stylesheet is missing. */}
           <div
-            className="h-full w-full bg-cover bg-center opacity-40 mix-blend-luminosity grayscale"
+            className="h-full w-full bg-cover bg-center opacity-40 mix-blend-luminosity grayscale scene-look-photo scene-look-original"
             style={{ backgroundImage: `url(${import.meta.env.BASE_URL}${activeRoom.backdrop})` }}
             aria-hidden="true"
           />
@@ -370,23 +709,101 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       </AnimatePresence>
 
       <div className={`relative z-20 flex-1 flex flex-col p-6 ${meta.hideoutStickyHeadOutEnabled ? 'pb-24 sm:pb-6' : 'pb-6'}`}>
+        {chromeLayout === 'new' ? (
+          <div className="sticky top-0 z-[60] mb-4 flex flex-col gap-2 border border-white/15 bg-black/90 p-3 shadow-xl backdrop-blur sm:p-4 lg:flex-row lg:items-center" data-testid="hub-control-dock">
+            <div className="flex flex-wrap items-center gap-2">
+              {onBack ? <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-white/40 hover:text-white" data-testid="button-hub-back-to-intro" aria-label="Back to title"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
+              <button type="button" onClick={() => setShowLorePopup(true)} aria-haspopup="dialog" aria-expanded={showLorePopup} className="inline-flex min-h-10 items-center gap-2 border border-red-500/60 bg-red-950/40 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-red-100 hover:border-red-300" data-testid="button-hub-mission-briefing" title={t('hub.missionBriefingTitle')}><ShieldAlert className="h-4 w-4 text-red-400" />{t('hub.missionBriefing')}</button>
+              {(meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
+                <button type="button" onClick={onOpenRunSetup} className="inline-flex min-h-10 items-center gap-2 border border-cyan-200/45 bg-slate-950/70 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 hover:border-cyan-100" data-testid="button-open-run-setup" title={t('hub.looksLokpetsTitle')}><Sparkles className="h-4 w-4 text-cyan-200" />{t('common.looksLokpets')}</button>
+              )}
+              {rescuedAllies.length > 0 ? <LokChatLauncher onOpen={() => setShowLokChat(true)} /> : null}
+              <HideoutEndgameDock onOpen={onOpen} compact />
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
+              {companion ? <div className="flex min-w-0 max-w-full items-center gap-2 border border-pink-200/35 bg-slate-950/80 p-2" data-testid="hideout-lokpet-companion"><LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={36} /><div className="min-w-0"><p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p><p className="font-mono text-[8px] uppercase tracking-wider text-white/55">{companion.stamina > 0 ? 'At your side' : meta.handheldDigiScopeOwned ? 'Resting in DigiScope' : 'Resting at the kennel'}</p></div></div> : null}
+              <MusicNowPlaying placement="inline" />
+            </div>
+          </div>
+        ) : null}
+        {chromeLayout === 'classic' && rescuedAllies.length > 0 ? <div className="mb-3 flex flex-wrap items-center gap-2"><LokChatLauncher onOpen={() => setShowLokChat(true)} /></div> : null}
+        {chromeLayout === 'classic' ? <HideoutEndgameDock onOpen={onOpen} /> : null}
         {meta.hideoutPreviewEnabled && (
           <HideoutPreview
             rig={selectedCharacter.rig}
             palette={selectedCharacterPalette}
+            height={meta.hideoutSceneStyle === 'cage' ? 220 : 176}
             className="mb-6 -mx-6 w-auto sm:mx-0 sm:w-full"
             pets={hideoutPets}
             weather={scene.weather}
+            biome={scene.biome}
+            accent={scene.homeAccent}
             eventsMode={meta.hideoutEvents}
             onPetCare={careForLokPet}
             onPetEvent={completeHideoutEvent}
             firstEventDelayMs={import.meta.env.DEV && new URLSearchParams(window.location.search).has('fastPetEvents') ? 600 : undefined}
+            props={hideoutPropInfos}
+            interactive={meta.hideoutInteractive}
+            keyboardActive={!showArrival && !showLorePopup && !showCurrencyGlossary && !showLokChat}
+            notice={stripNotice}
+            crewSpeak={crewLineFor}
+            say={crewSay}
+            crewCommand={crewCommand}
+            sceneStyle={meta.hideoutSceneStyle}
+            speechBubblesEnabled={meta.hideoutSpeechBubblesEnabled}
+            summonSeq={summonSeq}
+            onPickup={handlePickup}
+            ball={{ present: ballOut && meta.ownsBall && meta.hideoutInteractive, themeId: meta.uiTheme }}
+            cue={playCue}
+            onPropUse={handlePropUse}
+            onFocusPet={setFocusPetId}
+            onWalkBeat={handleWalkBeat}
+            eventChip={eventChip ? { label: t('hideout.life.eventChip'), aria: t('hideout.life.eventChipAria') } : null}
+            onEventChip={() => {
+              const id = eventChip;
+              setEventChip(null);
+              if (id) onStartChoiceEvent?.(id);
+            }}
           />
         )}
+        {meta.hideoutPreviewEnabled && meta.ownsBall && meta.hideoutInteractive ? (
+          <div className="mb-3 -mt-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setBallOut((out) => !out)}
+              className="border border-border px-3 py-1.5 text-xs font-bold uppercase tracking-wide hover:bg-white/10"
+              data-testid="button-toggle-ball"
+            >
+              {ballOut ? t('hideout.ball.putAway') : t('hideout.ball.putOut')}
+            </button>
+            {ballOut ? <span className="text-xs text-muted-foreground">{t('hideout.ball.hint')}</span> : null}
+          </div>
+        ) : null}
+        {meta.hideoutPreviewEnabled && meta.hideoutPetPlay && focusPet && (meta.totalRuns > 0 || meta.devModeAllUnlocks) ? (
+          <HideoutPlayBar
+            pet={focusPet}
+            others={hideoutPets.filter((pet) => pet.id !== focusPet.id).map((pet) => ({ id: pet.id, name: pet.name }))}
+            onPlay={handlePlay}
+            onSwitch={setFocusPetId}
+          />
+        ) : null}
+        <div className="mb-5 flex flex-wrap items-center gap-2 rounded border border-white/10 bg-black/50 px-3 py-2" data-testid="hideout-scene-controls">
+          <span className="text-[10px] font-black uppercase tracking-widest text-primary">{t('hideout.scene.title' as never)}</span>
+          {([['cage', 'hideout.scene.cage'], ['block', 'hideout.scene.oldBlock']] as const).map(([style, labelKey]) => (
+            <button key={style} type="button" onClick={() => setHideoutSceneStyle(style)} aria-pressed={meta.hideoutSceneStyle === style} className={`rounded border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${meta.hideoutSceneStyle === style ? 'border-primary bg-primary text-primary-foreground' : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/15'}`} data-testid={`button-hideout-scene-${style}`}>{t(labelKey as never)}</button>
+          ))}
+          <span className="ml-2 text-[10px] font-black uppercase tracking-widest text-primary">{t('hideout.scene.chat' as never)}</span>
+          {([true, false] as const).map((enabled) => (
+            <button key={String(enabled)} type="button" onClick={() => setHideoutSpeechBubbles(enabled)} aria-pressed={meta.hideoutSpeechBubblesEnabled === enabled} className={`rounded border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${meta.hideoutSpeechBubblesEnabled === enabled ? 'border-cyan-200 bg-cyan-100 text-slate-950' : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/15'}`} data-testid={`button-hideout-chat-${enabled ? 'on' : 'off'}`}>{t(enabled ? ('settings.hideout.on' as never) : ('settings.hideout.off' as never))}</button>
+          ))}
+          <button type="button" disabled={!rescuedAllies.length} onClick={() => commandCrew('help')} className="rounded border border-amber-300/50 bg-amber-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-100 enabled:hover:bg-amber-400/20 disabled:opacity-40" data-testid="button-hideout-call-help">{t('hideout.scene.callHelp' as never)}</button>
+          <button type="button" disabled={!rescuedAllies.length} onClick={() => commandCrew('encourage')} className="rounded border border-pink-300/50 bg-pink-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-pink-100 enabled:hover:bg-pink-400/20 disabled:opacity-40" data-testid="button-hideout-encourage">{t('hideout.scene.encourage' as never)}</button>
+          <button type="button" onClick={() => setUiChromeLayout(chromeLayout === 'new' ? 'classic' : 'new')} className="ml-auto border border-white/20 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wide text-white/65 hover:border-primary hover:text-white" data-testid="button-toggle-hub-layout">{chromeLayout === 'new' ? 'Classic corners' : 'New control dock'}</button>
+        </div>
         <header className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
             <div>
-              {onBack && (
+              {onBack && chromeLayout === 'classic' && (
                 <button
                   type="button"
                   onClick={onBack}
@@ -452,8 +869,39 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   <Sparkles className="inline w-3 h-3" />{lokBalance} LokTokens
                 </button>
               )}
+              {(roomId === 'main-floor' || roomId === 'the-back-room') && <button type="button" onClick={() => onOpen('locker')} className="mt-2 flex min-h-10 items-center gap-2 border border-primary/50 bg-primary/10 px-3 py-2 text-xs font-bold text-primary" data-testid="button-open-locker"><Paintbrush className="h-4 w-4" />Personal Locker</button>}
               {showCurrencyGlossary && <CurrencyGlossary />}
             </div>
+          </div>
+
+          <div className="mb-6">
+            <CollapsibleSection
+              title="Resources"
+              subtitle="Everything you're holding"
+              defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
+              testId="section-resources"
+            >
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" data-testid="resource-list">
+                {([
+                  { id: 'cred', name: 'Cred', value: meta.cred, color: 'text-amber-300' },
+                  { id: 'lootTokens', name: 'Loot tokens', value: meta.lootTokens, color: 'text-amber-400' },
+                  { id: 'skeletonKeys', name: 'Skeleton keys', value: meta.skeletonKeys, color: 'text-sky-400' },
+                  { id: 'cardCredits', name: 'Card credits', value: meta.cardCredits, color: 'text-emerald-300' },
+                  { id: 'lokPetTreats', name: 'Pet treats', value: meta.lokPetTreats, color: 'text-pink-300' },
+                  { id: 'petElixirs', name: 'Pet elixirs', value: meta.petElixirs, color: 'text-fuchsia-300' },
+                  { id: 'grpdSeals', name: 'GRPD seals', value: grpdAvailableSeals(meta.totalKills, meta.grpdSpentSeals), color: 'text-blue-300' },
+                  ...(activeEventBuff(meta.eventBuff, Date.now()) ? [{ id: 'eventBuff', name: t('eventbuff.tile'), value: t(`eventbuff.${meta.eventBuff!.buffId}.name` as never), color: 'text-cyan-300' }] : []),
+                  { id: 'runStreak', name: t('hub.resource.streak'), value: `${meta.runStreak} (${t('hub.resource.streakBest', { best: meta.bestRunStreak })})`, color: 'text-orange-300' },
+                  ...(meta.rescuedAllyIds.length > 0 ? [{ id: 'crewMorale', name: t('hub.resource.morale'), value: meta.crewMorale > 0 ? `+${meta.crewMorale}` : meta.crewMorale, color: meta.crewMorale < 0 ? 'text-red-400' : 'text-lime-300' }] : []),
+                  ...(session && lokBalance !== null ? [{ id: 'lokTokens', name: 'LokTokens', value: lokBalance, color: 'text-violet-300' }] : []),
+                ]).map((r) => (
+                  <div key={r.id} className="border border-border bg-black/20 p-2" data-testid={`resource-${r.id}`}>
+                    <p className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{r.name}</p>
+                    <p className={`font-mono text-sm font-black ${r.color}`}>{r.value}</p>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
           </div>
 
           <div className="mb-6">
@@ -499,268 +947,69 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </CollapsibleSection>
           </div>
 
-          <nav ref={roomNavRef} className="flex flex-wrap gap-2 mb-6">
-            {unlockedRooms.map((room) => {
-              const isActive = room.id === roomId;
-              return (
-                <button
-                  key={room.id}
-                  type="button"
-                  data-nav-item
-                  onClick={() => enterRoom(room.id)}
-                  className={`px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all border ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-card text-muted-foreground border-border hover:border-primary/50 hover:text-white'
-                  }`}
-                  data-active={isActive}
-                  data-testid={`button-room-${room.id}`}
-                >
-                  {room.name}
-                </button>
-              );
-            })}
-          </nav>
-
-          {lockedRooms.length > 0 && (
-            <div
-              className="mb-6 flex flex-wrap gap-2"
-              data-testid="hideout-locked-rooms"
-            >
-              {lockedRooms.map((room) => (
-                <div
-                  key={room.id}
-                  className="flex items-center gap-2 border border-dashed border-border px-4 py-3 text-xs uppercase tracking-wider text-muted-foreground/70"
-                  title={describeUnlock(room.unlock)}
-                  data-testid={`locked-room-${room.id}`}
-                >
-                  <Lock className="h-3 w-3" />
-                  <span>{room.name}</span>
-                  <span className="hidden font-normal normal-case tracking-normal text-muted-foreground/60 sm:inline">
-                    — {describeUnlock(room.unlock)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="p-4 bg-card border border-border">
-            <h2 className="text-xl font-bold text-white mb-1">{activeRoom.subtitle}</h2>
-            <p className="text-sm text-muted-foreground">{activeRoom.description}</p>
-          </div>
-            <div className="mt-3">
-            <CollapsibleSection
-              title="Scene & Sanctum links"
-              subtitle={`${scene.weatherLabel} · ${scene.homeName}`}
-              defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
-              testId="hideout-scene"
-            >
-            <div className="grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-             <div className="flex items-center gap-3">
-               <span className="grid h-10 w-10 place-items-center border border-primary/40 bg-primary/10 text-primary">
-                 {(() => { const Icon = weatherIcon; return <Icon className="h-5 w-5" />; })()}
-               </span>
-               <div>
-                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">{scene.weatherLabel}</p>
-                 <p className="text-xs text-muted-foreground">{scene.weatherDescription}</p>
-               </div>
-             </div>
-             <div className="hidden h-px bg-border sm:block" />
-              <div className="flex flex-col gap-3 text-right sm:items-end">
-                <div className="flex items-center gap-2">
-                  <Building2 className="hidden h-4 w-4 text-primary sm:block" />
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white">{scene.homeName}</p>
-                    <p className="text-[11px] text-muted-foreground">{scene.homeDescription}</p>
-                  </div>
-                </div>
-                {activeRoom.id === 'main-floor' && (
-                  <button
-                    type="button"
-                    onClick={onOpenMapEditor}
-                    data-testid="button-hideout-computer"
-                    className="group flex items-center gap-3 border border-cyan-200/35 bg-cyan-950/30 px-3 py-2 text-left transition hover:border-cyan-200/80 hover:bg-cyan-950/60"
-                  >
-                    <MonitorDot className="h-5 w-5 text-cyan-200 transition group-hover:text-white" />
-                    <span>
-                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100">Sanctum computer</span>
-                      <span className="block text-[10px] text-cyan-100/60">Open map builder</span>
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-cyan-200/70" />
-                  </button>
-                )}
-                {activeRoom.id === 'main-floor' && (
-                  <button
-                    type="button"
-                    onClick={onOpenSectorCommand}
-                    data-testid="button-hideout-sector-command"
-                    className="group flex items-center gap-3 border border-amber-200/35 bg-amber-950/30 px-3 py-2 text-left transition hover:border-amber-200/80 hover:bg-amber-950/60"
-                  >
-                    <Radio className="h-5 w-5 text-amber-200 transition group-hover:text-white" />
-                    <span>
-                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-amber-100">Sector Command</span>
-                      <span className="block text-[10px] text-amber-100/60">Direct captured units · campaign</span>
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-amber-200/70" />
-                  </button>
-                )}
-                {activeRoom.id === 'main-floor' && onOpenLokPetBattle && (
-                  <button
-                    type="button"
-                    onClick={onOpenLokPetBattle}
-                    data-testid="button-hideout-lokpet-battle"
-                    className="group flex items-center gap-3 border border-pink-400/40 bg-pink-950/40 px-3 py-2 text-left transition hover:border-pink-300 hover:bg-pink-950/70"
-                  >
-                    <Swords className="h-5 w-5 text-pink-300 transition group-hover:text-white" />
-                    <span>
-                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-pink-200">Lit Corner Battle Arena</span>
-                      <span className="block text-[10px] text-pink-200/70">Experimental · LokPet Battles · Sparring & League</span>
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-pink-300/80" />
-                  </button>
-                )}
-                {activeRoom.id === 'main-floor' && (
-                  <button
-                    type="button"
-                    onClick={() => onOpen('dust-mite-rancher')}
-                    data-testid="button-hideout-dust-mite-rancher"
-                    className="group flex items-center gap-3 border border-amber-400/40 bg-amber-950/40 px-3 py-2 text-left transition hover:border-amber-300 hover:bg-amber-950/70"
-                  >
-                    <Bug className="h-5 w-5 text-amber-400 transition group-hover:text-white" />
-                    <span>
-                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-amber-200">Dust Mite Rancher</span>
-                      <span className="block text-[10px] text-amber-200/70">Barnaby’s pure data-pet ranch · adopt & feed</span>
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-amber-300/80" />
-                  </button>
-                )}
-                {activeRoom.id === 'main-floor' && (
-                  <button
-                    type="button"
-                    onClick={onOpenArena}
-                    data-testid="button-hideout-arena"
-                    className="group flex items-center gap-3 border border-violet-200/35 bg-violet-950/30 px-3 py-2 text-left transition hover:border-violet-200/80 hover:bg-violet-950/60"
-                  >
-                    <Users className="h-5 w-5 text-violet-200 transition group-hover:text-white" />
-                    <span>
-                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-violet-100">LokSurvivorArena</span>
-                      <span className="block text-[10px] text-violet-100/60">Experimental · 2-4 players · most kills wins</span>
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-violet-200/70" />
-                  </button>
-                )}
-              </div>
-            </div>
-            </CollapsibleSection>
-            </div>
-        </header>
-
-        {activeRoom.id === 'grpd-vault' && blue616 && (
-          <section className="mb-8 border border-sky-300/45 bg-sky-950/35 p-4 shadow-[0_0_36px_rgba(96,165,250,.12)] sm:p-6" data-testid="section-grpd-vault-k9">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              <div className="grid h-28 w-28 shrink-0 place-items-center border border-sky-300/50 bg-slate-950/80">
-                <LokPetIcon silhouette={blue616.silhouette} palette={blue616.palette} size={88} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="border border-amber-300/50 bg-amber-300/10 px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">Legendary K9</span>
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">GRPD · Call sign 616</span>
-                </div>
-                <h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white">Blue 616</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-sky-100/70">The vault guardian held the last watch alone. Claim Blue directly from the evidence room—no cred, loot token, pack, or shop roll required.</p>
-                <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55">Heavy shot · Blue-line frost · Last Watch</p>
-              </div>
-              {legendaryPoliceDog ? (
-                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:min-w-44">
-                  <div className="flex items-center justify-center gap-2 border border-emerald-300/45 bg-emerald-400/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-emerald-200" data-testid="status-blue-616-recovered">
-                    <ShieldCheck className="h-4 w-4" /> Recovered
-                  </div>
-                  <button type="button" onClick={onOpenRunSetup} className="border border-sky-300/45 bg-sky-300/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-sky-100 transition hover:bg-sky-300/20" data-testid="button-equip-blue-616">
-                    Equip LokPet
-                  </button>
-                </div>
-              ) : (
-                <button type="button" onClick={claimLegendaryPoliceDog} className="flex shrink-0 items-center justify-center gap-2 border border-sky-200 bg-sky-300/15 px-5 py-4 font-mono text-xs font-black uppercase tracking-wider text-sky-50 transition hover:bg-sky-300/30 sm:min-w-44" data-testid="button-claim-blue-616">
-                  <Dog className="h-5 w-5" /> Claim Blue 616
-                </button>
-              )}
-            </div>
-          </section>
-        )}
-
-        <div className="mb-8">
-        <CollapsibleSection
-          title="Rumor for the road"
-          subtitle={activeRumor ? activeRumor.name : 'No rumor active'}
-          defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
-          testId="section-crew-rumor"
-        >
-          {activeRumor && meta.activeCrewRumor && rumorAlly ? (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-              <div
-                className="grid h-20 w-20 shrink-0 place-items-center border-2 bg-black/60"
-                style={{ borderColor: activeRumor.accent, color: activeRumor.accent, boxShadow: `0 0 24px ${activeRumor.accent}33` }}
+          <div ref={roomNavRef} className="mb-6 grid gap-4 lg:grid-cols-2">
+            {([
+              { kind: 'hideout', title: t('hub.nav.hideout.title'), note: t('hub.nav.hideout.note'), rooms: hideoutRooms, locked: lockedHideoutRooms },
+              { kind: 'travel', title: t('hub.nav.travel.title'), note: meta.travelEncountersEnabled ? t('hub.nav.travel.note') : t('hub.nav.travel.noteOff'), rooms: travelRooms, locked: lockedTravelRooms },
+            ] as const).map((group) => (
+              <section
+                key={group.kind}
+                aria-label={group.title}
+                className={`border p-3 ${group.kind === 'travel' ? 'border-amber-400/30 bg-amber-950/10' : 'border-emerald-400/30 bg-emerald-950/10'}`}
+                data-testid={`room-group-${group.kind}`}
               >
-                <RumorIcon className="h-10 w-10" aria-hidden="true" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <p className="text-xs font-bold uppercase tracking-[0.25em]" style={{ color: activeRumor.accent }}>Rumor for the road</p>
-                  <span className="border border-[#fbbf24]/40 bg-[#fbbf24]/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-[#fbbf24]">Active next run</span>
-                </div>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">{activeRumor.name}</h2>
-                <p className="mt-1 font-mono text-xs uppercase tracking-widest text-white/60">Brought by {rumorAlly.name}</p>
-                <p className="mt-3 max-w-2xl text-sm italic leading-relaxed text-muted-foreground">“{activeRumor.story}”</p>
-                <div className="mt-3 border-l-2 pl-3" style={{ borderColor: activeRumor.accent }}>
-                  <p className="text-xs font-bold uppercase tracking-widest text-white">{activeRumor.effectLabel}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{activeRumor.effectDescription}</p>
-                </div>
-              </div>
-            </div>
-          ) : rescuedAllies.length === 0 ? (
-            <div className="flex items-center gap-3" data-testid="text-rumor-no-crew">
-              <Radio className="h-7 w-7 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground">Rumor board quiet</p>
-                <p className="mt-1 text-sm text-muted-foreground">Rescue someone from the streets before the hideout can send a rumor ahead.</p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3" data-testid="text-rumor-quiet">
-              <Radio className="h-7 w-7 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground">No rumor active</p>
-                <p className="mt-1 text-sm text-muted-foreground">The crew has nothing strange to report yet. The next return may change that.</p>
-              </div>
-            </div>
-          )}
-        </CollapsibleSection>
-        </div>
-
-        <div className="mb-8">
-        <CollapsibleSection
-          title="First Night & Contracts"
-          subtitle="Daily boards and the crew's ongoing contracts"
-          defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
-          testId="section-first-night-contracts"
-        >
-          <FirstNightBoard compact />
-          {meta.loginStreakCount > 0 ? (
-            <div
-              className="mt-3 flex items-center gap-2 border border-amber-400/40 bg-amber-500/[0.08] px-4 py-2 text-xs font-bold uppercase tracking-widest text-amber-200"
-              data-testid="login-streak-chip"
-            >
-              <Flame className="h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
-              Day {meta.loginStreakCount} streak
-            </div>
-          ) : null}
-          <div className="mt-3">
-            <ContractBoard onHeadOut={() => onOpen('runs')} />
+                <h2 className={`font-mono text-[10px] font-black uppercase tracking-[0.25em] ${group.kind === 'travel' ? 'text-amber-300' : 'text-emerald-300'}`}>{group.title}</h2>
+                <p className="mb-3 mt-1 text-[11px] text-muted-foreground">{group.note}</p>
+                <nav className="flex flex-wrap gap-2" aria-label={group.title}>
+                  {group.rooms.map((room) => {
+                    const isActive = room.id === roomId;
+                    return (
+                      <button
+                        key={room.id}
+                        type="button"
+                        data-nav-item
+                        onClick={() => enterRoom(room.id)}
+                        className={`px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all border ${
+                          isActive
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-card text-muted-foreground border-border hover:border-primary/50 hover:text-white'
+                        }`}
+                        data-active={isActive}
+                        data-room-kind={room.kind}
+                        data-testid={`button-room-${room.id}`}
+                      >
+                        {room.name}
+                        {room.kind === 'travel' && meta.travelEncountersEnabled && (
+                          <span className="ml-2 border border-amber-400/50 px-1 py-0.5 font-mono text-[8px] tracking-wider text-amber-300" data-testid={`badge-ambush-${room.id}`}>{t('hub.nav.travel.badge')}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </nav>
+                {group.locked.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2" data-testid={`hideout-locked-rooms-${group.kind}`}>
+                    {group.locked.map((room) => (
+                      <div
+                        key={room.id}
+                        className="flex items-center gap-2 border border-dashed border-border px-4 py-3 text-xs uppercase tracking-wider text-muted-foreground/70"
+                        title={describeUnlock(room.unlock)}
+                        data-testid={`locked-room-${room.id}`}
+                      >
+                        <Lock className="h-3 w-3" />
+                        <span>{room.name}</span>
+                        <span className="hidden font-normal normal-case tracking-normal text-muted-foreground/60 sm:inline">
+                          — {describeUnlock(room.unlock)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ))}
           </div>
-        </CollapsibleSection>
-        </div>
 
-        <section className="mb-10 flex-1">
+        <LokPromoCycle onOpen={onPromo} />
+        <section className="mb-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="h-px bg-border flex-1" />
             <p className="text-xs uppercase tracking-widest text-primary font-bold">Playing as <span className="text-white">{selectedCharacter.name}</span></p>
@@ -833,6 +1082,48 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           </section>
         )}
 
+        {activeRoom.id === 'grpd-station' && (
+          <section className="mb-8 border border-sky-300/40 bg-sky-950/30 p-4 sm:p-5" data-testid="section-grpd-armory">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div><p className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">Division St. evidence room</p><h2 className="mt-1 text-xl font-black text-white">GRPD Armory</h2><p className="mt-1 text-sm text-sky-100/70">{armoryAnchor === 'station' ? 'Browse sealed designs, fabricate field prototypes, and choose which weapons may appear in future runs.' : 'The keeper hummed the Armory to the hideout. Its protected entrance is on the main floor until it returns.'}</p></div>
+              {armoryAnchor === 'station' && <button type="button" onClick={() => onOpen('grpd-armory')} className="min-h-11 border border-sky-200/70 bg-sky-300/15 px-4 font-mono text-xs font-black uppercase text-sky-50 hover:bg-sky-300/25" data-testid="button-open-grpd-armory">Open Armory</button>}
+            </div>
+          </section>
+        )}
+
+        {activeRoom.id === 'grpd-vault' && blue616 && (
+          <section className="mb-8 border border-sky-300/45 bg-sky-950/35 p-4 shadow-[0_0_36px_rgba(96,165,250,.12)] sm:p-6" data-testid="section-grpd-vault-k9">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="grid h-28 w-28 shrink-0 place-items-center border border-sky-300/50 bg-slate-950/80">
+                <LokPetIcon silhouette={blue616.silhouette} palette={blue616.palette} size={88} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="border border-amber-300/50 bg-amber-300/10 px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">Legendary K9</span>
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">GRPD · Call sign 616</span>
+                </div>
+                <h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white">Blue 616</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-sky-100/70">The vault guardian held the last watch alone. Claim Blue directly from the evidence room—no cred, loot token, pack, or shop roll required.</p>
+                <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55">Heavy shot · Blue-line frost · Last Watch</p>
+              </div>
+              {legendaryPoliceDog ? (
+                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:min-w-44">
+                  <div className="flex items-center justify-center gap-2 border border-emerald-300/45 bg-emerald-400/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-emerald-200" data-testid="status-blue-616-recovered">
+                    <ShieldCheck className="h-4 w-4" /> Recovered
+                  </div>
+                  <button type="button" onClick={onOpenRunSetup} className="border border-sky-300/45 bg-sky-300/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-sky-100 transition hover:bg-sky-300/20" data-testid="button-equip-blue-616">
+                    Equip LokPet
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={claimLegendaryPoliceDog} className="flex shrink-0 items-center justify-center gap-2 border border-sky-200 bg-sky-300/15 px-5 py-4 font-mono text-xs font-black uppercase tracking-wider text-sky-50 transition hover:bg-sky-300/30 sm:min-w-44" data-testid="button-claim-blue-616">
+                  <Dog className="h-5 w-5" /> Claim Blue 616
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
          {newlyRescuedAlly && (
            <section className="mb-8 border border-emerald-300/40 bg-emerald-950/20 p-4 sm:p-5" data-testid="section-welcome-home">
              <div className="mb-3 flex items-center gap-2">
@@ -852,6 +1143,237 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
              </div>
            </section>
          )}
+
+          <div className="p-4 bg-card border border-border">
+            <h2 className="text-xl font-bold text-white mb-1">{activeRoom.subtitle}</h2>
+            <p className="text-sm text-muted-foreground">{activeRoom.description}</p>
+          </div>
+            <div className="mt-3">
+            <CollapsibleSection
+              title="Scene & Sanctum links"
+              subtitle={`${scene.weatherLabel} · ${scene.homeName}`}
+              defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
+              testId="hideout-scene"
+            >
+            <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+             <div className="flex min-w-0 items-center gap-3 border border-white/10 bg-black/30 p-3">
+               <span className="grid h-10 w-10 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                 {(() => { const Icon = weatherIcon; return <Icon className="h-5 w-5" />; })()}
+               </span>
+               <div>
+                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">{scene.weatherLabel}</p>
+                 <p className="text-xs text-muted-foreground">{scene.weatherDescription}</p>
+               </div>
+             </div>
+                <div className="flex min-w-0 items-center gap-2 border border-white/10 bg-black/30 p-3">
+                  <Building2 className="hidden h-4 w-4 text-primary sm:block" />
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white">{scene.homeName}</p>
+                    <p className="text-[11px] text-muted-foreground">{scene.homeDescription}</p>
+                  </div>
+                </div>
+            </div>
+              <div className="grid min-w-0 gap-2 text-left sm:grid-cols-2 xl:grid-cols-3 [&>button]:min-w-0 [&>button]:w-full [&>button>span]:min-w-0 [&>button>svg]:shrink-0">
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={onOpenMapEditor}
+                    data-testid="button-hideout-computer"
+                    className="group flex items-center gap-3 border border-cyan-200/35 bg-cyan-950/30 px-3 py-2 text-left transition hover:border-cyan-200/80 hover:bg-cyan-950/60"
+                  >
+                    <MonitorDot className="h-5 w-5 text-cyan-200 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100">Sanctum computer</span>
+                      <span className="block text-[10px] text-cyan-100/60">Open map builder</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-cyan-200/70" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={onOpenSectorCommand}
+                    data-testid="button-hideout-sector-command"
+                    className="group flex items-center gap-3 border border-amber-200/35 bg-amber-950/30 px-3 py-2 text-left transition hover:border-amber-200/80 hover:bg-amber-950/60"
+                  >
+                    <Radio className="h-5 w-5 text-amber-200 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-amber-100">Sector Command</span>
+                      <span className="block text-[10px] text-amber-100/60">Direct captured units · campaign</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-amber-200/70" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && onOpenLokPetBattle && (
+                  <button
+                    type="button"
+                    onClick={onOpenLokPetBattle}
+                    data-testid="button-hideout-lokpet-battle"
+                    className="group flex items-center gap-3 border border-pink-400/40 bg-pink-950/40 px-3 py-2 text-left transition hover:border-pink-300 hover:bg-pink-950/70"
+                  >
+                    <Swords className="h-5 w-5 text-pink-300 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-pink-200">Lit Corner Battle Arena</span>
+                      <span className="block text-[10px] text-pink-200/70">Experimental · LokPet Battles · Sparring & League</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-pink-300/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (meta.trainingWeaponRackOwned || meta.devModeAllUnlocks) ? (
+                  <button
+                    type="button"
+                    onClick={onOpenTrainingArena}
+                    data-testid="button-hideout-training-arena"
+                    className="group flex items-center gap-3 border border-cyan-300/45 bg-cyan-950/45 px-3 py-2 text-left transition hover:border-cyan-200 hover:bg-cyan-950/75"
+                  >
+                    <Swords className="h-5 w-5 text-cyan-200 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100">{t('training.hub.title')}</span>
+                      <span className="block text-[10px] text-cyan-100/70">{t('training.hub.open')}</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-cyan-200/80" />
+                  </button>
+                ) : activeRoom.id === 'main-floor' ? (
+                  <div className="flex items-center gap-3 border border-white/10 bg-black/25 px-3 py-2 opacity-70" data-testid="training-arena-locked">
+                    <Swords className="h-5 w-5 text-white/35" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-white/55">{t('training.hub.locked')}</span>
+                      <span className="block text-[10px] text-white/40">{t('training.hub.shopHint')}</span>
+                    </span>
+                    <button type="button" onClick={() => onOpen('lok-shop')} className="border border-violet-300/40 px-2 py-1 font-mono text-[8px] font-bold uppercase tracking-widest text-violet-200 hover:bg-violet-200/10" data-testid="button-training-arena-shop">{t('training.hub.shop')}</button>
+                  </div>
+                ) : null}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={() => onOpen('dust-mite-rancher')}
+                    data-testid="button-hideout-dust-mite-rancher"
+                    className="group flex items-center gap-3 border border-amber-400/40 bg-amber-950/40 px-3 py-2 text-left transition hover:border-amber-300 hover:bg-amber-950/70"
+                  >
+                    <Bug className="h-5 w-5 text-amber-400 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-amber-200">Dust Mite Rancher</span>
+                      <span className="block text-[10px] text-amber-200/70">Barnaby’s pure data-pet ranch · adopt & feed</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-amber-300/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={() => onOpen('frog-ranch')}
+                    data-testid="button-hideout-frog-ranch"
+                    className="group flex items-center gap-3 border border-emerald-300/40 bg-emerald-950/40 px-3 py-2 text-left transition hover:border-emerald-200 hover:bg-emerald-950/70"
+                  >
+                    <Zap className="h-5 w-5 text-emerald-300 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-emerald-100">Circuit Frog Ranch</span>
+                      <span className="block text-[10px] text-emerald-100/70">Meet Jeremey Frogster · adopt and train frogs</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-emerald-300/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && armoryAnchor === 'hideout' && (
+                  <button type="button" onClick={() => onOpen('grpd-armory')} data-testid="button-hideout-grpd-armory"
+                    className="group flex items-center gap-3 border border-sky-200/50 bg-sky-950/50 px-3 py-2 text-left transition hover:border-amber-200 hover:bg-sky-950/80">
+                    <ShieldCheck className="h-5 w-5 text-amber-200" />
+                    <span><span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-sky-100">{stationFound ? t('hub.armory.relocatedEntrance') : t('hub.armory.hideoutEntrance')}</span><span className="block text-[10px] text-sky-100/70">{t('hub.armory.hideoutEntranceBlurb')}</span></span>
+                    <ArrowRight className="h-3.5 w-3.5 text-sky-200/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={onOpenArena}
+                    data-testid="button-hideout-arena"
+                    className="group flex items-center gap-3 border border-violet-200/35 bg-violet-950/30 px-3 py-2 text-left transition hover:border-violet-200/80 hover:bg-violet-950/60"
+                  >
+                    <Users className="h-5 w-5 text-violet-200 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-violet-100">LokSurvivorArena</span>
+                      <span className="block text-[10px] text-violet-100/60">Experimental · 2-4 players · most kills wins</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-violet-200/70" />
+                  </button>
+                )}
+              </div>
+            </div>
+            </CollapsibleSection>
+            </div>
+        </header>
+
+        <div className="mb-8">
+        <CollapsibleSection
+          title="Rumor for the road"
+          subtitle={activeRumor ? activeRumor.name : 'No rumor active'}
+          defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
+          testId="section-crew-rumor"
+        >
+          {activeRumor && meta.activeCrewRumor && rumorAlly ? (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+              <div
+                className="grid h-20 w-20 shrink-0 place-items-center border-2 bg-black/60"
+                style={{ borderColor: activeRumor.accent, color: activeRumor.accent, boxShadow: `0 0 24px ${activeRumor.accent}33` }}
+              >
+                <RumorIcon className="h-10 w-10" aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <p className="text-xs font-bold uppercase tracking-[0.25em]" style={{ color: activeRumor.accent }}>Rumor for the road</p>
+                  <span className="border border-[#fbbf24]/40 bg-[#fbbf24]/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-[#fbbf24]">Active next run</span>
+                </div>
+                <h2 className="mt-1 text-2xl font-black uppercase text-white">{activeRumor.name}</h2>
+                <p className="mt-1 font-mono text-xs uppercase tracking-widest text-white/60">Brought by {rumorAlly.name}</p>
+                <p className="mt-3 max-w-2xl text-sm italic leading-relaxed text-muted-foreground">“{activeRumor.story}”</p>
+                <div className="mt-3 border-l-2 pl-3" style={{ borderColor: activeRumor.accent }}>
+                  <p className="text-xs font-bold uppercase tracking-widest text-white">{activeRumor.effectLabel}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{activeRumor.effectDescription}</p>
+                </div>
+              </div>
+            </div>
+          ) : rescuedAllies.length === 0 ? (
+            <div className="flex items-center gap-3" data-testid="text-rumor-no-crew">
+              <Radio className="h-7 w-7 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground">Rumor board quiet</p>
+                <p className="mt-1 text-sm text-muted-foreground">Rescue someone from the streets before the hideout can send a rumor ahead.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3" data-testid="text-rumor-quiet">
+              <Radio className="h-7 w-7 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground">No rumor active</p>
+                <p className="mt-1 text-sm text-muted-foreground">The crew has nothing strange to report yet. The next return may change that.</p>
+              </div>
+            </div>
+          )}
+        </CollapsibleSection>
+        </div>
+
+        <div className="mb-8">
+        <CollapsibleSection
+          title="First Night & Contracts"
+          subtitle="Daily boards and the crew's ongoing contracts"
+          defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
+          testId="section-first-night-contracts"
+        >
+          <FirstNightBoard compact />
+          {meta.loginStreakCount > 0 ? (
+            <div
+              className="mt-3 flex items-center gap-2 border border-amber-400/40 bg-amber-500/[0.08] px-4 py-2 text-xs font-bold uppercase tracking-widest text-amber-200"
+              data-testid="login-streak-chip"
+            >
+              <Flame className="h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
+              Day {meta.loginStreakCount} streak
+            </div>
+          ) : null}
+          <div className="mt-3">
+            <ContractBoard onHeadOut={() => onOpen('runs')} />
+          </div>
+        </CollapsibleSection>
+        </div>
 
          {activeRoom.features.includes('allies') && (
           <section className="mt-auto">
@@ -955,6 +1477,14 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
 
       <AnimatePresence>
         {showLorePopup && <LorePopup onClose={() => setShowLorePopup(false)} />}
+        {showLokChat && (
+          <LokChatOverlay
+            allies={rescuedAllies}
+            buildContext={buildChatContext}
+            roomNameOf={(ally) => HUB_ROOMS_BY_ID[ally.room]?.name ?? ally.room}
+            onClose={() => setShowLokChat(false)}
+          />
+        )}
       </AnimatePresence>
     </motion.div>
   );

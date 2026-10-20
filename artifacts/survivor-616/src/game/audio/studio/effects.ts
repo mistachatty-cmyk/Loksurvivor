@@ -38,6 +38,27 @@ function expLerp(value: number, min: number, max: number): number {
 
 export const EFFECTS: readonly EffectDef[] = [
   {
+    id: 'eq',
+    label: 'EQ',
+    blurb: 'Shape lows, mids, and highs.',
+    create: () => new Tone.EQ3({ low: 0, mid: 0, high: 0 }),
+    params: [
+      { id: 'low', label: 'Low', defaultValue: 0.5, set: (node, value) => ((node as Tone.EQ3).low.value = lerp(value, -12, 12)) },
+      { id: 'mid', label: 'Mid', defaultValue: 0.5, set: (node, value) => ((node as Tone.EQ3).mid.value = lerp(value, -12, 12)) },
+      { id: 'high', label: 'High', defaultValue: 0.5, set: (node, value) => ((node as Tone.EQ3).high.value = lerp(value, -12, 12)) },
+    ],
+  },
+  {
+    id: 'compressor',
+    label: 'Compressor',
+    blurb: 'Control peaks and bring up detail.',
+    create: () => new Tone.Compressor({ threshold: -18, ratio: 3, attack: 0.01, release: 0.18 }),
+    params: [
+      { id: 'threshold', label: 'Threshold', defaultValue: 0.5, set: (node, value) => ((node as Tone.Compressor).threshold.value = lerp(value, -36, 0)) },
+      { id: 'ratio', label: 'Ratio', defaultValue: 0.2, set: (node, value) => ((node as Tone.Compressor).ratio.value = lerp(value, 1, 12)) },
+    ],
+  },
+  {
     id: 'reverb',
     label: 'Reverb',
     blurb: 'Room and space.',

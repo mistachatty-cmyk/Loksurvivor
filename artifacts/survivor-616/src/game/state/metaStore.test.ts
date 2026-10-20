@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createInitialMeta, isUnlocked, normalizeMeta, reducer } from './metaStore';
+import { characterUnlocked, createInitialMeta, isUnlocked, normalizeMeta, reducer } from './metaStore';
 import { getCharacter } from '@/game/data/characters';
 
 function withLegacyAttractModeStorage<T>(value: string | null, callback: () => T): T {
@@ -85,6 +85,56 @@ test('the hideout arrival scene defaults on, migrates safely, and is toggleable'
   assert.equal(updated.meta.hideoutArrivalEnabled, false);
 });
 
+test('update notice choices persist independently and old saves enable all four', () => {
+  assert.deepEqual(createInitialMeta().updatePopupKinds, {
+    bugfix: true, hotfix: true, update: true, expansion: true,
+  });
+  assert.deepEqual(normalizeMeta({ version: 1 }).updatePopupKinds, createInitialMeta().updatePopupKinds);
+  assert.equal(normalizeMeta({ version: 1, updatePopupKinds: { expansion: false } }).updatePopupKinds.expansion, false);
+
+  const initial = { meta: createInitialMeta(), lastRun: null };
+  const updated = reducer(initial, { type: 'setUpdatePopupKind', kind: 'hotfix', enabled: false });
+  assert.equal(updated.meta.updatePopupKinds.hotfix, false);
+  assert.equal(updated.meta.updatePopupKinds.update, true);
+  assert.equal(initial.meta.updatePopupKinds.hotfix, true);
+});
+
+test('Training Arena progression is backward-compatible and mailbox actions persist', () => {
+  const fresh = createInitialMeta();
+  assert.equal(fresh.trainingWeaponRackOwned, false);
+  assert.deepEqual(fresh.trainingWeaponKills, {});
+  assert.deepEqual(fresh.trainingMailbox, []);
+
+  const normalized = normalizeMeta({
+    version: 1,
+    trainingWeaponRackOwned: true,
+    trainingWeaponKills: { 'void-slash': 6_169, invalid: Number.NaN },
+    trainingMailbox: [
+      { id: 'notice', title: 'Unlocked', body: 'Ready', createdAt: 10, read: 'yes', kept: false },
+      { id: '', title: 'Invalid', body: 'Bad id', createdAt: 11 },
+    ],
+  });
+  assert.equal(normalized.trainingWeaponRackOwned, true);
+  assert.deepEqual(normalized.trainingWeaponKills, { 'void-slash': 6_166 });
+  assert.deepEqual(normalized.trainingMailbox.map(({ id, read, kept }) => ({ id, read, kept })), [
+    { id: 'notice', read: false, kept: false },
+  ]);
+
+  let state = { meta: fresh, lastRun: null };
+  state = reducer(state, { type: 'grantTrainingWeaponRack' });
+  state = reducer(state, { type: 'recordTrainingSession', characterId: 'operator', damage: 1_000_000, xp: 0.4, challenge: { key: 'void-slash@1', damage: 1_000_000 } });
+  assert.equal(state.meta.trainingDummyDamage, 1_000_000);
+  assert.equal(state.meta.trainingOperatorXp.operator, 0.4);
+  assert.deepEqual(state.meta.trainingChallengeMilestones, [0, 1_000, 5_000, 1_000_000]);
+  assert.equal(state.meta.trainingMailbox[0]?.read, false);
+  state = reducer(state, { type: 'markTrainingMailboxRead', id: 'training-multi-weapon-unlocked' });
+  state = reducer(state, { type: 'keepTrainingMailboxEntry', id: 'training-multi-weapon-unlocked', kept: true });
+  assert.equal(state.meta.trainingMailbox[0]?.read, true);
+  assert.equal(state.meta.trainingMailbox[0]?.kept, true);
+  state = reducer(state, { type: 'deleteTrainingMailboxEntry', id: 'training-multi-weapon-unlocked' });
+  assert.deepEqual(state.meta.trainingMailbox, []);
+});
+
 test('soundtrack objective progress safely defaults for older saves', () => {
   assert.equal(createInitialMeta().soundtrackObjectiveCompletions, 0);
   assert.equal(normalizeMeta({ version: 1 }).soundtrackObjectiveCompletions, 0);
@@ -126,6 +176,44 @@ test('Llamá Máma inherits the Crystal Cellar unlock', () => {
     isUnlocked(getCharacter('llama-mama').unlock, { ...freshMeta, clearedAreaIds: ['crystal-cellar'] }),
     true,
   );
+});
+
+test('LokPet Collector characters need the Lok Shop access purchase on top of their own unlock rule', () => {
+  const collector = getCharacter('sleeve');
+  assert.ok(collector.lokPetCollector, 'test assumes "sleeve" is a Collector-line character');
+  const freshMeta = createInitialMeta();
+  // Sleeve's own unlock rule is 'default' (always true), but Collector access is not bought yet.
+  assert.equal(isUnlocked(collector.unlock, freshMeta), true);
+  assert.equal(characterUnlocked(collector, freshMeta), false);
+  assert.equal(characterUnlocked(collector, { ...freshMeta, lokPetCollectorAccessUnlocked: true }), true);
+  // A non-Collector character is unaffected by the flag either way.
+  const operative = getCharacter('llamaste');
+  assert.equal(characterUnlocked(operative, freshMeta), isUnlocked(operative.unlock, freshMeta));
+});
+
+test('buying the LokPet field guide and Collector access are separate, idempotent, one-time flags', () => {
+  const initial = { meta: createInitialMeta(), lastRun: null, lastCardPackReveal: null };
+  assert.equal(initial.meta.lokPetFieldGuideUnlocked, false);
+  assert.equal(initial.meta.lokPetCollectorAccessUnlocked, false);
+
+  const afterGuide = reducer(initial, { type: 'grantLokPetFieldGuide' });
+  assert.equal(afterGuide.meta.lokPetFieldGuideUnlocked, true);
+  assert.equal(afterGuide.meta.lokPetCollectorAccessUnlocked, false, 'the two unlocks must not be coupled');
+  assert.equal(reducer(afterGuide, { type: 'grantLokPetFieldGuide' }), afterGuide, 'granting twice is a no-op');
+
+  const afterAccess = reducer(afterGuide, { type: 'grantLokPetCollectorAccess' });
+  assert.equal(afterAccess.meta.lokPetFieldGuideUnlocked, true);
+  assert.equal(afterAccess.meta.lokPetCollectorAccessUnlocked, true);
+});
+
+test('buying the Faction Races Pass is a separate, idempotent, one-time flag', () => {
+  const initial = { meta: createInitialMeta(), lastRun: null, lastCardPackReveal: null };
+  assert.equal(initial.meta.factionRacesUnlocked, false);
+
+  const after = reducer(initial, { type: 'grantFactionRacesUnlock' });
+  assert.equal(after.meta.factionRacesUnlocked, true);
+  assert.equal(after.meta.lokPetFieldGuideUnlocked, false, 'must not be coupled to the other unlocks');
+  assert.equal(reducer(after, { type: 'grantFactionRacesUnlock' }), after, 'granting twice is a no-op');
 });
 
 test('the GRPD Vault grants Blue 616 once after the Site Crew zone is cleared', () => {

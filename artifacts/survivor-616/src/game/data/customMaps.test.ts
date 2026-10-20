@@ -12,7 +12,10 @@ import {
   createCustomMap,
   normalizeCustomMap,
   normalizeCustomMaps,
+  areaToCustomMapTemplate,
+  generateCustomMap,
 } from '@/game/data/customMaps';
+import { MAP_PREFABS, expandMapPrefab } from '@/game/data/mapPack';
 
 test('custom map catalog has an asset for every supported editor category', () => {
   for (const category of CUSTOM_MAP_ASSET_CATEGORIES) {
@@ -44,7 +47,7 @@ test('normalization safely removes invalid and oversized placements', () => {
   }, source.id)!;
 
   assert.equal(normalized.placements.length, MAX_CUSTOM_MAP_PLACEMENTS);
-  assert.equal(normalized.placements[0]?.w, 260);
+  assert.equal(normalized.placements[0]?.w, 360);
   assert.equal(normalized.placements[0]?.h, 12);
   assert.ok(normalized.placements.every((placement) => Math.abs(placement.x) <= source.bounds.w / 2));
   assert.equal(normalizeCustomMap(null), null);
@@ -86,11 +89,39 @@ test('launch validation rejects routes without threat assets and preserves norma
 
 test('the visual editor exposes every obstacle kind already used by an area', () => {
   const representedKinds = new Set(
-    CUSTOM_MAP_ASSETS.filter((asset) => asset.category === 'structure').map((asset) => asset.id.replace('structure:', '')),
+    CUSTOM_MAP_ASSETS.filter((asset) => asset.category === 'structure' && asset.id.startsWith('structure:')).map((asset) => asset.id.replace('structure:', '')),
   );
   const usedKinds = new Set(AREAS.flatMap((area) => area.obstacles.map((obstacle) => obstacle.kind)));
   usedKinds.delete('pothole');
+  usedKinds.delete('map-prop');
   assert.deepEqual([...representedKinds].sort(), [...usedKinds].sort());
+});
+
+test('shipped breach arenas use the versioned editor format without losing finds or starts', () => {
+  for (const id of ['floodline-breach', 'glassroot-annex']) {
+    const source = AREAS.find((area) => area.id === id)!;
+    const draft = areaToCustomMapTemplate(source, `custom-${id}`);
+    const saved = normalizeCustomMap(JSON.parse(JSON.stringify(draft)), draft.id)!;
+    const runtime = customMapToArea(saved);
+    assert.equal(saved.version, 2);
+    assert.deepEqual(runtime.playerStart, source.playerStart);
+    assert.deepEqual(runtime.mapInteractables?.map((entry) => entry.kind), source.mapInteractables?.map((entry) => entry.kind));
+    assert.deepEqual(runtime.waves.map((wave) => wave.spawnAt), source.waves.map((wave) => wave.spawnAt));
+    assert.deepEqual(runtime.authoredGroundTiles, source.authoredGroundTiles);
+    assert.equal(runtime.mapFeature, source.mapFeature);
+    assert.deepEqual(customMapValidationIssues(saved), []);
+  }
+});
+
+test('seeded remixes and prefab quarter turns are deterministic', () => {
+  const first = generateCustomMap('alpha', 'breach', 'custom-seed');
+  const second = generateCustomMap('alpha', 'breach', 'custom-seed');
+  assert.deepEqual(first.placements, second.placements);
+  assert.notDeepEqual(first.placements, generateCustomMap('beta', 'breach', 'custom-seed').placements);
+  const prefab = MAP_PREFABS[0]!;
+  const placed = expandMapPrefab(prefab, { x: 100, y: 80 }, 'group', 1);
+  assert.equal(placed[0]?.x, 100 - prefab.pieces[0]!.y);
+  assert.equal(placed[0]?.y, 80 + prefab.pieces[0]!.x);
 });
 
 test('painted ground tiles survive normalization and reach the real renderer area', () => {
@@ -103,4 +134,12 @@ test('painted ground tiles survive normalization and reach the real renderer are
   assert.equal(normalized?.placements[0]?.category, 'tile');
   const area = customMapToArea(normalized!);
   assert.deepEqual(area.authoredGroundTiles?.[0], { x: 40, y: -20, w: 64, h: 64, ...tile.groundStyle });
+});
+
+test('a placed root anchor creates its destructible node in playtest', () => {
+  const map = createCustomMap('custom-anchor');
+  map.placements.push({ id: 'anchor', assetId: 'interactable:root-anchor', category: 'interactable', x: 80, y: 40, w: 70, h: 70 });
+  const area = customMapToArea(map);
+  assert.equal(area.mapInteractables?.[0]?.kind, 'root-anchor');
+  assert.equal(area.obstacles.filter((obstacle) => obstacle.artAssetId === 'node-pylon' && obstacle.x === 80 && obstacle.y === 40).length, 1);
 });

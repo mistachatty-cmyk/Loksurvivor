@@ -44,6 +44,30 @@ export function millionHordeActorCap(tier: RuntimePerformanceTier, quality: Grap
   return MILLION_HORDE_CAPS[tier][quality];
 }
 
+/** Real crowd members the field may hold (10 bytes each), by device class. */
+const MILLION_HORDE_POPULATION_CAPS: Record<RuntimePerformanceTier, number> = {
+  'constrained-mobile': 2_000_000,
+  'standard-mobile': 4_000_000,
+  'high-mobile': 6_000_000,
+  desktop: 10_000_000,
+};
+
+export function millionHordePopulationCap(tier: RuntimePerformanceTier): number {
+  return MILLION_HORDE_POPULATION_CAPS[tier];
+}
+
+/** Crowd members advanced per simulation step; a fixed cost, whatever the population. */
+const MILLION_HORDE_SWEEP_BUDGETS: Record<RuntimePerformanceTier, number> = {
+  'constrained-mobile': 16_384,
+  'standard-mobile': 32_768,
+  'high-mobile': 49_152,
+  desktop: 65_536,
+};
+
+export function millionHordeSweepBudget(tier: RuntimePerformanceTier): number {
+  return MILLION_HORDE_SWEEP_BUDGETS[tier];
+}
+
 export const RUNTIME_TIER_LABELS: Record<RuntimePerformanceTier, string> = {
   'constrained-mobile': 'Compatibility phone',
   'standard-mobile': 'Standard phone / browser',

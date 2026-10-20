@@ -65,7 +65,7 @@ function luma(hex: string): number {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 }
 
-const HEX = /^#[0-9a-fA-F]{6}$/;
+export const HEX = /^#[0-9a-fA-F]{6}$/;
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 const wrapHue = (h: number) => ((h % 360) + 360) % 360;
 
@@ -600,7 +600,12 @@ export interface OperatorDesign {
   /** The recipe the palette was generated from; edits to single colors leave it as a starting point. */
   paletteSpec: PaletteSpec;
   look: OperatorLook;
+  /** 'classic' is the original v1 plain rig (no feature stack). Missing means the detailed v2 look. */
+  style?: OperatorStyle;
 }
+
+export type OperatorStyle = 'detailed' | 'classic';
+export const OPERATOR_STYLES: OperatorStyle[] = ['detailed', 'classic'];
 
 export function lookDifference(a: OperatorLook, b: OperatorLook): number {
   return FEATURE_FIELDS.filter((field) => a[field] !== b[field]).length;
@@ -616,7 +621,7 @@ export function buildOperatorRig(design: OperatorDesign): SpriteRig {
     hunched: def.hunched,
     flarePants: def.flarePants,
   });
-  return applyOperatorLook(base, design.look);
+  return design.style === 'classic' ? base : applyOperatorLook(base, design.look);
 }
 
 /* ------------------------------------------------------------------ */
@@ -796,7 +801,10 @@ export function normalizeDesign(raw: unknown): OperatorDesign {
     const color = lookSrc[cat.colorField];
     look[cat.colorField] = typeof color === 'string' && PALETTE_KEY_SET.has(color) ? color : cat.pool[0]!;
   }
-  return { species, flavor, body, palette, paletteSpec, look: look as unknown as OperatorLook };
+  const normalized: OperatorDesign = { species, flavor, body, palette, paletteSpec, look: look as unknown as OperatorLook };
+  // Only classic is stored; the detailed look stays the implicit default so older saves and codes are unchanged.
+  if (src.style === 'classic') normalized.style = 'classic';
+  return normalized;
 }
 
 /* ------------------------------------------------------------------ */

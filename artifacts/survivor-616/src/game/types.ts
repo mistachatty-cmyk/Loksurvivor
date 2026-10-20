@@ -10,6 +10,7 @@ import type { BeatReaction } from '@/game/data/reactivity';
 import type { MusicSpawnEvent } from '@/game/data/musicEvents';
 import type { RunHighlight } from '@/game/data/runHighlights';
 import type { SfxStyleDef } from '@/game/audio/sfxCues';
+import type { ChangelogKind } from '@/game/data/changelogKinds';
 
 export interface Vec2 {
   x: number;
@@ -81,6 +82,8 @@ export interface SpriteRig {
   pixelHeight: number;
   parts: SpritePart[];
   anims: Record<AnimName, AnimClip>;
+  /** Optional approved Character Studio v3 appearance; gameplay stays on this base rig. */
+  studioV3?: import('./studio/v3Project').StudioProject;
 }
 
 /* ------------------------------------------------------------------ */
@@ -221,6 +224,8 @@ export interface SavedLokPet {
   level?: number;
   /** Current battle experience points. */
   exp?: number;
+  /** Permanently assigned Training Bay ranks. Unspent points come from pet levels. */
+  training?: LokPetTraining;
   /** Lifetime battle victories in sparring, league, and gauntlet. */
   battlesWon?: number;
   /** Total battles fought. */
@@ -253,6 +258,16 @@ export interface SavedLokPet {
    * evolution is derived from this plus level, so old saves keep working.
    */
   evolutionPath?: { branchId: string; chosenAt: number };
+}
+
+export type LokPetTrainingStat = 'vigor' | 'fury' | 'guard' | 'pace' | 'spirit';
+
+export interface LokPetTraining {
+  vigor: number;
+  fury: number;
+  guard: number;
+  pace: number;
+  spirit: number;
 }
 
 /** One pet's line in the Growth Recap shown after a run (not persisted). */
@@ -390,7 +405,24 @@ export interface CompletedObjective {
   rewardTokens: number;
 }
 
-export type DailyContractKind = 'clear-area' | 'kill-any' | 'survive-sec';
+export type DailyContractKind =
+  | 'clear-area'
+  | 'kill-any'
+  | 'survive-sec'
+  /** Defeat `targetCount` of the enemy named by `targetId`, across runs. */
+  | 'kill-enemy'
+  /** Reach level `targetCount` within a single run. */
+  | 'reach-level'
+  /** Open `targetCount` loot boxes across runs. */
+  | 'open-chests'
+  /** Earn `targetCount` Cred in runs (before contract pay). */
+  | 'earn-cred'
+  /** Clear the district named by `targetId`. */
+  | 'clear-district'
+  /** Find `targetCount` map finds across runs. */
+  | 'map-finds'
+  /** Gather `targetCount` relic crafting materials across runs. */
+  | 'scrap-haul';
 
 export interface DailyContractDef {
   id: string;
@@ -398,6 +430,8 @@ export interface DailyContractDef {
   description: string;
   kind: DailyContractKind;
   targetCount: number;
+  /** Enemy id (`kill-enemy`) or area id (`clear-district`) the job is about. */
+  targetId?: string;
   rewardCred: number;
   rewardTokens: number;
   /** Rare-currency payout; 0 for the three standard jobs, nonzero for the optional wildcard. */
@@ -510,7 +544,8 @@ export type WeaponKind =
   /** 4th-wall breaking / system error attack: drags selection marquees, blue-screens, and corrupts memory. */
   | 'glitch'
   /** Easter egg weapon: classic DVD bouncing screensaver icon that ricochets and explodes on corner hits. */
-  | 'dvd-bounce';
+  | 'dvd-bounce'
+  | 'arc-tether';
 
 /**
  * Shared physical-impact spectrum for authored attacks.
@@ -560,6 +595,8 @@ export interface WeaponDef {
   impactTrigger?: PotholeTrigger;
   /** Optional tint used when this weapon is not a character signature. */
   color?: string;
+  /** Discovery required before a map-find weapon joins normal level-up rolls. */
+  lootUnlockDiscoveryId?: string;
   /** How this projectile behaves when it meets reflective cover. */
   obstacleInteraction?: 'block' | 'reflect';
   /** Optional crowd-control effect applied by this weapon's hits. */
@@ -618,6 +655,8 @@ export interface StatusEffectInstance {
   appliedAt: number;
   expiresAt: number;
   nextTickAt?: number;
+  /** Weapon that applied this effect, for run-end kill attribution. */
+  sourceWeaponId?: string;
 }
 
 export interface RunWeapon {
@@ -646,6 +685,8 @@ export interface EvolutionDef {
   name: string;
   description: string;
   baseWeaponId: string;
+  /** Can be offered only when the earned Victory Lap evolution switch is on. */
+  endgameOnly?: boolean;
   /** Evolution partner weapon requirement: requires owning this weapon maxed (level 8). */
   requiredWeaponId?: string;
   requiredWeaponLevel?: number;
@@ -977,7 +1018,26 @@ export type EnemyBehavior =
   /** Firefly Wranglers: dual-wielding boss firing twin incendiary streams that leave fire trails. */
   | 'firefly-pyro-duelist'
   /** Sub-Terra / Digiverse: disguised mimic chest that attacks when approached. */
-  | 'mimic-chest';
+  | 'mimic-chest'
+  /** Gen Fitters: circle-strafes at mid range, telegraphs, then lunges in a slash. */
+  | 'strafe-duelist'
+  /** Gen Fitters: marks the player's spot, leaps there and lands in a shockwave ring. */
+  | 'pouncer'
+  /** Gen Fitters: plants itself and spins a wheel of short beams around it. */
+  | 'beam-wheel'
+  /** Gen Fitters: zigzags toward the player, stitching a trail of lingering mines. */
+  | 'mine-stitcher'
+  /** Gen Fitters: kites at range and fires five-way projectile fans. */
+  | 'fan-sampler'
+  /** Gen Fitters: saves its position, then rewinds to it with a burst at both ends. */
+  | 'rewinder';
+
+export interface EnemyDrop {
+  kind: 'health' | 'cred' | 'phosphor-ore' | 'silicon-alloy' | 'cyber-resin' | 'prism-quartz' | 'rootglass-cell' | 'glitch-cache';
+  /** 0..1 chance per defeat. */
+  chance: number;
+  value?: number;
+}
 
 export interface EnemyDef {
   id: string;
@@ -999,6 +1059,13 @@ export interface EnemyDef {
   palette: SpritePalette;
   rig: SpriteRig;
   lore: string;
+  /**
+   * Authored resource drops, rolled independently on defeat on top of the
+   * standard XP / health / cred rolls. `value` only matters for health and cred.
+   */
+  drops?: EnemyDrop[];
+  /** A delayed ring that detonates where this enemy fell. */
+  deathBurst?: { radius: number; damage: number };
   /** Spitter-only tuning. */
   ranged?: { cooldownMs: number; projectileSpeed: number; damage: number };
   faction?: string;
@@ -1014,6 +1081,9 @@ export interface EnemyDef {
   /** Ambient bioluminescent light radius in darkness or fog. */
   glowRadius?: number;
   traits?: {
+    /** Once at or below `belowHpPct` of max HP it moves faster, shortens its
+     *  attack cooldowns (Gen Fitters styles) and flares. */
+    enrage?: { belowHpPct: number; speedMult: number; cooldownMult: number };
     teleportMs?: number;
     ghostMs?: number;
     shiftMs?: number;
@@ -1158,6 +1228,8 @@ export interface WaveDef {
   hpMult?: number;
   formation?: 'ring' | 'wedge' | 'wall' | 'escort' | 'pincer' | 'file' | 'bait' | 'spiral' | 'phalanx' | 'crossfire' | 'vortex';
   faction?: string;
+  /** Authored finite-map entry; omitted waves keep their usual spawn ring. */
+  spawnAt?: { x: number; y: number };
 }
 
 export interface ObstacleDef {
@@ -1197,13 +1269,17 @@ export interface ObstacleDef {
      /** Rapid pressure wing: reinforced emergency-pressure room seal. */
      | 'pressure-door'
      /** Page overlay only: a DOM element on a live web page, standing in as a fixed, breakable block. */
-     | 'page-block';
+     | 'page-block' | 'map-prop';
+  /** Detailed map-pack artwork shared by the editor and live renderer. */
+  artAssetId?: string;
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
   /** Per-instance hit points; overrides the kind's table value (page overlay blocks scale with element area). */
   hp?: number;
   /** Page overlay only: opaque handle the host maps back to its DOM element. The engine never reads it. */
   domId?: number;
+  /** Solid to the player but not to enemies (nor to the player mid-dash). See `Aabb.soft`. */
+  soft?: boolean;
   /** Lethal pothole tuning; present only when kind === 'pothole'. */
   pothole?: {
     trigger: PotholeTrigger;
@@ -1255,6 +1331,15 @@ export interface AreaDef {
     seam: string;
     glow: string;
   }>;
+  /** Art-only objects do not enter the collision or damage simulation. */
+  decorations?: ObstacleDef[];
+  /** Authored finite-map entry locations. */
+  playerStart?: { x: number; y: number };
+  hostileEntries?: Array<{ x: number; y: number }>;
+  /** Placed supplies and interactive set pieces. */
+  mapPickups?: Array<{ id: string; kind: string; x: number; y: number; value?: number }>;
+  mapInteractables?: Array<{ id: string; kind: 'relay' | 'root-anchor' | 'cache' | 'plate' | 'coil'; x: number; y: number; w: number; h: number }>;
+  mapFeature?: 'fractured-616' | 'glassroot-shrine';
   /** Overhead conditions; defaults to 'clear' when omitted. */
   sky?: AreaSky;
   obstacles: ObstacleDef[];
@@ -1264,6 +1349,7 @@ export interface AreaDef {
     description: string;
     kind: 'market' | 'rail-yard' | 'plaza' | 'floodgate' | 'pressure-rooms';
     accent: string;
+    position?: { x: number; y: number };
   };
   /** Slow environmental corruption that Data-Gobs accelerate by chewing. */
   rawDataBreakage?: {
@@ -1322,7 +1408,10 @@ export type CustomMapAssetCategory =
   /** Where the player (or a Sector Command faction) enters the map. */
   | 'spawn-point'
   /** A named point a mission objective can reference (hold, escort, destroy). */
-  | 'objective-marker';
+  | 'objective-marker'
+  | 'pickup'
+  | 'interactable'
+  | 'ambiance';
 
 export interface CustomMapPlacement {
   id: string;
@@ -1332,18 +1421,29 @@ export interface CustomMapPlacement {
   y: number;
   w: number;
   h: number;
+  mode?: 'permanent' | 'breakable' | 'cosmetic';
+  groupId?: string;
+  fromSec?: number;
+  toSec?: number;
+  ratePerSec?: number;
+  burst?: number;
 }
 
 export interface CustomMap {
+  mapFeature?: 'fractured-616' | 'glassroot-shrine';
+  version?: 2;
   id: string;
   name: string;
   bounds: { w: number; h: number };
   groundAssetId: string;
   landmarkAssetId: string | null;
+  landmarkPosition?: { x: number; y: number };
   placements: CustomMapPlacement[];
   durationSec: number;
   threat: AreaDef['threat'];
   backdrop: string;
+  sky?: AreaSky;
+  ambiance?: 'street-rain' | 'null-spores' | 'breach' | 'clear';
   updatedAt: number;
 }
 
@@ -1366,6 +1466,11 @@ export interface CustomMapAsset {
   markerRole?: 'hold' | 'destroy' | 'escort' | 'extract';
   /** beacon only: which `SectorStructureDef` this placement builds. */
   beaconId?: string;
+  /** Map pack props use one physics kind and choose artwork by this id. */
+  artAssetId?: string;
+  pickupKind?: string;
+  interactableKind?: 'relay' | 'root-anchor' | 'cache' | 'plate' | 'coil';
+  defaultMode?: CustomMapPlacement['mode'];
 }
 
 export type DistrictIncursionKind = 'flood-surge' | 'market-bell' | 'freight-arrival' | 'fountain-ritual';
@@ -1464,6 +1569,8 @@ export interface RunModifiers {
 }
 
 export type GraphicsQuality = 'high' | 'balanced' | 'performance';
+import type { DamageNumberStyle } from './data/damageNumbers';
+export type { DamageNumberStyle };
 export type CompanionRevealStyle = 'ambush' | 'classic';
 export type RuntimePerformanceTier = 'constrained-mobile' | 'standard-mobile' | 'high-mobile' | 'desktop';
 
@@ -1537,11 +1644,52 @@ export interface DirectorRunState {
 }
 
 /** A one-shot meta-progression announcement, drained and shown by the hub on return. See `MetaState.pendingNotifications`. */
+/** A hideout panel a room tile or prop can open. */
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'locker' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'grpd-armory' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher' | 'frog-ranch' | 'lok-shop';
+
+/** Today's hideout payouts (local day), see `engine/hideoutRewards.ts`. */
+export interface HideoutLedger {
+  day: string;
+  granted: Partial<Record<'cred' | 'cardCredits' | 'lokPetTreats' | 'petElixirs' | 'skeletonKeys' | 'petExp', number>>;
+  events: number;
+  rare: number;
+}
+
 export interface PendingNotification {
   id: string;
   title: string;
   body: string;
   createdAt: number;
+  /** Optional icon identifier for the persistent mailbox card. */
+  iconId?: string;
+  titleKey?: string;
+  bodyKey?: string;
+  variables?: Record<string, string | number>;
+}
+
+export interface TrainingMailboxEntry {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: number;
+  iconId?: string;
+  titleKey?: string;
+  bodyKey?: string;
+  variables?: Record<string, string | number>;
+  read: boolean;
+  kept: boolean;
+}
+
+export interface TrainingArenaSavedLoadout {
+  id: string;
+  name: string;
+  weaponIds: string[];
+}
+
+export interface TrainingArenaLoadoutGroup {
+  id: string;
+  activeLoadoutId: string | null;
+  loadouts: TrainingArenaSavedLoadout[];
 }
 
 export type HordeSpinTierId = '1x' | '2x' | '3x' | '4x' | '5x5' | '666';
@@ -1799,7 +1947,11 @@ export type CrewActivityId =
   | 'rewire-the-cabinets'
   | 'run-the-high-score-board'
   // GRPD Station
-  | 'run-the-drills';
+  | 'run-the-drills'
+  | 'cook-the-last-feast' | 'count-the-sheep' | 'chart-the-horde'
+  | 'raise-the-palings' | 'tune-the-moon' | 'mix-the-elixir'
+  | 'forge-the-banners' | 'repair-the-cabinets' | 'cycle-the-air'
+  | 'seal-the-hatches' | 'relay-the-pressure' | 'inspect-the-lockers';
 
 export type CrewActivityIcon =
   | 'utensils'
@@ -1904,9 +2056,19 @@ export interface AmbientKindDef {
   fleeRadius: number;
 }
 
+/**
+ * Where a room sits relative to the hideout. `hideout` rooms are part of the
+ * safe base and never trigger a travel ambush; `travel` rooms are out in the
+ * city, so walking there can pull the player into a travel encounter (see
+ * `TRAVEL_ENCOUNTER_TRIGGERS`).
+ */
+export type HubRoomKind = 'hideout' | 'travel';
+
 export interface HubRoomDef {
   id: string;
   name: string;
+  /** Hideout rooms are safe; travel rooms can be ambushed on arrival. */
+  kind: HubRoomKind;
   subtitle: string;
   description: string;
   backdrop: string;
@@ -1914,7 +2076,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'director-terminal'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'director-terminal' | 'lok-shop'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -2042,6 +2204,8 @@ export interface UIThemeDef {
   starter?: boolean;
   /** Secret until earned through a rare reload takeover or Dev Mode. */
   hidden?: boolean;
+  /** Reward from an authored in-world find, excluded from random cold-open reveals. */
+  findOnly?: true;
   /** Selectable accent recolors within this theme. Themes without swatches use their own fixed palette. */
   swatches?: UIThemeSwatchDef[];
 }
@@ -2100,7 +2264,8 @@ export type RunAuraStyle =
   | 'rain-signal'
   | 'glitch-echo'
   | 'mothlight'
-  | 'tile-bloom';
+  | 'tile-bloom'
+  | 'comet-trail';
 
 export interface RunAuraDef {
   id: string;
@@ -2113,7 +2278,7 @@ export interface RunAuraDef {
 }
 
 /** Floating headwear is deliberately presentation-only and does not change collision. */
-export type HatStyle = 'none' | 'top-hat' | 'halo' | 'crown' | 'satellite' | 'rain-cloud' | 'cone' | 'orbital-eye' | 'moth-cap' | 'antenna' | 'vinyl-disc';
+export type HatStyle = 'none' | 'top-hat' | 'halo' | 'crown' | 'satellite' | 'rain-cloud' | 'cone' | 'orbital-eye' | 'moth-cap' | 'antenna' | 'vinyl-disc' | 'paper-visor';
 export interface HatDef {
   id: string;
   name: string;
@@ -2189,6 +2354,8 @@ export interface MetaState {
    * lower enemy counts, useful on a slower device or a very dense swarm run.
    */
   graphicsQuality: GraphicsQuality;
+  /** How hit numbers look. 'classic' (default) is the original popup; see `data/damageNumbers.ts`. */
+  damageNumberStyle: DamageNumberStyle;
   /**
    * How the starter LokPet encounter reveals your first companion.
    * 'ambush' (default) has the companion leap in and strike alongside you
@@ -2250,10 +2417,37 @@ export interface MetaState {
   hideoutSectionsCollapsedByDefault: boolean;
   /** The animated walking-rig hero at the top of the Hideout screen. On by default; off reverts to the classic static layout. */
   hideoutPreviewEnabled: boolean;
+  /** Backdrop around real operator/crew/LokPet rigs in the hideout scene. */
+  hideoutSceneStyle: 'cage' | 'block';
+  /** Show the canvas dialogue boxes above hideout actors and props. */
+  hideoutSpeechBubblesEnabled: boolean;
   /** Which pets walk the Hideout strip: all selected pets and the partner, only the partner, or none. */
   hideoutPets: 'all' | 'companion' | 'off';
   /** How often small pet events play in the Hideout: normal, rarely, or never. */
   hideoutEvents: 'on' | 'quiet' | 'off';
+  /** Walk the operator with taps or arrow keys and use the props around each room. On by default. */
+  hideoutInteractive: boolean;
+  /** The pet play bar (scratch, fetch, nap together...) under the Hideout strip. On by default. */
+  hideoutPetPlay: boolean;
+  /** How often a choice event offers itself while you move around: normal, rarely, or never. */
+  hideoutChoiceEvents: 'on' | 'quiet' | 'off';
+  /** When each prop, choice event or rare find last paid out (ms), keyed `prop.<id>`, `event.<id>`, `rare.<item>`. */
+  hideoutClaims: Record<string, number>;
+  /** What the hideout has handed out today, so small rewards stay small. */
+  hideoutLedger: HideoutLedger;
+  /** Crew-wide morale that follows how runs end (`data/morale.ts`); negative shrinks crew boosts. */
+  crewMorale: number;
+  /** Runs won in a row right now, and the longest such run ever (`data/morale.ts`). */
+  runStreak: number;
+  /** A started sky boost from the spyglass (`data/skyEvents.ts`). */
+  /** Whether the player owns the hideout Ball (sold in the LokShop; `data/hideoutBall.ts`). */
+  ownsBall: boolean;
+  /** The buff a hideout event left behind (`data/eventBuffs.ts`). */
+  eventBuff: { buffId: string; until: number } | null;
+  /** Places revealed by following a Light Spur in the spyglass (`data/lightSpurs.ts`). */
+  spurAreaIds: string[];
+  skyBoost: { eventId: string; until: number; window: number } | null;
+  bestRunStreak: number;
   /** The fixed mobile-only "Head out" button pinned to the bottom of the Hideout screen. On by default. */
   hideoutStickyHeadOutEnabled: boolean;
   /** The rotating Minecraft-style splash blurb on the title screen. On by default. */
@@ -2274,6 +2468,8 @@ export interface MetaState {
   worldColorFullRecolorEnabled: boolean;
   /** Sector Command missions cleared at least once. */
   completedSectorMissionIds: string[];
+  /** DIGI-Tower campaign record; only completed floor IDs grant first-clear Tokens. */
+  digiTower: DigiTowerProgress;
   /** Whether device tilt steers the player on supported hardware. */
   gyroEnabled: boolean;
   /** Tilt sensitivity, 0.5 (gentle) .. 2 (twitchy). */
@@ -2314,18 +2510,47 @@ export interface MetaState {
   petElixirUpdatedAt: number;
   /** enemyId -> total defeats, drives the bestiary. */
   bestiary: Record<string, number>;
+  /** Seeded trait specimens catalogued on first district clears. */
+  fieldCreatureSeeds: string[];
   totalKills: number;
+  /** Lifetime kills of enemies carrying each random quirk, by quirk id. */
+  quirkKills: Record<string, number>;
+  /** Runs started with at least one quirk set to Everywhere / Take it on. */
+  quirkEverywhereRuns: number;
+  quirkTakenRuns: number;
+  /** Quirk Surges the player has outlasted. */
+  quirkSurgesSurvived: number;
+  /** Director beats (supply drops, stampedes) finished, lifetime, by beat id. */
+  runEventsSurvived: Record<string, number>;
+  /** Crew call-ins used, lifetime. */
+  callInsUsed: number;
+  /** GRPD evidence seals are earned every 1,000 lifetime kills; this is the spent amount. */
+  grpdSpentSeals: number;
+  /** Completed field prototypes fabricated at the GRPD Armory. */
+  grpdUnlockedWeaponIds: string[];
+  /** Fabricated prototypes explicitly enabled for future runs. */
+  grpdActiveWeaponIds: string[];
+  /** Purchased offer-weight tier for each fabricated prototype, from 1 to 5. */
+  grpdSpawnTierByWeaponId: Record<string, number>;
+  /** Whether lifetime kills raise archived weapon offer weight. */
+  grpdAutoIncreaseEnabled: boolean;
+  /** The Luvitnot keeper can move the Armory between these two safe entrances. */
+  grpdArmoryAnchor: 'station' | 'hideout';
   totalRuns: number;
   bestSurvivalSec: number;
   /** Every level-up across every run, ever -- never resets. Feeds the persistent player level. */
   totalLevelUps: number;
   /** Soft currency earned per run. */
   cred: number;
+  /** Cumulative account creator Cred already applied to this save. */
+  creatorCredApplied?: number;
   /** Loot tokens spendable in the hideout. */
   lootTokens: number;
   /** Currency earned from blue loot boxes and spent at the LokPet card shop. */
   cardCredits: number;
   cardCollection: OwnedCardRecord[];
+  /** Owned booster cards. Each adds its units to a stat for every run, the way crew boosts do. */
+  boosterCards: BoosterCardRecord[];
   /** Purchased or found packs not yet opened, keyed by pack id. Opened via `openStoredCardPack`. */
   unopenedCardPacks: Partial<Record<CardPackId, number>>;
   /** When true (default), buying or finding a pack opens it immediately. When false, packs are stored sealed in `unopenedCardPacks` for the player to open later. */
@@ -2347,6 +2572,16 @@ export interface MetaState {
   cardFrameSleeves: string[];
   /** Currently equipped card frame style. */
   selectedCardFrame: string;
+  /** Purchased card backs (see data/cardCosmetics.ts). `back-default` is always owned. */
+  ownedCardBackIds: string[];
+  /** Card back shown face-down while a pack is opened. */
+  selectedCardBack: string;
+  /** Purchased pack skins. `pack-classic` is always owned. */
+  ownedPackSkinIds: string[];
+  /** How the shop's pack tiles are drawn. */
+  selectedPackSkin: string;
+  /** How much the pack and card cosmetics move: tilt and shimmer (`full`), hover only (`subtle`) or still (`off`). */
+  cardMotion: 'full' | 'subtle' | 'off';
   /** Completed runs made with any LokPet Collector; unlocks higher collector ranks. */
   lokCollectorRuns: number;
   /** Chest-origin LokPets caught during collector runs. */
@@ -2445,6 +2680,49 @@ export interface MetaState {
   /** Reward celebrations are selected independently from auras. */
   ownedCelebrationIds: string[];
   activeCelebrationId: string;
+  /** Drop art packs (render-only). The free Potato Pack is the original look. */
+  ownedDropPackIds: string[];
+  activeDropPackId: string;
+  /** LokToken purchase (Lok Shop): unlocks the LokPet field guide in Character Select. */
+  lokPetFieldGuideUnlocked: boolean;
+  /** LokToken purchase (Lok Shop): required to select any LokPet Collector character, in addition to that character's own progress-based unlock. */
+  lokPetCollectorAccessUnlocked: boolean;
+  /** LokToken purchase (Lok Shop): unlocks the Operator Forge's faction races list before Victory Lap would otherwise earn it. */
+  factionRacesUnlocked: boolean;
+  /** LOK Shop unlock: lets the Sleeve Counter sell the animated Live pack wraps. */
+  lokPackVisualizerUnlocked: boolean;
+  /** Permanent LokShop purchase required to enter the Training Arena. */
+  trainingWeaponRackOwned: boolean;
+  /** Saved weapon sets, organized into four starter groups; more groups are a future LokShop expansion. */
+  trainingArenaLoadoutGroups: TrainingArenaLoadoutGroup[];
+  trainingArenaActiveGroupId: string;
+  /** Weapon ids pinned to the top of the Training Arena rack. */
+  trainingFavoriteWeaponIds: string[];
+  /** Weapon id -> kills credited only when a run result is committed. */
+  trainingWeaponKills: Record<string, number>;
+  /** Cumulative damage dealt to the arena dummy across all visits. */
+  trainingDummyDamage: number;
+  /** Persistent arena-only operator training XP, kept separate from run mastery. */
+  trainingOperatorXp: Record<string, number>;
+  /** Best 24-second challenge result by weapon/loadout key. */
+  trainingChallengeBests: Record<string, number>;
+  /** One-time damage threshold milestones awarded by the arena challenge. */
+  trainingChallengeMilestones: number[];
+  /** Durable notification mailbox. */
+  trainingMailbox: TrainingMailboxEntry[];
+  /** LokShop perks owned (ids from `lokShopPerks.ts`): ball, Lok Pass, Passports. */
+  lokShopPerks: string[];
+  /** How well LokServer knows you; raised by daily visits and the feather game. */
+  lokShopRapport: number;
+  /** Passport stamps: one per local day visited while holding a Passport. */
+  lokShopStamps: number;
+  /** Local-day key of the last visit. */
+  lokShopLastVisit: string;
+  /** Feather Charm ids collected. */
+  lokShopCharms: string[];
+  /** Local-day key and count of feather-game tries used. */
+  lokShopHaggleDay: string;
+  lokShopHaggleCount: number;
   /** Local-date key for the currently active Broadcast contract board. */
   dailyContractDayKey: string;
   /** Progress accumulated against today's Broadcast contracts. */
@@ -2493,6 +2771,8 @@ export interface MetaState {
   pendingNotifications: PendingNotification[];
   /** Highest changelog version (see `data/changelog.ts`) the player has acknowledged via the update popup. */
   lastSeenChangelogVersion: string;
+  /** Which update categories may open an automatic notice on the hub. */
+  updatePopupKinds: Record<ChangelogKind, boolean>;
   /** Relic crafting materials gathered from runs, chests, and deep mines. */
   relicMaterials: Record<string, number>;
   /** Real relics crafted at the Workshop Forge that grant permanent/toggled run perks. */
@@ -2503,6 +2783,30 @@ export interface MetaState {
   unlockedCardCustomizations: string[];
   /** Card-specific customizations applied (frame, overlay, companion seal). */
   cardCustomizationsByCardId: Record<string, { frame?: string; overlay?: string; companionSeal?: string }>;
+}
+
+export interface DigiTowerPetCondition {
+  petId: string;
+  /** Current HP as a fraction of max HP, saved at the last cleared floor. */
+  hpRatio: number;
+  /** Current energy as a fraction of max energy. */
+  energyRatio: number;
+  statusEffects: Array<{ type: string; duration: number; value: number; sourcePetName: string }>;
+}
+
+export interface DigiTowerProgress {
+  highestFloor: number;
+  nextFloor: number;
+  checkpointFloor: number;
+  clearedFloorIds: string[];
+  defeatedMasterIds: string[];
+  claimedRestFloorIds: string[];
+  tokens: number;
+  /** Earned Training Bay currency; never purchased with premium or real-money currency. */
+  trainingData: number;
+  /** Party condition is committed only after a floor clear, so quitting mid-floor is recoverable. */
+  carry: DigiTowerPetCondition[];
+  checkpointCarry: DigiTowerPetCondition[];
 }
 
 export type ThreatAngleMode = 'standard' | 'pincer' | 'cardinal' | 'spiral' | 'corners';
@@ -2544,10 +2848,25 @@ export interface RunResult {
   level: number;
   cred: number;
   killsByEnemy: Record<string, number>;
+  /** Player kills by the weapon that landed the final damaging hit. */
+  weaponKills?: Record<string, number>;
+  /** Kills of quirked enemies this run, by quirk id. */
+  killsByQuirk?: Record<string, number>;
+  /** This run used a quirk's Everywhere option / Take it on option. */
+  quirkEverywhereRun?: boolean;
+  quirkTakenRun?: boolean;
+  /** This run outlasted its Quirk Surge. */
+  quirkSurgeSurvived?: boolean;
+  /** Director beats this run finished (survived the whole beat). */
+  runEventsSurvived?: string[];
+  /** Crew call-ins used this run. */
+  callInsUsed?: number;
   /** Growth Recap: XP, level and bond changes for pets that were out. Filled when the run is recorded. */
   petGrowth?: PetGrowthEntry[];
   rescuedAllyId?: string;
   discoveryId?: string;
+  /** Finds are kept even when the player falls before the area clear. */
+  mapFindIds?: string[];
   newlyUnlockedCharacterIds: string[];
   loadout: {
     weapons: Array<{ id: string; name: string; level: number; kind: WeaponKind; color?: string }>;
@@ -2617,6 +2936,8 @@ export interface RunResult {
   };
   /** City relic knowledge found by clearing a district for the first time. */
   newlyDiscoveredRelicIds?: string[];
+  /** Seeded trait creature found on a district's first successful clear. */
+  fieldCreatureSeed?: string;
   /** Optional district setpiece encounter state from this run. */
   districtIncursion?: {
     id: string;
@@ -2690,6 +3011,10 @@ export interface HudSnapshot {
   millionHorde?: { population: number; peakPopulation: number; defeatedPopulation: number; liveActors: number };
   cred: number;
   ultimateReadyPct: number;
+  /** 0 to 100: how far the dash cooldown has recovered (100 = ready). */
+  dashReadyPct?: number;
+  /** The next crew call-in: who it is and how far the shared cooldown has recovered. */
+  callIn?: { name: string; label: string; readyPct: number };
   ultimateActive: boolean;
   weaponLevel: number;
   /** Storm Chaser only: the weather cloud's current mode and whether the player has taken manual control of it. */
@@ -2979,4 +3304,19 @@ export interface SectorResourceDef {
   description: string;
   /** Gained per enemy killed while the tier is active. */
   perKill: number;
+}
+
+/** Who a booster card's stat applies to. Character, operatives and crew all feed the played character's stats. */
+export type BoosterGroup = 'character' | 'operatives' | 'crew' | 'lokpets' | 'enemies';
+export type BoosterStat = 'maxHp' | 'speed' | 'power' | 'area' | 'haste' | 'magnet' | 'armor' | 'lokPetDamage' | 'lokPetHaste' | 'enemyHp';
+export interface BoosterCardRecord {
+  id: string;
+  group: BoosterGroup;
+  stat: BoosterStat;
+  /** Whole units, 1 or more. What one unit means per stat lives in data/boosterCards.ts. */
+  units: number;
+  /** The character drawn as a ghosted copy on the card. */
+  characterId: string;
+  productId: string;
+  acquiredAt: number;
 }

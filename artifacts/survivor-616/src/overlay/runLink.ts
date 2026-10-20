@@ -6,6 +6,8 @@
  * page's address, text or any screenshot. The hub page decodes and validates it
  * independently (`apps/hub/lib/demoday-report.ts`); keep the two in step.
  */
+import { teardownPayload, type Teardown, type TeardownPayload } from './teardown';
+
 export const REPORT_URL = 'https://gsix.online/games/demoday/report';
 
 export interface ReportSummary {
@@ -13,6 +15,8 @@ export interface ReportSummary {
   kills: number;
   level: number;
   elapsedSec: number;
+  /** Optional per-role teardown numbers. */
+  teardown?: Teardown;
 }
 
 export interface ReportPayload {
@@ -25,6 +29,8 @@ export interface ReportPayload {
   sec: number;
   /** Character id the run used. */
   ch: string;
+  /** Teardown numbers. Optional and ignored by decoders that predate it, so the version stays 1. */
+  x?: TeardownPayload;
 }
 
 const toInt = (n: number, max: number) => Math.max(0, Math.min(max, Math.round(Number.isFinite(n) ? n : 0)));
@@ -37,6 +43,7 @@ export function reportPayload(summary: ReportSummary, character = 'foreman'): Re
     level: toInt(summary.level, 999),
     sec: toInt(summary.elapsedSec, 86_400),
     ch: character,
+    ...(summary.teardown ? { x: teardownPayload(summary.teardown) } : {}),
   };
 }
 

@@ -16,3 +16,18 @@ Decisions worth keeping:
 - Layout adapts at 640px: phones get one stacked column (log shrinks to the last round), wider screens get stat panels either side and a running battle log. Any new style must keep both layouts.
 - The first build used an on/off key (`survivor616.quickfight`); `getFightStyle` still reads it as `quick`.
 - e2e forces an ambush by setting `Math.random = () => 0` for one room change and restoring it as soon as the overlay mounts; seed meta needs `version: 5` or it is discarded.
+
+## Team and switching (0.14.3)
+
+Duo and Arena bring the selected team (`travelTeam()` in `data/travelEncounters.ts`,
+lead first, capped by `lokPetTeamCapacity`); Quick stays on the lead only.
+`createQuickFight` takes `playerPets` + `maxTeam`; `switchQuickFight` costs the
+player's turn and the opponent still plays its telegraphed `intent`. The engine
+already auto-sends the next teammate when the active pet faints
+(`executeMove`/`resolveStatusFaints`), so the fight only ends when the whole team
+is down, and `judgeAtCap` compares total team HP. The shared entrance effect is
+`ui/LokPetEntrance.tsx` (extracted from `StarterLokPetEncounter`, sound cue
+`lokPetEntrance`); fight overlays show it in a banner above the vignette because
+`HideoutVignette` is one canvas and cannot animate a single actor in DOM terms.
+Arena stays a Settings-only choice (no per-ambush chooser).
+

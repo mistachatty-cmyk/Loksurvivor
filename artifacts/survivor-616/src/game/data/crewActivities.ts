@@ -256,6 +256,18 @@ export const CREW_ACTIVITIES: CrewActivityDef[] = [
     icon: 'shield',
     effects: [{ stat: 'armor', add: 0.04 }],
   },
+  { id: 'cook-the-last-feast', roomId: 'main-floor', name: 'Cook the last feast', description: 'Mama Jo insists it is only the last feast until tomorrow. The leftovers are still legendary.', benefitLabel: '+22 max HP', icon: 'utensils', effects: [{ stat: 'maxHp', add: 22 }] },
+  { id: 'count-the-sheep', roomId: 'main-floor', name: 'Count the sheep', description: 'One sheep, two sheep, three suspiciously armored sheep. Everyone wakes up ready.', benefitLabel: '+2% armor', icon: 'coffee', effects: [{ stat: 'armor', add: 0.02 }] },
+  { id: 'chart-the-horde', roomId: 'rooftop-perch', name: 'Chart the horde', description: 'Nyx marks every crowd on a rooftop map. The arrows look suspiciously like a build order.', benefitLabel: '+7% area', icon: 'map', effects: [{ stat: 'area', mult: 1.07 }] },
+  { id: 'raise-the-palings', roomId: 'rooftop-perch', name: 'Raise the palings', description: 'A tiny watchtower appears overnight. No one admits to saying they need more wood.', benefitLabel: '+3% armor', icon: 'shield', effects: [{ stat: 'armor', add: 0.03 }] },
+  { id: 'tune-the-moon', roomId: 'the-cellar', name: 'Tune the moon', description: 'Sable loops a record until the beat and the moonrise land together. The monsters decline to comment.', benefitLabel: '5% faster cooldowns', icon: 'disc', effects: [{ stat: 'haste', mult: 0.95 }] },
+  { id: 'mix-the-elixir', roomId: 'the-cellar', name: 'Mix the elixir', description: 'One sip tastes like garlic. Two sips taste like victory. Nobody requests a third.', benefitLabel: '+1% lifesteal', icon: 'flame', effects: [{ stat: 'lifesteal', add: 0.01 }] },
+  { id: 'forge-the-banners', roomId: 'the-alley', name: 'Forge the banners', description: 'Ruth paints a banner for every block still holding out. The crew fights a little harder under them.', benefitLabel: '+7% damage', icon: 'paintbrush', effects: [{ stat: 'power', mult: 1.07 }] },
+  { id: 'repair-the-cabinets', roomId: 'the-back-room', name: 'Repair the cabinets', description: 'Otis finds an extra life inside a cabinet that only accepted quarters yesterday.', benefitLabel: '+15 max HP', icon: 'wrench', effects: [{ stat: 'maxHp', add: 15 }] },
+  { id: 'cycle-the-air', roomId: 'rapid-shelter', name: 'Cycle the air', description: 'Patch runs the emergency fans in a rhythm the broken gauges can still follow.', benefitLabel: '4% faster cooldowns', icon: 'radio', effects: [{ stat: 'haste', mult: 0.96 }] },
+  { id: 'seal-the-hatches', roomId: 'rapid-shelter', name: 'Seal the hatches', description: 'Latch checks every pressure wheel twice and leaves a chalk mark for the next shift.', benefitLabel: '+3% armor', icon: 'shield', effects: [{ stat: 'armor', add: 0.03 }] },
+  { id: 'relay-the-pressure', roomId: 'rapid-shelter', name: 'Relay the pressure', description: 'Mara races canisters between rooms. Her route becomes everyone else’s shortcut.', benefitLabel: '+7 move speed', icon: 'footprints', effects: [{ stat: 'speed', add: 7 }] },
+  { id: 'inspect-the-lockers', roomId: 'grpd-station', name: 'Inspect the lockers', description: 'Sarge finds a little extra protective gear in the last locker nobody opened.', benefitLabel: '+12 max HP', icon: 'shield', effects: [{ stat: 'maxHp', add: 12 }] },
 ];
 
 export const CREW_ACTIVITIES_BY_ID: Record<CrewActivityId, CrewActivityDef> =

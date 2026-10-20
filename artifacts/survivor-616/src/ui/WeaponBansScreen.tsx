@@ -12,6 +12,7 @@
 import { useMemo, useState } from 'react';
 import { CheckCircle2, Search, XCircle } from 'lucide-react';
 import { WEAPONS } from '@/game/data/weapons';
+import { isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
 import { useMeta } from '@/game/state/metaStore';
 import { ScreenLayout } from './ScreenLayout';
 import { WeaponIcon } from './WeaponIcon';
@@ -20,11 +21,13 @@ export interface WeaponBansScreenProps {
   onBack: () => void;
 }
 
+const FIELD_WEAPONS = WEAPONS.filter((weapon) => !isGrpdPlayableWeapon(weapon.id));
+
 export function WeaponBansScreen({ onBack }: WeaponBansScreenProps) {
   const { meta, toggleWeaponDisabled } = useMeta();
 
   const disabledWeaponIds = useMemo(() => new Set(meta.disabledWeaponIds ?? []), [meta.disabledWeaponIds]);
-  const activeWeaponsCount = WEAPONS.length - disabledWeaponIds.size;
+  const activeWeaponsCount = FIELD_WEAPONS.filter((weapon) => !disabledWeaponIds.has(weapon.id)).length;
 
   // Same invariant as ThreatMatrixScreen: never let the last active weapon
   // be banned, or a run would have nothing to spawn with.
@@ -36,13 +39,13 @@ export function WeaponBansScreen({ onBack }: WeaponBansScreenProps) {
   // data shows up here without touching this screen.
   const kindCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const weapon of WEAPONS) counts.set(weapon.kind, (counts.get(weapon.kind) ?? 0) + 1);
+    for (const weapon of FIELD_WEAPONS) counts.set(weapon.kind, (counts.get(weapon.kind) ?? 0) + 1);
     return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, []);
 
   const visibleWeapons = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return WEAPONS.filter((weapon) => {
+    return FIELD_WEAPONS.filter((weapon) => {
       if (kindFilter !== 'all' && weapon.kind !== kindFilter) return false;
       const banned = disabledWeaponIds.has(weapon.id);
       if (statusFilter === 'active' && banned) return false;
@@ -87,7 +90,7 @@ export function WeaponBansScreen({ onBack }: WeaponBansScreenProps) {
         <div className="rounded border border-amber-500/30 bg-amber-950/30 px-3 py-1.5 text-right font-mono">
           <span className="text-[10px] uppercase tracking-widest text-amber-400 font-bold">On the Bill</span>
           <span className="block text-xl font-black text-amber-200">
-            {activeWeaponsCount} / {WEAPONS.length}
+            {activeWeaponsCount} / {FIELD_WEAPONS.length}
           </span>
         </div>
       }
@@ -132,7 +135,7 @@ export function WeaponBansScreen({ onBack }: WeaponBansScreenProps) {
             </div>
           </div>
           <div className="-mx-1 flex snap-x gap-1.5 overflow-x-auto px-1 pb-1" role="group" aria-label="Weapon type filter">
-            {[['all', WEAPONS.length] as [string, number], ...kindCounts].map(([kind, count]) => (
+            {[['all', FIELD_WEAPONS.length] as [string, number], ...kindCounts].map(([kind, count]) => (
               <button
                 key={kind}
                 type="button"
@@ -149,7 +152,7 @@ export function WeaponBansScreen({ onBack }: WeaponBansScreenProps) {
           </div>
           <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wider">
             <span className="text-white/50" data-testid="weapon-ban-shown-count">
-              Showing {visibleWeapons.length} of {WEAPONS.length}
+              Showing {visibleWeapons.length} of {FIELD_WEAPONS.length}
             </span>
             <button type="button" onClick={enableAllShown} className="border border-emerald-400/40 px-2 py-1 font-bold text-emerald-300 hover:bg-emerald-400/10" data-testid="button-weapon-ban-enable-shown">
               Activate shown

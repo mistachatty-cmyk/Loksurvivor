@@ -6,6 +6,7 @@
  * mirrored into localStorage so a refresh does not wipe the hideout.
  */
 
+import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
 import {
   createContext,
   useCallback,
@@ -17,12 +18,15 @@ import {
 } from 'react';
 
 import { AREAS, getArea } from '@/game/data/areas';
+import { DIGI_TOWER_SECTORS } from '@/game/data/digiTower';
+import { isDamageNumberStyle } from '@/game/data/damageNumbers';
 import { CHARACTERS, getCharacter } from '@/game/data/characters';
 import { CHARACTER_EPISODES, CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
-import { getCharacterSkins } from '@/game/data/characterSkins';
+import { getCharacterSkins, isCharacterSkinUnlocked } from '@/game/data/characterSkins';
 import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { CITY_RELICS, CITY_RELICS_BY_ID, RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { ENEMIES } from '@/game/data/enemies';
+import { applyCreatorCredTotal } from '@/game/studio/creatorCred';
 import { isStarterLokPetId, LOKPET_VARIANTS_BY_ID, rollLokPet, type StarterLokPetId } from '@/game/data/lokPets';
 import { createRng } from '@/game/engine/math';
 import { ALLIES, ALLIES_BY_ID, DISCOVERIES, HUB_ROOMS } from '@/game/data/progression';
@@ -44,6 +48,7 @@ import {
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
 import { CHARACTER_MASTERY_STAT_EFFECTS, characterRankTitle } from '@/game/data/characterMastery';
 import { CURRENT_VERSION } from '@/game/data/changelog';
+import { DEFAULT_UPDATE_POPUP_KINDS, normalizeUpdatePopupKinds, type ChangelogKind } from '@/game/data/changelogKinds';
 import {
   advanceDailyContracts,
   contractDayKey,
@@ -64,6 +69,7 @@ import { DEFAULT_SOUND_PACK_ID, SOUND_PACKS_BY_ID } from '@/game/data/soundPacks
 import { DEFAULT_RUN_AURA_ID, RUN_AURAS, RUN_AURAS_BY_ID } from '@/game/data/runAuras';
 import { DEFAULT_HAT_ID, HATS, HATS_BY_ID } from '@/game/data/hats';
 import { CELEBRATIONS, CELEBRATIONS_BY_ID, DEFAULT_CELEBRATION_ID } from '@/game/data/celebrations';
+import { DROP_PACKS, DROP_PACKS_BY_ID, DEFAULT_DROP_PACK_ID } from '@/game/data/dropPacks';
 import { effectiveCatalogIds, hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
@@ -71,17 +77,39 @@ import { RENTABLE_GENERATORS, RENTABLE_GENERATORS_BY_ID } from '@/game/data/gene
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
 import type { BattleRewards } from '@/game/engine/lokPetBattleTypes';
 import { getExpForLevel } from '@/game/engine/petExpCurve';
+import { lokPetUnspentTrainingPoints, normalizeLokPetTraining, trainLokPet, TRAINING_DATA_RESPEC_COST } from '@/game/engine/petTraining';
 import { HIDEOUT_EVENTS_BY_ID } from '@/game/data/hideoutEvents';
+import { applyPetCare } from '@/game/data/petCare';
+import { applyChoice } from '@/game/engine/choiceEvents';
+import { HIDEOUT_PROPS_BY_ID, propClaimKey, propReady, resolvePropReward } from '@/game/data/hideoutProps';
+import {
+  MAX_CLAIMS,
+  REWARD_KEYS,
+  bondLuck,
+  emptyLedger,
+  grantWithFallback,
+  trimClaims,
+} from '@/game/engine/hideoutRewards';
 import { chooseBranch, normalizeEvolutionPath, undoBranch } from '@/game/engine/petEvolution';
 import { BOND_RANK_BY_ID, TRAVEL_WIN_EXP_BASE, TREAT_EXP_BASE, applyBond, bondDayKey, growPartyPets, growPet, growthHeadlines, runPetExpBase, sanitizePetName, scalePetExp, setPetName, type PetNameSlot } from '@/game/engine/petGrowth';
 import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS, LOKPET_CARDS } from '@/game/data/cards';
+import { CARD_COSMETICS_BY_ID, equipCardCosmetic, grantCardCosmetic, isCardCosmeticOwned, normalizeCardCosmetics } from '@/game/data/cardCosmetics';
+import { BOOSTER_PRODUCTS_BY_ID, applyBoosterToPlayerStats, boosterUnits, rollBoosterCard } from '@/game/data/boosterCards';
 import { CARD_SHOP_PACKS_BY_ID, CARD_VARIANT_VALUE, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
 import { BATTLE_DECK_SLOTS, CARD_SALVAGE_COST, CARD_SALVAGE_EARN_RUNS } from '@/game/data/travelEncounters';
 import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
-import { earnedEndgame, featureById, slotById } from '@/game/data/endgameUnlocks';
+import { ALL_WEAPON_DEFS } from '@/game/data/weaponPixelModels';
+import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, grpdEndgameWeaponEarned, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
+import { activeEventBuff, applyEventBuff, normalizeEventBuff } from '@/game/data/eventBuffs';
+import { AMBIENT_PICKUPS_BY_ID } from '@/game/data/hideoutAmbient';
+import { normalizeSpurAreaIds, spurAt } from '@/game/data/lightSpurs';
+import { openLuckyChest } from '@/game/engine/chestOpen';
+import { activeSkyBoost, applySkyStatBonus, normalizeSkyBoost, skyXpMultiplier, startSkyBoost } from '@/game/data/skyEvents';
+import { moraleMultiplier, nextMorale, nextStreak, normalizeMorale, normalizeStreak } from '@/game/data/morale';
+import { earnedEndgame, endgameReached, featureById, slotById } from '@/game/data/endgameUnlocks';
 import { recordEarnedEndgame } from '@/game/state/operatorForgeStore';
 import { PASSIVES } from '@/game/data/passives';
 import type {
@@ -116,6 +144,10 @@ import type {
   UIPanelLayout,
   ThreatCalibrations,
   ThreatEventId,
+  DigiTowerProgress,
+  DigiTowerPetCondition,
+  TrainingArenaLoadoutGroup,
+  LokPetTrainingStat,
 } from '@/game/types';
 
 export const DEFAULT_THREAT_CALIBRATIONS: ThreatCalibrations = {
@@ -151,12 +183,52 @@ export function normalizeThreatCalibrations(raw: unknown): ThreatCalibrations {
 }
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 22;
+const META_VERSION = 26;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 export const BASE_LOKPET_TEAM_SLOTS = 3;
 export const BASE_CARD_CREDITS_PER_LOOT_BOX = 2;
 export const LOKPET_CARD_PACK_COST = 14;
+
+function emptyDigiTowerProgress(): DigiTowerProgress {
+  return { highestFloor: 0, nextFloor: 1, checkpointFloor: 0, clearedFloorIds: [], defeatedMasterIds: [], claimedRestFloorIds: [], tokens: 0, trainingData: 0, carry: [], checkpointCarry: [] };
+}
+
+function normalizeTowerCarry(value: unknown): DigiTowerPetCondition[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 8).flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const row = entry as Partial<DigiTowerPetCondition>;
+    if (typeof row.petId !== 'string') return [];
+    const statusEffects = Array.isArray(row.statusEffects) ? row.statusEffects.slice(0, 8).flatMap((effect) => {
+      if (!effect || typeof effect !== 'object' || typeof effect.type !== 'string') return [];
+      const item = effect as DigiTowerPetCondition['statusEffects'][number];
+      return [{ type: item.type.slice(0, 24), duration: Math.max(0, Math.min(9, Math.floor(Number(item.duration) || 0))), value: Math.max(0, Math.min(999, Number(item.value) || 0)), sourcePetName: String(item.sourcePetName || '').slice(0, 40) }];
+    }) : [];
+    return [{ petId: row.petId.slice(0, 120), hpRatio: Math.max(0, Math.min(1, Number(row.hpRatio) || 0)), energyRatio: Math.max(0, Math.min(1, Number(row.energyRatio) || 0)), statusEffects }];
+  });
+}
+
+function normalizeDigiTowerProgress(raw: unknown): DigiTowerProgress {
+  if (!raw || typeof raw !== 'object') return emptyDigiTowerProgress();
+  const value = raw as Partial<DigiTowerProgress>;
+  const boundedInt = (input: unknown, fallback: number, max: number) => typeof input === 'number' && Number.isFinite(input) ? Math.max(0, Math.min(max, Math.floor(input))) : fallback;
+  const clearedFloorIds = Array.isArray(value.clearedFloorIds) ? [...new Set(value.clearedFloorIds.filter((id): id is string => typeof id === 'string' && /^tower-floor-(?:[1-9]|[1-9][0-9]|100)$/.test(id)))].slice(0, 100) : [];
+  const defeatedMasterIds = Array.isArray(value.defeatedMasterIds) ? [...new Set(value.defeatedMasterIds.filter((id): id is string => typeof id === 'string' && /^[a-z0-9-]{1,40}$/.test(id)))].slice(0, 10) : [];
+  const claimedRestFloorIds = Array.isArray(value.claimedRestFloorIds) ? [...new Set(value.claimedRestFloorIds.filter((id): id is string => typeof id === 'string' && /^tower-floor-(?:[1-9]|[1-9][0-9]|100)$/.test(id)))].slice(0, 20) : [];
+  return {
+    highestFloor: boundedInt(value.highestFloor, 0, 100),
+    nextFloor: boundedInt(value.nextFloor, 1, 101),
+    checkpointFloor: boundedInt(value.checkpointFloor, 0, 100),
+    clearedFloorIds,
+    defeatedMasterIds,
+    claimedRestFloorIds,
+    tokens: boundedInt(value.tokens, 0, 1_000_000),
+    trainingData: boundedInt(value.trainingData, 0, 1_000_000),
+    carry: normalizeTowerCarry(value.carry),
+    checkpointCarry: normalizeTowerCarry(value.checkpointCarry),
+  };
+}
 
 export function lokPetTeamCapacity(character: CharacterDef): number {
   return BASE_LOKPET_TEAM_SLOTS + (character.lokPetCollector?.extraTeamSlots ?? 0);
@@ -264,6 +336,30 @@ export function createInitialMeta(): MetaState {
     levelUpPresentation: 'pause-focus',
     pauseMapVisible: true,
     graphicsQuality: 'high',
+    ownedDropPackIds: [DEFAULT_DROP_PACK_ID],
+    activeDropPackId: DEFAULT_DROP_PACK_ID,
+    lokPetFieldGuideUnlocked: false,
+    lokPetCollectorAccessUnlocked: false,
+    factionRacesUnlocked: false,
+    lokPackVisualizerUnlocked: false,
+    trainingWeaponRackOwned: false,
+    trainingArenaLoadoutGroups: [{ id: 'training-group-1', activeLoadoutId: null, loadouts: [] }],
+    trainingArenaActiveGroupId: 'training-group-1',
+    trainingFavoriteWeaponIds: [],
+    trainingWeaponKills: {},
+    trainingDummyDamage: 0,
+    trainingOperatorXp: {},
+    trainingChallengeBests: {},
+    trainingChallengeMilestones: [],
+    trainingMailbox: [],
+    lokShopPerks: [],
+    lokShopRapport: 0,
+    lokShopStamps: 0,
+    lokShopLastVisit: '',
+    lokShopCharms: [],
+    lokShopHaggleDay: '',
+    lokShopHaggleCount: 0,
+    damageNumberStyle: 'classic',
     companionRevealStyle: 'ambush',
     frameRateMode: 60,
     soundtrackObjectiveCompletions: 0,
@@ -290,8 +386,22 @@ export function createInitialMeta(): MetaState {
     hideoutArrivalEnabled: true,
     hideoutSectionsCollapsedByDefault: false,
     hideoutPreviewEnabled: true,
+    hideoutSceneStyle: 'cage',
+    hideoutSpeechBubblesEnabled: true,
     hideoutPets: 'all',
     hideoutEvents: 'on',
+    hideoutInteractive: true,
+    hideoutPetPlay: true,
+    hideoutChoiceEvents: 'on',
+    hideoutClaims: {},
+    hideoutLedger: emptyLedger(),
+    crewMorale: 0,
+    runStreak: 0,
+    skyBoost: null,
+    ownsBall: false,
+    eventBuff: null,
+    spurAreaIds: [],
+    bestRunStreak: 0,
     hideoutStickyHeadOutEnabled: true,
     splashTextEnabled: true,
     oneLineTitleEnabled: false,
@@ -320,14 +430,29 @@ export function createInitialMeta(): MetaState {
     petElixirs: 3,
     petElixirUpdatedAt: Date.now(),
     bestiary: {},
+    fieldCreatureSeeds: [],
     totalKills: 0,
+    quirkKills: {},
+    quirkEverywhereRuns: 0,
+    quirkTakenRuns: 0,
+    quirkSurgesSurvived: 0,
+    runEventsSurvived: {},
+    callInsUsed: 0,
+    grpdSpentSeals: 0,
+    grpdUnlockedWeaponIds: [],
+    grpdActiveWeaponIds: [],
+    grpdSpawnTierByWeaponId: {},
+    grpdAutoIncreaseEnabled: true,
+    grpdArmoryAnchor: 'station',
     totalRuns: 0,
     bestSurvivalSec: 0,
     totalLevelUps: 0,
     cred: 0,
+    creatorCredApplied: 0,
     lootTokens: 0,
     cardCredits: 0,
     cardCollection: [],
+    boosterCards: [],
     unopenedCardPacks: {},
     autoOpenPacksEnabled: true,
     activePassiveCardIds: [],
@@ -339,6 +464,11 @@ export function createInitialMeta(): MetaState {
     eclipseMonocleOwned: false,
     cardFrameSleeves: ['frame-classic'],
     selectedCardFrame: 'frame-classic',
+    ownedCardBackIds: ['back-default'],
+    selectedCardBack: 'back-default',
+    ownedPackSkinIds: ['pack-classic'],
+    selectedPackSkin: 'pack-classic',
+    cardMotion: 'subtle',
     lokCollectorRuns: 0,
     lokCollectorPetsFound: 0,
     lokPetLeagueTier: 0,
@@ -371,6 +501,7 @@ export function createInitialMeta(): MetaState {
     unlockedEvolutionIds: [],
     episodeProgressById: {},
     completedSectorMissionIds: [],
+    digiTower: emptyDigiTowerProgress(),
     knownRelicIds: [],
     customMaps: [],
     uiPanelLayout: 'rail',
@@ -409,6 +540,7 @@ export function createInitialMeta(): MetaState {
     dvdEasterEggUnlocked: false,
     pendingNotifications: [],
     lastSeenChangelogVersion: CURRENT_VERSION,
+    updatePopupKinds: { ...DEFAULT_UPDATE_POPUP_KINDS },
     relicMaterials: { 'phosphor-ore': 6, 'silicon-alloy': 8, 'cyber-resin': 6, 'prism-quartz': 2 },
     craftedRelicIds: [],
     ownedKeyItemIds: ['digiscope'],
@@ -440,10 +572,43 @@ function normalizeEndlessDiscoveries(value: unknown): string[] {
   return [...discoveries];
 }
 
+function normalizeQuirkKills(value: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
+  for (const quirk of ENEMY_QUIRKS) {
+    const count = counter((value as Record<string, unknown>)[quirk.id]);
+    if (count > 0) out[quirk.id] = count;
+  }
+  return out;
+}
+
+function mergeQuirkKills(prev: Record<string, number>, run?: Record<string, number>): Record<string, number> {
+  if (!run) return prev;
+  const out = { ...prev };
+  for (const [id, count] of Object.entries(run)) {
+    if (ENEMY_QUIRKS_BY_ID[id] && count > 0) out[id] = (out[id] ?? 0) + Math.floor(count);
+  }
+  return out;
+}
+
 function counter(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? Math.floor(value)
     : fallback;
+}
+
+/** A saved id -> count map, keeping only well-formed entries so an old or edited save cannot poison arithmetic. */
+function cleanCounts(value: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (value && typeof value === 'object') {
+    for (const [key, count] of Object.entries(value as Record<string, unknown>)) out[key] = counter(count);
+  }
+  return out;
+}
+
+function normalizeBoosterCards(value: unknown): MetaState['boosterCards'] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((card): card is MetaState['boosterCards'][number] => !!card && typeof card.id === 'string' && typeof card.characterId === 'string' && typeof card.stat === 'string' && typeof card.group === 'string' && typeof card.productId === 'string' && Number.isInteger(card.units) && card.units >= 1);
 }
 
 function normalizeCardCollection(value: unknown): MetaState['cardCollection'] {
@@ -864,7 +1029,7 @@ export const STARTER_LOKPET_FREE_REFRESH_MS = 60 * 60 * 1000;
 export const HANDHELD_DIGISCOPE_COST = 240;
 const ELIXIR_GRANT_MS = 20 * 60 * 1000;
 const ELIXIR_GRANT_AMOUNT = 3;
-const ELIXIR_CAP = 18;
+export const ELIXIR_CAP = 18;
 
 function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
   if (!Array.isArray(value)) return [];
@@ -878,6 +1043,7 @@ function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
       roll: roll as SavedLokPet['roll'],
       stamina: Math.max(0, Math.min(PET_STAMINA_MAX, counter(candidate.stamina))),
       level: typeof candidate.level === 'number' && candidate.level >= 1 ? Math.min(candidate.starter === true ? 99 : 50, Math.floor(candidate.level)) : 1,
+      training: normalizeLokPetTraining(candidate.training, candidate.starter === true),
       exp: typeof candidate.exp === 'number' ? Math.max(0, Math.floor(candidate.exp)) : 0,
       battlesWon: counter(candidate.battlesWon),
       battlesFought: counter(candidate.battlesFought),
@@ -912,6 +1078,27 @@ function normalizeHideoutEventHistory(value: unknown): SavedLokPet['hideoutEvent
     .sort((a, b) => (b[1] as number) - (a[1] as number))
     .slice(0, 40);
   return entries.length > 0 ? (Object.fromEntries(entries) as Record<string, number>) : undefined;
+}
+
+function normalizeHideoutClaims(value: unknown): Record<string, number> {
+  if (!isRecord(value)) return {};
+  const entries = Object.entries(value).filter(
+    ([id, at]) => id.length > 0 && id.length <= 48 && typeof at === 'number' && Number.isFinite(at) && at > 0,
+  ) as Array<[string, number]>;
+  return trimClaims(Object.fromEntries(entries.slice(0, MAX_CLAIMS * 4)));
+}
+
+function normalizeHideoutLedger(value: unknown): MetaState['hideoutLedger'] {
+  if (!isRecord(value) || typeof value.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.day)) return emptyLedger();
+  const granted: MetaState['hideoutLedger']['granted'] = {};
+  if (isRecord(value.granted)) {
+    for (const key of [...REWARD_KEYS, 'petExp'] as const) {
+      const amount = value.granted[key];
+      if (typeof amount === 'number' && Number.isFinite(amount) && amount > 0) granted[key] = Math.min(100_000, Math.floor(amount));
+    }
+  }
+  const count = (raw: unknown) => (typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? Math.min(1000, Math.floor(raw)) : 0);
+  return { day: value.day, granted, events: count(value.events), rare: count(value.rare) };
 }
 
 function normalizePetNames(value: unknown): SavedLokPet['names'] {
@@ -980,6 +1167,31 @@ function replenishPetElixirs(meta: MetaState, now = Date.now()): Pick<MetaState,
 }
 
 /** Coerce an untrusted save payload into a usable MetaState. */
+function normalizeTrainingArenaLoadoutGroups(value: unknown): TrainingArenaLoadoutGroup[] {
+  if (!Array.isArray(value)) return [{ id: 'training-group-1', activeLoadoutId: null, loadouts: [] }];
+  const groups = value.slice(0, 4).flatMap((rawGroup): TrainingArenaLoadoutGroup[] => {
+    if (!rawGroup || typeof rawGroup !== 'object') return [];
+    const candidate = rawGroup as Partial<TrainingArenaLoadoutGroup>;
+    if (typeof candidate.id !== 'string' || !candidate.id) return [];
+    const loadouts = Array.isArray(candidate.loadouts)
+      ? candidate.loadouts.slice(0, 100).flatMap((rawLoadout) => {
+        if (!rawLoadout || typeof rawLoadout !== 'object') return [];
+        const loadout = rawLoadout as { id?: unknown; name?: unknown; weaponIds?: unknown };
+        if (typeof loadout.id !== 'string' || !loadout.id || typeof loadout.name !== 'string' || !Array.isArray(loadout.weaponIds)) return [];
+        const weaponIds = [...new Set(loadout.weaponIds.filter((id): id is string => typeof id === 'string' && id.length > 0))].slice(0, 128);
+        if (weaponIds.length === 0) return [];
+        return [{ id: loadout.id.slice(0, 80), name: loadout.name.trim().slice(0, 40) || 'Loadout', weaponIds }];
+      })
+      : [];
+    const activeLoadoutId = typeof candidate.activeLoadoutId === 'string' && loadouts.some((loadout) => loadout.id === candidate.activeLoadoutId)
+      ? candidate.activeLoadoutId
+      : null;
+    return [{ id: candidate.id.slice(0, 80), activeLoadoutId, loadouts }];
+  });
+  const uniqueGroups = groups.filter((group, index) => groups.findIndex((candidate) => candidate.id === group.id) === index);
+  return uniqueGroups.length > 0 ? uniqueGroups : [{ id: 'training-group-1', activeLoadoutId: null, loadouts: [] }];
+}
+
 export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const defaults = createInitialMeta();
   const liveModeEnabled = parsed.liveModeEnabled === true;
@@ -1059,6 +1271,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       ? parsed.selectedCharacterId
       : (unlockedCharacterIds[0] ?? defaults.selectedCharacterId);
   const rescuedAllyIds = idList(parsed.rescuedAllyIds, allyIds, []);
+  const savedTotalKills = counter(parsed.totalKills);
   const crewActivityByAlly = normalizeCrewActivities(
     parsed.crewActivityByAlly,
     rescuedAllyIds,
@@ -1071,7 +1284,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       const requested = parsed.characterSkinByCharacterId[character.id];
       const skin = getCharacterSkins(character).find((entry) => entry.id === requested);
       const characterEpisode = CHARACTER_EPISODES.find((entry) => entry.characterId === character.id);
-      if (skin && (!skin.episodeRequired || Boolean(characterEpisode && completedEpisodeIds.includes(characterEpisode.id)))) {
+      if (skin && isCharacterSkinUnlocked(skin, rescuedAllyIds.length, Boolean(characterEpisode && completedEpisodeIds.includes(characterEpisode.id)), savedTotalKills)) {
         characterSkinByCharacterId[character.id] = skin.id;
       }
     }
@@ -1092,6 +1305,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     new Set(SECTOR_MISSIONS.map((mission) => mission.id)),
     [],
   );
+  const digiTower = normalizeDigiTowerProgress(parsed.digiTower);
   const knownRelicIds = idList(
     parsed.knownRelicIds,
     new Set(CITY_RELICS.map((relic) => relic.id)),
@@ -1103,6 +1317,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const ownedRunAuraIds = normalizeOwnedRunAuraIds(parsed.ownedRunAuraIds);
   const ownedHatIds = normalizeOwnedIds(parsed.ownedHatIds, HATS.map((hat) => hat.id), DEFAULT_HAT_ID);
   const ownedCelebrationIds = normalizeOwnedIds(parsed.ownedCelebrationIds, CELEBRATIONS.map((entry) => entry.id), DEFAULT_CELEBRATION_ID);
+  const ownedDropPackIds = normalizeOwnedIds(parsed.ownedDropPackIds, DROP_PACKS.map((pack) => pack.id), DEFAULT_DROP_PACK_ID);
   const today = contractDayKey();
   const savedContractDay = typeof parsed.dailyContractDayKey === 'string' ? parsed.dailyContractDayKey : today;
   const dailyContractDayKey = savedContractDay === today ? savedContractDay : today;
@@ -1146,6 +1361,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     ownedGeneratorIds,
     generatorAccrualAt: Math.max(0, typeof parsed.generatorAccrualAt === 'number' ? parsed.generatorAccrualAt : Date.now()),
   });
+  const clearedAreaIds = idList(parsed.clearedAreaIds, areaIds, []);
+  const fabricatedGrpdIds = idList(parsed.grpdUnlockedWeaponIds, GRPD_PLAYABLE_WEAPON_IDS, []).filter((id) => !isGrpdEndgameWeapon(id));
+  const earnedEndgameGrpdIds = [...GRPD_PLAYABLE_WEAPON_IDS].filter((id) => grpdEndgameWeaponEarned(id, savedTotalKills, endgameReached({ clearedAreaIds })));
+  const activeGrpdIds = idList(parsed.grpdActiveWeaponIds, new Set([...fabricatedGrpdIds, ...earnedEndgameGrpdIds]), []);
 
   return {
     version: META_VERSION,
@@ -1164,6 +1383,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       parsed.graphicsQuality === 'balanced' || parsed.graphicsQuality === 'performance'
         ? parsed.graphicsQuality
         : 'high',
+    damageNumberStyle: isDamageNumberStyle(parsed.damageNumberStyle) ? parsed.damageNumberStyle : 'classic',
     companionRevealStyle: parsed.companionRevealStyle === 'classic' ? 'classic' : 'ambush',
     frameRateMode: parsed.frameRateMode === 120 ? 120 : 60,
     soundtrackObjectiveCompletions: counter(parsed.soundtrackObjectiveCompletions),
@@ -1211,6 +1431,59 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     hideoutAmbienceEnabled: parsed.hideoutAmbienceEnabled === true,
     hideoutWeatherEnabled: parsed.hideoutWeatherEnabled !== false,
     hideoutArrivalEnabled: parsed.hideoutArrivalEnabled !== false,
+    // LokToken purchases (Lok Shop) -- off by default for a returning save that predates them.
+    lokPetFieldGuideUnlocked: parsed.lokPetFieldGuideUnlocked === true,
+    lokPetCollectorAccessUnlocked: parsed.lokPetCollectorAccessUnlocked === true,
+    factionRacesUnlocked: parsed.factionRacesUnlocked === true,
+    lokPackVisualizerUnlocked: parsed.lokPackVisualizerUnlocked === true,
+    trainingWeaponRackOwned: parsed.trainingWeaponRackOwned === true,
+    trainingArenaLoadoutGroups: normalizeTrainingArenaLoadoutGroups(parsed.trainingArenaLoadoutGroups),
+    trainingArenaActiveGroupId: (() => {
+      const groups = normalizeTrainingArenaLoadoutGroups(parsed.trainingArenaLoadoutGroups);
+      return groups.some((group) => group.id === parsed.trainingArenaActiveGroupId)
+        ? parsed.trainingArenaActiveGroupId!
+        : groups[0]!.id;
+    })(),
+    trainingFavoriteWeaponIds: Array.isArray(parsed.trainingFavoriteWeaponIds)
+      ? [...new Set(parsed.trainingFavoriteWeaponIds.filter((id): id is string => typeof id === 'string' && id.length > 0))].slice(0, 512)
+      : [],
+    trainingWeaponKills: parsed.trainingWeaponKills && typeof parsed.trainingWeaponKills === 'object'
+      ? Object.fromEntries(Object.entries(parsed.trainingWeaponKills).filter(([id, value]) => id.length > 0 && typeof value === 'number' && Number.isFinite(value)).map(([id, value]) => [id, Math.max(0, Math.min(6_166, Math.floor(value as number)))]))
+      : {},
+    trainingDummyDamage: Math.max(0, Number.isFinite(parsed.trainingDummyDamage) ? Math.floor(parsed.trainingDummyDamage!) : 0),
+    trainingOperatorXp: parsed.trainingOperatorXp && typeof parsed.trainingOperatorXp === 'object'
+      ? Object.fromEntries(Object.entries(parsed.trainingOperatorXp).filter(([id, value]) => id.length > 0 && typeof value === 'number' && Number.isFinite(value)).map(([id, value]) => [id, Math.max(0, value as number)]))
+      : {},
+    trainingChallengeBests: parsed.trainingChallengeBests && typeof parsed.trainingChallengeBests === 'object'
+      ? Object.fromEntries(Object.entries(parsed.trainingChallengeBests).filter(([id, value]) => id.length > 0 && typeof value === 'number' && Number.isFinite(value)).map(([id, value]) => [id, Math.max(0, Math.floor(value as number))]))
+      : {},
+    trainingChallengeMilestones: Array.isArray(parsed.trainingChallengeMilestones)
+      ? [...new Set(parsed.trainingChallengeMilestones.filter((value): value is number => [0, 1000, 5000, 1_000_000, 5_000_000, 100_000_000].includes(value)))]
+      : [],
+    trainingMailbox: Array.isArray(parsed.trainingMailbox)
+      ? parsed.trainingMailbox
+        .filter((entry): entry is NonNullable<typeof parsed.trainingMailbox>[number] => Boolean(entry && typeof entry.id === 'string' && entry.id.length > 0 && typeof entry.title === 'string' && typeof entry.body === 'string' && Number.isFinite(entry.createdAt)))
+        .slice(-100)
+        .map((entry) => ({
+          id: entry.id,
+          title: entry.title,
+          body: entry.body,
+          createdAt: Math.max(0, Math.floor(entry.createdAt)),
+          read: entry.read === true,
+          kept: entry.kept === true,
+          ...(typeof entry.iconId === 'string' ? { iconId: entry.iconId } : {}),
+          ...(typeof entry.titleKey === 'string' ? { titleKey: entry.titleKey } : {}),
+          ...(typeof entry.bodyKey === 'string' ? { bodyKey: entry.bodyKey } : {}),
+          ...(entry.variables && typeof entry.variables === 'object' ? { variables: Object.fromEntries(Object.entries(entry.variables).filter(([, value]) => typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value)))) } : {}),
+        }))
+      : [],
+    lokShopPerks: Array.isArray(parsed.lokShopPerks) ? parsed.lokShopPerks.filter((v): v is string => typeof v === 'string') : [],
+    lokShopRapport: typeof parsed.lokShopRapport === 'number' && parsed.lokShopRapport >= 0 ? Math.floor(parsed.lokShopRapport) : 0,
+    lokShopStamps: typeof parsed.lokShopStamps === 'number' && parsed.lokShopStamps >= 0 ? Math.floor(parsed.lokShopStamps) : 0,
+    lokShopLastVisit: typeof parsed.lokShopLastVisit === 'string' ? parsed.lokShopLastVisit : '',
+    lokShopCharms: Array.isArray(parsed.lokShopCharms) ? parsed.lokShopCharms.filter((v): v is string => typeof v === 'string') : [],
+    lokShopHaggleDay: typeof parsed.lokShopHaggleDay === 'string' ? parsed.lokShopHaggleDay : '',
+    lokShopHaggleCount: typeof parsed.lokShopHaggleCount === 'number' && parsed.lokShopHaggleCount >= 0 ? Math.floor(parsed.lokShopHaggleCount) : 0,
     // Falls back to the pre-existing standalone localStorage toggle
     // (AttractMode.tsx's old component-local key) so a player who already
     // turned the background sim off doesn't see it silently re-enabled.
@@ -1219,8 +1492,22 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       : !(typeof window !== 'undefined' && window.localStorage.getItem('survivor616.attractMode') === 'off'),
     hideoutSectionsCollapsedByDefault: parsed.hideoutSectionsCollapsedByDefault === true,
     hideoutPreviewEnabled: parsed.hideoutPreviewEnabled !== false,
+    hideoutSceneStyle: parsed.hideoutSceneStyle === 'block' ? 'block' : 'cage',
+    hideoutSpeechBubblesEnabled: parsed.hideoutSpeechBubblesEnabled !== false,
     hideoutPets: parsed.hideoutPets === 'companion' || parsed.hideoutPets === 'off' ? parsed.hideoutPets : 'all',
     hideoutEvents: parsed.hideoutEvents === 'quiet' || parsed.hideoutEvents === 'off' ? parsed.hideoutEvents : 'on',
+    hideoutInteractive: parsed.hideoutInteractive !== false,
+    hideoutPetPlay: parsed.hideoutPetPlay !== false,
+    hideoutChoiceEvents: parsed.hideoutChoiceEvents === 'quiet' || parsed.hideoutChoiceEvents === 'off' ? parsed.hideoutChoiceEvents : 'on',
+    hideoutClaims: normalizeHideoutClaims(parsed.hideoutClaims),
+    hideoutLedger: normalizeHideoutLedger(parsed.hideoutLedger),
+    crewMorale: normalizeMorale(parsed.crewMorale),
+    runStreak: normalizeStreak(parsed.runStreak),
+    skyBoost: normalizeSkyBoost(parsed.skyBoost),
+    ownsBall: parsed.ownsBall === true,
+    eventBuff: normalizeEventBuff(parsed.eventBuff),
+    spurAreaIds: normalizeSpurAreaIds(parsed.spurAreaIds),
+    bestRunStreak: Math.max(normalizeStreak(parsed.bestRunStreak), normalizeStreak(parsed.runStreak)),
     hideoutStickyHeadOutEnabled: parsed.hideoutStickyHeadOutEnabled !== false,
     splashTextEnabled: parsed.splashTextEnabled !== false,
     oneLineTitleEnabled: parsed.oneLineTitleEnabled === true,
@@ -1245,7 +1532,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     selectedCharacterId,
     characterSkinByCharacterId,
     unlockedCharacterIds,
-    clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
+    clearedAreaIds,
     rescuedAllyIds,
     discoveryIds: idList(parsed.discoveryIds, discoveryIds, []),
     lokPetCatalog: normalizeLokPetCatalog(parsed.lokPetCatalog),
@@ -1258,14 +1545,35 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     visitingLokCards: normalizeVisitingLokCards(parsed.visitingLokCards),
     ...recoveredElixirs,
     bestiary,
-    totalKills: counter(parsed.totalKills),
+    fieldCreatureSeeds: Array.isArray(parsed.fieldCreatureSeeds)
+      ? [...new Set(parsed.fieldCreatureSeeds.filter((seed): seed is string => typeof seed === 'string' && /^field:[a-z0-9-]+$/.test(seed)))].slice(0, 500)
+      : [],
+    totalKills: savedTotalKills,
+    quirkKills: normalizeQuirkKills(parsed.quirkKills),
+    quirkEverywhereRuns: counter(parsed.quirkEverywhereRuns),
+    quirkTakenRuns: counter(parsed.quirkTakenRuns),
+    quirkSurgesSurvived: counter(parsed.quirkSurgesSurvived),
+    runEventsSurvived: cleanCounts(parsed.runEventsSurvived),
+    callInsUsed: counter(parsed.callInsUsed),
+    grpdSpentSeals: counter(parsed.grpdSpentSeals),
+    grpdUnlockedWeaponIds: fabricatedGrpdIds,
+    grpdActiveWeaponIds: activeGrpdIds,
+    grpdSpawnTierByWeaponId: Object.fromEntries(
+      Object.entries(parsed.grpdSpawnTierByWeaponId ?? {})
+        .filter(([id]) => GRPD_PLAYABLE_WEAPON_IDS.has(id))
+        .map(([id, tier]) => [id, Math.max(1, Math.min(GRPD_MAX_SPAWN_MULTIPLIER, Math.floor(Number(tier) || 1)))]),
+    ),
+    grpdAutoIncreaseEnabled: parsed.grpdAutoIncreaseEnabled !== false,
+    grpdArmoryAnchor: parsed.grpdArmoryAnchor === 'hideout' ? 'hideout' : 'station',
     totalRuns: counter(parsed.totalRuns),
     bestSurvivalSec: counter(parsed.bestSurvivalSec),
     totalLevelUps: counter(parsed.totalLevelUps),
     ...settledGeneratorIncome,
+    creatorCredApplied: counter(parsed.creatorCredApplied),
     lootTokens: counter(parsed.lootTokens),
     cardCredits: counter(parsed.cardCredits),
     cardCollection,
+    boosterCards: normalizeBoosterCards(parsed.boosterCards),
     unopenedCardPacks: normalizeUnopenedCardPacks(parsed.unopenedCardPacks),
     autoOpenPacksEnabled: parsed.autoOpenPacksEnabled !== false,
     activePassiveCardIds: Array.isArray(parsed.activePassiveCardIds) ? [...new Set(parsed.activePassiveCardIds.filter((id): id is string => typeof id === 'string' && ownedPassiveIds.has(id)))].slice(0, 5) : [],
@@ -1275,8 +1583,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     miningHelmetOwned: parsed.miningHelmetOwned === true,
     rancherWhistleOwned: parsed.rancherWhistleOwned === true,
     eclipseMonocleOwned: parsed.eclipseMonocleOwned === true,
-    cardFrameSleeves: Array.isArray(parsed.cardFrameSleeves) && parsed.cardFrameSleeves.length > 0 ? (parsed.cardFrameSleeves as string[]) : ['frame-classic'],
-    selectedCardFrame: typeof parsed.selectedCardFrame === 'string' ? parsed.selectedCardFrame : 'frame-classic',
+    ...normalizeCardCosmetics(parsed),
+    cardMotion: parsed.cardMotion === 'full' || parsed.cardMotion === 'off' ? parsed.cardMotion : 'subtle',
     lokCollectorRuns: counter(parsed.lokCollectorRuns),
     lokCollectorPetsFound: counter(parsed.lokCollectorPetsFound),
     lokPetLeagueTier: counter(parsed.lokPetLeagueTier),
@@ -1315,6 +1623,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     unlockedEvolutionIds,
     episodeProgressById,
     completedSectorMissionIds,
+    digiTower,
     knownRelicIds,
     customMaps,
     uiPanelLayout: parsed.uiPanelLayout === 'slideout' ? 'slideout' : 'rail',
@@ -1333,6 +1642,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     activeHatId: normalizeOwnedCosmeticId(parsed.activeHatId, ownedHatIds, DEFAULT_HAT_ID),
     ownedCelebrationIds,
     activeCelebrationId: normalizeOwnedCosmeticId(parsed.activeCelebrationId, ownedCelebrationIds, DEFAULT_CELEBRATION_ID),
+    ownedDropPackIds,
+    activeDropPackId: normalizeOwnedCosmeticId(parsed.activeDropPackId, ownedDropPackIds, DEFAULT_DROP_PACK_ID),
     dailyContractDayKey,
     dailyContractProgressById,
     completedDailyContractIds: [...new Set(completedDailyContractIds)],
@@ -1382,6 +1693,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // "older than every real version," so those players see the update
     // popup summarizing everything they missed, once.
     lastSeenChangelogVersion: typeof parsed.lastSeenChangelogVersion === 'string' ? parsed.lastSeenChangelogVersion : '0.0.0',
+    updatePopupKinds: normalizeUpdatePopupKinds(parsed.updatePopupKinds),
     relicMaterials: typeof parsed.relicMaterials === 'object' && parsed.relicMaterials !== null
       ? (parsed.relicMaterials as Record<string, number>)
       : { 'phosphor-ore': 6, 'silicon-alloy': 8, 'cyber-resin': 6, 'prism-quartz': 2 },
@@ -1483,6 +1795,33 @@ export function isUnlocked(rule: UnlockRule | undefined | null, meta: MetaState)
   }
 }
 
+/**
+ * Whether a character is actually selectable: its own unlock rule, AND -- for
+ * the LokPet Collector line specifically -- the separate LokToken "Collector
+ * Access" purchase from the Lok Shop. The two gates are independent: a
+ * Collector character's own progress rule can be met long before the player
+ * buys access, or vice versa if dev-mode unlocks everything.
+ */
+export function characterUnlocked(character: CharacterDef, meta: MetaState): boolean {
+  if (!isUnlocked(character.unlock, meta)) return false;
+  if (character.lokPetCollector && !meta.lokPetCollectorAccessUnlocked && !meta.devModeAllUnlocks) return false;
+  return true;
+}
+
+/** Whether a place is open to the player: its own rule, or a Light Spur they followed. */
+export function areaOpen(area: AreaDef, meta: MetaState): boolean {
+  return isUnlocked(area.unlock, meta) || meta.spurAreaIds.includes(area.id);
+}
+
+/** The Light Spur showing at `now` for this player, or null. */
+export function spurShowing(meta: MetaState, now: number): AreaDef | null {
+  const lead = spurAt(now, (areaId) => {
+    const area = AREAS.find((a) => a.id === areaId);
+    return !area || areaOpen(area, meta);
+  });
+  return lead ? AREAS.find((a) => a.id === lead.areaId) ?? null : null;
+}
+
 export function describeUnlock(rule: UnlockRule): string {
   switch (rule.kind) {
     case 'default':
@@ -1533,11 +1872,12 @@ function validEpisodeResult(result: RunResult): CharacterEpisodeDef | undefined 
 /** Total permanent stat boost granted by every rescued ally. */
 export function allyBoostTotals(meta: MetaState): Partial<BaseStats> {
   const totals: Partial<BaseStats> = {};
+  const morale = moraleMultiplier(meta.crewMorale, endgameReached(meta));
   for (const id of meta.rescuedAllyIds) {
     const ally = ALLIES_BY_ID[id];
     if (!ally) continue;
     for (const [key, value] of Object.entries(ally.boost) as Array<[keyof BaseStats, number]>) {
-      totals[key] = (totals[key] ?? 0) + value;
+      totals[key] = (totals[key] ?? 0) + value * morale;
     }
   }
   return totals;
@@ -1551,6 +1891,8 @@ export function effectiveStats(character: CharacterDef, meta: MetaState, ignoreF
   for (const [key, value] of Object.entries(boosts) as Array<[keyof BaseStats, number]>) {
     stats[key] = stats[key] + value;
   }
+  // Booster cards add to the played character (character, operatives and crew groups).
+  Object.assign(stats, applyBoosterToPlayerStats(stats, boosterUnits(meta.boosterCards ?? [])));
   for (const effect of crewActivityEffects(meta)) {
     if (effect.add) stats[effect.stat] += effect.add;
     if (effect.mult) stats[effect.stat] *= effect.mult;
@@ -1578,6 +1920,8 @@ export function effectiveStats(character: CharacterDef, meta: MetaState, ignoreF
   const cards = activeCardEffects(meta);
   for (const [stat, multiplier] of Object.entries(cards.statMults) as Array<[keyof BaseStats, number]>) stats[stat] *= multiplier;
   stats.magnet *= cards.magnetMult;
+  applyEventBuff(stats, activeEventBuff(meta.eventBuff, Date.now()));
+  applySkyStatBonus(stats, activeSkyBoost(meta.skyBoost, Date.now())?.statBonus ?? 0);
   stats.armor = Math.min(stats.armor, 0.6);
   if (!ignoreFatigue) {
     const fatigue = Math.min(MAX_FATIGUE_PCT, Math.max(0, settled.fatigueByCharacter[character.id] ?? 0)) / 100;
@@ -1808,11 +2152,13 @@ interface StoreState {
 }
 
 type Action =
+  | { type: 'applyCreatorCredTotal'; total: number }
   | { type: 'selectCharacter'; id: string }
   | { type: 'selectCharacterSkin'; characterId: string; skinId: string }
   | { type: 'enterHideout'; now: number }
   | { type: 'completeRun'; result: RunResult }
   | { type: 'buyCardPack'; packId: CardPackId; now: number }
+  | { type: 'buyBoosterProduct'; productId: string; now: number }
   | { type: 'buySingleCard'; cardId: string; cost: number; variant?: CardVariant }
   | { type: 'recycleCard'; cardId: string; rewardCC: number }
   | { type: 'recycleAllDuplicates' }
@@ -1823,8 +2169,9 @@ type Action =
   | { type: 'consumeThrownCard'; cardId: string }
   | { type: 'buyCardSalvageProtocol' }
   | { type: 'buyHandheldDigiScope' }
-  | { type: 'buyCardFrameSleeve'; frameId: string; cardCreditsCost: number }
-  | { type: 'equipCardFrameSleeve'; frameId: string }
+  | { type: 'buyCardCosmetic'; id: string }
+  | { type: 'equipCardCosmetic'; id: string }
+  | { type: 'setCardMotion'; motion: 'full' | 'subtle' | 'off' }
   | { type: 'buyKeyItem'; itemId: 'miningHelmet' | 'rancherWhistle' | 'eclipseMonocle'; credCost: number }
   | { type: 'craftRelic'; relicId: string }
   | { type: 'buyKeyItemAction'; keyItemId: string; credCost: number }
@@ -1839,7 +2186,12 @@ type Action =
   | { type: 'feedLokPetTreat'; id: string }
   | { type: 'adoptRancherPet'; variantId: string; credCost: number }
   | { type: 'feedRanchKibble'; petId: string; credCost: number }
-  | { type: 'recordLokPetBattleResult'; rewards: BattleRewards; winningPetIds: string[] }
+  | { type: 'recordLokPetBattleResult'; rewards: BattleRewards; winningPetIds: string[]; towerFloor?: number; towerCarry?: DigiTowerPetCondition[] }
+  | { type: 'claimDigiTowerRest'; floor: number; choice: 'treats' | 'tokens' }
+  | { type: 'trainLokPetAtTower'; floor: number; petId: string; stat: LokPetTrainingStat }
+  | { type: 'respecLokPetAtTower'; floor: number; petId: string }
+  | { type: 'buyDigiTowerSupply' }
+  | { type: 'endDigiTowerClimb' }
   | { type: 'toggleFavoriteLokPet'; id: string }
   | { type: 'renameLokPet'; id: string; name: string }
   | { type: 'setLokPetName'; id: string; slot: PetNameSlot; name: string }
@@ -1887,6 +2239,16 @@ type Action =
   | { type: 'setLevelUpPresentation'; value: MetaState['levelUpPresentation'] }
   | { type: 'setPauseMapVisible'; enabled: boolean }
   | { type: 'setGraphicsQuality'; quality: MetaState['graphicsQuality'] }
+  | { type: 'grantDropPack'; id: string }
+  | { type: 'grantLokPetFieldGuide' }
+  | { type: 'grantLokPetCollectorAccess' }
+  | { type: 'grantFactionRacesUnlock' }
+  | { type: 'grantLokPackVisualizer' }
+  | { type: 'grantLokShopPerk'; id: string }
+  | { type: 'lokShopVisit'; day: string; stamped: boolean }
+  | { type: 'lokShopHaggle'; day: string; rapport: number; charmId: string | null }
+  | { type: 'equipDropPack'; id: string }
+  | { type: 'setDamageNumberStyle'; style: MetaState['damageNumberStyle'] }
   | { type: 'setCompanionRevealStyle'; style: MetaState['companionRevealStyle'] }
   | { type: 'setFrameRateMode'; mode: MetaState['frameRateMode'] }
   | { type: 'setFogAmbianceMode'; mode: MetaState['fogAmbianceMode'] }
@@ -1901,8 +2263,20 @@ type Action =
   | { type: 'setHideoutWeather'; enabled: boolean }
   | { type: 'setHideoutSectionsCollapsedByDefault'; enabled: boolean }
   | { type: 'setHideoutPreview'; enabled: boolean }
+  | { type: 'setHideoutSceneStyle'; style: MetaState['hideoutSceneStyle'] }
+  | { type: 'setHideoutSpeechBubbles'; enabled: boolean }
   | { type: 'setHideoutPets'; mode: MetaState['hideoutPets'] }
   | { type: 'setHideoutEvents'; mode: MetaState['hideoutEvents'] }
+  | { type: 'setHideoutInteractive'; enabled: boolean }
+  | { type: 'setHideoutPetPlay'; enabled: boolean }
+  | { type: 'setHideoutChoiceEvents'; mode: MetaState['hideoutChoiceEvents'] }
+  | { type: 'activateHideoutProp'; propId: string; seed: number; now: number }
+  | { type: 'lookThroughSpyglass'; now: number }
+  | { type: 'openLuckyChest'; now: number; seed: number }
+  | { type: 'grantBall' }
+  | { type: 'collectHideoutPickup'; kindId: string; now: number }
+  | { type: 'resolveChoiceEvent'; eventId: string; choiceId: string; seed: number; now: number; petId?: string; propId?: string }
+  | { type: 'playWithLokPet'; petId: string; verbId: string; seed: number; now: number; musicPlaying: boolean }
   | { type: 'careForLokPet'; id: string; now: number }
   | { type: 'chooseLokPetBranch'; id: string; branchId: string; now: number }
   | { type: 'undoLokPetBranch'; id: string; now: number }
@@ -1928,8 +2302,16 @@ type Action =
   | { type: 'setMirrorModeEnabled'; enabled: boolean }
   | { type: 'toggleRunModifier'; key: keyof RunModifiers }
   | { type: 'dismissNotifications'; ids: string[] }
+  | { type: 'grantTrainingWeaponRack' }
+  | { type: 'setTrainingArenaLoadoutGroups'; groups: TrainingArenaLoadoutGroup[]; activeGroupId: string }
+  | { type: 'toggleFavoriteTrainingWeapon'; id: string }
+  | { type: 'recordTrainingSession'; characterId: string; damage: number; xp: number; challenge?: { key: string; damage: number } }
+  | { type: 'markTrainingMailboxRead'; id: string }
+  | { type: 'keepTrainingMailboxEntry'; id: string; kept: boolean }
+  | { type: 'deleteTrainingMailboxEntry'; id: string }
   | { type: 'announceEndgame'; ids: string[]; now: number }
   | { type: 'acknowledgeChangelog' }
+  | { type: 'setUpdatePopupKind'; kind: ChangelogKind; enabled: boolean }
   | { type: 'buyGenerator'; id: string; now: number }
   | { type: 'refreshGeneratorIncome'; now: number }
   | { type: 'setUiDensity'; density: 'grid' | 'list' }
@@ -1952,6 +2334,11 @@ type Action =
   | { type: 'toggleEnemyDisabled'; enemyId: string }
   | { type: 'setAllEnemiesDisabled'; disabled: boolean }
   | { type: 'toggleWeaponDisabled'; weaponId: string }
+  | { type: 'unlockGrpdWeapon'; weaponId: string }
+  | { type: 'toggleGrpdWeapon'; weaponId: string }
+  | { type: 'buyGrpdSpawnTier'; weaponId: string }
+  | { type: 'setGrpdAutoIncreaseEnabled'; enabled: boolean }
+  | { type: 'setGrpdArmoryAnchor'; anchor: MetaState['grpdArmoryAnchor'] }
   | { type: 'setAllWeaponsDisabled'; disabled: boolean }
   | { type: 'togglePassiveDisabled'; passiveId: string }
   | { type: 'setAllPassivesDisabled'; disabled: boolean }
@@ -2005,6 +2392,8 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
 function coreReducer(state: StoreState, action: Action): StoreState {
   switch (action.type) {
+    case 'applyCreatorCredTotal':
+      return { ...state, meta: applyCreatorCredTotal(state.meta, action.total) };
     case 'selectCharacter': {
       const character = CHARACTERS.find((candidate) => candidate.id === action.id);
       if (!character) return state;
@@ -2023,7 +2412,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       if (!character) return state;
       const skin = getCharacterSkins(character).find((entry) => entry.id === action.skinId);
       const characterEpisode = CHARACTER_EPISODES.find((entry) => entry.characterId === character.id);
-      if (!skin || (skin.episodeRequired && (!characterEpisode || !state.meta.completedEpisodeIds.includes(characterEpisode.id)))) return state;
+      if (!skin || !isCharacterSkinUnlocked(skin, state.meta.rescuedAllyIds.length, Boolean(characterEpisode && state.meta.completedEpisodeIds.includes(characterEpisode.id)), state.meta.totalKills)) return state;
       return {
         ...state,
         meta: {
@@ -2050,6 +2439,14 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...state.meta, selectedLokPetIds } };
     }
 
+    case 'buyBoosterProduct': {
+      const product = BOOSTER_PRODUCTS_BY_ID[action.productId];
+      if (!product || state.meta.cardCredits < product.cost) return state;
+      const seed = (action.now ^ state.meta.totalRuns ^ state.meta.boosterCards.length ^ product.cost) >>> 0;
+      const rng = createRng(seed);
+      const cards = Array.from({ length: product.cards }, (_, index) => rollBoosterCard(rng, product.id, action.now, index));
+      return { ...state, meta: { ...state.meta, cardCredits: state.meta.cardCredits - product.cost, boosterCards: [...state.meta.boosterCards, ...cards] } };
+    }
     case 'buyCardPack': {
       const pack = CARD_SHOP_PACKS_BY_ID[action.packId];
       if (!pack || state.meta.cardCredits < pack.cost) return state;
@@ -2320,6 +2717,8 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'recordLokPetBattleResult': {
       const { rewards, winningPetIds } = action;
+      const towerFloorId = action.towerFloor ? `tower-floor-${action.towerFloor}` : undefined;
+      if (towerFloorId && action.towerFloor !== state.meta.digiTower.nextFloor) return state;
       const nextWins = state.meta.lokPetBattleWins + 1;
       const badges = [...state.meta.lokPetBattleBadges];
       let leagueTier = state.meta.lokPetLeagueTier;
@@ -2335,7 +2734,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         // stops XP from vanishing between battles.
         const result = rewards.petResults?.find((r) => r.petId.includes(candidate.id));
         const newLevel = result ? result.level : levelUp ? levelUp.newLevel : (candidate.level || 1);
-        const bond = applyBond(candidate, 'battle', now);
+        const bond = applyBond(candidate, 'battle', now, Math.floor((candidate.training?.spirit ?? 0) / 5));
         return {
           ...candidate,
           level: newLevel,
@@ -2358,6 +2757,111 @@ function coreReducer(state: StoreState, action: Action): StoreState {
           lokPetBattleBadges: badges,
           lokPetLeagueTier: leagueTier,
           savedLokPets: updatedSaved,
+          ...(towerFloorId && action.towerFloor ? {
+            digiTower: (() => {
+              const progress = state.meta.digiTower;
+              const firstClear = !progress.clearedFloorIds.includes(towerFloorId!);
+              const clearedFloorIds = firstClear ? [...progress.clearedFloorIds, towerFloorId] : progress.clearedFloorIds;
+              const isMaster = action.towerFloor % 10 === 0;
+              const isCheckpoint = action.towerFloor % 5 === 0;
+              const carry = normalizeTowerCarry(action.towerCarry);
+              const masterIndex = Math.floor(action.towerFloor / 10) - 1;
+              const master = DIGI_TOWER_SECTORS[masterIndex];
+              const tokenReward = isMaster ? master?.masterReward ?? 0 : 5 + Math.ceil(action.towerFloor / 10) * 2;
+              return {
+                ...progress,
+                highestFloor: Math.max(progress.highestFloor, action.towerFloor),
+                nextFloor: Math.min(101, Math.max(progress.nextFloor, action.towerFloor + 1)),
+                checkpointFloor: isCheckpoint ? action.towerFloor : progress.checkpointFloor,
+                clearedFloorIds,
+                defeatedMasterIds: isMaster && master ? [...new Set([...progress.defeatedMasterIds, master.masterId])] : progress.defeatedMasterIds,
+                tokens: Math.min(1_000_000, progress.tokens + (firstClear ? tokenReward : 0)),
+                trainingData: Math.min(1_000_000, progress.trainingData + (firstClear ? 3 + Math.ceil(action.towerFloor / 5) : 0)),
+                carry,
+                checkpointCarry: isCheckpoint ? carry : progress.checkpointCarry,
+              };
+            })(),
+          } : {}),
+        },
+      };
+    }
+
+    case 'claimDigiTowerRest': {
+      const id = `tower-floor-${action.floor}`;
+      const progress = state.meta.digiTower;
+      if (!Number.isInteger(action.floor) || action.floor !== progress.nextFloor || action.floor < 1 || action.floor > 100 || action.floor % 10 !== 5 || progress.clearedFloorIds.includes(id)) return state;
+      const claimedRestFloorIds = [...progress.claimedRestFloorIds, id];
+      const alreadyCleared = progress.clearedFloorIds.includes(id);
+      const healedCarry = progress.carry.map((pet) => ({ ...pet, hpRatio: 1, energyRatio: 1, statusEffects: [] }));
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          lokPetTreats: state.meta.lokPetTreats + (action.choice === 'treats' ? 2 : 0),
+          digiTower: {
+            ...progress,
+            highestFloor: Math.max(progress.highestFloor, action.floor),
+            nextFloor: action.floor + 1,
+            checkpointFloor: action.floor,
+            clearedFloorIds: alreadyCleared ? progress.clearedFloorIds : [...progress.clearedFloorIds, id],
+            claimedRestFloorIds,
+            tokens: Math.min(1_000_000, progress.tokens + (action.choice === 'tokens' ? 35 + Math.ceil(action.floor / 10) * 5 : 20 + Math.ceil(action.floor / 10) * 5)),
+            trainingData: Math.min(1_000_000, progress.trainingData + 10),
+            carry: healedCarry,
+            checkpointCarry: healedCarry,
+          },
+        },
+      };
+    }
+
+    case 'trainLokPetAtTower': {
+      const floorId = `tower-floor-${action.floor}`;
+      const progress = state.meta.digiTower;
+      if (!Number.isInteger(action.floor) || action.floor !== progress.nextFloor || action.floor < 1 || action.floor > 100 || action.floor % 10 !== 5 || progress.claimedRestFloorIds.includes(floorId)) return state;
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.petId);
+      if (!pet || lokPetUnspentTrainingPoints(pet) < 1) return state;
+      const trained = trainLokPet(pet, action.stat);
+      if (!trained) return state;
+      return { ...state, meta: { ...state.meta, savedLokPets: state.meta.savedLokPets.map((candidate) => candidate.id === pet.id ? trained : candidate) } };
+    }
+
+    case 'respecLokPetAtTower': {
+      const floorId = `tower-floor-${action.floor}`;
+      const progress = state.meta.digiTower;
+      if (!Number.isInteger(action.floor) || action.floor !== progress.nextFloor || action.floor < 1 || action.floor > 100 || action.floor % 10 !== 5 || progress.claimedRestFloorIds.includes(floorId) || progress.trainingData < TRAINING_DATA_RESPEC_COST) return state;
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.petId);
+      if (!pet || !pet.training || Object.values(normalizeLokPetTraining(pet.training, pet.starter)).every((rank) => rank === 0)) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          savedLokPets: state.meta.savedLokPets.map((candidate) => candidate.id === pet.id ? { ...candidate, training: normalizeLokPetTraining(undefined, pet.starter) } : candidate),
+          digiTower: { ...progress, trainingData: progress.trainingData - TRAINING_DATA_RESPEC_COST },
+        },
+      };
+    }
+
+    case 'buyDigiTowerSupply': {
+      const progress = state.meta.digiTower;
+      const cost = 50;
+      if (!progress.defeatedMasterIds.includes('nib') || progress.tokens < cost) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          lokPetTreats: Math.min(99_999, state.meta.lokPetTreats + 3),
+          digiTower: { ...progress, tokens: progress.tokens - cost },
+        },
+      };
+    }
+
+    case 'endDigiTowerClimb': {
+      const progress = state.meta.digiTower;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          digiTower: { ...progress, nextFloor: Math.min(100, progress.checkpointFloor + 1), carry: progress.checkpointCarry },
         },
       };
     }
@@ -2711,12 +3215,55 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...state.meta, disabledWeaponIds } };
     }
 
+    case 'unlockGrpdWeapon': {
+      const weaponId = action.weaponId;
+      if (!GRPD_PLAYABLE_WEAPON_IDS.has(weaponId) || state.meta.grpdUnlockedWeaponIds.includes(weaponId)) return state;
+      if (isGrpdEndgameWeapon(weaponId)) return state;
+      if (grpdAvailableSeals(state.meta.totalKills, state.meta.grpdSpentSeals) < GRPD_UNLOCK_SEAL_COST) return state;
+      return { ...state, meta: {
+        ...state.meta,
+        grpdSpentSeals: state.meta.grpdSpentSeals + GRPD_UNLOCK_SEAL_COST,
+        grpdUnlockedWeaponIds: [...state.meta.grpdUnlockedWeaponIds, weaponId],
+        grpdSpawnTierByWeaponId: { ...state.meta.grpdSpawnTierByWeaponId, [weaponId]: 1 },
+      } };
+    }
+
+    case 'toggleGrpdWeapon': {
+      const weaponId = action.weaponId;
+      if (!state.meta.grpdUnlockedWeaponIds.includes(weaponId) && !grpdEndgameWeaponEarned(weaponId, state.meta.totalKills, endgameReached(state.meta))) return state;
+      const active = state.meta.grpdActiveWeaponIds;
+      return { ...state, meta: {
+        ...state.meta,
+        grpdActiveWeaponIds: active.includes(weaponId) ? active.filter((id) => id !== weaponId) : [...active, weaponId],
+      } };
+    }
+
+    case 'buyGrpdSpawnTier': {
+      const weaponId = action.weaponId;
+      if (!state.meta.grpdUnlockedWeaponIds.includes(weaponId) && !grpdEndgameWeaponEarned(weaponId, state.meta.totalKills, endgameReached(state.meta))) return state;
+      const current = state.meta.grpdSpawnTierByWeaponId[weaponId] ?? 1;
+      if (current >= GRPD_MAX_SPAWN_MULTIPLIER) return state;
+      const cost = grpdNextTierCost(current);
+      if (grpdAvailableSeals(state.meta.totalKills, state.meta.grpdSpentSeals) < cost) return state;
+      return { ...state, meta: {
+        ...state.meta,
+        grpdSpentSeals: state.meta.grpdSpentSeals + cost,
+        grpdSpawnTierByWeaponId: { ...state.meta.grpdSpawnTierByWeaponId, [weaponId]: current + 1 },
+      } };
+    }
+
+    case 'setGrpdAutoIncreaseEnabled':
+      return { ...state, meta: { ...state.meta, grpdAutoIncreaseEnabled: action.enabled } };
+
+    case 'setGrpdArmoryAnchor':
+      return { ...state, meta: { ...state.meta, grpdArmoryAnchor: action.anchor } };
+
     case 'setAllWeaponsDisabled': {
       return {
         ...state,
         meta: {
           ...state.meta,
-          disabledWeaponIds: action.disabled ? Object.keys(WEAPONS_BY_ID) : [],
+          disabledWeaponIds: action.disabled ? Object.keys(WEAPONS_BY_ID).filter((id) => !isGrpdPlayableWeapon(id)) : [],
         },
       };
     }
@@ -3115,6 +3662,104 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'setPauseMapVisible':
       return { ...state, meta: { ...state.meta, pauseMapVisible: action.enabled } };
 
+    case 'setDamageNumberStyle':
+      return { ...state, meta: { ...state.meta, damageNumberStyle: action.style } };
+    // Drop packs are sold for LokTokens only, so the server-verified purchase
+    // grants them here with no local currency moving. Idempotent.
+    case 'grantDropPack': {
+      if (!DROP_PACKS_BY_ID[action.id] || state.meta.ownedDropPackIds.includes(action.id)) return state;
+      return { ...state, meta: { ...state.meta, ownedDropPackIds: [...state.meta.ownedDropPackIds, action.id] } };
+    }
+    case 'equipDropPack':
+      if (!hasCatalogItem(state.meta, 'dropPacks', action.id, state.meta.ownedDropPackIds)) return state;
+      return { ...state, meta: { ...state.meta, activeDropPackId: action.id } };
+    // LokToken-only feature unlocks (Lok Shop), server-verified before this fires. Idempotent.
+    case 'grantLokPetFieldGuide':
+      if (state.meta.lokPetFieldGuideUnlocked) return state;
+      return { ...state, meta: { ...state.meta, lokPetFieldGuideUnlocked: true } };
+    case 'grantLokPetCollectorAccess':
+      if (state.meta.lokPetCollectorAccessUnlocked) return state;
+      return { ...state, meta: { ...state.meta, lokPetCollectorAccessUnlocked: true } };
+    case 'grantFactionRacesUnlock':
+      if (state.meta.factionRacesUnlocked) return state;
+      return { ...state, meta: { ...state.meta, factionRacesUnlocked: true } };
+    case 'grantLokPackVisualizer':
+      if (state.meta.lokPackVisualizerUnlocked) return state;
+      return { ...state, meta: { ...state.meta, lokPackVisualizerUnlocked: true } };
+    case 'grantTrainingWeaponRack':
+      if (state.meta.trainingWeaponRackOwned) return state;
+      return { ...state, meta: { ...state.meta, trainingWeaponRackOwned: true } };
+    case 'setTrainingArenaLoadoutGroups': {
+      const groups = normalizeTrainingArenaLoadoutGroups(action.groups);
+      const activeGroupId = groups.some((group) => group.id === action.activeGroupId) ? action.activeGroupId : groups[0]!.id;
+      return { ...state, meta: { ...state.meta, trainingArenaLoadoutGroups: groups, trainingArenaActiveGroupId: activeGroupId } };
+    }
+    case 'toggleFavoriteTrainingWeapon': {
+      if (!action.id) return state;
+      const favoriteIds = state.meta.trainingFavoriteWeaponIds;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          trainingFavoriteWeaponIds: favoriteIds.includes(action.id)
+            ? favoriteIds.filter((id) => id !== action.id)
+            : [...favoriteIds, action.id].slice(-512),
+        },
+      };
+    }
+    case 'recordTrainingSession': {
+      const damage = Math.max(0, Math.floor(action.damage));
+      const xp = Math.max(0, action.xp);
+      const previousTotal = state.meta.trainingDummyDamage;
+      const nextTotal = previousTotal + damage;
+      const multiWeaponUnlockedBefore = previousTotal >= 1_000_000;
+      const multiWeaponUnlockedAfter = nextTotal >= 1_000_000;
+      const challengeDamage = action.challenge ? Math.max(0, Math.floor(action.challenge.damage)) : undefined;
+      const challengeBest = action.challenge && challengeDamage !== undefined
+        ? Math.max(state.meta.trainingChallengeBests[action.challenge.key] ?? 0, challengeDamage)
+        : undefined;
+      const milestones = action.challenge && challengeDamage !== undefined
+        ? [...new Set([...state.meta.trainingChallengeMilestones, ...[0, 1_000, 5_000, 1_000_000, 5_000_000, 100_000_000].filter((threshold) => challengeDamage >= threshold)])]
+        : state.meta.trainingChallengeMilestones;
+      const multiNotice = !multiWeaponUnlockedBefore && multiWeaponUnlockedAfter
+        ? { id: 'training-multi-weapon-unlocked', title: 'Multi-Weapon Testing unlocked', body: 'The Training Arena rack can now test more than one weapon at a time.', titleKey: 'training.notification.multi.title', bodyKey: 'training.notification.multi.body', createdAt: Date.now() }
+        : null;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          trainingDummyDamage: nextTotal,
+          trainingOperatorXp: { ...state.meta.trainingOperatorXp, [action.characterId]: (state.meta.trainingOperatorXp[action.characterId] ?? 0) + xp },
+          trainingChallengeBests: action.challenge && challengeBest !== undefined
+            ? { ...state.meta.trainingChallengeBests, [action.challenge.key]: challengeBest }
+            : state.meta.trainingChallengeBests,
+          trainingChallengeMilestones: milestones,
+          pendingNotifications: multiNotice ? [...state.meta.pendingNotifications, multiNotice] : state.meta.pendingNotifications,
+          trainingMailbox: multiNotice
+            ? [...state.meta.trainingMailbox, { ...multiNotice, read: false, kept: false }].slice(-100)
+            : state.meta.trainingMailbox,
+        },
+      };
+    }
+    case 'markTrainingMailboxRead':
+      return { ...state, meta: { ...state.meta, trainingMailbox: state.meta.trainingMailbox.map((entry) => entry.id === action.id ? { ...entry, read: true } : entry) } };
+    case 'keepTrainingMailboxEntry':
+      return { ...state, meta: { ...state.meta, trainingMailbox: state.meta.trainingMailbox.map((entry) => entry.id === action.id ? { ...entry, kept: action.kept } : entry) } };
+    case 'deleteTrainingMailboxEntry':
+      return { ...state, meta: { ...state.meta, trainingMailbox: state.meta.trainingMailbox.filter((entry) => entry.id !== action.id) } };
+    case 'grantLokShopPerk': {
+      if (state.meta.lokShopPerks.includes(action.id)) return state;
+      return { ...state, meta: { ...state.meta, lokShopPerks: [...state.meta.lokShopPerks, action.id], ...(action.id === 'ball' ? { ownsBall: true } : {}) } };
+    }
+    case 'lokShopVisit': {
+      if (state.meta.lokShopLastVisit === action.day) return state;
+      return { ...state, meta: { ...state.meta, lokShopLastVisit: action.day, lokShopRapport: state.meta.lokShopRapport + 1, lokShopStamps: state.meta.lokShopStamps + (action.stamped ? 1 : 0) } };
+    }
+    case 'lokShopHaggle': {
+      const sameDay = state.meta.lokShopHaggleDay === action.day;
+      const charms = action.charmId && !state.meta.lokShopCharms.includes(action.charmId) ? [...state.meta.lokShopCharms, action.charmId] : state.meta.lokShopCharms;
+      return { ...state, meta: { ...state.meta, lokShopHaggleDay: action.day, lokShopHaggleCount: (sameDay ? state.meta.lokShopHaggleCount : 0) + 1, lokShopRapport: state.meta.lokShopRapport + action.rapport, lokShopCharms: charms } };
+    }
     case 'setGraphicsQuality':
       return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
     case 'setCompanionRevealStyle':
@@ -3158,12 +3803,93 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'setHideoutPreview':
       return { ...state, meta: { ...state.meta, hideoutPreviewEnabled: action.enabled } };
+    case 'setHideoutSceneStyle':
+      return { ...state, meta: { ...state.meta, hideoutSceneStyle: action.style } };
+    case 'setHideoutSpeechBubbles':
+      return { ...state, meta: { ...state.meta, hideoutSpeechBubblesEnabled: action.enabled } };
 
     case 'setHideoutPets':
       return { ...state, meta: { ...state.meta, hideoutPets: action.mode } };
 
     case 'setHideoutEvents':
       return { ...state, meta: { ...state.meta, hideoutEvents: action.mode } };
+
+    case 'setHideoutInteractive':
+      return { ...state, meta: { ...state.meta, hideoutInteractive: action.enabled } };
+
+    case 'setHideoutPetPlay':
+      return { ...state, meta: { ...state.meta, hideoutPetPlay: action.enabled } };
+
+    case 'setHideoutChoiceEvents':
+      return { ...state, meta: { ...state.meta, hideoutChoiceEvents: action.mode } };
+
+    case 'resolveChoiceEvent': {
+      // A choice event: validation, the rolled outcome and the payout all live in `applyChoice`
+      // (and the shared reward policy). A repeat of the same event inside its cooldown is a no-op.
+      const result = applyChoice(state.meta, action.eventId, action.choiceId, action.seed, {
+        now: action.now,
+        petId: action.petId,
+        propId: action.propId,
+        elixirCap: ELIXIR_CAP,
+      });
+      return result.ok ? { ...state, meta: result.meta } : state;
+    }
+
+    case 'playWithLokPet': {
+      // A play verb: cooldown per pet, XP and bond scaled by mood, plus the verb's small find.
+      // The rules (and every cap) live in `applyPetCare` and the shared reward policy.
+      const outcome = applyPetCare(state.meta, action.petId, action.verbId, action.seed, {
+        now: action.now,
+        musicPlaying: action.musicPlaying,
+        elixirCap: ELIXIR_CAP,
+      });
+      return outcome.ok ? { ...state, meta: outcome.meta } : state;
+    }
+
+    case 'activateHideoutProp': {
+      // A reward prop pays out once per cooldown; everything else about a prop (lines,
+      // opening a panel, starting an event) never touches the save.
+      const def = HIDEOUT_PROPS_BY_ID[action.propId];
+      if (!def || def.action.kind !== 'reward') return state;
+      if (def.unlock && !isUnlocked(def.unlock, state.meta)) return state;
+      if (!propReady(def, state.meta.hideoutClaims, action.now)) return state;
+      const roll = resolvePropReward(def, createRng(action.seed), bondLuck(state.meta.savedLokPets));
+      if (!roll) return state;
+      const result = grantWithFallback(state.meta, roll.reward, roll.fallback, { now: action.now, rare: roll.rare, elixirCap: ELIXIR_CAP });
+      // A grant the daily caps swallowed whole pays nothing, so it must not burn the day's claim.
+      if (!result.paid) return state;
+      const claimed = trimClaims({ ...result.meta.hideoutClaims, [propClaimKey(def.id)]: action.now });
+      return { ...state, meta: { ...result.meta, hideoutClaims: claimed } };
+    }
+
+    case 'collectHideoutPickup': {
+      const def = AMBIENT_PICKUPS_BY_ID[action.kindId];
+      if (!def) return state;
+      const paid = grantWithFallback(state.meta, def.reward, undefined, { now: action.now, elixirCap: ELIXIR_CAP });
+      return paid.paid ? { ...state, meta: paid.meta } : state;
+    }
+
+    case 'grantBall':
+      return state.meta.ownsBall ? state : { ...state, meta: { ...state.meta, ownsBall: true } };
+
+    case 'openLuckyChest': {
+      const opened = openLuckyChest(state.meta, action.now, action.seed, ELIXIR_CAP);
+      return opened ? { ...state, meta: opened.meta } : state;
+    }
+
+    case 'lookThroughSpyglass': {
+      const boost = startSkyBoost(state.meta.skyBoost, action.now);
+      const spur = spurShowing(state.meta, action.now);
+      if (!boost && !spur) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          skyBoost: boost ?? state.meta.skyBoost,
+          spurAreaIds: spur ? [...state.meta.spurAreaIds, spur.id] : state.meta.spurAreaIds,
+        },
+      };
+    }
 
     case 'chooseLokPetBranch': {
       const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
@@ -3299,6 +4025,20 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         },
       };
 
+    case 'buyCardCosmetic': {
+      const item = CARD_COSMETICS_BY_ID[action.id];
+      if (!item || item.cost <= 0 || isCardCosmeticOwned(state.meta, item) || state.meta.cardCredits < item.cost) return state;
+      if (item.requiresUnlock === 'lokPackVisualizer' && !state.meta.lokPackVisualizerUnlocked) return state;
+      return { ...state, meta: { ...grantCardCosmetic(state.meta, item), cardCredits: state.meta.cardCredits - item.cost } };
+    }
+    case 'equipCardCosmetic': {
+      const item = CARD_COSMETICS_BY_ID[action.id];
+      if (!item || !isCardCosmeticOwned(state.meta, item)) return state;
+      return { ...state, meta: equipCardCosmetic(state.meta, item) };
+    }
+    case 'setCardMotion':
+      return { ...state, meta: { ...state.meta, cardMotion: action.motion } };
+
     case 'setUiDensity':
       return {
         ...state,
@@ -3374,6 +4114,15 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return {
         ...state,
         meta: { ...state.meta, lastSeenChangelogVersion: CURRENT_VERSION },
+      };
+
+    case 'setUpdatePopupKind':
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          updatePopupKinds: { ...state.meta.updatePopupKinds, [action.kind]: action.enabled },
+        },
       };
 
     case 'refreshGeneratorIncome':
@@ -3521,11 +4270,24 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'completeRun': {
       const result = action.result;
       const prev = state.meta;
+      const crewMorale = nextMorale(prev.crewMorale, result.cleared);
+      const runStreak = nextStreak(prev.runStreak, result.cleared);
+      const bestRunStreak = Math.max(prev.bestRunStreak, runStreak);
       const runCharacter = getCharacter(result.characterId);
       const collectorRun = Boolean(runCharacter.lokPetCollector);
       const collectorPetsFound = collectorRun
         ? result.lokPets.filter((pet) => pet.origin === 'chest').length
         : 0;
+      const trainingWeaponKills = { ...prev.trainingWeaponKills };
+      const newlyTrainingWeapons: string[] = [];
+      if (prev.trainingWeaponRackOwned && result.areaId !== 'training-arena') {
+        for (const [weaponId, count] of Object.entries(result.weaponKills ?? {})) {
+          const oldCount = trainingWeaponKills[weaponId] ?? 0;
+          const nextCount = Math.min(6_166, oldCount + Math.max(0, Math.floor(count)));
+          trainingWeaponKills[weaponId] = nextCount;
+          if (oldCount < 616 && nextCount >= 616) newlyTrainingWeapons.push(weaponId);
+        }
+      }
 
       const bestiary = { ...prev.bestiary };
       for (const [enemyId, count] of Object.entries(result.killsByEnemy)) {
@@ -3540,6 +4302,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       let discoveryIds = prev.discoveryIds;
       if (result.cleared && result.discoveryId) {
         discoveryIds = addUnique(discoveryIds, result.discoveryId);
+      }
+      for (const findId of result.mapFindIds ?? []) {
+        if (findId === 'breach-616-plate' || findId === 'transit-coil-found') discoveryIds = addUnique(discoveryIds, findId);
       }
       const discoveredRelic = result.cleared && result.discoveryId
         ? RELIC_BY_DISCOVERY_ID[result.discoveryId]
@@ -3567,6 +4332,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         ? addUnique(prev.clearedAreaIds, result.areaId)
         : prev.clearedAreaIds;
       const lokPetCatalog = recordLokPetCatalog(prev.lokPetCatalog, result.lokPets);
+      const fieldCreatureSeeds = result.fieldCreatureSeed
+        ? addUnique(prev.fieldCreatureSeeds, result.fieldCreatureSeed)
+        : prev.fieldCreatureSeeds;
       const recoveredElixirs = replenishPetElixirs(prev);
       const spentPetIds = new Set(prev.selectedLokPetIds);
       const runNow = Date.now();
@@ -3597,7 +4365,13 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
       const next: MetaState = {
         ...prev,
+        crewMorale,
+        runStreak,
+        bestRunStreak,
+        ownedUiThemeIds: discoveryIds.includes('breach-616-plate') ? addUnique(prev.ownedUiThemeIds, 'breach-616') : prev.ownedUiThemeIds,
         bestiary,
+        trainingWeaponKills,
+        fieldCreatureSeeds,
         rescuedAllyIds,
         discoveryIds,
         lokPetCatalog,
@@ -3607,6 +4381,15 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         ...recoveredElixirs,
         clearedAreaIds,
         totalKills: prev.totalKills + result.kills,
+        quirkKills: mergeQuirkKills(prev.quirkKills, result.killsByQuirk),
+        quirkEverywhereRuns: prev.quirkEverywhereRuns + (result.quirkEverywhereRun ? 1 : 0),
+        quirkTakenRuns: prev.quirkTakenRuns + (result.quirkTakenRun ? 1 : 0),
+        quirkSurgesSurvived: prev.quirkSurgesSurvived + (result.quirkSurgeSurvived ? 1 : 0),
+        callInsUsed: prev.callInsUsed + (result.callInsUsed ?? 0),
+        runEventsSurvived: (result.runEventsSurvived ?? []).reduce(
+          (counts, id) => ({ ...counts, [id]: (counts[id] ?? 0) + 1 }),
+          prev.runEventsSurvived,
+        ),
         totalRuns: prev.totalRuns + 1,
         bestSurvivalSec: Math.max(prev.bestSurvivalSec, Math.round(result.survivedSec)),
         totalLevelUps: prev.totalLevelUps + Math.max(0, result.level - 1),
@@ -3663,6 +4446,23 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         completedDailyContractIds: dailyContracts.completedIds,
       };
 
+      for (const weaponId of newlyTrainingWeapons) {
+        const weapon = ALL_WEAPON_DEFS.find((candidate) => candidate.id === weaponId) ?? WEAPONS_BY_ID[weaponId];
+        if (!weapon) continue;
+        const notice = {
+          id: `training-weapon-${weaponId}-${runNow}`,
+          title: `${weapon.name} training unlocked`,
+          body: `${weapon.name} can now be tested in the Training Arena.`,
+          iconId: weaponId,
+          titleKey: 'training.notification.weaponUnlocked.title',
+          bodyKey: 'training.notification.weaponUnlocked.body',
+          variables: { weapon: weapon.name },
+          createdAt: runNow,
+        };
+        next.pendingNotifications = [...next.pendingNotifications, notice];
+        next.trainingMailbox = [...next.trainingMailbox, { ...notice, read: false, kept: false }].slice(-100);
+      }
+
       const episodeDefinition = validEpisodeResult(result);
       if (episodeDefinition && result.episode) {
         const nextProgress = Math.max(
@@ -3676,9 +4476,10 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         }
       }
 
-      // Characters whose unlock rule just became true.
+      // Characters whose unlock rule just became true (Collector characters also need
+      // the separate LokToken Collector Access purchase -- see characterUnlocked).
       const newlyUnlocked = CHARACTERS.filter(
-        (c) => !next.unlockedCharacterIds.includes(c.id) && isUnlocked(c.unlock, next),
+        (c) => !next.unlockedCharacterIds.includes(c.id) && characterUnlocked(c, next),
       ).map((c) => c.id);
 
       next.unlockedCharacterIds = [...next.unlockedCharacterIds, ...newlyUnlocked];
@@ -3703,6 +4504,19 @@ function coreReducer(state: StoreState, action: Action): StoreState {
             body: director
               ? `${director.toggleLabel} is now available as a run toggle on the Roster screen.`
               : 'A new run toggle is now available on the Roster screen.',
+            createdAt: Date.now(),
+          },
+        ];
+      }
+
+      const newEvidenceSeals = grpdEarnedSeals(next.totalKills) - grpdEarnedSeals(prev.totalKills);
+      if (newEvidenceSeals > 0) {
+        next.pendingNotifications = [
+          ...next.pendingNotifications,
+          {
+            id: `grpd-evidence-${next.totalKills}`,
+            title: `${newEvidenceSeals} GRPD evidence seal${newEvidenceSeals === 1 ? '' : 's'} earned`,
+            body: 'Visit the GRPD Armory to fabricate an archived weapon or raise its spawn modifier.',
             createdAt: Date.now(),
           },
         ];
@@ -3739,6 +4553,26 @@ function coreReducer(state: StoreState, action: Action): StoreState {
             title: `${runCharacter.name} reached ${rankAfter} rank`,
             body: `Level ${characterLevelProgress(next, result.characterId).level} mastery for ${runCharacter.name} -- permanent combat bonus increased.`,
             createdAt: Date.now(),
+          },
+        ];
+      }
+
+      // First run ever completed: the Looks & LokPets button and the pet
+      // Play & Bond bar were hidden until now (see their hub render guards).
+      // Announce the unlock together with this run's own pet growth, since
+      // a starter pet's first level-up naturally lands on this same run.
+      if (prev.totalRuns === 0) {
+        const firstRunHeadlines = growthHeadlines(runGrowth.entries);
+        next.pendingNotifications = [
+          ...next.pendingNotifications,
+          {
+            id: `first-run-unlocks-${runNow}`,
+            title: 'Looks & LokPets unlocked',
+            body: [
+              'The Looks & LokPets button and your LokPet\'s Play & Bond bar are now available in the Hideout.',
+              ...firstRunHeadlines,
+            ].join(' '),
+            createdAt: runNow,
           },
         ];
       }
@@ -3787,6 +4621,7 @@ export interface MetaContextValue {
   completeRun: (result: RunResult) => void;
   resolveTravelEncounter: (result: TravelEncounterResult) => void;
   buyCardPack: (packId: CardPackId) => void;
+  buyBoosterProduct: (productId: string) => void;
   craftRelic: (relicId: string) => void;
   buyKeyItemAction: (keyItemId: string, credCost: number) => void;
   buySingleCard: (cardId: string, cost: number, variant?: CardVariant) => void;
@@ -3807,7 +4642,12 @@ export interface MetaContextValue {
   feedLokPetTreat: (id: string) => void;
   adoptRancherPet: (variantId: string, credCost: number) => void;
   feedRanchKibble: (petId: string, credCost: number) => void;
-  recordLokPetBattleResult: (rewards: BattleRewards, winningPetIds: string[]) => void;
+  recordLokPetBattleResult: (rewards: BattleRewards, winningPetIds: string[], towerFloor?: number, towerCarry?: DigiTowerPetCondition[]) => void;
+  claimDigiTowerRest: (floor: number, choice: 'treats' | 'tokens') => void;
+  trainLokPetAtTower: (floor: number, petId: string, stat: LokPetTrainingStat) => void;
+  respecLokPetAtTower: (floor: number, petId: string) => void;
+  buyDigiTowerSupply: () => void;
+  endDigiTowerClimb: () => void;
   toggleFavoriteLokPet: (id: string) => void;
   renameLokPet: (id: string, name: string) => void;
   setLokPetName: (id: string, slot: PetNameSlot, name: string) => void;
@@ -3858,6 +4698,23 @@ export interface MetaContextValue {
   setLevelUpPresentation: (value: MetaState['levelUpPresentation']) => void;
   setPauseMapVisible: (enabled: boolean) => void;
   setGraphicsQuality: (quality: MetaState['graphicsQuality']) => void;
+  grantDropPack: (id: string) => void;
+  grantLokPetFieldGuide: () => void;
+  grantLokPetCollectorAccess: () => void;
+  grantFactionRacesUnlock: () => void;
+  grantLokPackVisualizer: () => void;
+  grantTrainingWeaponRack: () => void;
+  setTrainingArenaLoadoutGroups: (groups: TrainingArenaLoadoutGroup[], activeGroupId: string) => void;
+  toggleFavoriteTrainingWeapon: (id: string) => void;
+  recordTrainingSession: (characterId: string, damage: number, xp: number, challenge?: { key: string; damage: number }) => void;
+  markTrainingMailboxRead: (id: string) => void;
+  keepTrainingMailboxEntry: (id: string, kept: boolean) => void;
+  deleteTrainingMailboxEntry: (id: string) => void;
+  grantLokShopPerk: (id: string) => void;
+  lokShopVisit: (day: string, stamped: boolean) => void;
+  lokShopHaggle: (day: string, rapport: number, charmId: string | null) => void;
+  equipDropPack: (id: string) => void;
+  setDamageNumberStyle: (style: MetaState['damageNumberStyle']) => void;
   setCompanionRevealStyle: (style: MetaState['companionRevealStyle']) => void;
   setFrameRateMode: (mode: MetaState['frameRateMode']) => void;
   setFogAmbianceMode: (mode: MetaState['fogAmbianceMode']) => void;
@@ -3872,8 +4729,21 @@ export interface MetaContextValue {
   setHideoutWeather: (enabled: boolean) => void;
   setHideoutSectionsCollapsedByDefault: (enabled: boolean) => void;
   setHideoutPreview: (enabled: boolean) => void;
+  setHideoutSceneStyle: (style: MetaState['hideoutSceneStyle']) => void;
+  setHideoutSpeechBubbles: (enabled: boolean) => void;
   setHideoutPets: (mode: MetaState['hideoutPets']) => void;
   setHideoutEvents: (mode: MetaState['hideoutEvents']) => void;
+  setHideoutInteractive: (enabled: boolean) => void;
+  setHideoutPetPlay: (enabled: boolean) => void;
+  setHideoutChoiceEvents: (mode: MetaState['hideoutChoiceEvents']) => void;
+  activateHideoutProp: (propId: string, seed: number) => void;
+  lookThroughSpyglass: () => void;
+  openLuckyChest: (seed: number) => void;
+  /** Gives the player the Ball. The LokShop purchase will call this. */
+  grantBall: () => void;
+  collectHideoutPickup: (kindId: string) => void;
+  playWithLokPet: (petId: string, verbId: string, seed: number, musicPlaying: boolean) => void;
+  resolveChoiceEvent: (eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => void;
   careForLokPet: (id: string) => void;
   chooseLokPetBranch: (id: string, branchId: string) => void;
   undoLokPetBranch: (id: string) => void;
@@ -3900,9 +4770,13 @@ export interface MetaContextValue {
   toggleRunModifier: (key: keyof RunModifiers) => void;
   dismissNotifications: (ids: string[]) => void;
   acknowledgeChangelog: () => void;
+  setUpdatePopupKind: (kind: ChangelogKind, enabled: boolean) => void;
   buyGenerator: (id: string) => void;
   refreshGeneratorIncome: () => void;
   setUiDensity: (density: 'grid' | 'list') => void;
+  buyCardCosmetic: (id: string) => void;
+  equipCardCosmetic: (id: string) => void;
+  setCardMotion: (motion: 'full' | 'subtle' | 'off') => void;
   setLokPetArtStyle: (style: MetaState['lokPetArtStyle']) => void;
   setUiBorderStyle: (style: MetaState['uiBorderStyle']) => void;
   setLokPetBorderStyle: (style: MetaState['lokPetBorderStyle']) => void;
@@ -3922,6 +4796,11 @@ export interface MetaContextValue {
   toggleEnemyDisabled: (enemyId: string) => void;
   setAllEnemiesDisabled: (disabled: boolean) => void;
   toggleWeaponDisabled: (weaponId: string) => void;
+  unlockGrpdWeapon: (weaponId: string) => void;
+  toggleGrpdWeapon: (weaponId: string) => void;
+  buyGrpdSpawnTier: (weaponId: string) => void;
+  setGrpdAutoIncreaseEnabled: (enabled: boolean) => void;
+  setGrpdArmoryAnchor: (anchor: MetaState['grpdArmoryAnchor']) => void;
   setAllWeaponsDisabled: (disabled: boolean) => void;
   togglePassiveDisabled: (passiveId: string) => void;
   setAllPassivesDisabled: (disabled: boolean) => void;
@@ -3933,6 +4812,7 @@ export interface MetaContextValue {
   resetProgress: () => void;
   /** Wholesale-replaces progress, e.g. from an imported save file or a cloud-save pull. Normalised the same way a loaded save is. */
   importMeta: (meta: Partial<MetaState>) => void;
+  applyCreatorCredTotal: (total: number) => void;
 }
 
 const MetaContext = createContext<MetaContextValue | null>(null);
@@ -3959,12 +4839,14 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   // metaStore helpers in tests never pulls in the Supabase-touching auth
   // module) a cloud-save pull.
   const importMeta = useCallback((meta: Partial<MetaState>) => dispatch({ type: 'replaceMeta', meta }), []);
+  const applyCreatorCredGrantTotal = useCallback((total: number) => dispatch({ type: 'applyCreatorCredTotal', total }), []);
 
   const selectCharacter = useCallback((id: string) => dispatch({ type: 'selectCharacter', id }), []);
   const selectCharacterSkin = useCallback((characterId: string, skinId: string) => dispatch({ type: 'selectCharacterSkin', characterId, skinId }), []);
   const enterHideout = useCallback(() => dispatch({ type: 'enterHideout', now: Date.now() }), []);
   const completeRun = useCallback((result: RunResult) => dispatch({ type: 'completeRun', result }), []);
   const buyCardPack = useCallback((packId: CardPackId) => dispatch({ type: 'buyCardPack', packId, now: Date.now() }), []);
+  const buyBoosterProduct = useCallback((productId: string) => dispatch({ type: 'buyBoosterProduct', productId, now: Date.now() }), []);
   const buySingleCard = useCallback((cardId: string, cost: number, variant?: CardVariant) => dispatch({ type: 'buySingleCard', cardId, cost, variant }), []);
   const recycleCard = useCallback((cardId: string, rewardCC: number) => dispatch({ type: 'recycleCard', cardId, rewardCC }), []);
   const recycleAllDuplicates = useCallback(() => dispatch({ type: 'recycleAllDuplicates' }), []);
@@ -3985,10 +4867,15 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const adoptRancherPet = useCallback((variantId: string, credCost: number) => dispatch({ type: 'adoptRancherPet', variantId, credCost }), []);
   const feedRanchKibble = useCallback((petId: string, credCost: number) => dispatch({ type: 'feedRanchKibble', petId, credCost }), []);
   const recordLokPetBattleResult = useCallback(
-    (rewards: BattleRewards, winningPetIds: string[]) =>
-      dispatch({ type: 'recordLokPetBattleResult', rewards, winningPetIds }),
+    (rewards: BattleRewards, winningPetIds: string[], towerFloor?: number, towerCarry?: DigiTowerPetCondition[]) =>
+      dispatch({ type: 'recordLokPetBattleResult', rewards, winningPetIds, ...(towerFloor ? { towerFloor, towerCarry } : {}) }),
     [],
   );
+  const claimDigiTowerRest = useCallback((floor: number, choice: 'treats' | 'tokens') => dispatch({ type: 'claimDigiTowerRest', floor, choice }), []);
+  const trainLokPetAtTower = useCallback((floor: number, petId: string, stat: LokPetTrainingStat) => dispatch({ type: 'trainLokPetAtTower', floor, petId, stat }), []);
+  const respecLokPetAtTower = useCallback((floor: number, petId: string) => dispatch({ type: 'respecLokPetAtTower', floor, petId }), []);
+  const buyDigiTowerSupply = useCallback(() => dispatch({ type: 'buyDigiTowerSupply' }), []);
+  const endDigiTowerClimb = useCallback(() => dispatch({ type: 'endDigiTowerClimb' }), []);
   const toggleFavoriteLokPet = useCallback((id: string) => dispatch({ type: 'toggleFavoriteLokPet', id }), []);
   const renameLokPet = useCallback((id: string, name: string) => dispatch({ type: 'renameLokPet', id, name }), []);
   const setLokPetName = useCallback((id: string, slot: PetNameSlot, name: string) => dispatch({ type: 'setLokPetName', id, slot, name }), []);
@@ -4057,7 +4944,24 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setLootPresentation = useCallback((value: MetaState['lootPresentation']) => dispatch({ type: 'setLootPresentation', value }), []);
   const setLevelUpPresentation = useCallback((value: MetaState['levelUpPresentation']) => dispatch({ type: 'setLevelUpPresentation', value }), []);
   const setPauseMapVisible = useCallback((enabled: boolean) => dispatch({ type: 'setPauseMapVisible', enabled }), []);
+  const grantDropPack = useCallback((id: string) => dispatch({ type: 'grantDropPack', id }), []);
+  const grantLokPetFieldGuide = useCallback(() => dispatch({ type: 'grantLokPetFieldGuide' }), []);
+  const grantLokPetCollectorAccess = useCallback(() => dispatch({ type: 'grantLokPetCollectorAccess' }), []);
+  const grantFactionRacesUnlock = useCallback(() => dispatch({ type: 'grantFactionRacesUnlock' }), []);
+  const grantLokPackVisualizer = useCallback(() => dispatch({ type: 'grantLokPackVisualizer' }), []);
+  const grantTrainingWeaponRack = useCallback(() => dispatch({ type: 'grantTrainingWeaponRack' }), []);
+  const setTrainingArenaLoadoutGroups = useCallback((groups: TrainingArenaLoadoutGroup[], activeGroupId: string) => dispatch({ type: 'setTrainingArenaLoadoutGroups', groups, activeGroupId }), []);
+  const toggleFavoriteTrainingWeapon = useCallback((id: string) => dispatch({ type: 'toggleFavoriteTrainingWeapon', id }), []);
+  const recordTrainingSession = useCallback((characterId: string, damage: number, xp: number, challenge?: { key: string; damage: number }) => dispatch({ type: 'recordTrainingSession', characterId, damage, xp, challenge }), []);
+  const markTrainingMailboxRead = useCallback((id: string) => dispatch({ type: 'markTrainingMailboxRead', id }), []);
+  const keepTrainingMailboxEntry = useCallback((id: string, kept: boolean) => dispatch({ type: 'keepTrainingMailboxEntry', id, kept }), []);
+  const deleteTrainingMailboxEntry = useCallback((id: string) => dispatch({ type: 'deleteTrainingMailboxEntry', id }), []);
+  const grantLokShopPerk = useCallback((id: string) => dispatch({ type: 'grantLokShopPerk', id }), []);
+  const lokShopVisit = useCallback((day: string, stamped: boolean) => dispatch({ type: 'lokShopVisit', day, stamped }), []);
+  const lokShopHaggle = useCallback((day: string, rapport: number, charmId: string | null) => dispatch({ type: 'lokShopHaggle', day, rapport, charmId }), []);
+  const equipDropPack = useCallback((id: string) => dispatch({ type: 'equipDropPack', id }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
+  const setDamageNumberStyle = useCallback((style: MetaState['damageNumberStyle']) => dispatch({ type: 'setDamageNumberStyle', style }), []);
   const setCompanionRevealStyle = useCallback((style: MetaState['companionRevealStyle']) => dispatch({ type: 'setCompanionRevealStyle', style }), []);
   const setFrameRateMode = useCallback((mode: MetaState['frameRateMode']) => dispatch({ type: 'setFrameRateMode', mode }), []);
   const setFogAmbianceMode = useCallback((mode: MetaState['fogAmbianceMode']) => dispatch({ type: 'setFogAmbianceMode', mode }), []);
@@ -4091,8 +4995,20 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setHideoutPreview', enabled }),
     [],
   );
+  const setHideoutSceneStyle = useCallback((style: MetaState['hideoutSceneStyle']) => dispatch({ type: 'setHideoutSceneStyle', style }), []);
+  const setHideoutSpeechBubbles = useCallback((enabled: boolean) => dispatch({ type: 'setHideoutSpeechBubbles', enabled }), []);
   const setHideoutPets = useCallback((mode: MetaState['hideoutPets']) => dispatch({ type: 'setHideoutPets', mode }), []);
   const setHideoutEvents = useCallback((mode: MetaState['hideoutEvents']) => dispatch({ type: 'setHideoutEvents', mode }), []);
+  const setHideoutInteractive = useCallback((enabled: boolean) => dispatch({ type: 'setHideoutInteractive', enabled }), []);
+  const setHideoutPetPlay = useCallback((enabled: boolean) => dispatch({ type: 'setHideoutPetPlay', enabled }), []);
+  const setHideoutChoiceEvents = useCallback((mode: MetaState['hideoutChoiceEvents']) => dispatch({ type: 'setHideoutChoiceEvents', mode }), []);
+  const resolveChoiceEvent = useCallback((eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => dispatch({ type: 'resolveChoiceEvent', eventId, choiceId, seed, now: Date.now(), petId, propId }), []);
+  const playWithLokPet = useCallback((petId: string, verbId: string, seed: number, musicPlaying: boolean) => dispatch({ type: 'playWithLokPet', petId, verbId, seed, now: Date.now(), musicPlaying }), []);
+  const collectHideoutPickup = useCallback((kindId: string) => dispatch({ type: 'collectHideoutPickup', kindId, now: Date.now() }), []);
+  const grantBall = useCallback(() => dispatch({ type: 'grantBall' }), []);
+  const openLuckyChestAction = useCallback((seed: number) => dispatch({ type: 'openLuckyChest', now: Date.now(), seed }), []);
+  const lookThroughSpyglass = useCallback(() => dispatch({ type: 'lookThroughSpyglass', now: Date.now() }), []);
+  const activateHideoutProp = useCallback((propId: string, seed: number) => dispatch({ type: 'activateHideoutProp', propId, seed, now: Date.now() }), []);
   const careForLokPet = useCallback((id: string) => dispatch({ type: 'careForLokPet', id, now: Date.now() }), []);
   const chooseLokPetBranch = useCallback((id: string, branchId: string) => dispatch({ type: 'chooseLokPetBranch', id, branchId, now: Date.now() }), []);
   const undoLokPetBranch = useCallback((id: string) => dispatch({ type: 'undoLokPetBranch', id, now: Date.now() }), []);
@@ -4176,8 +5092,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const toggleRunModifier = useCallback((key: keyof RunModifiers) => dispatch({ type: 'toggleRunModifier', key }), []);
   const dismissNotifications = useCallback((ids: string[]) => dispatch({ type: 'dismissNotifications', ids }), []);
   const acknowledgeChangelog = useCallback(() => dispatch({ type: 'acknowledgeChangelog' }), []);
+  const setUpdatePopupKind = useCallback((kind: ChangelogKind, enabled: boolean) => dispatch({ type: 'setUpdatePopupKind', kind, enabled }), []);
   const buyGenerator = useCallback((id: string) => dispatch({ type: 'buyGenerator', id, now: Date.now() }), []);
   const refreshGeneratorIncome = useCallback(() => dispatch({ type: 'refreshGeneratorIncome', now: Date.now() }), []);
+  const buyCardCosmetic = useCallback((id: string) => dispatch({ type: 'buyCardCosmetic', id }), []);
+  const equipCardCosmetic = useCallback((id: string) => dispatch({ type: 'equipCardCosmetic', id }), []);
+  const setCardMotion = useCallback((motion: 'full' | 'subtle' | 'off') => dispatch({ type: 'setCardMotion', motion }), []);
   const setUiDensity = useCallback(
     (density: 'grid' | 'list') => dispatch({ type: 'setUiDensity', density }),
     [],
@@ -4217,6 +5137,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setAllEnemiesDisabled = useCallback((disabled: boolean) => dispatch({ type: 'setAllEnemiesDisabled', disabled }), []);
   const toggleThreatUpgrade = useCallback((upgradeId: string) => dispatch({ type: 'toggleThreatUpgrade', upgradeId }), []);
   const toggleWeaponDisabled = useCallback((weaponId: string) => dispatch({ type: 'toggleWeaponDisabled', weaponId }), []);
+  const unlockGrpdWeapon = useCallback((weaponId: string) => dispatch({ type: 'unlockGrpdWeapon', weaponId }), []);
+  const toggleGrpdWeapon = useCallback((weaponId: string) => dispatch({ type: 'toggleGrpdWeapon', weaponId }), []);
+  const buyGrpdSpawnTier = useCallback((weaponId: string) => dispatch({ type: 'buyGrpdSpawnTier', weaponId }), []);
+  const setGrpdAutoIncreaseEnabled = useCallback((enabled: boolean) => dispatch({ type: 'setGrpdAutoIncreaseEnabled', enabled }), []);
+  const setGrpdArmoryAnchor = useCallback((anchor: MetaState['grpdArmoryAnchor']) => dispatch({ type: 'setGrpdArmoryAnchor', anchor }), []);
   const setAllWeaponsDisabled = useCallback((disabled: boolean) => dispatch({ type: 'setAllWeaponsDisabled', disabled }), []);
   const togglePassiveDisabled = useCallback((passiveId: string) => dispatch({ type: 'togglePassiveDisabled', passiveId }), []);
   const setAllPassivesDisabled = useCallback((disabled: boolean) => dispatch({ type: 'setAllPassivesDisabled', disabled }), []);
@@ -4228,10 +5153,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<MetaContextValue>(() => {
     const { meta } = state;
-    const unlockedCharacters = CHARACTERS.filter((c) => isUnlocked(c.unlock, meta));
-    const lockedCharacters = CHARACTERS.filter((c) => !isUnlocked(c.unlock, meta));
-    const unlockedAreas = AREAS.filter((a) => isUnlocked(a.unlock, meta));
-    const lockedAreas = AREAS.filter((a) => !isUnlocked(a.unlock, meta));
+    const unlockedCharacters = CHARACTERS.filter((c) => characterUnlocked(c, meta));
+    const lockedCharacters = CHARACTERS.filter((c) => !characterUnlocked(c, meta));
+    const unlockedAreas = AREAS.filter((a) => areaOpen(a, meta));
+    const lockedAreas = AREAS.filter((a) => !areaOpen(a, meta));
     const unlockedRooms = HUB_ROOMS.filter((r) => isUnlocked(r.unlock, meta));
     const lockedRooms = HUB_ROOMS.filter((r) => !isUnlocked(r.unlock, meta));
     const rescuedAllies = ALLIES.filter((a) => meta.rescuedAllyIds.includes(a.id));
@@ -4266,6 +5191,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       completeRun,
       resolveTravelEncounter,
       buyCardPack,
+      buyBoosterProduct,
       buySingleCard,
       recycleCard,
       recycleAllDuplicates,
@@ -4289,6 +5215,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       adoptRancherPet,
       feedRanchKibble,
       recordLokPetBattleResult,
+      claimDigiTowerRest,
+      trainLokPetAtTower,
+      respecLokPetAtTower,
+      buyDigiTowerSupply,
+      endDigiTowerClimb,
       toggleFavoriteLokPet,
       renameLokPet,
       setLokPetName,
@@ -4336,6 +5267,23 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setLevelUpPresentation,
       setPauseMapVisible,
       setGraphicsQuality,
+      grantDropPack,
+      grantLokPetFieldGuide,
+      grantLokPetCollectorAccess,
+      grantFactionRacesUnlock,
+      grantLokPackVisualizer,
+      grantTrainingWeaponRack,
+      setTrainingArenaLoadoutGroups,
+      toggleFavoriteTrainingWeapon,
+      recordTrainingSession,
+      markTrainingMailboxRead,
+      keepTrainingMailboxEntry,
+      deleteTrainingMailboxEntry,
+      grantLokShopPerk,
+      lokShopVisit,
+      lokShopHaggle,
+      equipDropPack,
+      setDamageNumberStyle,
       setCompanionRevealStyle,
       setFrameRateMode,
       setFogAmbianceMode,
@@ -4350,8 +5298,20 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setHideoutWeather,
       setHideoutSectionsCollapsedByDefault,
       setHideoutPreview,
+      setHideoutSceneStyle,
+      setHideoutSpeechBubbles,
       setHideoutPets,
       setHideoutEvents,
+      setHideoutInteractive,
+      setHideoutPetPlay,
+      setHideoutChoiceEvents,
+      activateHideoutProp,
+      lookThroughSpyglass,
+      openLuckyChest: openLuckyChestAction,
+      grantBall,
+      collectHideoutPickup,
+      playWithLokPet,
+      resolveChoiceEvent,
       careForLokPet,
       chooseLokPetBranch,
       undoLokPetBranch,
@@ -4378,9 +5338,13 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       toggleRunModifier,
       dismissNotifications,
       acknowledgeChangelog,
+      setUpdatePopupKind,
       buyGenerator,
       refreshGeneratorIncome,
       setUiDensity,
+      buyCardCosmetic,
+      equipCardCosmetic,
+      setCardMotion,
       setLokPetArtStyle,
       setUiBorderStyle,
       setLokPetBorderStyle,
@@ -4401,6 +5365,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       toggleEnemyDisabled,
       setAllEnemiesDisabled,
       toggleWeaponDisabled,
+      unlockGrpdWeapon,
+      toggleGrpdWeapon,
+      buyGrpdSpawnTier,
+      setGrpdAutoIncreaseEnabled,
+      setGrpdArmoryAnchor,
       setAllWeaponsDisabled,
       togglePassiveDisabled,
       setAllPassivesDisabled,
@@ -4410,6 +5379,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       toggleThreatUpgrade,
       unlockDvdEasterEgg,
       importMeta,
+      applyCreatorCredTotal: applyCreatorCredGrantTotal,
     };
   }, [
     state,
@@ -4419,6 +5389,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     completeRun,
     resolveTravelEncounter,
     buyCardPack,
+    buyBoosterProduct,
     buySingleCard,
     recycleCard,
     recycleAllDuplicates,
@@ -4438,6 +5409,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     adoptRancherPet,
     feedRanchKibble,
     recordLokPetBattleResult,
+    claimDigiTowerRest,
+    trainLokPetAtTower,
+    respecLokPetAtTower,
+    buyDigiTowerSupply,
+    endDigiTowerClimb,
     toggleFavoriteLokPet,
     renameLokPet,
     setLokPetName,
@@ -4485,6 +5461,23 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setLevelUpPresentation,
     setPauseMapVisible,
     setGraphicsQuality,
+    grantDropPack,
+    grantLokPetFieldGuide,
+    grantLokPetCollectorAccess,
+    grantFactionRacesUnlock,
+    grantLokPackVisualizer,
+    grantTrainingWeaponRack,
+    setTrainingArenaLoadoutGroups,
+    toggleFavoriteTrainingWeapon,
+    recordTrainingSession,
+    markTrainingMailboxRead,
+    keepTrainingMailboxEntry,
+    deleteTrainingMailboxEntry,
+    grantLokShopPerk,
+    lokShopVisit,
+    lokShopHaggle,
+    equipDropPack,
+    setDamageNumberStyle,
     setCompanionRevealStyle,
     setFrameRateMode,
     setFogAmbianceMode,
@@ -4499,8 +5492,16 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setHideoutWeather,
     setHideoutSectionsCollapsedByDefault,
     setHideoutPreview,
+    setHideoutSceneStyle,
+    setHideoutSpeechBubbles,
     setHideoutPets,
     setHideoutEvents,
+    setHideoutInteractive,
+    setHideoutPetPlay,
+    setHideoutChoiceEvents,
+    activateHideoutProp,
+    playWithLokPet,
+    resolveChoiceEvent,
     careForLokPet,
     chooseLokPetBranch,
     undoLokPetBranch,
@@ -4526,9 +5527,13 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     toggleRunModifier,
     dismissNotifications,
     acknowledgeChangelog,
+    setUpdatePopupKind,
     buyGenerator,
     refreshGeneratorIncome,
     setUiDensity,
+    buyCardCosmetic,
+    equipCardCosmetic,
+    setCardMotion,
     setLokPetArtStyle,
     setUiBorderStyle,
     setLokPetBorderStyle,
@@ -4549,6 +5554,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     toggleEnemyDisabled,
     setAllEnemiesDisabled,
     toggleWeaponDisabled,
+    unlockGrpdWeapon,
+    toggleGrpdWeapon,
+    buyGrpdSpawnTier,
+    setGrpdAutoIncreaseEnabled,
+    setGrpdArmoryAnchor,
     setAllWeaponsDisabled,
     togglePassiveDisabled,
     setAllPassivesDisabled,
@@ -4558,6 +5568,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     toggleThreatUpgrade,
     unlockDvdEasterEgg,
     importMeta,
+    applyCreatorCredGrantTotal,
   ]);
 
   return <MetaContext.Provider value={value}>{children}</MetaContext.Provider>;
@@ -4581,7 +5592,7 @@ export function areaStatus(areaId: string, meta: MetaState) {
   const area = getArea(areaId);
   return {
     area,
-    unlocked: isUnlocked(area.unlock, meta),
+    unlocked: areaOpen(area, meta),
     cleared: meta.clearedAreaIds.includes(areaId),
   };
 }

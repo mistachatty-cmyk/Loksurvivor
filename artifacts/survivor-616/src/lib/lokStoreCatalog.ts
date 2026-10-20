@@ -4,7 +4,7 @@
  * table and re-run `scripts/export-lok-registry.ts` to change them; nothing
  * else needs to move. Documented in Lok-EcoSystsem/LokToken EcoSystem/LOKTOKEN_STORE.md.
  */
-export type StoreItemKind = 'palette' | 'aura' | 'hat' | 'celebration';
+export type StoreItemKind = 'palette' | 'aura' | 'hat' | 'celebration' | 'dropPack' | 'fieldGuideUnlock' | 'collectorAccess' | 'factionRacesUnlock' | 'packVisualizerUnlock' | 'weaponRackUnlock' | 'perkUnlock';
 
 /** Placeholder LokToken price by cosmetic tier. */
 export const LOKTOKEN_PRICE_BY_TIER: Record<string, number> = {
@@ -17,8 +17,10 @@ export const LOKTOKEN_PRICE_BY_TIER: Record<string, number> = {
 /**
  * Kinds that can ONLY be bought with LokTokens (the local loot-token path is
  * closed for them). Add a kind here to move it over; anything already owned
- * stays owned. Right now: themes (world colour palettes).
+ * stays owned. Right now: themes (world colour palettes), drop packs, and
+ * the feature unlocks (field guide, Collector access, faction races) -- there is no
+ * local-currency fallback for any of them, by design.
  */
-export const LOKTOKEN_ONLY_KINDS: ReadonlySet<StoreItemKind> = new Set<StoreItemKind>(['palette']);
+export const LOKTOKEN_ONLY_KINDS: ReadonlySet<StoreItemKind> = new Set<StoreItemKind>(['palette', 'dropPack', 'fieldGuideUnlock', 'collectorAccess', 'factionRacesUnlock', 'packVisualizerUnlock', 'weaponRackUnlock', 'perkUnlock']);
 
 export const catalogSku = (kind: StoreItemKind, id: string) => `survivor616.${kind}.${id}`;

@@ -7,10 +7,14 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
-      "number": 35,
-      "version": "0.12.4",
-      "date": "2026-10-18",
+      "number": 142,
+      "version": "0.42.3",
+      "date": "2026-10-20",
+      "publishedAt": "2026-10-20T22:00:00Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Achievements Travel With You",
       "body": [
         "Signed in, your 616 achievements now show up on your GSix account at gsix.online, on a new Achievements page next to every other game. Each one lists what it takes to earn it, what it gives you, and the day you earned it.",
@@ -18,10 +22,14 @@
       ]
     },
     {
-      "number": 34,
-      "version": "0.12.3",
-      "date": "2026-10-18",
+      "number": 141,
+      "version": "0.42.2",
+      "date": "2026-10-20",
+      "publishedAt": "2026-10-20T22:00:00Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Your Play Time Counts",
       "body": [
         "When you are signed in, the time you spend in 616 Survivor is now saved to your GSix account. You can see it on your profile at gsix.online, next to the time you spend in every other game.",
@@ -29,10 +37,1642 @@
       ]
     },
     {
+      "number": 140,
+      "version": "0.42.1",
+      "date": "2026-10-20",
+      "publishedAt": "2026-10-20T12:00:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Calmer Key Stacks",
+      "body": [
+        "With reduced motion on, collected skeleton keys now sit still above you and simply fade out, with no spring, wobble, rise or trailing."
+      ]
+    },
+    {
+      "number": 139,
+      "version": "0.42.0",
+      "date": "2026-10-19",
+      "publishedAt": "2026-10-19T14:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "LOK Chat",
+      "body": [
+        "Your crew now have a chat window. Open LOK Chat from the hideout and message anyone you have rescued: type whatever you like or tap a suggestion. They answer in their own voice and know what is going on: how your last run went, your LokPet, the weather, the room, and what they think of the rest of the crew.",
+        "The more you talk, the better they know you. Friends open up with a personal story, close friends say so, and the crew will message you first after a run, after a long time away, or at the start and end of the day. The #hideout channel keeps everything the crew say around the hideout. It all stays on your device, and a Clear button wipes it whenever you like."
+      ]
+    },
+    {
+      "number": 138,
+      "version": "0.41.1",
+      "date": "2026-10-19",
+      "publishedAt": "2026-10-19T12:00:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Skeleton Keys Stack, Not Spam",
+      "body": [
+        "Standing on a locked Relic Vault chest no longer buries your character in LOCKED popups; the hint shows once, over the chest. Skeleton keys picked up together now stack above you for a second as one little ×N KEY flourish, with a single alert and sound, instead of a pile of overlapping text."
+      ]
+    },
+    {
+      "number": 137,
+      "version": "0.41.0",
+      "date": "2026-10-16",
+      "publishedAt": "2026-10-16T23:01:37Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "A smoother first character",
+      "body": [
+        "A new optional guide walks you from the first pixel pose through animation frames, previews, review, and submission.",
+        "Blank projects can copy the first pose into empty frames without replacing art you already made. Every copied frame still needs your own animation work and review.",
+        "Studio drafts now save automatically on this device, show their save status, and offer a quick way to continue your latest character."
+      ]
+    },
+    {
+      "number": 136,
+      "version": "0.40.0",
+      "date": "2026-10-14",
+      "publishedAt": "2026-10-14T12:30:24Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Draw your own Character Studio art",
+      "body": [
+        "Start with a blank 48 × 48 pixel map or a generated pose. Draw with a finger, mouse, or pen; place colors at X/Y coordinates and choose a brush from one to eight pixels.",
+        "Edit the 16-color palette and layer stack. Copy poses through clips and directions, then review frames before saving and submitting a creation.",
+        "Staff-approved creations appear in the Survivor 616 and GSix community galleries, where players can preview, adopt, remix, and report them."
+      ]
+    },
+    {
+      "number": 135,
+      "version": "0.39.1",
+      "date": "2026-10-14",
+      "publishedAt": "2026-10-14T05:05:56Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "Weapon Rack account sync",
+      "body": [
+        "LokShop purchases can now reach the shared LokToken purchase service.",
+        "A Weapon Rack bought with LokTokens now opens the Training Arena as soon as account inventory loads, even if you go straight to the hideout after signing in or reloading."
+      ]
+    },
+    {
+      "number": 134,
+      "version": "0.39.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T21:32:41Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Ultimate Looks and Training Arena Updates",
+      "body": [
+        "Every fighter now has three mastery skins: Null-Crowned at 616 lifetime defeats, Solar Ascendant at 6,160, and Prism Overdrive at 16,160. Their animated finish follows the selected skin into the run and the roster preview.",
+        "The customization shop adds four animated menu atmospheres and six high-tier animated palettes. Each new backdrop has its own colors and scene treatment, and reduced-motion settings keep the atmosphere still.",
+        "Buy a permanent Training Arena Weapon Rack in LokShop, then earn 616 defeats with each weapon to unlock its test slot. Unlock notices are saved in the new Notifications mailbox.",
+        "The arena adds multi-weapon testing, operator Training XP, damage and effect readouts, target durability modes, and a 24-second damage challenge with personal bests and achievements."
+      ]
+    },
+    {
+      "number": 133,
+      "version": "0.38.1",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T20:55:46Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Training Arena mobile header fix",
+      "body": [
+        "The floating Looks & LokPets shortcut no longer covers the Training Arena title while the arena is open on a narrow screen."
+      ]
+    },
+    {
+      "number": 132,
+      "version": "0.38.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T20:19:49Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Training Arena layout controls",
+      "body": [
+        "The default Training Arena layout puts the operator and Dust Mite in a wide stage with the weapon rack in a dedicated side rail. Weapon icons expand inline details and require an explicit test action.",
+        "The Classic arrangement remains available. The layout choice is saved on this device; the rack has its own visible scroll area, and the arena top bar, operator, target and stage have dedicated positions."
+      ]
+    },
+    {
+      "number": 131,
+      "version": "0.37.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T20:07:09Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Training Arena stays in view",
+      "body": [
+        "The arena now fills the screen, keeps the weapon rack in its own scroll panel, and places test controls and readouts over the arena view.",
+        "Weapon tests now run through their active attack effects before settling. Each selection fires once; orbit weapons get one visible rotation."
+      ]
+    },
+    {
+      "number": 130,
+      "version": "0.36.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T18:36:40Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Training Bay Opens",
+      "body": [
+        "Rest floors now include a free Training Bay visit. Assign Vigor, Fury, Guard, Pace and Spirit points earned from LokPet levels, with bonus points at evolution levels and a higher cap for your starter partner.",
+        "Training changes real battle stats and skill power. Tower first clears and rest stops award Training Data for respecs at later rest stops."
+      ]
+    },
+    {
+      "number": 129,
+      "version": "0.35.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T18:27:51Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Training Arena",
+      "body": [
+        "Unlock the Sanctum Training Arena after 616 defeats, then browse the full weapon rack and test one weapon at a time against a stationary Dust Mite.",
+        "Choose the dummy’s durability, activate any weapon, and review the damage and average damage per second from each test."
+      ]
+    },
+    {
+      "number": 128,
+      "version": "0.34.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T12:44:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The DIGI-Tower Campaign",
+      "body": [
+        "Climb 100 floors across ten sectors, with authored story trials, faction squads, mirror fights, field rules and a named Master at every sector capstone.",
+        "Party condition and five-floor checkpoints persist. Wipes can be retried without deadlocking old floor clears or paying first-clear tokens twice; you can also replay any cleared floor safely for reduced pet XP.",
+        "Master Nib opens a token exchange for LokPet treats. Endless Spire, Training Bay, daily floors, Vault picks and Operator/Duo challenges remain future expansions."
+      ]
+    },
+    {
+      "number": 127,
+      "version": "0.33.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T12:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Field Specimens and Clearer Arena Rooms",
+      "body": [
+        "The first time you clear a standard district, its seeded LokPet-like field specimen is revealed in the run report and saved to a new Bestiary tab. These are research traces for now: they do not enter the battle roster or affect stats.",
+        "Arena now identifies itself as a shared-enemy kill race, reports room connection state, handles tied scores, and allows online guests to retry after a lost connection. Online results no longer grant win tokens because the relay is not authoritative; player combat and ranked results are still future work."
+      ]
+    },
+    {
+      "number": 126,
+      "version": "0.32.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T11:56:01Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Hideout Cage",
+      "body": [
+        "The hideout now opens on an animated cage scene with your actual operator, selected LokPets, and rescued crew together. Switch back to the original room-by-room block scene whenever you like.",
+        "Call for help to gather your LokPets and bring crew over, or encourage the crew for a cheerful reaction. Speech bubbles have an independent on/off control in the hideout and Settings; these interactions are cosmetic."
+      ]
+    },
+    {
+      "number": 125,
+      "version": "0.31.0",
+      "date": "2026-10-13",
+      "publishedAt": "2026-10-13T11:46:59Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Props Take a Hit",
+      "body": [
+        "Breakable props now show cumulative, material-specific cracks from the impact point, then fade through a brief burst into a bounded debris and rubble aftermath.",
+        "The effect uses reduced-motion preferences and trims debris on lower graphics settings. Run Setup now summarizes the selected operator, LokPets, map, controls, modifiers, and contracts; a recommended next map sits above the map filters."
+      ]
+    },
+    {
+      "number": 124,
+      "version": "0.30.0",
+      "date": "2026-10-12",
+      "publishedAt": "2026-10-12T23:50:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Character Studio v3",
+      "body": [
+        "Build eight-direction characters with layered 48-pixel art, six rig families, six styles and individual animation frames. Classic Forge and detailed v2 designs stay in place.",
+        "Save v3 drafts to this device or your account, review every required frame, then submit a complete creation for the moderated Community Gallery.",
+        "Your Room now has a Personal Locker for drafts, creations and adoptions. Approved characters can be previewed, adopted, used in runs and exported as attributed cards or vertical videos."
+      ]
+    },
+    {
+      "number": 123,
+      "version": "0.29.0",
+      "date": "2026-10-12",
+      "publishedAt": "2026-10-12T21:10:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The 616 Forge Roster",
+      "body": [
+        "The Operator Forge now shows the full 616 roster as editable starting designs alongside your saved custom operators. Choosing one never changes the original character.",
+        "Custom operator slots grow beyond the first five: eight are earned through play, with more milestone slots available through Lok Pass, Lok Passport and Lifetime supporter tiers.",
+        "Enemies gain Classic and Styled palette previews. Faction Races Pass, Furniture City Dusk, Furnace Orbit, Relay Mast and Ticker Tape join the customization catalog."
+      ]
+    },
+    {
+      "number": 122,
+      "version": "0.28.1",
+      "date": "2026-10-12",
+      "publishedAt": "2026-10-12T01:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Your LokTokens, in Every Shop",
+      "body": [
+        "Every shop that sells for LokTokens now shows how many you have, and if you are not signed in it offers a Sign in button that takes you straight to your account."
+      ]
+    },
+    {
+      "number": 121,
+      "version": "0.28.0",
+      "date": "2026-10-11",
+      "publishedAt": "2026-10-11T23:00:00Z",
+      "kind": "expansion",
+      "categoryLabel": "Expansion",
+      "categoryColor": "#ef4444",
+      "categoryLore": "Another part of the 616 opens up.",
+      "title": "Thank You, Supporters",
+      "body": [
+        "The supporter bar now follows you into every shop. Lok Pass and Passport supporters glow teal and blue, Lifetime founders glow gold, and the bar takes on the colors of whichever world you are in.",
+        "The hideout has a new ad slot that cycles the LokShop, the Sleeve Counter and the newest updates. Click any of them to jump straight there, or straight to that update in your Archive.",
+        "Behind the scenes: Lok Pass, Passport and Lifetime are now supporter entitlements, the shared SDK carries the supporter rules for every Lok game, and everything new is drawn in code so it costs nothing extra to load."
+      ]
+    },
+    {
+      "number": 120,
+      "version": "0.27.5",
+      "date": "2026-10-11",
+      "publishedAt": "2026-10-11T21:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Supporter Bar, Chest Pass and Rider Saddle",
+      "body": [
+        "A live supporter bar now streams across the bottom of the game: teal and blue for Lok Pass and Lok Passport supporters, gold with a founder star for Lifetime Passport holders. Names stay on the bar for good, even if a subscription ends.",
+        "The LokShop now sells the Chest Pass (the Lucky Chest turns up far more often) and the Rider Saddle (your lead LokPet rides on your back and attacks 20% faster). Pass and Passport perks, like extra feather tries, now come from your supporter status instead of a LokToken purchase."
+      ]
+    },
+    {
+      "number": 119,
+      "version": "0.27.4",
+      "date": "2026-10-11",
+      "publishedAt": "2026-10-11T18:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "LokServer Opens the Back Room",
+      "body": [
+        "The LokShop is rebuilt around LokServer, now a glowing holographic owl who greets you by how well he knows you. Visit daily to build rapport, play the feather game for Feather Charms, and open the back room.",
+        "New LokToken items: The Ball, the Lok Pass (more feather tries a day), the Lok Passport (daily stamps and doubled charm luck) and the Lifetime Passport, which counts as both."
+      ]
+    },
+    {
+      "number": 118,
+      "version": "0.27.3",
+      "date": "2026-10-11",
+      "publishedAt": "2026-10-11T16:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "LokShop Has a Door Button",
+      "body": [
+        "The LokShop now has a real button in the hideout rooms instead of only the counter picture. Inside, the shelf lists everything LokServer sells for LokTokens (the LokPet Field Guide, Collector Access and the LokPack Visualizer) with working buy buttons, plus a link to the full Customization Shop."
+      ]
+    },
+    {
+      "number": 117,
+      "version": "0.27.2",
+      "date": "2026-10-11",
+      "publishedAt": "2026-10-11T15:30:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Skeleton Keys Stop Raining",
+      "body": [
+        "Skeleton keys were dropping from the random item weather in open arenas about once every 25 seconds, each with a popup, alert and sound. They now only show up there as a rare surprise."
+      ]
+    },
+    {
+      "number": 116,
+      "version": "0.27.1",
+      "date": "2026-10-11",
+      "publishedAt": "2026-10-11T15:00:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Live Wraps Now Move",
+      "body": [
+        "The Live pack wraps (Prism Holo Live, Retro Neon Live and Retro Neon Arcade) were frozen on the default Subtle card motion. They now animate in the Sleeve Counter, the card shop and on your shelf unless card motion is Off or your device asks for reduced motion."
+      ]
+    },
+    {
+      "number": 115,
+      "version": "0.27.0",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T21:20:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "LokPack Visualizer and Live Wraps",
+      "body": [
+        "Every pack wrap now uses the Fighter Print frame: the torn edge, ribbon, price roundel and barcode sit on real foil, kraft or matte stock. The foils are crinkled metal, and Retro Neon was redrawn in retro colors only, on the same torn-edge pack shape, with a black starburst, outlined lettering and the cast in black and white.",
+        "The LOK Shop sells a new LokPack Visualizer for 1500 LokTokens. Owning it unlocks the Live pack wraps in the Sleeve Counter, animated packs that cost 480 Card Credits each: Prism Holo Live, Retro Neon Live with the cast marching across, and the bonus Retro Neon Arcade, the busy full-color version."
+      ]
+    },
+    {
+      "number": 114,
+      "version": "0.26.0",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T21:10:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Foil, Chrome and Neon Pack Wraps",
+      "body": [
+        "The Sleeve Counter has seven new pack wraps: Gilt Foil, Platinum Chrome, Foundry Bronze and Prism Holo in real crinkled foil with a moving highlight, plus Retro Neon, Kraft Sleeve and Street Stock.",
+        "Retro Neon is the classic neon-green trading pack, with your fighters digitized and walking across it. Every wrap prints the pack's own fighter or LokPet, drawn from the real in-game sprites."
+      ]
+    },
+    {
+      "number": 113,
+      "version": "0.25.0",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T21:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Bootleg Booster Bin",
+      "body": [
+        "The Vendor has a new Bootleg Booster Bin. Totally Real Booster Packs and Bulk Hype Booster Boxes cost Card Credits and contain ghosted copies of familiar faces.",
+        "Each booster adds a random stat for every run: operatives and crew gain HP, speed, power, area, cooldown, pickup reach or armor; LokPets gain damage or speed; enemies gain HP. Results may vary."
+      ]
+    },
+    {
+      "number": 112,
+      "version": "0.24.8",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T20:45:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Double-Click Dash",
+      "body": [
+        "In the hideout, double-click (or double-tap) a spot and your operator dashes there instead of walking, leaving a trail of afterimages. It follows the same double-click and double-tap dash settings as a run, and works on props and crew too."
+      ]
+    },
+    {
+      "number": 111,
+      "version": "0.24.7",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T20:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Crew Gets A Life",
+      "body": [
+        "Your crew no longer stand in a row waiting for you. Each of them now has their own way of moving: Pippa never stops, Deacon takes his time, Nyx wanders everywhere, Bulbosa holds her ground, Cinder tinkers, and the shy ones back away when you walk up while the curious ones come over to see who it is. They pace, fiddle with things, visit the props in the room, stop to talk with each other, and say hello when you pass.",
+        "Talking is no longer a box sitting on top of everyone. Speech now appears as a bubble beside whoever is talking, a crew member you tap stops and turns to face you, and the things you use answer in the world: the bell rings and shakes, the lid of the crate pops, the Lucky Chest has its own look and flies open, the jukebox gets the whole room dancing, and the window seat lets you sit down."
+      ]
+    },
+    {
+      "number": 110,
+      "version": "0.24.6",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T19:45:04Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "Clear Roof",
+      "body": [
+        "The rooftop room in the hideout no longer has the dark building bars behind it. You get open sky, stars and the water tower, with its legs standing on the floor."
+      ]
+    },
+    {
+      "number": 109,
+      "version": "0.24.5",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T19:34:18Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Volume Knobs and Balanced Settings",
+      "body": [
+        "Settings has two new volume sliders: one for gameplay sound effects and one for the hideout room ambience. Each is saved on this device and starts at the level you already heard.",
+        "The Standard settings page now flows into two balanced columns instead of leaving gaps beside tall cards. Full-width sections still span the page."
+      ]
+    },
+    {
+      "number": 108,
+      "version": "0.24.4",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:30Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Steadier Big Fights",
+      "body": [
+        "Huge particle storms are now capped at 600 visible sparks on High graphics, which keeps frame rate steadier on phones and older arcade machines without changing how fights look."
+      ]
+    },
+    {
+      "number": 107,
+      "version": "0.24.3",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:25Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Overlays Ease In",
+      "body": [
+        "Level-up choices now rise in one after another, and the pause menu, soundtrack panel and outcome banner fade and pop in instead of snapping on.",
+        "All of it respects your reduced-motion setting."
+      ]
+    },
+    {
+      "number": 106,
+      "version": "0.24.2",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:20Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Menu Dock",
+      "body": [
+        "Menu screens now have an always-there dock: Hideout, Pick a map, Roster, Card shop, Settings and Search. It sits along the bottom on phones and down the left side on bigger screens.",
+        "Search opens the Go to menu, so any unlocked screen is one tap away."
+      ]
+    },
+    {
+      "number": 105,
+      "version": "0.24.1",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:15Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Bigger Text On Demand",
+      "body": [
+        "New Text size setting (Settings, under Accessibility): Small, Normal, Large or Extra large, for phones, TVs and arcade screens viewed from across the room."
+      ]
+    },
+    {
+      "number": 104,
+      "version": "0.24.0",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:10Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Go To Anywhere",
+      "body": [
+        "New Go to search: press Ctrl+K or / (or tap the Go to button) to jump straight to any screen you have unlocked. Locked rooms stay locked.",
+        "Your browser or phone Back button now walks back through the menus you visited instead of leaving the game, and a stray Back never drops a live run.",
+        "Escape in the pause menu now closes Settings or Soundtrack first, and menu corner buttons stay clear of notches."
+      ]
+    },
+    {
+      "number": 103,
+      "version": "0.23.9",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:05Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Smoother Menus",
+      "body": [
+        "Menus now slide in softly, buttons press down when tapped, and Escape takes you back from any screen.",
+        "Screen shake can be turned down or off, and it follows your device's reduced-motion setting.",
+        "Pinch-zoom works again, and back buttons stay clear of phone notches."
+      ]
+    },
+    {
+      "number": 102,
+      "version": "0.23.8",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Blackout, static and hideout stories",
+      "body": [
+        "Clear 10 maps and a Blackout can hit: the lights go out and only a pool of light follows you while a few extra stalkers creep in. Get through it for cred, and come through untouched for a rare crystal.",
+        "Clear 12 maps and a Relay Storm can roll in: a field of static drifts toward you and slows you down inside it. Keep out of it for most of the storm and you find the supplies it was sitting on.",
+        "That makes six kinds of moment in a run. The Seen It All achievement now asks for all of them.",
+        "The hideout has five new little stories that depend on the weather and the hour: a leaking awning in the rain, a horn in the fog, a LokPet that wanders off into it, card night with the crew, and warm glass in the cellar."
+      ]
+    },
+    {
+      "number": 101,
+      "version": "0.23.7",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:10:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Block party",
+      "body": [
+        "Clear 8 maps and a Block Party can break out mid-run. A glowing pink ring appears nearby. Stand in it and your weapons fire faster while you slowly recover health.",
+        "Stay in the ring for at least 6 seconds and the neighbourhood says thanks with cred and a Magnet Coil. Skip it and nothing is lost."
+      ]
+    },
+    {
+      "number": 100,
+      "version": "0.23.6",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Call the crew",
+      "body": [
+        "Rescued crew can now help mid-run. Press Q (or the new round button with their name) to call the next one in line: Pippa patches you up, Nyx freezes the crowd, Bulbosa stomps, Vee pulls loot in, and more. The button fills as the shared cooldown recovers.",
+        "It costs no slot. Everyone you have rescued with a call-in takes a turn in the order you rescued them, so the bigger your crew, the more variety you get. Q can be changed on the Controls page.",
+        "New achievements for calling in your crew: Phone a Friend, On Speed Dial and Never Alone."
+      ]
+    },
+    {
+      "number": 99,
+      "version": "0.23.5",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T00:50:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Dash and a Controls page",
+      "body": [
+        "You can now dash on a computer: press Shift, click the new Dash button above the Ultimate button, or double-click the playfield. The button shows its cooldown. Dash goes the way you are steering, or the way you last moved.",
+        "Settings has a new Controls page with keyboard, mouse, controller and touch sections. Rebind any key (a clash swaps the two), remap controller buttons, set the stick deadzone, and switch the on-screen Dash button and double-tap dash on or off.",
+        "Controllers can now steer with the left stick or d-pad. A controller button does its job when you press it, not while you hold it."
+      ]
+    },
+    {
+      "number": 98,
+      "version": "0.23.4",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T00:40:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The ground shakes",
+      "body": [
+        "Clear 6 maps and a Tremor can hit mid-run. A grey ring spreads from the epicenter, then the ground shakes four times. Enemies and loose props get shoved away and enemies stagger for a moment. The tremor never hurts anything, and it leaves a heart where it centred.",
+        "The Seen It All achievement now asks for every kind of moment, Tremor included."
+      ]
+    },
+    {
+      "number": 97,
+      "version": "0.23.3",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T00:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Magnet coil and event switches",
+      "body": [
+        "Supply drops now include a Magnet Coil. Grab it and coins, gems and hearts get pulled to you from four times as far for 12 seconds.",
+        "Settings has a new Run events section where you can switch each kind of moment on or off."
+      ]
+    },
+    {
+      "number": 96,
+      "version": "0.23.2",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T00:20:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Things happen now",
+      "body": [
+        "Runs now have moments. Clear 2 maps and a Supply Drop can land mid-run: a glowing ring marks where the crate falls, and it comes with guards. Clear 4 maps and a Rush-Hour stampede can charge across the map; step into the green gap to dodge it.",
+        "The more maps you clear, the more moments a run can have (up to 4). Your first runs stay calm."
+      ]
+    },
+    {
+      "number": 95,
+      "version": "0.23.1",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T00:10:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The hideout, painted",
+      "body": [
+        "The hideout strip is no longer a flat dark band. Every room now has its own backdrop: a lit skyline over the Sanctum, stars and a blinking marker lamp on the rooftop, breathing glass growths in the cellar, a swaying service lamp in the alley and a stuttering neon sign at the Neon Sleeve.",
+        "There is a lit pool of floor light that follows your operator and pulses with whatever music is playing, dust drifting through the light, and little puffs when you walk.",
+        "With Hideout ambience on, each room now hums a slow music-box line of its own over the bed. It stays off until you turn it on."
+      ]
+    },
+    {
+      "number": 94,
+      "version": "0.23.0",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:59:45Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Board Gets Weird",
+      "body": [
+        "Side jobs now have local flavor: Bait Shop After Dark, Lost Dog, Found Teeth, Winter Pothole Revenge, Meijer Cart Roulette and more.",
+        "New job: the Raccoon Scrap Union wants relic crafting scraps hauled across your runs."
+      ]
+    },
+    {
+      "number": 93,
+      "version": "0.22.9",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:59:30Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "More Jobs On The Board",
+      "body": [
+        "The Broadcast Board now posts three extra rotating side jobs each day: hunt a specific street enemy, reach a level in one run, crack open crates, earn Cred, clear a named district, or spot map finds.",
+        "Every side job is doable from a fresh save and tracks automatically across your runs."
+      ]
+    },
+    {
+      "number": 92,
+      "version": "0.22.8",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:59:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "A Clearer Photosensitivity Warning",
+      "body": [
+        "The warning before you enter the hideout now spells out what can trigger a reaction (strobing flashes, bright bursts, screen shake), the symptoms that mean you should stop playing, and a few ways to play more safely."
+      ]
+    },
+    {
+      "number": 91,
+      "version": "0.22.7",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Volume On The Soundbar",
+      "body": [
+        "Open the music bar and tap the small arrow to reveal volume, seek, shuffle, repeat and speed. The panel floats over the screen, so the bar itself stays the same size, and it stays hidden until you ask for it.",
+        "Your volume and mute choice are now remembered between visits."
+      ]
+    },
+    {
+      "number": 90,
+      "version": "0.22.6",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Events That Matter",
+      "body": [
+        "Nine hideout events that used to end with nothing now leave you a story and an event boost: a lift to one stat paired with a cost to another, for an hour. The result tells you exactly what you got and what it costs.",
+        "Only one event boost runs at a time and a new one replaces the old. The running boost shows in the Resources panel."
+      ]
+    },
+    {
+      "number": 89,
+      "version": "0.22.5",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T22:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Street Life",
+      "body": [
+        "The hideout street now has visitors. A llama trots across, a runner sprints past, a courier jogs by, and a tiny Digi mite skitters in that you can tap to squash. Your LokPets react in their own way: adoring, laughing, startled or curious.",
+        "Small things now turn up on the ground. Walk over one to pick it up. Ringing the bell calls a visitor over.",
+        "Three new LokPet emotes: adore, scared and laugh. A few text fixes too: the streak, chest, sky and shop lines now fill in their numbers and names."
+      ]
+    },
+    {
+      "number": 88,
+      "version": "0.22.4",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T21:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Light Spurs",
+      "body": [
+        "Every few hours a Light Spur can streak across the sky over a place where Digi enemies are moving all wrong. Look through the rooftop Sky Spyglass while one is up and that place is revealed and unlocked.",
+        "Only places you have not opened yet can show a spur."
+      ]
+    },
+    {
+      "number": 87,
+      "version": "0.22.3",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T20:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Fetch!",
+      "body": [
+        "The hideout now has a Ball. Put it out, tap it and your operator walks over and picks it up, then tap anywhere to throw it. How far and how high it goes depends on your UI theme.",
+        "Your LokPets race for it, faster pets and closer bonds win more often. Most pets love the ball. A few are ball-shy until you bond or play with them. The winner spits the ball out, spins, jumps on your head and jumps off.",
+        "The Ball will be sold in the LokShop. It is not for sale yet."
+      ]
+    },
+    {
+      "number": 86,
+      "version": "0.22.2",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T19:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The LokShop Opens",
+      "body": [
+        "A LokShop counter now stands on the main floor, run by LokServer, a cheerful digital host with owl energy. Ask it about the shop, the eclipse, other universes, other games and what we could build.",
+        "The shelf previews what is coming: the Ball, the Chest Pass and the Rider Saddle. Nothing can be bought yet."
+      ]
+    },
+    {
+      "number": 85,
+      "version": "0.22.1",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T18:00:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Before You Play",
+      "body": [
+        "A seizure and photosensitivity warning now fades in between the title screen and the hideout, and fades out when you continue. Tick \"Don't show this again\" to skip it on later visits."
+      ]
+    },
+    {
+      "number": 84,
+      "version": "0.22.0",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T17:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Lucky Chest",
+      "body": [
+        "A Lucky Chest now turns up in the main floor every so often. Open it once each time it is out.",
+        "Inside is a roll from four rarity tiers: common, uncommon, rare and ultra rare. Higher tiers can hold cards and card cosmetics you do not own yet, and everything else pays out resources."
+      ]
+    },
+    {
+      "number": 83,
+      "version": "0.21.9",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T16:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Look at the Sky",
+      "body": [
+        "The rooftop now has a Sky Spyglass. Every two hours the sky changes: clear, glyphs, an eclipse, or both at once.",
+        "Look through the spyglass while something is up to start a one hour boost. Glyphs give +10% to every stat, an eclipse gives +5% experience, and a glyph eclipse gives +15% to every stat plus the +5% experience."
+      ]
+    },
+    {
+      "number": 82,
+      "version": "0.21.8",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T15:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Win Streak",
+      "body": [
+        "The hideout Resources panel now counts your win streak, the number of runs you have won in a row, and remembers your best. Any loss sends the streak back to zero."
+      ]
+    },
+    {
+      "number": 81,
+      "version": "0.21.7",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T14:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Secrets on the Title Screen",
+      "body": [
+        "The title screen now sometimes shows a little pop in the corner, including a salute to Perfect L13gend, one of the greatest fighting game players ever.",
+        "Five secrets can also be summoned by typing a word on the title screen. Finding the words is half the fun."
+      ]
+    },
+    {
+      "number": 80,
+      "version": "0.21.6",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T13:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Crew Morale",
+      "body": [
+        "Your crew now has morale. Winning a run raises it and losing lowers it, and it can go negative. While it is negative your crew boosts shrink, down to half.",
+        "A loss while morale is positive wipes the streak back to zero. Once the end game is reached, every point of positive morale adds a quarter to every crew boost, with no upper limit.",
+        "Crew morale shows in the hideout Resources panel."
+      ]
+    },
+    {
+      "number": 79,
+      "version": "0.21.5",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T12:00:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "The Crate Answers",
+      "body": [
+        "Hideout props no longer eat your daily claim when the daily reward limit leaves nothing to pay. The Relay Crate now tells you your pockets are full and lets you try again later."
+      ]
+    },
+    {
+      "number": 78,
+      "version": "0.21.4",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T23:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Everything You Hold",
+      "body": [
+        "The hideout now has a Resources panel above Passive income that counts everything you are holding: cred, loot tokens, skeleton keys, card credits, pet treats, pet elixirs, GRPD seals and LokTokens."
+      ]
+    },
+    {
+      "number": 77,
+      "version": "0.21.3",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T23:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Endgame, Within Reach",
+      "body": [
+        "After Victory Lap the Bestiary gets a Custom Bestiary view for your recolored enemies and LokPets, and the hideout gets an Endgame dock with your switches and shortcuts. Hide the dock in Endgame settings.",
+        "Endgame settings now has a table of everything the end game unlocks, how to earn it and why. Every custom operator and look has its own \"use in runs\" switch, plus one master switch with All on and All off.",
+        "Custom looks now show up in your runs. Customs stay out of card packs for now.",
+        "Ten Forge achievements join the Archive."
+      ]
+    },
+    {
+      "number": 76,
+      "version": "0.21.2",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T21:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Forge Gets Three Screens",
+      "body": [
+        "The Forge now has a top bar with Operators, Enemies and LokPets. Switching is instant and each screen keeps where you left it.",
+        "Operators can use the Classic v1 look: the original plain build, with your detailed v2 features kept for when you switch back.",
+        "Enemies and LokPets open as classic galleries. Recolor any of them and keep it as a custom look. Stats and behavior never change; full part-by-part forging for both comes next."
+      ]
+    },
+    {
+      "number": 75,
+      "version": "0.21.1",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T13:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Surge Records",
+      "body": [
+        "The game now keeps count of the Quirk Surges you outlast. A 10-second warning appears before one ends, and the run summary marks a Surge survived.",
+        "Five new achievements: Glyph Reader, Heard the Howls, Eclipse Regular, Nothing Surprises Me, and Victory Lap for opening the end game."
+      ]
+    },
+    {
+      "number": 74,
+      "version": "0.21.0",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T12:55:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Rarer Surges",
+      "body": [
+        "Before the end game, a Quirk Surge now comes to about 1 run in 4 instead of 2 in 5. Once Victory Lap opens it still comes every run."
+      ]
+    },
+    {
+      "number": 73,
+      "version": "0.20.9",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T12:50:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Surge Has a History",
+      "body": [
+        "The Quirk Surge now opens after you have cleared 14 maps. Until the end game it only comes to some runs, and it works even before Enemy quirks are unlocked.",
+        "Reach the end game and the Surge comes every run, with its own switch to go back to the chance. Clear 14 maps to read the field note in the Bestiary Effects tab. Nobody knows much about it yet, only that it is one heck of a boost for someone."
+      ]
+    },
+    {
+      "number": 72,
+      "version": "0.20.8",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T12:45:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Quirk Surge",
+      "body": [
+        "With Enemy quirks on, every run now has one surprise: somewhere between 1:30 and 3:30 a Quirk Surge hits. For 20 seconds every enemy that spawns carries a random quirk.",
+        "Survive it and a bonus drops at your feet: health, cred and a Prism Quartz."
+      ]
+    },
+    {
+      "number": 71,
+      "version": "0.20.7",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T12:40:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Quirks You Can See",
+      "body": [
+        "Each quirk now looks different in the field: Gilded enemies glow gold, Volatile ones pulse red and faster as they weaken, Regenerating ones shed green plus signs, Adrenaline leaves speed streaks, and Spawn Shield and Flicker show a bubble while they cannot be hurt.",
+        "The first time a quirk shows up in a run, an alert tells you what it does. The run summary lists every quirk you defeated."
+      ]
+    },
+    {
+      "number": 70,
+      "version": "0.20.6",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T12:35:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Fitting Floor Achievements",
+      "body": [
+        "Eight new achievements for the Gen content: survive Gen Fitting Floor, defeat the Tile Warden, beat each of the six new fighting styles, and defeat every Gen Fitter.",
+        "Play with the quirk options to earn the rest: finish a run with Everywhere on, or with a quirk taken on, then do it ten times."
+      ]
+    },
+    {
+      "number": 69,
+      "version": "0.20.5",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T12:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Everywhere and Take It On",
+      "body": [
+        "Every enemy quirk now counts the enemies you defeat with it. At 1,000,000 kills, a quirk unlocks Everywhere: it lands on every enemy in the game, bosses included. At 2,500,000 kills it unlocks Take it on: you gain the quirk yourself, such as Regenerating healing you or Frame Skip hopping you forward.",
+        "Both options are off until you switch them on, and sit right under each quirk in Settings, End game, with a progress bar until they unlock.",
+        "New achievements: Odd One Out, Quirk Collector, an Everywhere and a Become achievement for each of the ten quirks, plus Nothing Is Normal and The Whole Weird Set."
+      ]
+    },
+    {
+      "number": 68,
+      "version": "0.20.4",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T12:25:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Quirks Join the End Game",
+      "body": [
+        "Enemy quirks are now a Victory Lap feature. Clear every standard map and they switch on by default; before that, enemies spawn without them.",
+        "Settings, End game now has an Enemy quirks switch and one switch for each of the ten quirks, plus All on and All off. A quirk you turn off never spawns, and the rest keep their relative odds."
+      ]
+    },
+    {
+      "number": 67,
+      "version": "0.20.3",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T12:20:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Enemy Quirks",
+      "body": [
+        "Regular enemies can now spawn with a random quirk: Frame Skip, Oversized, Shrunken, Volatile, Gilded, Regenerating, Spawn Shield, Adrenaline, Flicker or Jitterbug. Quirked enemies wear a dashed ring and their quirk name.",
+        "About 6% of spawns carry one at the start of a run, rising to 14% by minute ten. Bosses and giants never do. The new Effects tab in the Bestiary has a chart with every quirk, what it does, and its odds."
+      ]
+    },
+    {
+      "number": 66,
+      "version": "0.20.2",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T12:15:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Next-Gen Fitters and Their Drops",
+      "body": [
+        "Every Gen Fitter now drops real crafting resources: Silicon Alloy, Phosphor Ore, Cyber Resin, Prism Quartz, Rootglass Cells, plus extra cred and health. The Bestiary lists each enemy's confirmed drops and chances. The Tile Warden always pays out.",
+        "The tougher Fitters now enrage below 40% health: faster, quicker attacks, and bigger versions of their moves (a fourth beam on the Color Wheel, a seven-way Fan Sampler, wider landings and mines). Several also detonate a delayed ring where they fall, so do not stand on the body."
+      ]
+    },
+    {
+      "number": 65,
+      "version": "0.20.1",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T12:10:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Six New Ways to Fight",
+      "body": [
+        "Gen Fitting Floor adds six new enemies, each with its own fighting style: a strafing Duelist that lunges, a Pouncer that marks your spot and lands on it, a Color Wheel that spins beams, a Stitcher that zigzags and lays mines, a Sampler that fires five-way fans, and a Rewinder that snaps back to a saved spot."
+      ]
+    },
+    {
+      "number": 64,
+      "version": "0.20.0",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T12:05:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Gen Fitting Floor",
+      "body": [
+        "A new finite level, Gen Fitting Floor, opens after Glassroot Annex. Four ground zones are painted in different palettes, with stamped prefab clusters like the ones the map builder makes.",
+        "Meet the Gen Fitters: Swatch Mites, Aura Ringers, Skin Shedders, Hat Hurlers, Prefab Brutes, Remix Seeds and Undo Echoes, led by the Tile Warden. Each is built from a customization or map-builder idea."
+      ]
+    },
+    {
+      "number": 63,
+      "version": "0.19.11",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T11:52:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Build a Beat in Gorilla Studios",
+      "body": [
+        "Studio now keeps multiple local projects. Create, open, rename, duplicate, and delete them from the project browser; undo and redo edits as you work.",
+        "The new 16-step drum sequencer has three original kits, swing, velocity, custom sample pads, and patterns you can place on the song timeline.",
+        "Audio clips gain waveforms, zoom, trim, split, duplication, gain, and fades. Melodies live in movable MIDI clips with note length, velocity, and quantize controls.",
+        "Add EQ or compression to tracks, watch input and master levels, and record with a click and count-in. Studio renders now pass through a master limiter.",
+        "A .616project backup carries the song and its local sounds. WAV exports and To Soundtrack remain available; Studio songs carry their authored BPM into the game."
+      ]
+    },
+    {
+      "number": 62,
+      "version": "0.19.10",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T05:31:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "A Clearer Hideout",
+      "body": [
+        "The hideout puts Mission Briefing, Looks & LokPets, your companion, and music in a dock above the walking scene. The expanded player stays within that dock. Classic corner positions remain available in Settings.",
+        "Looks & LokPets is available throughout the menus and includes a direct game interface theme picker. A quiet Back control sits at the top of menu screens.",
+        "The Scene & Sanctum links have a clearer grid on narrow and wide screens."
+      ]
+    },
+    {
+      "number": 61,
+      "version": "0.19.9",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T05:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Crew Have a Lot to Say",
+      "body": [
+        "Rescued crew in the hideout now say something new every time you walk up to them, in their own voice. Vee talks shop, Mama Jo feeds you, Nyx talks paint, Deacon counts the hour.",
+        "Settings has a new Crew chatter choice: fresh lines or the original intro only, plus a Family or Wry tone. Wry is drier and more grown-up, and both stay fine for a child to read."
+      ]
+    },
+    {
+      "number": 60,
+      "version": "0.19.8",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T05:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Longer Notes, Crew in Every Room",
+      "body": [
+        "Settings now has a Note duration choice for the corner notes in the hideout: 6, 12, 20 or 30 seconds before they fade.",
+        "When you walk your operator into a room, the crew you rescued who hang out there now stand in it, so every room has someone to meet. Walk up to one to hear from them."
+      ]
+    },
+    {
+      "number": 59,
+      "version": "0.19.7",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T04:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Drop Packs",
+      "body": [
+        "Drops now come in packs. Your current gems, coins, chests and materials are the free Potato Pack, and everyone starts on it, so nothing about the way drops look has changed unless you pick something new.",
+        "The Customization Shop has a new Drop packs tab with seven more looks, each sold for LokTokens: Pop Cut (bright and cartoon-clean), Paper Cut (layered craft paper), Pixel Stash (hand-pixeled sprites), Blueprint (drafting-table schematics), Salvage Grit (worn metal, glass and stone), Neon Arcade (tube-light outlines) and Dark Circuit (matte hardware with glowing lines). Packs add a spawn bounce, a soft shadow, idle animation and a streak when the magnet pulls a drop in. Display only; drops and rewards never change, and Performance graphics always uses Potato.",
+        "Three new Economy achievements go with it: New Loot Look, Pack Rat and Full Stash."
+      ]
+    },
+    {
+      "number": 58,
+      "version": "0.19.6",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T03:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Sleeve Counter",
+      "body": [
+        "The Neon Sleeve has a new Sleeve Counter tab where you can dress up your LokPacks with Card Credits. Pack wrappers: a crimped Foil Wrapper for every pack, a printed Fighter Print booster that puts a real fighter or LokPet from the game on the front with their attack, and a lift-lid Collector Box.",
+        "Eight district card backs, from Furniture City Walnut to the Null Sector Rack, each with a real fighter in the hub, show while you flip through a pack. Two new card frames lay your collection out like real cards: Printed Stock, with a halftone art window and a real attack box, and Spellbook Layout, with a cost line, type line, rules text, flavor and an attack/HP box. The old colored frames now work on the default card too. Everything is cosmetic only: pack odds, prices and card stats never change.",
+        "Settings has a new Card motion option: Full tilts cards toward your cursor and lets foil shimmer, Subtle only reacts on hover, Off keeps everything still. Classic tiles and the classic card stay free and are the default."
+      ]
+    },
+    {
+      "number": 57,
+      "version": "0.19.5",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T00:10:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "A Real Million",
+      "body": [
+        "Million Horde now holds real millions. Every one of the up to ten million enemies has its own place in the crowd, walks in toward you, waits in a mass just past the edge of the screen, and steps into the fight as room opens up. It used to be a counter standing in for the crowd; kills now count one enemy at a time. Weaker phones hold a smaller crowd, and the cost per frame stays flat whatever its size.",
+        "Big fights run lighter everywhere. Crowd collisions, the death dissolve, sprite drawing and loot trimming were all rebuilt to do less work, so mass wipes should stay smooth. Nothing about the way anything looks or plays changed."
+      ]
+    },
+    {
+      "number": 56,
+      "version": "0.19.4",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T23:50:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Sealed Card Secrets",
+      "body": [
+        "Every LOK card can still be opened and inspected, but a card you have not unlocked yet now keeps its stats, element, abilities, moves and matchups hidden until you own it."
+      ]
+    },
+    {
+      "number": 55,
+      "version": "0.19.3",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T23:30:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Settings Jump Menu Complete",
+      "body": [
+        "The Find a section menu at the top of Settings was missing half the screen. It now also jumps to Scrollbar, Minimap, Prop launches, Chaos toggles, Wildlife, Card layout and Panel layout."
+      ]
+    },
+    {
+      "number": 54,
+      "version": "0.19.2",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T22:45:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "A Quieter Scrollbar",
+      "body": [
+        "The scrollbar is now a thin, low-profile line that takes its color from your UI theme instead of the loud browser default.",
+        "Settings has a new Scrollbar section: pick Slim, Hidden or Standard, and match the theme or stay neutral."
+      ]
+    },
+    {
+      "number": 53,
+      "version": "0.19.1",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T22:30:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Tidier Hideout Links",
+      "body": [
+        "The Scene & Sanctum Links panel on the hideout main floor used to stack its buttons in a ragged, right-aligned pile. The rain and room notes now sit side by side, and every destination is an even card in a clean grid that reflows from three columns down to one on a phone."
+      ]
+    },
+    {
+      "number": 52,
+      "version": "0.19.0",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T21:15:41Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Damage Numbers, Cascade Style",
+      "body": [
+        "Settings now has a Damage numbers choice. Classic is the same short yellow number as always. Cascade keeps numbers on screen longer and stacks them above each enemy you hit.",
+        "In Cascade, the bigger the hit the bigger and brighter the number: white, yellow, orange, red, pink, violet, cyan, and a glowing gold for the biggest hits. Crits count as one step higher.",
+        "Display only. It never changes how much damage you deal."
+      ]
+    },
+    {
+      "number": 51,
+      "version": "0.18.1",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T21:10:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Every Update Wears Its Own Date",
+      "body": [
+        "Patch notes used to pile up under a handful of shared dates. Each note now carries the exact day and time it reached the game, in the Updates history and on gsix.online.",
+        "A few notes that were filed under the wrong day have been corrected."
+      ]
+    },
+    {
+      "number": 50,
+      "version": "0.18.0",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T20:57:33Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Four Ways the Block Changes",
+      "body": [
+        "Release notes now have four distinct looks: green Bugfixes, amber Hotfixes, vibrant cyan Major Updates, and red Expansions. Each carries a short piece of 616 lore.",
+        "Choose which kinds may open an automatic popup in Settings. Every note stays in the Updates history, even when its popup is off."
+      ]
+    },
+    {
+      "number": 49,
+      "version": "0.17.0",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T20:38:30Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Floodline Breach and the Map Builder",
+      "body": [
+        "Survive Floodline Breach and Glassroot Annex, two finite arenas built with new street and Null scenery.",
+        "Restore relays, destroy root anchors, open the transit cache, and find the 616 Plate and Transit Coil. The coil unlocks the Catenary Harpoon.",
+        "The map builder now supports pickups, interactables, ambiance, grouped prefabs, seeded remix, editable templates, encounter timing, zoom, undo and redo, and playtesting through the game renderer."
+      ]
+    },
+    {
+      "number": 48,
+      "version": "0.16.0",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T20:29:46Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Ten Scores Leave the Armory",
+      "body": [
+        "DigiFrog Lance, the three legendary Digi-Tanas, and six more Volume I weapons now unlock after Victory Lap at alternating 750,000 and 1,000,000 lifetime-kill steps.",
+        "Each weapon stays off until you activate it in the GRPD Armory. Every design has its own combat pattern, pixel model, and three-part evolution recipe.",
+        "The Endgame weapon evolution switch starts on when Victory Lap opens and can be turned off without sealing the base weapons."
+      ]
+    },
+    {
+      "number": 47,
+      "version": "0.15.2",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T02:42:28Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Your LokPet Travels With You",
+      "body": [
+        "Your lead LokPet now comes along on every travel ambush. It steps in beside you with the same entrance it got on your first night in the hideout.",
+        "In Duo and Arena fights you bring your whole selected team and can switch LokPets mid-fight. A switch costs your turn, and the next LokPet steps in with the entrance, including after one is knocked out.",
+        "Arena combat is a travel fight style you can pick in Settings. The classic popup is still the default, and its Send button now replays the entrance."
+      ]
+    },
+    {
+      "number": 46,
+      "version": "0.15.1",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T02:42:28Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Hideout and Travel, Armory Found",
+      "body": [
+        "The GRPD Armory was stuck behind GRPD Station, which only opens after clearing Division St. Until the station is found, the Luvitnot keeper now holds the Armory entrance on the Sanctum main floor.",
+        "The room list is split in two. Hideout rooms (the Sanctum, the Perch, the Cellar, the Alley Annex, the Back Room and the Sound Booth) are safe. Travel rooms (The Neon Sleeve, Studio 28, GRPD Station, the Vault and Rapid Shelter) are out in the city and are marked with an Ambush risk badge.",
+        "You can only be ambushed when you travel. Studio 28, the Vault and Rapid Shelter now count, and the Perch, Cellar and Alley Annex no longer do. The Travel setting still switches ambushes off."
+      ]
+    },
+    {
+      "number": 45,
+      "version": "0.15.0",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T23:33:39Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Walk the Hideout",
+      "body": [
+        "You can walk your operator around the hideout now. Tap the ground, or use the arrow keys or A and D, and walk up to the things in each room to use them.",
+        "The bell cord, the Relay Crate, the Static Jar, the Beacon Lamp and a few others hand out small finds once a day. The stoop cat and the old telescope can start something, too.",
+        "LokPets can do more than get petted. Scratch, fetch, boogie, snack break, nap together, and go on a sniff hunt. Every pet likes different things, and a closer bond opens up more of them and makes rare finds a little more likely.",
+        "Little choice events turn up around the hideout and when you move between rooms. Pick what to do and see how it goes. A few rare surprises are hiding in there.",
+        "It is all capped per day, and you can switch each part off in Settings under Hideout."
+      ]
+    },
+    {
+      "number": 44,
+      "version": "0.14.2",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T23:20:13Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Studio Takes Stop Hogging Memory",
+      "body": [
+        "Fixed a memory leak in the Studio: deleting a recorded mic take (or any clip) left its audio loaded in memory for the rest of the session. A clip’s audio is now freed once nothing else uses it.",
+        "Clips that share the same audio, and clips still waiting in your library, keep playing normally."
+      ]
+    },
+    {
+      "number": 43,
+      "version": "0.14.1",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T22:53:52Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Popups Stay on Screen",
+      "body": [
+        "Fixed popups (card details in The Neon Sleeve, pack odds, the bestiary and more) opening off-center, forcing you to scroll to reach them. On desktop browsers this hit anyone using an animated theme (Midnight Reliquary, Mirror Carnival, Aurora Transit, Chrome Vespers, Paper Lantern): the popup opened far below the screen.",
+        "Popups now size to the visible screen on phones, so the browser toolbar no longer clips them. A tall popup scrolls inside itself, and its close button stays reachable.",
+        "The floating Back button no longer sits on top of an open popup."
+      ]
+    },
+    {
+      "number": 42,
+      "version": "0.14.0",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T21:04:32Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Frogsters and the Armory Keeper",
+      "body": [
+        "Jeremey Frogster now welcomes survivors to the Circuit Frog Ranch, while his twin Jeramy runs the boards at Gorilla Studios. Both have their own animated character models and a shared story in the Digi-Verse Archives.",
+        "The GRPD Armory has a Luvitnot keeper: an Eclipse-born water and spirit being in a white-and-gold protective suit with a glass helmet.",
+        "Ask the keeper to hum-shift the Armory between the GRPD Station and the hideout. The entrance follows its saved location."
+      ]
+    },
+    {
+      "number": 41,
+      "version": "0.13.3",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T21:04:32Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Armory Spawn Control",
+      "body": [
+        "The GRPD Armory now has an automatic kill increase switch. Turn it off to remove the +0.01 offer weight gained every 1,000 lifetime kills while keeping your purchased tiers.",
+        "Turn it back on whenever you want the bonus from your current lifetime kill total."
+      ]
+    },
+    {
+      "number": 40,
+      "version": "0.13.2",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T21:04:32Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The GRPD Armory Opens",
+      "body": [
+        "The GRPD Station now holds an evidence archive of thirty weapon designs, each with its own pixel model. Sealed designs stay out of runs.",
+        "Crossing Baton, Rivet Driver, and Deck Sling are the first field prototypes. Earn an evidence seal every 1,000 lifetime kills, fabricate a prototype, then switch it on before it can appear in future runs.",
+        "Every 1,000 kills adds 0.01 relative offer weight to active GRPD weapons. You can spend evidence seals on individual 2×, 3×, 4×, and 5× offer tiers."
+      ]
+    },
+    {
+      "number": 39,
+      "version": "0.13.1",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T12:13:10Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Faster Forge Starts",
+      "body": [
+        "The Forge now has one-tap Street, Tech, Mystic, and Wild starting designs, plus reset buttons for body, palette, and each feature section.",
+        "Settings has a fullscreen control for browsers that support it. Esc still leaves fullscreen normally."
+      ]
+    },
+    {
+      "number": 38,
+      "version": "0.13.0",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T12:00:10Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Forge and Settings Tune-Up",
+      "body": [
+        "Dev Mode now shows all five usable Forge slots inside the workshop, matching the save rules.",
+        "Save downloads now include your forged operators alongside game progress. Older progress-only files still import without erasing operators already on this device.",
+        "Settings has a section finder and music volume control. The Forge keeps a compact preview visible on phones and adds undo, redo, duplicate, and a warning before replacing unsaved work."
+      ]
+    },
+    {
+      "number": 37,
+      "version": "0.12.6",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T04:22:14Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Demo Day Breaks Through",
+      "body": [
+        "Smashing a page now tears real holes in it: the streets of 616 show through wherever text, pictures and buttons were destroyed, with a hard pixel edge and scorch marks around big blasts. The page underneath is never touched, so quitting puts everything back instantly.",
+        "Breaking things now feels like it: hit flashes, cracks that spread across damaged blocks, pieces that dissolve away and fly off in the page’s own colours, climbing damage numbers, a combo counter, heavy-hit freezes, screen shake, a soft glow around blasts and sound effects (M mutes).",
+        "Demo Day is now a survival game: waves of glitch enemies arrive in tiers while you tear the page down, a boss shows up as the page falls, and clearing 70% of the page and the boss completes the level. You can dash (Shift, or double-tap a direction) through enemies and text with a brief invulnerable window, pause with Esc or P (it also pauses when you switch tabs), pick level-up upgrades with 1, 2 or 3, and open loot boxes for prizes. Settings include Zen mode with no enemies, game speed, screen shake and more.",
+        "Everything you break pays out for what it was: headings give big XP, links some, buttons and inputs can heal, large images are loot crates, and ad frames set off a street sweep. Footers, navigation and headings are armored (hazard tape along the top), article text is soft, and the deeper down the page you go the tougher the enemies get; dense text brings more of them. The level is named after the page, and your report link now breaks down what came down.",
+        "Pick any of the 69 survivors before you start (or switch from the pause menu): a searchable roster with portraits, every character playable. Zero Day’s freeze-and-throw and Artiste’s draw-dodge work on the F key, since there is no mouse to aim with.",
+        "The Foreman moves about 30% faster and the game now runs on a chunkier pixel grid that stays locked to the page as it scrolls. While you play, clicks and the mouse wheel no longer reach the page, so a destroyed link cannot be followed by accident."
+      ]
+    },
+    {
+      "number": 36,
+      "version": "0.12.5",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T04:20:47Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Back To The Arcade",
+      "body": [
+        "Signing in from the game on the GSix website now brings you straight back to the arcade page, signed in and ready to play, instead of leaving you on the standalone game page."
+      ]
+    },
+    {
+      "number": 35,
+      "version": "0.12.4",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T04:18:52Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Crew After Hours",
+      "body": [
+        "Eleven new crew jobs widen the hideout rotation. Rapid Shelter now has working assignments of its own, and every rescued ally has more than one reachable job.",
+        "Rescue crew to earn Ember Guard and Moon Runner colors for every fighter, plus three animated hideout scene looks. The original scene and original fighter colors stay available.",
+        "Three new hats join the loot-token shop. Watch for a tiny feudal age, a garlic orbit, and one more run before dawn."
+      ]
+    },
+    {
+      "number": 34,
+      "version": "0.12.3",
+      "date": "2026-10-06",
+      "publishedAt": "2026-10-06T03:49:26Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Experimental Map Playlist",
+      "body": [
+        "The map picker now has an Experimental overview for bonus, 2×, 4×, classic, infinite, and custom routes. The original map filters are still there.",
+        "Every map card now shows its type, including routes you have not unlocked yet."
+      ]
+    },
+    {
       "number": 33,
       "version": "0.12.2",
       "date": "2026-10-06",
+      "publishedAt": "2026-10-06T00:30:56Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Demo Day On The Web",
       "body": [
         "Demo Day lets The Foreman play on top of any web page. Start it from the Demo Day page on the GSix website, and the page’s text, pictures and buttons become things to smash. Press Esc and everything goes back exactly as it was.",
@@ -43,7 +1683,11 @@
       "number": 32,
       "version": "0.12.1",
       "date": "2026-10-05",
+      "publishedAt": "2026-10-05T22:47:59Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "The Block Stays Alive",
       "body": [
         "Endless buildings now let you walk in without resetting the street fight. Choose Classic in Settings if you prefer the separate prefab rooms.",
@@ -55,7 +1699,11 @@
       "number": 31,
       "version": "0.12.0",
       "date": "2026-10-05",
+      "publishedAt": "2026-10-05T05:17:50Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "The Digi-Verse On The Web",
       "body": [
         "The 616 Survivor page on the GSix website now shows the Digi-Verse Archives in the game’s original deep red, with an option to switch back to the classic colors.",
@@ -66,7 +1714,11 @@
       "number": 30,
       "version": "0.11.9",
       "date": "2026-10-05",
+      "publishedAt": "2026-10-05T04:31:03Z",
       "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
       "title": "Sign In Inside The Arcade",
       "body": [
         "Continue with Google and Continue with Apple now work when you play on the GSix website. The website’s game player is a window inside a page, and Google refuses to show its sign-in there — the error you saw. The game now opens sign-in on the full page instead, then brings you back signed in.",
@@ -77,7 +1729,11 @@
       "number": 29,
       "version": "0.11.8",
       "date": "2026-10-05",
+      "publishedAt": "2026-10-05T04:20:18Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Where the Songs Come From",
       "body": [
         "On the GSix website, the music player now says which game each song is from, with a link to play it, and under every locked song it tells you exactly how to unlock it, such as completing a number of run objectives in 616 Survivor.",
@@ -88,7 +1744,11 @@
       "number": 28,
       "version": "0.11.7",
       "date": "2026-10-05",
+      "publishedAt": "2026-10-05T04:04:07Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Lokifed Everywhere",
       "body": [
         "The Lokifed — Take 1 soundtrack is now a built-in part of the Lok network. The same album can be played from the GSix site and any other Lok app with the new Lok Music player: play, pause, skip, seek, shuffle, repeat, volume, and pick any song from the list.",
@@ -101,7 +1761,11 @@
       "number": 27,
       "version": "0.11.6",
       "date": "2026-10-05",
+      "publishedAt": "2026-10-05T03:53:34Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Universe Binder",
       "body": [
         "The Universe chapter now holds a binder of every card from every LOK game. Browse them all together or one game at a time, and build decks that follow your account.",
@@ -112,7 +1776,11 @@
       "number": 26,
       "version": "0.11.5",
       "date": "2026-10-05",
+      "publishedAt": "2026-10-05T03:53:34Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Universe Hookups",
       "body": [
         "The Universe chapter now shows your LokTokens, cloud save state and collection side by side.",
@@ -123,7 +1791,11 @@
       "number": 25,
       "version": "0.11.4",
       "date": "2026-10-05",
+      "publishedAt": "2026-10-05T03:17:16Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Your LokDex Follows You",
       "body": [
         "Sign in and your cards and LokPets now show up in the LokDex on the GSix website, next to the ones from Spend It All. It is the same account, so signing in on the site or in either game is enough.",
@@ -134,7 +1806,11 @@
       "number": 24,
       "version": "0.11.3",
       "date": "2026-10-04",
+      "publishedAt": "2026-10-04T23:10:50Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Language Support",
       "body": [
         "The title screen, the hideout rooms and part of Settings can now be translated. Translations are made automatically, so some wording will be off, and anything not translated yet stays in English.",
@@ -145,7 +1821,11 @@
       "number": 23,
       "version": "0.11.2",
       "date": "2026-10-04",
+      "publishedAt": "2026-10-04T22:51:41Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Evolution Paths",
       "body": [
         "Once a LokPet reaches its second form you can pick an evolution path for it, from the new Evolution section of its profile in the Companion Kennel (it starts collapsed, and a small dot says a path is ready). Each starter has two paths with their own names and looks, such as Lil Llamà's Heart path (halo, softer glow) or Street path (armor plates, horns). Every other LokPet gets a path for its family, so the whole roster has a second way to grow.",
@@ -157,7 +1837,11 @@
       "number": 22,
       "version": "0.11.1",
       "date": "2026-10-04",
+      "publishedAt": "2026-10-04T22:26:35Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Hideout Companions",
       "body": [
         "Your LokPets now walk the Hideout strip with your operator. Your starter partner is always there, and the pets you picked for a run can tag along. They trail behind, sit, sniff or nap when the operator stops, and splash in the puddles when it rains.",
@@ -170,7 +1854,11 @@
       "number": 21,
       "version": "0.11.0",
       "date": "2026-10-04",
+      "publishedAt": "2026-10-04T22:02:41Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Bond and Growth",
       "body": [
         "LokPets now grow from everything you do: finishing runs, winning travel fights, treats and arena battles all earn XP, and your starter partner always takes the biggest share. XP now adds up between battles instead of being lost.",
@@ -184,7 +1872,11 @@
       "number": 20,
       "version": "0.10.9",
       "date": "2026-10-04",
+      "publishedAt": "2026-10-04T20:43:20Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "End Game: Victory Lap",
       "body": [
         "Clear every standard map once and Settings gains a second page, End game, that slides in beside Standard. Before then it does not appear at all.",
@@ -197,7 +1889,11 @@
       "number": 19,
       "version": "0.10.8",
       "date": "2026-10-04",
+      "publishedAt": "2026-10-04T20:09:36Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "The Operator Forge",
       "body": [
         "A hidden workshop for designing new operators. Tap the Save data label in Settings five times to find it.",
@@ -210,7 +1906,11 @@
       "number": 18,
       "version": "0.10.7",
       "date": "2026-10-04",
+      "publishedAt": "2026-10-04T19:35:18Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Travel Fight Styles",
       "body": [
         "Settings has a new Travel fight style picker. Classic is still the original card-throw popup and is still the default.",
@@ -222,7 +1922,11 @@
       "number": 17,
       "version": "0.10.6",
       "date": "2026-10-04",
+      "publishedAt": "2026-10-04T19:27:39Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Clearer Fights",
       "body": [
         "Every move in the LokPet arena now says Strong, Normal, Weak or Support against the opponent in front of you, and status effects show whether they help or hurt and how many turns are left.",
@@ -233,7 +1937,11 @@
       "number": 16,
       "version": "0.10.5",
       "date": "2026-10-04",
+      "publishedAt": "2026-10-04T19:10:35Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Studio 28 Filters",
       "body": [
         "Studio 28 can now filter the weapon list by weapon type, by active or banned status, and by search, with Activate shown and Ban shown buttons that always leave at least one weapon lit."
@@ -243,7 +1951,11 @@
       "number": 15,
       "version": "0.10.4",
       "date": "2026-10-04",
+      "publishedAt": "2026-10-04T19:10:35Z",
       "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
       "title": "Motion Override",
       "body": [
         "When a phone or computer asks apps to reduce motion, the title live feed, hideout rain and parallax, the walking operative and random visitors now stay still. The title screen shows a tap-to-fix notice, and Settings has an Always animate switch that keeps everything moving."
@@ -253,7 +1965,11 @@
       "number": 14,
       "version": "0.10.3",
       "date": "2026-10-04",
+      "publishedAt": "2026-10-04T19:10:35Z",
       "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
       "title": "Soundtrack Wake-Up",
       "body": [
         "The title-screen soundtrack now starts on your first tap or key press, including on phones and tablets where the old retry could not satisfy the browser. A new Start on first tap switch in the Music panel turns it off.",
@@ -264,7 +1980,11 @@
       "number": 13,
       "version": "0.10.2",
       "date": "2026-10-04",
+      "publishedAt": "2026-10-04T19:10:35Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Card Style Choice",
       "body": [
         "Lok Card Shop and Lock Deck cards now have a Card Style picker: Classic keeps the original foil-framed binder look and stays the default, New is the streamlined look from the Underground Update, and Dynamic 3D adds tilt and holographic foil."
@@ -274,7 +1994,11 @@
       "number": 12,
       "version": "0.10.1",
       "date": "2026-10-04",
+      "publishedAt": "2026-10-04T19:10:35Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "The Underground Update",
       "body": [
         "Digital Russel (Cluck-616) and Barnaby Bit-Herder join the roster, with the Bionic Cluck Protocol run modifier turning fallen hostiles into egg-laying allies.",
@@ -288,7 +2012,11 @@
       "number": 11,
       "version": "0.10.0",
       "date": "2026-09-28",
+      "publishedAt": "2026-09-28T16:13:35Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "The Horde Hits Seven Digits",
       "body": [
         "Million Horde joins the run modifiers with a crowd that can climb into the millions without allocating millions of individual enemies.",
@@ -301,7 +2029,11 @@
       "number": 10,
       "version": "0.9.0",
       "date": "2026-09-28",
+      "publishedAt": "2026-09-28T14:37:48Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Hazards Get Their Own Identity",
       "body": [
         "Ground hazards, novas, and auras now use weapon-specific shapes instead of sharing the same circle or center flash.",
@@ -314,7 +2046,11 @@
       "number": 9,
       "version": "0.8.0",
       "date": "2026-09-27",
+      "publishedAt": "2026-09-27T02:06:21Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "The Defector Reaches the Spire",
       "body": [
         "Vector Lev joins the playable roster with the Lev Expansion nova and Singularity Collapse ultimate.",
@@ -326,7 +2062,11 @@
       "number": 8,
       "version": "0.7.0",
       "date": "2026-09-21",
+      "publishedAt": "2026-09-21T12:58:38Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Your Frame, Your Soundtrack",
       "body": [
         "LokPets and playable characters now each have their own saved portrait frame: Square, Soft, or Round. Interface borders remain a separate choice.",
@@ -338,7 +2078,11 @@
       "number": 7,
       "version": "0.6.0",
       "date": "2026-09-21",
+      "publishedAt": "2026-09-21T03:49:15Z",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Looks, LokPets, and a Hideout That Makes Sense",
       "body": [
         "Looks & LokPets now stays saved and launches from the hideout instead of interrupting every match.",
@@ -356,6 +2100,9 @@
       "version": "0.5.0",
       "date": "2026-09-18",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Patch Notes, From Us to You",
       "body": [
         "You're reading it. Added real patch notes: a big popup when we ship something new, a running Updates page in the Archive, and -- because every good main menu needs one -- random little blurbs from us up on the Hideout screen.",
@@ -367,6 +2114,9 @@
       "version": "0.4.0",
       "date": "2026-09-18",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Every Operative Gets Their Own Story",
       "body": [
         "Characters now level up individually. Play Shade a lot, Shade gets stronger -- permanently. Small combat bonus, capped, so it stays a nice perk and not a new meta.",
@@ -379,6 +2129,9 @@
       "version": "0.3.0",
       "date": "2026-09-18",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Your Level Now Actually Means Something",
       "body": [
         "Added a persistent Player Level that tracks everything you've ever done, forever. No cap -- it just gets slower to climb the higher you go.",
@@ -391,6 +2144,9 @@
       "version": "0.2.0",
       "date": "2026-09-18",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Factions Move In With the Bestiary",
       "body": [
         "Moved the Factions lore pages out of the Archive and into the Bestiary, right next to the Threats list, with a toggle to flip between them. Made more sense living together."
@@ -401,6 +2157,9 @@
       "version": "0.1.1",
       "date": "2026-09-17",
       "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
       "title": "Fixed a Dungeon Exit That Wasn't",
       "body": [
         "Squashed a bug where an endless-mode dungeon exit could spawn somewhere you could never actually reach -- if you've ever gotten permanently stuck in a dungeon, this was why.",
@@ -412,6 +2171,9 @@
       "version": "0.1.0",
       "date": "2026-09-17",
       "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
       "title": "Faster Loads, New Face on the Block",
       "body": [
         "Split the app into smaller chunks so a fresh visit loads noticeably faster.",

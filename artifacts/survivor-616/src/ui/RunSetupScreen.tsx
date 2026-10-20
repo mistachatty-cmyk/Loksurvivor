@@ -1,7 +1,9 @@
 import { ArrowLeft, Check, Circle, Cpu, Grid3X3, Monitor, PawPrint, Pencil, Sparkles } from 'lucide-react';
 import { Fragment, useState } from 'react';
 
-import { lokPetTeamCapacity, useMeta } from '@/game/state/metaStore';
+import { activeUiThemeSwatchId, lokPetTeamCapacity, useMeta } from '@/game/state/metaStore';
+import { effectiveCatalogIds } from '@/game/data/devUnlockRegistry';
+import { UI_THEMES } from '@/game/data/uiThemes';
 import type { MetaState } from '@/game/types';
 import { LokPetIcon } from '@/ui/LokPetVariantSheet';
 import { hasBranchToChoose, petEvolvedLook } from '@/game/engine/petEvolution';
@@ -10,12 +12,16 @@ import { petNameplate } from '@/game/engine/petGrowth';
 import { RigPortrait } from '@/ui/RigPortrait';
 import { THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
 import { detectRuntimePerformanceTier, RUNTIME_TIER_LABELS } from '@/game/performanceProfile';
+import { customMapToArea } from '@/game/data/customMaps';
+import { availableChallengeContracts } from '@/game/data/vendor';
 
 type SetupStep = 'companion' | 'look';
 
 export interface RunSetupScreenProps {
   /** Launch continues into a run; manage returns to the hideout after saving. */
   intent: 'launch' | 'manage';
+  areaId?: string;
+  challengeIds?: string[];
   onBack: () => void;
   onComplete: () => void;
 }
@@ -48,9 +54,10 @@ function selectClass(selected: boolean) {
     : 'border-white/15 bg-black/25 text-white/65 hover:border-white/45 hover:text-white';
 }
 
-export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenProps) {
+export function RunSetupScreen({ intent, areaId, challengeIds = [], onBack, onComplete }: RunSetupScreenProps) {
   const {
     meta,
+    unlockedAreas,
     selectedCharacter,
     setLokPetLoadout,
     setLokPetArtStyle,
@@ -61,8 +68,11 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
     setUiPanelLayout,
     setMinimapVisible,
     equipPalette,
+    equipUiTheme,
+    selectUiThemeSwatch,
   } = useMeta();
   const [step, setStep] = useState<SetupStep>('companion');
+  const [direction, setDirection] = useState<'right' | 'left'>('right');
   const [selectedPetIds, setSelectedPetIds] = useState<string[]>(meta.selectedLokPetIds);
   const [namesOpenId, setNamesOpenId] = useState<string | null>(null);
   const [artStyle, setArtStyle] = useState(meta.lokPetArtStyle);
@@ -78,8 +88,18 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
   const capacity = lokPetTeamCapacity(selectedCharacter);
   const isLaunch = intent === 'launch';
   const ownedPalettes = meta.ownedPaletteIds.map((id) => THEMED_PALETTES_BY_ID[id]).filter(Boolean);
+  const ownedUiThemeIds = effectiveCatalogIds(meta, 'uiThemes', meta.ownedUiThemeIds);
+  const ownedUiThemes = UI_THEMES.filter((theme) => ownedUiThemeIds.includes(theme.id));
+  const activeSwatchId = activeUiThemeSwatchId(meta);
   const paletteIndex = Math.max(0, ownedPalettes.findIndex((palette) => palette.id === meta.activePaletteId));
   const runtimeTier = detectRuntimePerformanceTier();
+  const customMap = areaId ? meta.customMaps.find((map) => map.id === areaId) : undefined;
+  const briefingArea = areaId ? unlockedAreas.find((area) => area.id === areaId) ?? (customMap ? customMapToArea(customMap) : undefined) : undefined;
+  const briefingPets = meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && (pet.starter || pet.stamina > 0));
+  const briefingContracts = availableChallengeContracts(meta).filter((contract) => challengeIds.includes(contract.id));
+  const briefingModifiers = Object.entries(meta.runModifiers)
+    .filter(([, enabled]) => enabled)
+    .map(([key]) => key.replace(/Enabled$/, '').replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`).trim());
 
   // One slot behaves like a radio button, as before; Collector characters can take a full team.
   const togglePet = (id: string) => {
@@ -90,9 +110,15 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
     });
   };
 
+  const goToStep = (next: SetupStep) => {
+    if (next === step) return;
+    setDirection(next === 'look' ? 'right' : 'left');
+    setStep(next);
+  };
+
   const continueWithCompanion = () => {
     setLokPetLoadout(selectedPetIds);
-    setStep('look');
+    goToStep('look');
   };
 
   const saveLookAndFinish = () => {
@@ -109,6 +135,27 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
   return (
     <main className="min-h-[100dvh] bg-[#05060b] px-3 py-4 text-white sm:px-6 sm:py-7" data-testid="screen-run-setup">
       <div className="mx-auto w-full max-w-5xl">
+        {isLaunch && briefingArea ? (
+          <section className="mb-4 border border-cyan-200/25 bg-cyan-950/15 p-4 sm:p-5" data-testid="run-briefing-card">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-[10px] font-black uppercase tracking-[.22em] text-cyan-200">Run briefing · ready when you are</p>
+                <h2 className="mt-1 text-lg font-black uppercase text-white">{briefingArea.name}</h2>
+                <p className="mt-1 max-w-3xl text-xs leading-relaxed text-white/70">{briefingArea.description}</p>
+              </div>
+              <div className="grid min-w-44 gap-2 text-right sm:text-left">
+                <p className="font-mono text-[10px] uppercase text-white/55">Operator <span className="ml-1 font-bold text-white">{selectedCharacter.name}</span></p>
+                <p className="font-mono text-[10px] uppercase text-white/55">LokPets <span className="ml-1 font-bold text-white">{briefingPets.length ? briefingPets.map((pet) => pet.name ?? pet.roll.name).join(', ') : 'None selected'}</span></p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-white/10 pt-3 font-mono text-[9px] uppercase tracking-wider text-white/55">
+              <span>Move: WASD / arrows or touch pad</span>
+              <span>Dash: Space or touch button</span>
+              <span>Modifiers: {briefingModifiers.length ? briefingModifiers.join(', ') : 'Standard rules'}</span>
+              {briefingContracts.length ? <span className="text-amber-200">Contracts: {briefingContracts.map((contract) => contract.name).join(', ')}</span> : <span>No optional contracts</span>}
+            </div>
+          </section>
+        ) : null}
         <header className="flex items-start justify-between gap-4 border-b border-white/15 pb-4">
           <div>
             <button
@@ -125,12 +172,38 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
               {isLaunch ? `Choose ${selectedCharacter.name}'s companion, then make the screen yours.` : 'Change your companion and look anytime. Nothing here changes stats or rewards.'}
             </p>
           </div>
-          <div className="hidden min-w-32 border border-cyan-200/25 bg-cyan-300/5 p-3 text-right sm:block">
-            <p className="font-mono text-[9px] uppercase tracking-widest text-cyan-100/65">Step {step === 'companion' ? '1' : '2'} / 2</p>
-            <p className="mt-1 text-xs font-black uppercase text-white">{step === 'companion' ? 'LokPet' : 'Your look'}</p>
-          </div>
         </header>
 
+        <div role="tablist" aria-label="Setup step" className="relative mt-5 flex border border-white/15 bg-black/25" data-testid="run-setup-tabs">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={step === 'companion'}
+            onClick={() => goToStep('companion')}
+            className={`relative flex-1 px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${step === 'companion' ? 'text-white' : 'text-white/55 hover:text-white'}`}
+            data-testid="tab-run-setup-companion"
+          >
+            1 · LokPet
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={step === 'look'}
+            onClick={() => goToStep('look')}
+            className={`relative flex-1 px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${step === 'look' ? 'text-white' : 'text-white/55 hover:text-white'}`}
+            data-testid="tab-run-setup-look"
+          >
+            2 · Your look
+          </button>
+          <span
+            aria-hidden
+            className="absolute bottom-0 h-0.5 w-1/2 bg-gradient-to-r from-cyan-300 via-pink-300 to-cyan-300 transition-transform duration-300 ease-out"
+            style={{ transform: step === 'companion' ? 'translateX(0)' : 'translateX(100%)' }}
+          />
+        </div>
+
+        <div className="overflow-x-clip">
+        <div key={step} className={direction === 'right' ? 'settings-slide-from-right' : 'settings-slide-from-left'} role="tabpanel">
         {step === 'companion' ? (
           <section className="mt-5">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -242,6 +315,22 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
                 </div>
                 <input type="range" min={0} max={Math.max(0, ownedPalettes.length - 1)} value={paletteIndex} onChange={(event) => { const palette = ownedPalettes[Number(event.target.value)]; if (palette) equipPalette(palette.id); }} className="mt-4 w-full accent-cyan-300" aria-label="Theme palette" />
               </section>
+              <section className="border border-white/15 bg-white/[.03] p-4 lg:col-span-2" data-testid="looks-game-theme">
+                <h3 className="text-sm font-black uppercase">Game interface theme</h3>
+                <p className="mt-1 text-xs text-white/55">Choose an owned theme and its color. Menus update immediately.</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {ownedUiThemes.map((theme) => {
+                    const equipped = meta.uiTheme === theme.id;
+                    return <div key={theme.id} className={`min-w-0 border p-3 ${equipped ? 'border-primary bg-primary/10' : 'border-white/15 bg-black/25'}`}>
+                      <button type="button" onClick={() => equipUiTheme(theme.id)} aria-pressed={equipped} className="w-full text-left" data-testid={`button-looks-ui-theme-${theme.id}`}>
+                        <span className="flex items-center justify-between gap-2 text-xs font-black uppercase"><span>{theme.name}</span>{equipped ? <Check className="h-4 w-4 text-primary" /> : null}</span>
+                        <span className="mt-2 flex h-2 overflow-hidden border border-white/20" aria-hidden="true">{theme.swatches?.map((swatch) => <span key={swatch.id} className="flex-1" style={{ backgroundColor: `hsl(${swatch.primaryHsl})` }} />)}</span>
+                      </button>
+                      {equipped && theme.swatches ? <div className="mt-3 flex flex-wrap gap-2">{theme.swatches.map((swatch) => <button key={swatch.id} type="button" onClick={() => selectUiThemeSwatch(theme.id, swatch.id)} aria-pressed={activeSwatchId === swatch.id} className={`min-h-9 border px-2 py-1 text-[10px] font-bold ${activeSwatchId === swatch.id ? 'border-white text-white' : 'border-white/20 text-white/60 hover:border-white/60'}`} data-testid={`button-looks-ui-swatch-${theme.id}-${swatch.id}`}><span className="mr-1 inline-block h-3 w-3 border border-white/30 align-middle" style={{ backgroundColor: `hsl(${swatch.primaryHsl})` }} />{swatch.name}</button>)}</div> : null}
+                    </div>;
+                  })}
+                </div>
+              </section>
               <section className="border border-white/15 bg-white/[.03] p-4">
                 <h3 className="flex items-center gap-2 text-sm font-black uppercase"><PawPrint className="h-4 w-4 text-pink-200" /> LokPet art style</h3>
                 <p className="mt-1 text-xs text-white/55">A visual-only finish for portraits and cards.</p>
@@ -329,14 +418,16 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
             </div>
 
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <button type="button" onClick={() => setStep('companion')} className="min-h-11 px-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55 hover:text-white">Back · LokPet</button>
+              <button type="button" onClick={() => goToStep('companion')} className="min-h-11 px-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55 hover:text-white">Back · LokPet</button>
               <button type="button" onClick={saveLookAndFinish} className="flex min-h-14 items-center justify-center gap-2 bg-cyan-100 px-7 py-4 text-sm font-black uppercase tracking-[.18em] text-slate-950 hover:bg-white" data-testid="button-run-setup-finish">
                 {isLaunch ? 'Start the run' : 'Save my look'} <ArrowLeft className="h-4 w-4 rotate-180" />
               </button>
             </div>
-            <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-wider text-white/40">Change this anytime from the floating Looks & LokPets button.</p>
+            <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-wider text-white/40">Change this anytime from Looks & LokPets in the Hideout dock.</p>
           </section>
         )}
+        </div>
+        </div>
       </div>
     </main>
   );

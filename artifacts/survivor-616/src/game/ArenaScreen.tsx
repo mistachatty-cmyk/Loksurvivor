@@ -8,10 +8,13 @@
  * (`arena/arenaInput.ts`) and a live kill-count scoreboard
  * (`arena/scoreboard.ts`) in place of AttractMode's bot and no-UI.
  *
- * Concept-skeleton scope: local multiplayer only. Networking is a later
- * phase -- see `.agents/memory/loksurvivor-arena.md` -- and slots in here by
- * filling `guestInputs` from remote messages instead of `readArenaInputs`,
- * with no other change to this loop.
+ * Online mode (`net` prop set): see `arena/arenaNet.ts`. The host relays
+ * the merged per-tick input vector plus authoritative kill/time/outcome
+ * counters over a free Supabase Realtime room; every client -- including
+ * the host -- runs its own full local `stepWorld`, so no enemy/actor state
+ * ever crosses the wire. A remote guest's scoreboard always reflects the
+ * host's broadcast numbers, never its own local simulation's kill count,
+ * so "who's winning" never disagrees between screens.
  */
 import { useEffect, useRef, useState } from 'react';
 
@@ -19,38 +22,76 @@ import { SILENT_FRAME } from '@/game/audio/beatBus';
 import { stepWorld, type World } from '@/game/engine/world';
 import { renderWorld, type Viewport } from '@/game/render/draw';
 import { type ArenaSeat, createArenaWorld } from '@/game/arena/arenaWorld';
-import { readArenaInputs } from '@/game/arena/arenaInput';
+import { readArenaInputs, type ArenaMove } from '@/game/arena/arenaInput';
 import { arenaStandings, type ArenaStanding } from '@/game/arena/scoreboard';
+import type { ArenaConnectionStatus, ArenaNetRole, ArenaTickMessage } from '@/game/arena/arenaNet';
 import { useLokEconomy } from '@/state/lokEconomyStore';
 import type { AreaDef } from '@/game/types';
 
 const FIXED_STEP = 1 / 60;
 const MAX_SUBSTEPS = 6;
 const MATCH_DURATION_SEC = 180;
+/** Host broadcasts a tick every 3rd fixed step (~20Hz) -- plenty for an input relay, far under Realtime's free-tier message budget. */
+const NET_TICK_EVERY_STEPS = 3;
+const NET_INPUT_SEND_MS = 50;
 
 export interface ArenaScreenProps {
   area: AreaDef;
   seats: ArenaSeat[];
+  net?: ArenaNetRole;
   onExit: () => void;
 }
 
-export function ArenaScreen({ area, seats, onExit }: ArenaScreenProps) {
+export function ArenaScreen({ area, seats, net, onExit }: ArenaScreenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World | null>(null);
   const keysRef = useRef<Set<string>>(new Set());
   const [standings, setStandings] = useState<ArenaStanding[]>([]);
   const [secondsLeft, setSecondsLeft] = useState(MATCH_DURATION_SEC);
   const [ended, setEnded] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ArenaConnectionStatus>(net ? 'connecting' : 'connected');
   const { earn: earnLokTokens } = useLokEconomy();
+
+  // Host: latest input received per remote seat id. Guest: the latest
+  // authoritative tick received from the host.
+  const remoteInputsRef = useRef<Record<string, ArenaMove>>({});
+  const lastTickRef = useRef<ArenaTickMessage | null>(null);
+
+  const mySeatId = net?.kind === 'guest' ? net.room.getSeatId() : 'host';
 
   useEffect(() => {
     worldRef.current = createArenaWorld(area, seats);
   }, [area, seats]);
 
   useEffect(() => {
-    // Only the signed-in host (seat 'host') can earn -- guests are local-only
-    // actors sharing this device, not separate Supabase-authenticated users.
-    if (ended && standings[0]?.id === 'host') {
+    if (!net) return;
+    if (net.kind === 'host') {
+      net.room.setHandlers({
+        onStatus: setConnectionStatus,
+        onGuestInput: (msg) => {
+          remoteInputsRef.current[msg.seatId] = { moveX: msg.moveX, moveY: msg.moveY };
+        },
+      });
+    } else {
+      net.room.setHandlers({
+        onStatus: setConnectionStatus,
+        onTick: (msg) => { lastTickRef.current = msg; },
+      });
+    }
+    return () => net.room.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [net?.code]);
+
+  useEffect(() => {
+    // Each client only ever earns for *its own* seat winning -- a local
+    // shared-device guest (no `lokClient` session of its own) still can't
+    // earn, since only the device running this effect with `mySeatId`
+    // matching the winner calls out. A remote guest is its own signed-in
+    // session on its own device, so this generalizes cleanly from the
+    // old hardcoded "host only" check.
+    // Online counters are relayed by clients and are not server-validated.
+    // Never issue competitive currency for an online result.
+    if (!net && ended && standings[0]?.id === mySeatId && standings[0]?.kills > (standings[1]?.kills ?? 0)) {
       earnLokTokens('arena_match_win', { refType: 'arena-match', refId: `${area.id}-${Date.now()}` });
     }
     // Deliberately keyed only to `ended`'s false->true transition, not
@@ -81,6 +122,8 @@ export function ArenaScreen({ area, seats, onExit }: ArenaScreenProps) {
     let accumulator = 0;
     let sizeCheckedAt = 0;
     let hudAt = 0;
+    let netInputSentAt = 0;
+    let stepsSinceNetTick = 0;
     let view: Viewport = { width: 1, height: 1, dpr: 1 };
 
     const resize = (): Viewport => {
@@ -108,10 +151,33 @@ export function ArenaScreen({ area, seats, onExit }: ArenaScreenProps) {
         view = resize();
       }
 
+      const myLocalInput = readArenaInputs(keysRef.current, net ? 1 : seats.length)[0]!;
+
+      if (net?.kind === 'guest' && time - netInputSentAt > NET_INPUT_SEND_MS) {
+        netInputSentAt = time;
+        net.room.sendInput(myLocalInput);
+      }
+
       if (world.outcome === 'running' && !ended) {
-        const inputs = readArenaInputs(keysRef.current, seats.length);
-        const host = inputs[0]!;
-        const guestInputs = inputs.slice(1);
+        let host: ArenaMove;
+        let guestInputs: ArenaMove[];
+
+        if (net?.kind === 'guest') {
+          // Dumb-client: step with whatever the host last broadcast, not
+          // this device's own local input -- the host is the single
+          // source of truth for everyone's movement, this screen's own
+          // key presses are only ever sent upstream, never applied locally.
+          const tick = lastTickRef.current;
+          host = tick?.inputs[0] ?? { moveX: 0, moveY: 0 };
+          guestInputs = seats.slice(1).map((_, i) => tick?.inputs[i + 1] ?? { moveX: 0, moveY: 0 });
+        } else if (net?.kind === 'host') {
+          host = myLocalInput;
+          guestInputs = seats.slice(1).map((seat) => remoteInputsRef.current[seat.id] ?? { moveX: 0, moveY: 0 });
+        } else {
+          const inputs = readArenaInputs(keysRef.current, seats.length);
+          host = inputs[0]!;
+          guestInputs = inputs.slice(1);
+        }
 
         accumulator = Math.min(accumulator + dt, FIXED_STEP * MAX_SUBSTEPS);
         while (accumulator >= FIXED_STEP) {
@@ -124,6 +190,20 @@ export function ArenaScreen({ area, seats, onExit }: ArenaScreenProps) {
             guestInputs,
           });
           if (world.outcome !== 'running') break;
+
+          if (net?.kind === 'host') {
+            stepsSinceNetTick += 1;
+            if (stepsSinceNetTick >= NET_TICK_EVERY_STEPS) {
+              stepsSinceNetTick = 0;
+              net.room.sendTick({
+                inputs: [host, ...guestInputs],
+                time: world.time,
+                kills: world.kills,
+                guestKills: world.guestKills,
+                outcome: world.outcome,
+              });
+            }
+          }
         }
 
         if (world.time >= MATCH_DURATION_SEC) {
@@ -131,32 +211,60 @@ export function ArenaScreen({ area, seats, onExit }: ArenaScreenProps) {
         }
       }
 
-      if (world.outcome !== 'running') setEnded(true);
+      // A guest's own local world can diverge slightly from the host's (see
+      // the module comment) -- never let that local divergence end the
+      // match early/late on this screen. Only the host's broadcast outcome
+      // decides "over" for a guest; only this screen's own simulation
+      // decides it for the host (and for local-only matches).
+      const matchOver = net?.kind === 'guest'
+        ? lastTickRef.current !== null && lastTickRef.current.outcome !== 'running'
+        : world.outcome !== 'running';
+      if (matchOver) setEnded(true);
 
       renderWorld(ctx, world, view);
 
       if (time - hudAt > 100) {
         hudAt = time;
-        setStandings(arenaStandings(world, seats[0]!.character.name));
-        setSecondsLeft(Math.max(0, Math.round(MATCH_DURATION_SEC - world.time)));
+        if (net?.kind === 'guest' && lastTickRef.current) {
+          const tick = lastTickRef.current;
+          const rows: ArenaStanding[] = [
+            { id: 'host', name: seats[0]!.character.name, kills: tick.kills, isHost: true },
+            ...seats.slice(1).map((seat) => ({
+              id: seat.id,
+              name: seat.character.name,
+              kills: tick.guestKills[seat.id] ?? 0,
+              isHost: false,
+            })),
+          ].sort((a, b) => b.kills - a.kills);
+          setStandings(rows);
+          setSecondsLeft(Math.max(0, Math.round(MATCH_DURATION_SEC - tick.time)));
+        } else {
+          setStandings(arenaStandings(world, seats[0]!.character.name));
+          setSecondsLeft(Math.max(0, Math.round(MATCH_DURATION_SEC - world.time)));
+        }
       }
     };
 
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [seats, ended]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seats, ended, net?.code]);
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-black">
       <canvas ref={canvasRef} className="block h-full w-full" />
       <div className="absolute top-3 right-3 rounded-md bg-black/60 px-3 py-2 font-mono text-xs text-white min-w-[180px]">
         <div className="mb-1 flex items-center justify-between text-white/70">
-          <span>LokSurvivorArena</span>
+          <span>Kill Race{net ? ` · ${net.code}` : ''}</span>
           <span>{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</span>
         </div>
+        {net && <div className={`mb-1 text-[10px] uppercase ${connectionStatus === 'connected' ? 'text-emerald-300' : connectionStatus === 'disconnected' ? 'text-rose-300' : 'text-amber-200'}`}>
+          {connectionStatus === 'connected' ? 'Room connected' : connectionStatus === 'disconnected' ? 'Connection lost · match may desync' : 'Connecting to room…'}
+        </div>}
+        {net && <div className="mb-2 text-[9px] text-white/45">Shared-enemy kill race · no player combat · online scores are unranked</div>}
         {standings.map((row, i) => (
           <div key={row.id} className="flex items-center justify-between gap-3">
-            <span>{i + 1}. {row.name}{row.isHost ? ' (you)' : ''}</span>
+            <span>{i + 1}. {row.name}{row.id === mySeatId ? ' (you)' : ''}</span>
             <span>{row.kills}</span>
           </div>
         ))}
@@ -165,8 +273,13 @@ export function ArenaScreen({ area, seats, onExit }: ArenaScreenProps) {
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/70 text-white font-mono">
           <div className="text-xl">Match over</div>
           <div>
-            {standings[0] ? `${standings[0].name} wins with ${standings[0].kills} kills` : 'No winner'}
+            {standings[0] && standings[0].kills > (standings[1]?.kills ?? 0)
+              ? `${standings[0].name} wins with ${standings[0].kills} kills`
+              : standings[0] && standings[0].kills === (standings[1]?.kills ?? 0)
+                ? `Tie at ${standings[0].kills} kills`
+                : 'No winner'}
           </div>
+          {net && <p className="max-w-sm text-center text-xs text-white/60">Online results are an informal room scoreboard. Player-versus-player combat and verified ranked rewards are not available in this mode.</p>}
           <button
             type="button"
             onClick={onExit}

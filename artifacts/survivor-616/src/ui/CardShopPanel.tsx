@@ -1,3 +1,5 @@
+import { SupporterBar } from './SupporterBar';
+import { LokWalletStrip } from './LokWalletStrip';
 import { useState } from 'react';
 import {
   BarChart3,
@@ -9,6 +11,7 @@ import {
   PackageOpen,
   Sparkles,
   Swords,
+  Palette,
   RefreshCw,
   Flame,
   Info,
@@ -39,6 +42,8 @@ import type { CardPackId } from '@/game/types';
 import type { LokAssetManifest } from '@/game/lok/types';
 import { LockDeckCollection, CardDetail } from './LockDeckCollection';
 import { PackOpeningReveal } from './PackOpeningReveal';
+import { PackArt } from './CardCosmetics';
+import { SleeveCounter } from './SleeveCounter';
 import { ScreenLayout } from './ScreenLayout';
 import { LokDeckCardView, CardStyleToggle, type CardViewMode } from './LokDeckCardView';
 import { CardMatrixChartModal } from './CardMatrixChartModal';
@@ -71,16 +76,17 @@ const RECYCLE_VALUE: Record<string, number> = {
   secret: 40,
 };
 
-type ShopTab = 'binder' | 'singles' | 'salvage' | 'passive' | 'battle';
+type ShopTab = 'binder' | 'singles' | 'salvage' | 'passive' | 'battle' | 'sleeve';
 const SHOP_TABS: { id: ShopTab; label: string; icon: typeof PackageOpen }[] = [
   { id: 'binder', label: 'Lock Deck Binder', icon: PackageOpen },
   { id: 'singles', label: 'Singles Showcase', icon: Sparkles },
   { id: 'salvage', label: 'Card Recycle Depot', icon: RefreshCw },
   { id: 'passive', label: 'Passive Lock Deck', icon: Layers3 },
   { id: 'battle', label: 'Battle Deck', icon: Swords },
+  { id: 'sleeve', label: 'Sleeve Counter', icon: Palette },
 ];
 
-export function CardShopPanel({ onBack }: { onBack: () => void }) {
+export function CardShopPanel({ onBack, initialTab, onSignIn }: { onBack: () => void; initialTab?: ShopTab; onSignIn?: () => void }) {
   const {
     meta,
     buyCardPack,
@@ -95,7 +101,7 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
     clearCardPackReveal,
   } = useMeta();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
-  const [tab, setTab] = useState<ShopTab>('binder');
+  const [tab, setTab] = useState<ShopTab>(initialTab ?? 'binder');
   const [showAll, setShowAll] = useState(false);
   const [showMatrixModal, setShowMatrixModal] = useState(false);
   const [showOddsModal, setShowOddsModal] = useState(false);
@@ -184,6 +190,8 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
                 variant="holo"
                 size="compact"
                 mode={singlesViewMode}
+                customFrame={meta.selectedCardFrame}
+                motion={meta.cardMotion}
                 onClick={() => {
                   setInspectCard(card);
                   sfx.play('uiNav');
@@ -518,6 +526,8 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
 
   return (
     <ScreenLayout title="Lock Pack Counter" subtitle="The Neon Sleeve · Hideout location" onBack={onBack}>
+      <SupporterBar variant="inline" />
+      <LokWalletStrip onSignIn={onSignIn} />
       {/* Hero Banner with Card Credits & Action buttons */}
       <section
         className="relative mb-7 overflow-hidden border border-fuchsia-300/40 bg-[radial-gradient(circle_at_80%_15%,rgba(232,121,249,.22),transparent_38%),linear-gradient(135deg,rgba(8,47,73,.75),rgba(24,24,39,.94))] p-5 sm:p-7"
@@ -759,10 +769,16 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
             key={pack.id}
             className="flex min-h-56 w-[220px] shrink-0 snap-start flex-col border border-white/15 bg-black/30 p-4 sm:w-auto hover:border-white/35 transition-all"
           >
-            <span className="font-mono text-[9px] uppercase tracking-widest text-fuchsia-200">
-              {pack.cards} cards
-            </span>
-            <h3 className="mt-4 font-display text-lg font-black uppercase text-white">{pack.name}</h3>
+            {meta.selectedPackSkin !== 'pack-classic' ? (
+              <div className="mb-3">
+                <PackArt pack={pack} skin={meta.selectedPackSkin} motion={meta.cardMotion} />
+              </div>
+            ) : (
+              <span className="font-mono text-[9px] uppercase tracking-widest text-fuchsia-200">
+                {pack.cards} cards
+              </span>
+            )}
+            <h3 className={`${meta.selectedPackSkin !== 'pack-classic' ? 'mt-1' : 'mt-4'} font-display text-lg font-black uppercase text-white`}>{pack.name}</h3>
             <p className="mt-2 text-[10px] text-white/50 leading-relaxed">{pack.description}</p>
             <button
               type="button"
@@ -852,6 +868,8 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
         passiveSection
       ) : tab === 'battle' ? (
         battleSection
+      ) : tab === 'sleeve' ? (
+        <SleeveCounter onPlay={(sound) => sfx.play(sound)} />
       ) : (
         binderSection
       )}
@@ -882,7 +900,7 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
             aria-modal="true"
             onMouseDown={(e) => e.target === e.currentTarget && setShowOddsModal(false)}
           >
-            <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto border border-white/20 bg-[#0d0d15] p-5 shadow-2xl">
+            <div className="relative w-full max-w-xl max-h-[90dvh] overflow-y-auto border border-white/20 bg-[#0d0d15] p-5 shadow-2xl">
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div className="flex items-center gap-2">
                   <Dices className="h-5 w-5 text-amber-300" />
@@ -1046,6 +1064,8 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
         <PackOpeningReveal
           reveal={lastCardPackReveal}
           cardCredits={meta.cardCredits}
+          backId={meta.selectedCardBack}
+          cardMotion={meta.cardMotion}
           sfx={sfx}
           onOpenAnother={() => buyCardPack(lastCardPackReveal.packId)}
           onClose={clearCardPackReveal}
@@ -1057,6 +1077,8 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
         <CardDetail
           card={inspectCard}
           owned={owned.has(inspectCard.id)}
+          frame={meta.selectedCardFrame}
+          motion={meta.cardMotion}
           onClose={() => setInspectCard(null)}
         />
       )}

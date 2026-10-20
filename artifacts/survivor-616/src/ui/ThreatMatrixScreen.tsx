@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { ENEMIES } from '@/game/data/enemies';
 import { WEAPONS } from '@/game/data/weapons';
+import { isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
 import { PASSIVES } from '@/game/data/passives';
 import { useMeta, DEFAULT_THREAT_CALIBRATIONS } from '@/game/state/metaStore';
 import type {
@@ -181,7 +182,7 @@ export function ThreatMatrixScreen({ onBack }: ThreatMatrixScreenProps) {
   }, [enemySearch, selectedFaction]);
 
   const filteredWeapons = useMemo(() => {
-    return WEAPONS.filter((weapon) => {
+    return WEAPONS.filter((weapon) => !isGrpdPlayableWeapon(weapon.id)).filter((weapon) => {
       const matchesSearch =
         weapon.name.toLowerCase().includes(arsenalSearch.toLowerCase()) ||
         weapon.description.toLowerCase().includes(arsenalSearch.toLowerCase()) ||
@@ -209,7 +210,8 @@ export function ThreatMatrixScreen({ onBack }: ThreatMatrixScreenProps) {
   }, [arsenalSearch]);
 
   const activeEnemiesCount = ENEMIES.length - disabledEnemyIds.size;
-  const activeWeaponsCount = WEAPONS.length - disabledWeaponIds.size;
+  const fieldWeapons = WEAPONS.filter((weapon) => !isGrpdPlayableWeapon(weapon.id));
+  const activeWeaponsCount = fieldWeapons.filter((weapon) => !disabledWeaponIds.has(weapon.id)).length;
   const activePassivesCount = PASSIVES.length - disabledPassiveIds.size;
 
   const universalIncursionActive = Boolean(meta.threatUpgrades?.['universal-incursion']);
@@ -861,7 +863,7 @@ export function ThreatMatrixScreen({ onBack }: ThreatMatrixScreenProps) {
                       <Swords className="h-3.5 w-3.5" /> Weapons Arsenal ({filteredWeapons.length})
                     </h4>
                     <span className="font-mono text-[10px] text-white/40">
-                      Active: {activeWeaponsCount} / {WEAPONS.length}
+                      Active: {activeWeaponsCount} / {fieldWeapons.length}
                     </span>
                   </div>
 

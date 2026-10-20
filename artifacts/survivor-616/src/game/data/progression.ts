@@ -54,7 +54,7 @@ export const ALLIES: AllyDef[] = [
     room: 'main-floor',
     boost: { magnet: 18 },
     boostLabel: '+18 pickup range',
-    preferredActivityIds: ['sort-supplies', 'fortify-doors'],
+    preferredActivityIds: ['sort-supplies', 'fortify-doors', 'count-the-sheep'],
     palette: {
       ink: '#1a1208', body: '#d97706', bodyDark: '#78350f', accent: '#fbbf24',
       accentBright: '#fef3c7', skin: '#b45309', glow: '#fbbf24',
@@ -68,7 +68,7 @@ export const ALLIES: AllyDef[] = [
     room: 'main-floor',
     boost: { armor: 0.06, maxHp: 12 },
     boostLabel: '+6% armor, +12 max HP',
-    preferredActivityIds: ['fortify-doors', 'field-rations'],
+    preferredActivityIds: ['fortify-doors', 'field-rations', 'count-the-sheep'],
     palette: {
       ink: '#0d1117', body: '#475569', bodyDark: '#1e293b', accent: '#94a3b8',
       accentBright: '#e2e8f0', skin: '#64748b', glow: '#cbd5e1',
@@ -82,7 +82,7 @@ export const ALLIES: AllyDef[] = [
     room: 'rooftop-perch',
     boost: { speed: 8 },
     boostLabel: '+8 move speed',
-    preferredActivityIds: ['scout-routes', 'mark-approach-lanes'],
+    preferredActivityIds: ['scout-routes', 'mark-approach-lanes', 'chart-the-horde', 'raise-the-palings'],
     palette: {
       ink: '#1b0a1a', body: '#db2777', bodyDark: '#831843', accent: '#f9a8d4',
       accentBright: '#fce7f3', skin: '#9d174d', glow: '#f472b6',
@@ -96,7 +96,7 @@ export const ALLIES: AllyDef[] = [
     room: 'the-cellar',
     boost: { power: 0.08 },
     boostLabel: '+8% damage',
-    preferredActivityIds: ['tune-the-rig', 'study-anomalies'],
+    preferredActivityIds: ['tune-the-rig', 'study-anomalies', 'tune-the-moon'],
     palette: {
       ink: '#0a1410', body: '#0f766e', bodyDark: '#134e4a', accent: '#5eead4',
       accentBright: '#ccfbf1', skin: '#0d9488', glow: '#2dd4bf',
@@ -110,7 +110,7 @@ export const ALLIES: AllyDef[] = [
     room: 'main-floor',
     boost: { maxHp: 25 },
     boostLabel: '+25 max HP',
-    preferredActivityIds: ['field-rations', 'sort-supplies'],
+    preferredActivityIds: ['field-rations', 'sort-supplies', 'cook-the-last-feast'],
     palette: {
       ink: '#1a0f0a', body: '#b91c1c', bodyDark: '#7f1d1d', accent: '#fca5a5',
       accentBright: '#fee2e2', skin: '#92400e', glow: '#f87171',
@@ -124,7 +124,7 @@ export const ALLIES: AllyDef[] = [
     room: 'main-floor',
     boost: { area: 0.1 },
     boostLabel: '+10% area',
-    preferredActivityIds: ['scout-routes', 'study-anomalies'],
+    preferredActivityIds: ['cook-the-last-feast', 'count-the-sheep'],
     palette: {
       ink: '#22091a', body: '#db2777', bodyDark: '#831843', accent: '#f9a8d4',
       accentBright: '#fff0f7', skin: '#f6c9de', glow: '#ff9ecb',
@@ -138,7 +138,7 @@ export const ALLIES: AllyDef[] = [
     room: 'rooftop-perch',
     boost: { crit: 0.06, magnet: 8 },
     boostLabel: '+6% crit, +8 pickup range',
-    preferredActivityIds: ['scout-routes', 'mark-approach-lanes'],
+    preferredActivityIds: ['scout-routes', 'mark-approach-lanes', 'chart-the-horde', 'raise-the-palings'],
     palette: {
       ink: '#0b0b19', body: '#2d2a70', bodyDark: '#17153d', accent: '#a5b4fc',
       accentBright: '#eef2ff', skin: '#9a5b48', glow: '#c084fc',
@@ -152,7 +152,7 @@ export const ALLIES: AllyDef[] = [
     room: 'the-cellar',
     boost: { haste: -0.035, armor: 0.025 },
     boostLabel: '3.5% faster cooldowns, +2.5% armor',
-    preferredActivityIds: ['tune-the-rig', 'study-anomalies'],
+    preferredActivityIds: ['tune-the-rig', 'study-anomalies', 'tune-the-moon'],
     palette: {
       ink: '#11100d', body: '#435143', bodyDark: '#20291f', accent: '#b8d66b',
       accentBright: '#f1ffd0', skin: '#81533b', glow: '#d8ff7a',
@@ -166,7 +166,7 @@ export const ALLIES: AllyDef[] = [
     room: 'main-floor',
     boost: { maxHp: 14, lifesteal: 0.015 },
     boostLabel: '+14 max HP, +1.5% lifesteal',
-    preferredActivityIds: ['field-rations', 'sort-supplies'],
+    preferredActivityIds: ['field-rations', 'sort-supplies', 'cook-the-last-feast'],
     palette: {
       ink: '#1b0e12', body: '#a53d62', bodyDark: '#5c1c33', accent: '#ffb3c7',
       accentBright: '#fff0f4', skin: '#a85b43', glow: '#ff7ab8',
@@ -192,7 +192,7 @@ export const ALLIES: AllyDef[] = [
     room: 'main-floor',
     boost: { crit: 0.05 },
     boostLabel: '+5% crit',
-    preferredActivityIds: ['walk-the-block', 'keep-the-lookbook'],
+    preferredActivityIds: ['walk-the-block', 'keep-the-lookbook', 'count-the-sheep'],
     rigHint: 'cap',
     palette: {
       ink: '#040d1a', body: '#1d4ed8', bodyDark: '#1e3a8a', accent: '#60a5fa',
@@ -207,7 +207,7 @@ export const ALLIES: AllyDef[] = [
     room: 'the-alley',
     boost: { magnet: 16 },
     boostLabel: '+16 pickup range',
-    preferredActivityIds: ['run-the-numbers', 'paint-a-mural'],
+    preferredActivityIds: ['run-the-numbers', 'paint-a-mural', 'forge-the-banners'],
     rigHint: 'bulk',
     palette: {
       ink: '#171203', body: '#a16207', bodyDark: '#422006', accent: '#facc15',
@@ -222,7 +222,7 @@ export const ALLIES: AllyDef[] = [
     room: 'the-cellar',
     boost: { haste: -0.04 },
     boostLabel: '4% faster cooldowns',
-    preferredActivityIds: ['catalog-the-vinyl', 'tune-the-rig'],
+    preferredActivityIds: ['catalog-the-vinyl', 'tune-the-rig', 'mix-the-elixir'],
     rigHint: 'staff',
     palette: {
       ink: '#150e08', body: '#7c4a2d', bodyDark: '#3f2815', accent: '#d97757',
@@ -237,7 +237,7 @@ export const ALLIES: AllyDef[] = [
     room: 'main-floor',
     boost: { armor: 0.05 },
     boostLabel: '+5% armor',
-    preferredActivityIds: ['file-the-ledgers', 'mind-the-register'],
+    preferredActivityIds: ['file-the-ledgers', 'mind-the-register', 'count-the-sheep'],
     rigHint: 'halo',
     palette: {
       ink: '#1a170f', body: '#d4c19c', bodyDark: '#8a7550', accent: '#f5e6c8',
@@ -252,7 +252,7 @@ export const ALLIES: AllyDef[] = [
     room: 'the-alley',
     boost: { power: 0.07 },
     boostLabel: '+7% damage',
-    preferredActivityIds: ['weld-a-brace', 'sharpen-the-edges'],
+    preferredActivityIds: ['weld-a-brace', 'sharpen-the-edges', 'forge-the-banners'],
     rigHint: 'hunched',
     palette: {
       ink: '#0a140d', body: '#166534', bodyDark: '#14532d', accent: '#4ade80',
@@ -267,7 +267,7 @@ export const ALLIES: AllyDef[] = [
     room: 'the-back-room',
     boost: { crit: 0.05 },
     boostLabel: '+5% crit chance',
-    preferredActivityIds: ['rewire-the-cabinets', 'run-the-high-score-board'],
+    preferredActivityIds: ['rewire-the-cabinets', 'run-the-high-score-board', 'repair-the-cabinets'],
     rigHint: 'cap',
     palette: {
       ink: '#1a0e00', body: '#b45309', bodyDark: '#78350f', accent: '#fde047',
@@ -296,7 +296,7 @@ export const ALLIES: AllyDef[] = [
     room: 'grpd-station',
     boost: { armor: 0.03 },
     boostLabel: '+3% armor',
-    preferredActivityIds: ['run-the-drills'],
+    preferredActivityIds: ['run-the-drills', 'inspect-the-lockers'],
     rigHint: 'cap',
     palette: {
       ink: '#0a0f1a', body: '#1e3a5f', bodyDark: '#0b192c', accent: '#facc15',
@@ -311,7 +311,7 @@ export const ALLIES: AllyDef[] = [
     room: 'rapid-shelter',
     boost: { haste: -0.03 },
     boostLabel: '3% faster cooldowns',
-    preferredActivityIds: ['tune-the-rig', 'study-anomalies'],
+    preferredActivityIds: ['cycle-the-air', 'seal-the-hatches'],
     rigHint: 'hood',
     palette: {
       ink: '#052e16', body: '#166534', bodyDark: '#14532d', accent: '#22d3ee',
@@ -326,7 +326,7 @@ export const ALLIES: AllyDef[] = [
     room: 'rapid-shelter',
     boost: { speed: 5 },
     boostLabel: '+5 move speed',
-    preferredActivityIds: ['scout-routes', 'stretch-before-dawn'],
+    preferredActivityIds: ['relay-the-pressure', 'seal-the-hatches'],
     rigHint: 'puffs',
     palette: {
       ink: '#172554', body: '#1d4ed8', bodyDark: '#1e3a8a', accent: '#86efac',
@@ -341,7 +341,7 @@ export const ALLIES: AllyDef[] = [
     room: 'rapid-shelter',
     boost: { maxHp: 16 },
     boostLabel: '+16 max HP',
-    preferredActivityIds: ['fortify-doors', 'field-rations'],
+    preferredActivityIds: ['seal-the-hatches', 'cycle-the-air'],
     rigHint: 'bulk',
     palette: {
       ink: '#1c1917', body: '#57534e', bodyDark: '#292524', accent: '#facc15',
@@ -389,6 +389,7 @@ export function nextRescueAllyId(
 export const HUB_ROOMS: HubRoomDef[] = [
   {
     id: 'main-floor',
+    kind: 'hideout',
     name: 'The Sanctum',
     subtitle: 'Main floor',
     description:
@@ -396,10 +397,11 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/bar.jpeg',
     biome: 'sanctum',
     unlock: { kind: 'default' },
-    features: ['runs', 'roster', 'allies', 'settings', 'account', 'feedback'],
+    features: ['runs', 'roster', 'allies', 'lok-shop', 'settings', 'account', 'feedback'],
   },
   {
     id: 'rooftop-perch',
+    kind: 'hideout',
     name: 'The Perch',
     subtitle: 'Rooftop recovery deck',
     description:
@@ -407,10 +409,11 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/rooftops.jpeg',
     biome: 'rooftop',
     unlock: { kind: 'discovery', discoveryId: 'alley-hatch' },
-    features: ['runs', 'recovery', 'bestiary', 'unlocks', 'settings', 'palette-store', 'account', 'feedback'],
+    features: ['runs', 'recovery', 'bestiary', 'unlocks', 'settings', 'palette-store', 'lok-shop', 'account', 'feedback'],
   },
   {
     id: 'the-cellar',
+    kind: 'hideout',
     name: 'The Cellar',
     subtitle: 'Hidden room',
     description:
@@ -422,6 +425,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-alley',
+    kind: 'hideout',
     name: 'The Alley Annex',
     subtitle: 'Back-door workshop',
     description:
@@ -433,6 +437,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-storefront',
+    kind: 'travel',
     name: 'The Neon Sleeve',
     subtitle: 'The Neon Sleeve',
     description:
@@ -446,6 +451,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'studio-28',
+    kind: 'travel',
     name: 'Studio 28',
     subtitle: 'One-screen picture house',
     description:
@@ -460,6 +466,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-back-room',
+    kind: 'hideout',
     name: 'The Back Room',
     subtitle: 'Salvaged cabinet row',
     description:
@@ -471,6 +478,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-sound-booth',
+    kind: 'hideout',
     name: 'The Sound Booth',
     subtitle: 'Patch bay and foldback',
     description:
@@ -484,6 +492,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'grpd-station',
+    kind: 'travel',
     name: 'GRPD Station',
     subtitle: 'Division St.',
     description:
@@ -501,6 +510,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'grpd-vault',
+    kind: 'travel',
     name: 'The Vault',
     subtitle: 'Sealed evidence room',
     description:
@@ -512,6 +522,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'rapid-shelter',
+    kind: 'travel',
     name: 'Rapid Shelter',
     subtitle: 'Digi-Arch safe side',
     description:
@@ -550,6 +561,11 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'bubble-wash-cleanse', name: 'The Bubble Wash Cleanse', blurb: 'A siren-triggered wall of suds that scours the whole basin clean twice a shift, whether or not anyone is still standing in it.' },
   { id: 'digital-soul-core', name: 'The Digital Soul Core', blurb: "A crystallized fragment of every human essence The Director's foundry has compiled so far. It hums when it recognizes a name." },
   { id: 'tree-null-log', name: 'The Tree Null Log', blurb: "A growth ring cut from Yggdrasil Null's trunk, its rings encoded instead of counted -- one bio-digital season per line." },
+  { id: 'floodline-breach-log', name: 'Floodline Exchange Ledger', blurb: 'A transit ledger that kept printing 616 after the roots reached the platforms.' },
+  { id: 'gen-fitting-floor-log', name: 'Fitting Floor Swatch Book', blurb: 'A swatch book of palettes, skins and hats that kept adding pages while the floor was being repainted around it.' },
+  { id: 'glassroot-annex-log', name: 'Glassroot Field Note', blurb: 'A field note mapping false trees around the buried shrine.' },
+  { id: 'breach-616-plate', name: 'The 616 Plate', blurb: 'A fractured station plate found under the Floodline relays. Its rain-worn number follows you home.' },
+  { id: 'transit-coil-found', name: 'The Transit Coil', blurb: 'An intact rail coil that powers the Catenary Harpoon.' },
   { id: 'grpd-station-found', name: 'GRPD Station — Division St.', blurb: 'A precinct nobody decommissioned on paper. The lights are still department-metered.' },
   { id: 'rapid-pressure-rooms-cleared', name: 'Rapid Shelter Reconnected', blurb: 'The Data-Gobs scattered, the pressure doors opened, and one Digi-Arch finally held a route long enough to bring the trapped Rapids through.' },
   { id: 'supabuilda-belt', name: 'Supabuilda Championship Belt', blurb: 'A scarred heavyweight belt taken from the Main Event Rack after the Heavy Floor finally went quiet.' },

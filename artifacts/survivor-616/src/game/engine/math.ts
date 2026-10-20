@@ -47,6 +47,11 @@ export interface Aabb {
   y: number;
   w: number;
   h: number;
+  /**
+   * Collision-only flag (page overlay): the player is stopped by this box, but enemies walk through it,
+   * and so does the player while dashing. Lets web-page text be solid to the hero without jamming a horde.
+   */
+  soft?: boolean;
 }
 
 /** Whether a circle overlaps an axis-aligned box, with no side effects. */

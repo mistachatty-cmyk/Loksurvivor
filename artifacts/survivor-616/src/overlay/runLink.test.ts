@@ -35,3 +35,21 @@ test('the report URL puts the run in the fragment (never sent to a server) and n
   assert.equal(new URL(url).search, '', 'nothing in the query string');
   assert.ok(!/(http|www|\.com)/i.test(decodeURIComponent(url.split('#r=')[1]!)), 'payload carries no address');
 });
+
+test('teardown numbers ride along as an optional x field and keep the fragment far under the hub limit', () => {
+  const roles = { text: 99999, link: 99999, heading: 99999, button: 99999, image: 99999, frame: 99999, input: 99999, box: 99999 };
+  const summary = {
+    destroyedPct: 100,
+    kills: 999999,
+    level: 999,
+    elapsedSec: 86400,
+    teardown: { roles, words: 9_999_999, px: 9e12, biggest: 9e9, combo: 99999 },
+  };
+  const encoded = encodeReport(summary, 'data-weaver-lyra');
+  assert.ok(encoded.length < 480, `fragment is ${encoded.length} chars; the hub accepts at most 512`);
+  const decoded = decode(encoded) as { v: number; pct: number; x: { r: Record<string, number> } };
+  assert.equal(decoded.v, 1, 'the version stays 1 so an older hub still opens the link');
+  assert.equal(decoded.x.r.t, 99999);
+  assert.equal(Object.keys(decoded.x.r).length, 8);
+  assert.equal('x' in reportPayload({ destroyedPct: 5, kills: 1, level: 1, elapsedSec: 1 }), false, 'no teardown, no x');
+});

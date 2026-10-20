@@ -30,6 +30,7 @@ async function signInWithProvider(
   client: SupabaseClient,
   provider: OAuthProvider,
   redirectTo?: string,
+  hooks?: { onFramed?: () => void },
 ) {
   const framed = typeof window !== "undefined" && window.self !== window.top;
   const target =
@@ -40,6 +41,7 @@ async function signInWithProvider(
   });
   if (framed && result.data?.url && !result.error) {
     try {
+      hooks?.onFramed?.();
       window.top!.location.href = result.data.url;
     } catch {
       return {
@@ -53,12 +55,21 @@ async function signInWithProvider(
   return result;
 }
 
-export function signInWithGoogle(client: SupabaseClient, redirectTo?: string) {
-  return signInWithProvider(client, "google", redirectTo);
+/** `hooks.onFramed` runs just before the top window is sent to the provider. */
+export function signInWithGoogle(
+  client: SupabaseClient,
+  redirectTo?: string,
+  hooks?: { onFramed?: () => void },
+) {
+  return signInWithProvider(client, "google", redirectTo, hooks);
 }
 
-export function signInWithApple(client: SupabaseClient, redirectTo?: string) {
-  return signInWithProvider(client, "apple", redirectTo);
+export function signInWithApple(
+  client: SupabaseClient,
+  redirectTo?: string,
+  hooks?: { onFramed?: () => void },
+) {
+  return signInWithProvider(client, "apple", redirectTo, hooks);
 }
 
 export async function signOut(client: SupabaseClient) {

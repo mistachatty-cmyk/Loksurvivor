@@ -143,7 +143,7 @@ export function CardMatrixChartModal({
       aria-label="LokDex Multi-Variable Matrix Chart"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden border border-white/20 bg-[#0a0a10] shadow-2xl">
+      <div className="relative flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden border border-white/20 bg-[#0a0a10] shadow-2xl">
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-white/10 bg-white/[.02] p-4 sm:px-6">
           <div className="flex items-center gap-3">

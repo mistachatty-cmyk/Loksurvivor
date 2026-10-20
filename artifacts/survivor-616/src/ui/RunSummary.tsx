@@ -5,10 +5,12 @@
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { ENEMIES_BY_ID } from '@/game/data/enemies';
+import { ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
 import { ALLIES_BY_ID, DISCOVERIES_BY_ID } from '@/game/data/progression';
 import { LOKPET_ELEMENT_COLORS, LOKPET_RARITY_COLORS, LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { CITY_RELICS_BY_ID, RELIC_RECIPES } from '@/game/data/relics';
 import { SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
+import { BODY_PLAN_BY_ID, THEME_BY_ID, definingTraits, feelLabel, rollCreature } from '@/game/data/creatureTraits';
 import type { AreaDef, LokPetRunDiscovery, RunResult } from '@/game/types';
 import type { RunHighlightKind } from '@/game/data/runHighlights';
 import { ScreenLayout } from './ScreenLayout';
@@ -159,6 +161,9 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
   const discovery = result.cleared && result.discoveryId ? DISCOVERIES_BY_ID[result.discoveryId] : undefined;
   const lokPets = result.lokPets ?? [];
   const lokPetDiscoveries = result.lokPetDiscoveries ?? [];
+  const fieldCreature = result.fieldCreatureSeed
+    ? rollCreature(result.fieldCreatureSeed, { tier: 'wild', findability: 'common' })
+    : undefined;
   const hasLokPetProgress = lokPets.length > 0;
   const rumorAlly = result.crewRumor ? ALLIES_BY_ID[result.crewRumor.allyId] : undefined;
   const RumorIcon = result.crewRumor ? (RUMOR_ICONS[result.crewRumor.icon] ?? Sparkles) : Sparkles;
@@ -180,6 +185,29 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
       className={positive ? 'border-t-8 border-primary' : 'border-t-8 border-destructive'}
     >
       <div className="max-w-4xl mx-auto w-full space-y-8 mt-4">
+
+        {fieldCreature ? (
+          <section className="border border-violet-300/35 bg-violet-950/15 p-5" data-testid="section-field-creature-discovery">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-violet-200">New field specimen · {area.name}</p>
+            <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="grid h-16 w-16 shrink-0 place-items-center border border-violet-200/35 bg-violet-300/10 font-mono text-[9px] font-black uppercase text-violet-100" aria-hidden="true">
+                {(BODY_PLAN_BY_ID[fieldCreature.plan]?.noun ?? fieldCreature.plan).slice(0, 3)}
+              </div>
+              <div>
+                <h2 className="text-xl font-black uppercase text-white">{fieldCreature.name}</h2>
+                <p className="text-xs uppercase tracking-wider text-violet-100/70">{BODY_PLAN_BY_ID[fieldCreature.plan]?.noun ?? fieldCreature.plan} · {feelLabel(fieldCreature.traits)}</p>
+                <p className="mt-1 text-xs leading-relaxed text-white/70">{THEME_BY_ID[fieldCreature.themes[0] ?? '']?.blurb ?? 'A new creature has left a trace in this district.'}</p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {definingTraits(fieldCreature.traits, 4).map(({ axis, value }) => (
+                <span key={axis.id} className="border border-violet-200/20 bg-black/25 px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-violet-100">{axis.label} {value}/5</span>
+              ))}
+              {fieldCreature.quirks.slice(0, 2).map((quirk) => <span key={quirk} className="border border-white/10 px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-white/60">{quirk.replace(/-/g, ' ')}</span>)}
+            </div>
+            <p className="mt-3 font-mono text-[9px] uppercase tracking-wider text-violet-200/70">Catalogued in the Bestiary · traits are flavor and do not change battle stats</p>
+          </section>
+        ) : null}
 
         {mission ? (
           <section
@@ -676,6 +704,26 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Quirks this run */}
+        {(result.quirkSurgeSurvived || (result.killsByQuirk && Object.keys(result.killsByQuirk).length > 0)) && (
+          <div className="border border-border bg-card p-6" data-testid="section-run-quirks">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4">Quirks Defeated</h2>
+            <div className="flex flex-wrap gap-3">
+              {result.quirkSurgeSurvived && (
+                <div className="border border-fuchsia-300 px-3 py-2 font-mono text-xs uppercase text-fuchsia-200" data-testid="chip-surge-survived">Surge survived</div>
+              )}
+              {Object.entries(result.killsByQuirk ?? {}).sort((a, b) => b[1] - a[1]).map(([quirkId, count]) => {
+                const quirk = ENEMY_QUIRKS_BY_ID[quirkId];
+                return (
+                  <div key={quirkId} className="border px-3 py-2 font-mono text-xs uppercase" style={{ borderColor: quirk?.color ?? '#64748b', color: quirk?.color ?? '#cbd5e1' }}>
+                    {quirk?.name ?? quirkId} <span className="text-white/80">x{count}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

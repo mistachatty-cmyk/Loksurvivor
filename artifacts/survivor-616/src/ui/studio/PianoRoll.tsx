@@ -7,9 +7,9 @@
  * move a note.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { StudioNote, StudioTrack } from '@/game/audio/studio/project';
+import { flattenTrackNotes, type StudioNote, type StudioTrack } from '@/game/audio/studio/project';
 
 /** Two octaves is what fits on a phone and covers a part; scroll is the escape. */
 const LOW_PITCH = 48; // C3
@@ -38,6 +38,8 @@ export interface PianoRollProps {
   onAddNote: (note: Omit<StudioNote, 'id'>) => void;
   onMoveNote: (noteId: string, pitch: number, startBeat: number) => void;
   onRemoveNote: (noteId: string) => void;
+  onPatchNote: (noteId: string, patch: { lengthBeats?: number; velocity?: number }) => void;
+  onQuantize: () => void;
 }
 
 interface DragState {
@@ -53,11 +55,15 @@ export function PianoRoll({
   onAddNote,
   onMoveNote,
   onRemoveNote,
+  onPatchNote,
+  onQuantize,
 }: PianoRollProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const dragPositionRef = useRef<{ pitch: number; beat: number } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const notes = useMemo(() => flattenTrackNotes(track), [track]);
+  const selectedNote = notes.find((note) => note.id === selectedId);
   /** Length used for the next drawn note, inherited from the last one. */
   const lastLengthRef = useRef(1);
 
@@ -125,7 +131,7 @@ export function PianoRoll({
       }
 
       // --- notes ---
-      for (const note of track.notes) {
+      for (const note of notes) {
         const dragging = dragRef.current?.noteId === note.id;
         const position = dragging ? dragPositionRef.current : null;
         const pitch = position ? position.pitch : note.pitch;
@@ -167,10 +173,10 @@ export function PianoRoll({
 
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [track, beatsPerBar, playing, selectedId, playheadRef]);
+  }, [notes, beatsPerBar, playing, selectedId, playheadRef]);
 
   const hitTest = (pitch: number, beat: number) =>
-    track.notes.find(
+    notes.find(
       (note) => note.pitch === pitch && beat >= note.startBeat && beat <= note.startBeat + note.lengthBeats,
     );
 
@@ -254,7 +260,12 @@ export function PianoRoll({
         >
           Delete note
         </button>
+        <button type="button" onClick={onQuantize} className="border border-border px-2 py-1 text-[10px] font-bold uppercase text-white">Quantize</button>
       </div>
+      {selectedNote && <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <label>Length <input type="number" min="0.25" step="0.25" value={selectedNote.lengthBeats} onChange={(event) => onPatchNote(selectedNote.id, { lengthBeats: Number(event.target.value) })} className="w-16 border border-border bg-background px-1 text-white" /> beats</label>
+        <label>Velocity <input type="range" min="0" max="1" step="0.05" value={selectedNote.velocity} onChange={(event) => onPatchNote(selectedNote.id, { velocity: Number(event.target.value) })} /> {Math.round(selectedNote.velocity * 100)}%</label>
+      </div>}
       <div className="overflow-x-auto">
         <canvas
           ref={canvasRef}

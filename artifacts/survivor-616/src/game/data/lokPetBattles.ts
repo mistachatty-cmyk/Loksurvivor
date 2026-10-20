@@ -764,6 +764,60 @@ export function getElementalMultiplier(attackElement: LokPetElement, defenderEle
   return { multiplier: 1.0 };
 }
 
+/** Street EnemyDef role -> battle element. Role is a closed, reusable union, the strongest signal an EnemyDef carries for this. */
+const ROLE_ELEMENT: Partial<Record<'anchor' | 'flanker' | 'sniper' | 'carrier' | 'swarm' | 'disruptor' | 'skirmisher' | 'spitter' | 'heavy' | 'boss', LokPetElement>> = {
+  sniper: 'volt',
+  spitter: 'glitch',
+  heavy: 'terra',
+  flanker: 'aero',
+  disruptor: 'slow',
+  carrier: 'freeze',
+  skirmisher: 'fire',
+  boss: 'dark',
+  swarm: 'light',
+  anchor: 'terra',
+};
+
+/**
+ * Deterministic battle element for a street EnemyDef, derived from its own
+ * data (role first, family/faction keyword fallback) rather than hashing
+ * its name string. Two enemies with the same role always share an element;
+ * different roles read as different kinds of fights.
+ */
+export function enemyBattleElement(enemy: { role?: keyof typeof ROLE_ELEMENT; family?: string; faction?: string }): LokPetElement {
+  if (enemy.role && ROLE_ELEMENT[enemy.role]) return ROLE_ELEMENT[enemy.role]!;
+  const text = `${enemy.family ?? ''} ${enemy.faction ?? ''}`.toLowerCase();
+  if (text.includes('fire') || text.includes('cinder') || text.includes('ember')) return 'fire';
+  if (text.includes('frost') || text.includes('ice') || text.includes('chill')) return 'freeze';
+  if (text.includes('watch') || text.includes('static')) return 'volt';
+  return 'none';
+}
+
+/**
+ * Battle-engine hook for a legendary variant's named `specialAbility` string
+ * (overworld-only until now). Partial coverage is intentional and additive --
+ * an unmapped specialAbility simply does nothing extra in battle.
+ */
+export type SpecialAbilityBattlePassive =
+  | { kind: 'empower-on-crit'; value: number }
+  | { kind: 'shield-on-low-hp'; threshold: number; value: number }
+  | { kind: 'leech-on-hit'; value: number };
+
+export const SPECIAL_ABILITY_BATTLE_PASSIVE: Partial<Record<string, SpecialAbilityBattlePassive>> = {
+  'tri-laser': { kind: 'empower-on-crit', value: 15 },
+  'thunder-claw': { kind: 'empower-on-crit', value: 15 },
+  'plasma-orbit': { kind: 'empower-on-crit', value: 12 },
+  'kirin-thunder': { kind: 'empower-on-crit', value: 18 },
+  'silicon-shield': { kind: 'shield-on-low-hp', threshold: 0.3, value: 40 },
+  'firewall-curl': { kind: 'shield-on-low-hp', threshold: 0.3, value: 40 },
+  'seraph-radiance': { kind: 'shield-on-low-hp', threshold: 0.35, value: 35 },
+  'rebirth-burst': { kind: 'shield-on-low-hp', threshold: 0.3, value: 45 },
+  'null-consume': { kind: 'leech-on-hit', value: 8 },
+  'singularity-drain': { kind: 'leech-on-hit', value: 10 },
+  'abyss-crush': { kind: 'leech-on-hit', value: 8 },
+  'mite-swarm': { kind: 'leech-on-hit', value: 6 },
+};
+
 /** Trinkets that can be equipped onto pets in the kennel / arena preparation. */
 export const BATTLE_TRINKETS: LokPetTrinketDef[] = [
   {

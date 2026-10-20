@@ -3,6 +3,7 @@ import type { CharacterDef, SpriteRig } from '@/game/types';
 import { palette } from './authoring';
 import { REACTION_PRESETS } from './reactivity';
 import { registerForgedOperators } from '@/game/data/forgedOperators';
+import { CHARACTER_CREATOR_OPERATORS } from '@/game/data/forgeFive';
 
 /** Static Nomad's rig: a cloud-afro head, metallic arms and a flared trouser stance, plus a floating electrified trail. */
 function staticNomadRig(): SpriteRig {
@@ -2392,6 +2393,7 @@ export const CHARACTERS: CharacterDef[] = [
     signatureTraits: ['Optic Harmony', '+30% Elemental Light Synergy'],
     unlock: { kind: 'default' },
   },
+  ...CHARACTER_CREATOR_OPERATORS,
 ];
 
 export const CHARACTERS_BY_ID: Record<string, CharacterDef> = Object.fromEntries(

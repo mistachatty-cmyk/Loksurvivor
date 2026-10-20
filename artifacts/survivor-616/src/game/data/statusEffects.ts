@@ -3,6 +3,16 @@ import type { StatusEffectDef } from '@/game/types';
 /** The single source of truth for combat status-effect behaviour and copy. */
 export const STATUS_EFFECTS: StatusEffectDef[] = [
   {
+    id: 'sticky', name: 'Sticky',
+    description: 'DigiFrog residue clings to the target and briefly slows movement.',
+    color: '#9afa99', durationMs: 2400, maxStacks: 1, speedMultiplier: 0.72,
+  },
+  {
+    id: 'grossed-out', name: 'Grossed Out',
+    description: 'Nearby enemies stop and squirm after seeing a sticky collision.',
+    color: '#d5f77e', durationMs: 650, maxStacks: 1, speedMultiplier: 0,
+  },
+  {
     id: 'freeze',
     name: 'Freeze',
     description: 'Locks an enemy in place. Reapplying refreshes the duration and adds a stack.',

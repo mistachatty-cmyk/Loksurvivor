@@ -23,19 +23,21 @@ test('the customization shop has twenty new palettes and a deep animated collect
   }
 });
 
-test('run auras cover six paid styles across multiple cosmetic tiers', () => {
-  assert.equal(RUN_AURAS.filter((aura) => aura.cost > 0).length, 6);
+test('run auras cover eight paid styles across multiple cosmetic tiers', () => {
+  assert.equal(RUN_AURAS.filter((aura) => aura.cost > 0).length, 8);
   assert.equal(new Set(RUN_AURAS.map((aura) => aura.id)).size, RUN_AURAS.length);
   assert.deepEqual(new Set(RUN_AURAS.map((aura) => aura.tier)), new Set(['standard', 'uncommon', 'rare', 'legendary']));
 });
 
-test('every fighter has five distinct personal skins and the last is episode-gated', () => {
+test('every fighter has eleven distinct personal skins with episode, crew, and lifetime mastery earnables', () => {
   for (const character of CHARACTERS) {
     const skins = getCharacterSkins(character);
-    assert.equal(skins.length, 5);
-    assert.equal(new Set(skins.map((skin) => skin.id)).size, 5);
+    assert.equal(skins.length, 11);
+    assert.equal(new Set(skins.map((skin) => skin.id)).size, 11);
     assert.equal(skins.filter((skin) => skin.episodeRequired).length, 1);
-    assert.equal(new Set(skins.map((skin) => skin.palette.body)).size, 5);
+    assert.deepEqual(skins.filter((skin) => skin.crewRequired).map((skin) => skin.crewRequired), [3, 8]);
+    assert.deepEqual(skins.filter((skin) => skin.totalKillsRequired).map((skin) => skin.totalKillsRequired), [616, 6160, 16160]);
+    assert.equal(skins.filter((skin) => skin.tier === 'ultimate').length, 3);
   }
 
   const character = CHARACTERS[0]!;
@@ -46,6 +48,9 @@ test('every fighter has five distinct personal skins and the last is episode-gat
   const unlockedMeta = { ...createInitialMeta(), completedEpisodeIds: [episode.id] };
   const unlocked = reducer({ meta: unlockedMeta, lastRun: null }, { type: 'selectCharacterSkin', characterId: character.id, skinId: episodeSkin.id });
   assert.equal(unlocked.meta.characterSkinByCharacterId[character.id], episodeSkin.id);
+  const crewSkin = getCharacterSkins(character).find((skin) => skin.crewRequired === 3)!;
+  const crewLocked = reducer({ meta: createInitialMeta(), lastRun: null }, { type: 'selectCharacterSkin', characterId: character.id, skinId: crewSkin.id });
+  assert.equal(crewLocked.meta.characterSkinByCharacterId[character.id], undefined);
 });
 
 test('aura purchases charge once and only owned auras can be equipped', () => {
@@ -73,7 +78,7 @@ test('version ten Lookbook-era saves migrate without carrying portable customiza
     version: 10,
     customizationLooks: [{ id: 'old-lookbook-record' }],
   } as ReturnType<typeof createInitialMeta> & { customizationLooks: unknown[] });
-  assert.equal(migrated.version, 22);
+  assert.equal(migrated.version, createInitialMeta().version);
   assert.equal('customizationLooks' in migrated, false);
   assert.deepEqual(migrated.ownedRunAuraIds, ['street-halo']);
   assert.equal(migrated.activeRunAuraId, 'street-halo');

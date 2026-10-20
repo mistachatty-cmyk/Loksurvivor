@@ -6,6 +6,8 @@ import { AREAS_DISCO } from './areas-disco';
 import { WEIRD_AREAS, BONUS_DIGIVERSE_AREAS } from './areas-weird';
 import { AREAS_ENDLESS } from './areas-endless';
 import { AREAS_NULL_SECTOR } from './areas-null-sector';
+import { AREAS_BREACH } from './areas-breach';
+import { AREAS_GEN } from './areas-gen';
 import { squadWave } from './authoring';
 
 /**
@@ -62,6 +64,7 @@ export const AREAS: AreaDef[] = [
       { fromSec: 76, toSec: 120, enemyId: 'corner-cutter', ratePerSec: 0.42, burst: 1, formation: 'pincer', faction: 'Afterimage Choir' },
       { fromSec: 90, toSec: 120, enemyId: 'curb-stomper', ratePerSec: 0.1, burst: 1 },
       { fromSec: 95, toSec: 120, enemyId: 'crypt-bouncer', ratePerSec: 0.12, burst: 1 },
+      { fromSec: 102, toSec: 120, enemyId: 'kennel-marshal', ratePerSec: 0.035, burst: 1 },
       squadWave({ fromSec: 30, toSec: 120, factionId: 'the-watch', ratePerSec: 0.25, formation: 'ring' }),
     ],
     musicEvents: [
@@ -1088,6 +1091,8 @@ export const AREAS: AreaDef[] = [
   ...AREAS_CLASSIC,
   ...AREAS_DISCO,
   ...AREAS_NULL_SECTOR,
+  ...AREAS_BREACH,
+  ...AREAS_GEN,
 ];
 
 export const AREAS_BY_ID: Record<string, AreaDef> = Object.fromEntries(

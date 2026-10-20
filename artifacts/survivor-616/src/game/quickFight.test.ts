@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BATTLE_MOVES } from './data/lokPetBattles';
+import { BATTLE_MOVES, enemyBattleElement } from './data/lokPetBattles';
 import { rollLokPet } from './data/lokPets';
 import { ENEMIES_BY_ID } from './data/enemies';
 import { moveMatchup, statusChips, describeIntent } from './engine/battleClarity';
@@ -8,19 +8,27 @@ import {
   ASSIST_SCALE,
   DEEP_TURN_CAP,
   QUICK_MAX_MOVES,
+  buildQuickOpponent,
   cheerQuickFight,
   QUICK_TURN_CAP,
   createQuickFight,
   quickFightOutcome,
   stepQuickFight,
+  switchQuickFight,
+  switchTargets,
   trimQuickMoves,
 } from './engine/quickFight';
 import { buildTravelEncounterResultFromOutcome, type ResolvedTravelEncounterOpponent } from './travelEncounter';
 import { lokPetRig, lokPetSpritePalette } from './data/lokPets';
+import type { SavedLokPet } from './types';
 
 function enemyOpponent(): ResolvedTravelEncounterOpponent {
   const enemy = Object.values(ENEMIES_BY_ID)[0]!;
   return { kind: 'enemy', name: enemy.name, hp: enemy.hp, damage: enemy.damage, rig: enemy.rig, palette: enemy.palette, enemyId: enemy.id };
+}
+
+function enemyOpponentWithRole(role: ResolvedTravelEncounterOpponent['enemyRole']): ResolvedTravelEncounterOpponent {
+  return { ...enemyOpponent(), enemyRole: role };
 }
 
 function petOpponent(): ResolvedTravelEncounterOpponent {
@@ -126,6 +134,22 @@ test('stepping a finished fight does nothing', () => {
   assert.equal(stepQuickFight(qf, qf.battle.playerTeam[0]!.moves[0]!.id), qf);
 });
 
+test('street enemies with different roles fight differently, not just with different numbers', () => {
+  const sniper = enemyOpponentWithRole('sniper');
+  const heavy = enemyOpponentWithRole('heavy');
+  // Same hp/damage on both -- any difference below comes from role, not stats.
+  const sniperPet = buildQuickOpponent(sniper, 10, enemyBattleElement({ role: sniper.enemyRole }));
+  const heavyPet = buildQuickOpponent(heavy, 10, enemyBattleElement({ role: heavy.enemyRole }));
+  assert.notEqual(sniperPet.element, heavyPet.element);
+  assert.notEqual(sniperPet.moves.map((m) => m.id).join(','), heavyPet.moves.map((m) => m.id).join(','));
+});
+
+test('a street enemy with no role falls back to the old generic pool', () => {
+  const pet = buildQuickOpponent(enemyOpponent(), 10, 'none');
+  assert.equal(pet.element, 'none');
+  assert.ok(pet.moves.length > 0);
+});
+
 test('outcome rewards match the classic encounter rules', () => {
   const pet = petOpponent();
   const won = buildTravelEncounterResultFromOutcome('won', pet, () => 0);
@@ -225,4 +249,72 @@ test('a heal assist restores the pet', () => {
   const strike = qf.battle.playerTeam[0]!.moves.find((move) => move.energyCost === 0)!;
   const next = stepQuickFight(qf, strike.id, Math.random, { kind: 'card', label: 'Ally Card', damage: 0, heal: 6 });
   assert.ok(next.lastRoundLog.some((line) => line.includes('patches')));
+});
+
+function savedPet(id: string, seed: number): SavedLokPet {
+  return { id, roll: rollLokPet(() => seed), stamina: 3, level: 5, exp: 0, battlesWon: 0, battlesFought: 0 };
+}
+
+test('Duo and Arena can bring a team, but a quick fight stays one pet', () => {
+  const pets = [savedPet('a', 0.1), savedPet('b', 0.4), savedPet('c', 0.7)];
+  const team = createQuickFight({ opponent: enemyOpponent(), playerPets: pets, maxTeam: 3, depth: 'deep' });
+  assert.equal(team.battle.playerTeam.length, 3);
+  assert.equal(team.battle.activePlayerIndex, 0);
+  assert.ok(team.battle.playerTeam.every((pet) => pet.energy >= 30));
+  const capped = createQuickFight({ opponent: enemyOpponent(), playerPets: pets, maxTeam: 2, depth: 'quick' });
+  assert.equal(capped.battle.playerTeam.length, 2);
+  const single = createQuickFight({ opponent: enemyOpponent(), playerPets: pets });
+  assert.equal(single.battle.playerTeam.length, 1);
+});
+
+test('switching costs the turn: the opponent plays its telegraphed move on the new pet', () => {
+  const pets = [savedPet('a', 0.1), savedPet('b', 0.4)];
+  const qf = createQuickFight({ opponent: enemyOpponent(), playerPets: pets, maxTeam: 2, depth: 'deep', rand: () => 0.5 });
+  assert.deepEqual(switchTargets(qf), [1]);
+  const next = switchQuickFight(qf, 1, () => 0.5);
+  assert.equal(next.battle.activePlayerIndex, 1);
+  assert.equal(next.battle.turn, qf.battle.turn + 1);
+  assert.ok(next.lastRoundLog.some((line) => /Switched active companion/.test(line)));
+  assert.equal(qf.battle.activePlayerIndex, 0, 'does not mutate the previous state');
+  // The old lead is now the only swap target.
+  assert.deepEqual(switchTargets(next), [0]);
+});
+
+test('switching is refused for the active pet, a fainted pet, or after the fight ends', () => {
+  const pets = [savedPet('a', 0.1), savedPet('b', 0.4)];
+  const qf = createQuickFight({ opponent: enemyOpponent(), playerPets: pets, maxTeam: 2, depth: 'deep' });
+  assert.equal(switchQuickFight(qf, 0), qf);
+  assert.equal(switchQuickFight(qf, 5), qf);
+  const down = structuredClone(qf);
+  down.battle.playerTeam[1]!.fainted = true;
+  assert.equal(switchQuickFight(down, 1), down);
+  const over = structuredClone(qf);
+  over.battle.phase = 'victory';
+  assert.equal(switchQuickFight(over, 1), over);
+});
+
+test('a fainted lead sends in a teammate and the fight goes on until the whole team is down', () => {
+  const pets = [savedPet('a', 0.1), savedPet('b', 0.4)];
+  const qf = createQuickFight({ opponent: enemyOpponent(), playerPets: pets, maxTeam: 2, depth: 'deep', rand: () => 0.5 });
+  qf.battle.playerTeam[0]!.hp = 1;
+  qf.battle.enemyTeam[0]!.hp = qf.battle.enemyTeam[0]!.maxHp = 100000;
+  qf.battle.enemyTeam[0]!.attack = 100000;
+  const free = qf.battle.playerTeam[0]!.moves.find((move) => move.energyCost === 0)!;
+  const next = stepQuickFight(qf, free.id, () => 0.5);
+  assert.equal(quickFightOutcome(next), 'active');
+  assert.equal(next.battle.playerTeam[0]!.fainted, true);
+  assert.equal(next.battle.activePlayerIndex, 1);
+  // With the last pet gone the fight is lost.
+  const last = structuredClone(next);
+  last.battle.playerTeam[1]!.hp = 1;
+  const lost = stepQuickFight(last, free.id, () => 0.5);
+  assert.equal(quickFightOutcome(lost), 'lost');
+});
+
+test('rewards do not depend on how many pets were brought', () => {
+  const opponent = petOpponent();
+  const one = buildTravelEncounterResultFromOutcome('won', opponent, () => 0.99);
+  const qf = createQuickFight({ opponent, playerPets: [savedPet('a', 0.1), savedPet('b', 0.4)], maxTeam: 2, depth: 'deep' });
+  assert.equal(quickFightOutcome(qf), 'active');
+  assert.deepEqual(buildTravelEncounterResultFromOutcome('won', opponent, () => 0.99), one);
 });
