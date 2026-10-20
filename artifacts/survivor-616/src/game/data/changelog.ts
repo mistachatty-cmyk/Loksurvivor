@@ -1610,6 +1610,28 @@ export const CHANGELOG: ChangelogEntry[] = [
       'With reduced motion on, collected skeleton keys now sit still above you and simply fade out, with no spring, wobble, rise or trailing.',
     ],
   },
+  {
+    version: '0.42.2',
+    date: '2026-10-20',
+    publishedAt: '2026-10-20T22:00:00Z',
+    kind: 'update',
+    title: 'Your Play Time Counts',
+    body: [
+      'When you are signed in, the time you spend in 616 Survivor is now saved to your GSix account. You can see it on your profile at gsix.online, next to the time you spend in every other game.',
+      'It only counts while the game is open and in front of you. Play inside the GSix website is counted by the site, so no minute is ever counted twice.',
+    ],
+  },
+  {
+    version: '0.42.3',
+    date: '2026-10-20',
+    publishedAt: '2026-10-20T22:00:00Z',
+    kind: 'update',
+    title: 'Achievements Travel With You',
+    body: [
+      'Signed in, your 616 achievements now show up on your GSix account at gsix.online, on a new Achievements page next to every other game. Each one lists what it takes to earn it, what it gives you, and the day you earned it.',
+      'Achievements you had already earned before this update are shown as earned, with the date marked as unknown. From now on, each new one is stamped with the day you get it.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
