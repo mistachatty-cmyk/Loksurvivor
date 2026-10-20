@@ -9,7 +9,10 @@ import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/c
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getCharacter } from '@/game/data/characters';
 import { getHideoutScene, weatherClass } from '@/game/data/hideout';
-import { allyRig } from '@/game/data/progression';
+import { allyRig, HUB_ROOMS_BY_ID } from '@/game/data/progression';
+import { AREAS } from '@/game/data/areas';
+import type { ChatContext } from '@/game/engine/lokChat';
+import { logCrewLine, startProactive } from '@/game/state/lokChatActions';
 import { crewSpeak } from '@/game/engine/crewSpeak';
 import { getCrewTalkMode, getCrewTalkTone } from '@/game/state/crewTalkSetting';
 import { RigPortrait } from './RigPortrait';
@@ -45,6 +48,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords, ScanEye, Dog, HelpCircle, Clapperboard, Bug } from 'lucide-react';
 import { LorePopup } from './LorePopup';
+import { LokChatLauncher, LokChatOverlay } from './LokChat';
 import type { CrewActivityIcon, HubPanel } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
@@ -242,8 +246,40 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       recent: seen,
     });
     crewRecentRef.current.set(allyId, [...seen, line].slice(-12));
+    // Everything the crew say out loud is also kept in LOK Chat's #hideout channel.
+    logCrewLine(allyId, line, activeRoom?.name, Date.now());
     return line;
   };
+
+  // LOK Chat: what a crew member knows when you message them.
+  const [showLokChat, setShowLokChat] = useState(false);
+  const buildChatContext = (allyId: string, affinity: number): ChatContext => {
+    const ally = rescuedAllies.find((candidate) => candidate.id === allyId) ?? rescuedAllies[0]!;
+    const run = lastRun ? { cleared: lastRun.cleared, kills: lastRun.kills, areaName: AREAS.find((area) => area.id === lastRun.areaId)?.name ?? lastRun.areaId } : undefined;
+    return {
+      self: { id: ally.id, name: ally.name, role: ally.role },
+      others: rescuedAllies.filter((other) => other.id !== ally.id).map((other) => ({ id: other.id, name: other.name, role: other.role })),
+      roomName: HUB_ROOMS_BY_ID[ally.room]?.name ?? ally.room,
+      crewHere: rescuedAllies.filter((other) => other.room === ally.room && other.id !== ally.id).map((other) => other.name),
+      weather: getHideoutScene(ally.room).weather,
+      hour: new Date().getHours(),
+      lastRun: run,
+      petName: companion ? petCallName(companion) : undefined,
+      tone: getCrewTalkTone(),
+      affinity,
+    };
+  };
+  const proactiveKeyRef = useRef('');
+  useEffect(() => {
+    if (rescuedAllies.length === 0) return;
+    const run = lastRun ? { key: `${lastRun.areaId}|${lastRun.survivedSec}|${lastRun.kills}`, cleared: lastRun.cleared } : undefined;
+    const signature = `${rescuedAllies.map((ally) => ally.id).join(',')}|${run?.key ?? ''}`;
+    if (proactiveKeyRef.current === signature) return;
+    proactiveKeyRef.current = signature;
+    startProactive({ allyIds: rescuedAllies.map((ally) => ally.id), buildContext: buildChatContext, now: Date.now(), hour: new Date().getHours(), rng: Math.random, run });
+    // Rebuilt context reads current props; the signature above is what decides when to run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rescuedAllies, lastRun]);
 
   // The props standing in this room. Memoized so a poll tick does not rebuild them (the strip
   // reads them through a ref, but a new array each render would still churn the parent).
@@ -681,6 +717,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               {(meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
                 <button type="button" onClick={onOpenRunSetup} className="inline-flex min-h-10 items-center gap-2 border border-cyan-200/45 bg-slate-950/70 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 hover:border-cyan-100" data-testid="button-open-run-setup" title={t('hub.looksLokpetsTitle')}><Sparkles className="h-4 w-4 text-cyan-200" />{t('common.looksLokpets')}</button>
               )}
+              {rescuedAllies.length > 0 ? <LokChatLauncher onOpen={() => setShowLokChat(true)} /> : null}
               <HideoutEndgameDock onOpen={onOpen} compact />
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
@@ -689,6 +726,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </div>
           </div>
         ) : null}
+        {chromeLayout === 'classic' && rescuedAllies.length > 0 ? <div className="mb-3 flex flex-wrap items-center gap-2"><LokChatLauncher onOpen={() => setShowLokChat(true)} /></div> : null}
         {chromeLayout === 'classic' ? <HideoutEndgameDock onOpen={onOpen} /> : null}
         {meta.hideoutPreviewEnabled && (
           <HideoutPreview
@@ -706,7 +744,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             firstEventDelayMs={import.meta.env.DEV && new URLSearchParams(window.location.search).has('fastPetEvents') ? 600 : undefined}
             props={hideoutPropInfos}
             interactive={meta.hideoutInteractive}
-            keyboardActive={!showArrival && !showLorePopup && !showCurrencyGlossary}
+            keyboardActive={!showArrival && !showLorePopup && !showCurrencyGlossary && !showLokChat}
             notice={stripNotice}
             crewSpeak={crewLineFor}
             say={crewSay}
@@ -1439,6 +1477,14 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
 
       <AnimatePresence>
         {showLorePopup && <LorePopup onClose={() => setShowLorePopup(false)} />}
+        {showLokChat && (
+          <LokChatOverlay
+            allies={rescuedAllies}
+            buildContext={buildChatContext}
+            roomNameOf={(ally) => HUB_ROOMS_BY_ID[ally.room]?.name ?? ally.room}
+            onClose={() => setShowLokChat(false)}
+          />
+        )}
       </AnimatePresence>
     </motion.div>
   );

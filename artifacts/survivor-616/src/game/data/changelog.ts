@@ -1589,6 +1589,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Standing on a locked Relic Vault chest no longer buries your character in LOCKED popups; the hint shows once, over the chest. Skeleton keys picked up together now stack above you for a second as one little ×N KEY flourish, with a single alert and sound, instead of a pile of overlapping text.',
     ],
   },
+  {
+    version: '0.42.0',
+    date: '2026-10-19',
+    publishedAt: '2026-10-19T14:00:00Z',
+    kind: 'update',
+    title: 'LOK Chat',
+    body: [
+      'Your crew now have a chat window. Open LOK Chat from the hideout and message anyone you have rescued: type whatever you like or tap a suggestion. They answer in their own voice and know what is going on: how your last run went, your LokPet, the weather, the room, and what they think of the rest of the crew.',
+      'The more you talk, the better they know you. Friends open up with a personal story, close friends say so, and the crew will message you first after a run, after a long time away, or at the start and end of the day. The #hideout channel keeps everything the crew say around the hideout. It all stays on your device, and a Clear button wipes it whenever you like.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
