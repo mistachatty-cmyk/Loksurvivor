@@ -29,6 +29,10 @@ export type ChatIntent =
   | 'confide'
   | 'thanks'
   | 'bye'
+  | 'topic'
+  | 'followUp'
+  | 'feeling'
+  | 'smalltalk'
   | 'unknown';
 
 /** Rules are tried in this order; the first whose pattern matches wins. */
@@ -41,7 +45,7 @@ export const INTENT_RULES: ReadonlyArray<readonly [ChatIntent, RegExp]> = [
   ['pet', /\b(pet|lokpet|puppy|doggo|kitty|critter|companion|buddy)\b/],
   ['weather', /\b(weather|rain|raining|snow|snowing|fog|foggy|hot|heat|cold|storm|outside|sky)\b/],
   ['advice', /\b(advice|tip|tips|help me|what should i|should i|any ideas|how do i|how to|suggest)\b/],
-  ['howAreYou', /\b(how are you|how'?s it going|hows it going|you ok|you okay|you good|how you doing|how are things|feeling)\b/],
+  ['howAreYou', /\b(how are you|how'?s it going|hows it going|you ok|you okay|you good|how you doing|how are things|feeling|how was your day|how is your day|how'?s your day|hows your day|how have you been|how are you doing|what have you been up to|you alright)\b/],
   ['work', /\b(what do you do|your job|your role|what'?s your job|what is your job|do for work|who are you|about yourself|what are you)\b/],
   ['room', /\b(where are you|where am i|this room|the room|what'?s here|whats here|around here|this place)\b/],
   ['greet', /\b(hi|hey|hello|yo|sup|howdy|hiya|good morning|good evening|good afternoon|morning|evening)\b/],
@@ -58,7 +62,7 @@ export const TIME_WORDS: Record<'morning' | 'afternoon' | 'evening' | 'night', s
 
 /** Intent templates, shared by everyone; a voice's own openers/closers/topics add the personal flavor. */
 /** Intents answered from these shared templates (the rest have their own sources). */
-export type TemplatedIntent = Exclude<ChatIntent, 'crew' | 'joke' | 'story' | 'confide'>;
+export type TemplatedIntent = Exclude<ChatIntent, 'crew' | 'joke' | 'story' | 'confide' | 'topic' | 'followUp' | 'feeling' | 'smalltalk'>;
 
 export const INTENT_TEMPLATES: Record<TemplatedIntent, Record<Tone, string[]>> = {
   greet: {

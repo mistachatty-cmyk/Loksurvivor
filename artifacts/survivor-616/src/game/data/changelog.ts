@@ -1654,6 +1654,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'After a report goes to LOK, LokServer says thank you.',
     ],
   },
+  {
+    version: '0.42.6',
+    date: '2026-10-20',
+    publishedAt: '2026-10-20T23:50:00Z',
+    kind: 'update',
+    title: 'LOK Chat Remembers The Thread',
+    body: [
+      'The crew now follow a conversation. Say "why" or "tell me more" and they go deeper, answer "yes" or "no" when they ask you something, and keep talking when you share how you feel instead of changing the subject.',
+      'Every crew member has more to say about their own world, and the closer you get the more they open up. Longer replies sometimes arrive as two messages, and the quick replies change to fit what you are talking about.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

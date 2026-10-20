@@ -8,7 +8,7 @@
 
 import { useSyncExternalStore } from 'react';
 
-import { AFFINITY_MAX, affinityTier, type AffinityTier, type ChatIntent } from '@/game/engine/lokChat';
+import { AFFINITY_MAX, affinityTier, emptyConv, type AffinityTier, type ChatIntent, type ConvState } from '@/game/engine/lokChat';
 
 export const MESSAGES_PER_THREAD = 80;
 export const CHANNEL_ENTRIES = 60;
@@ -32,6 +32,8 @@ export interface ChatThread {
   lastProactiveAt: number;
   /** Their last few lines, so they do not repeat themselves. */
   recent: string[];
+  /** What they are talking about and any question waiting on you (ids and counts, never your words). */
+  conv: ConvState;
 }
 
 export interface ChannelEntry {
@@ -51,7 +53,7 @@ export interface LokChatState {
   lastRunReactedKey: string;
 }
 
-export const emptyThread = (): ChatThread => ({ messages: [], affinity: 0, unread: 0, intents: {}, lastProactiveAt: 0, recent: [] });
+export const emptyThread = (): ChatThread => ({ messages: [], affinity: 0, unread: 0, intents: {}, lastProactiveAt: 0, recent: [], conv: emptyConv() });
 export const emptyState = (): LokChatState => ({ version: 1, threads: {}, channel: [], lastRunReactedKey: '' });
 
 export const threadOf = (state: LokChatState, id: string): ChatThread => state.threads[id] ?? emptyThread();
@@ -93,6 +95,10 @@ export function addAffinity(state: LokChatState, id: string, points: number): { 
   return { state: withThread(state, id, { ...thread, affinity: next }), tierUp: after !== before ? after : undefined };
 }
 
+export function setConv(state: LokChatState, id: string, conv: ConvState): LokChatState {
+  return withThread(state, id, { ...threadOf(state, id), conv });
+}
+
 export function setProactiveAt(state: LokChatState, id: string, at: number): LokChatState {
   return withThread(state, id, { ...threadOf(state, id), lastProactiveAt: at });
 }
@@ -109,6 +115,20 @@ export const totalUnread = (state: LokChatState): number => Object.values(state.
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const num = (value: unknown, fallback = 0): number => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
 const str = (value: unknown): string => (typeof value === 'string' ? value : '');
+
+function normalizeConv(raw: unknown): ConvState {
+  const conv = emptyConv();
+  if (!isRecord(raw)) return conv;
+  if (isRecord(raw.topic) && str(raw.topic.key)) conv.topic = { key: str(raw.topic.key).slice(0, 40), depth: Math.max(0, Math.min(5, Math.floor(num(raw.topic.depth)))) };
+  conv.pending = str(raw.pending).slice(0, 60);
+  if (isRecord(raw.depths)) {
+    for (const [k, v] of Object.entries(raw.depths).slice(0, 60)) conv.depths[k.slice(0, 40)] = Math.max(0, Math.min(5, Math.floor(num(v))));
+  }
+  if (Array.isArray(raw.asked)) conv.asked = raw.asked.filter((x): x is string => typeof x === 'string').slice(-6).map((x) => x.slice(0, 40));
+  conv.lastSubjectId = str(raw.lastSubjectId).slice(0, 64);
+  conv.lastTopicLabel = str(raw.lastTopicLabel).slice(0, 60);
+  return conv;
+}
 
 /** Accept anything out of storage and return a valid state (never throws, drops what it cannot trust). */
 export function normalizeLokChat(raw: unknown): LokChatState {
@@ -132,6 +152,7 @@ export function normalizeLokChat(raw: unknown): LokChatState {
         unread: Math.max(0, Math.min(messages.length, Math.floor(num(value.unread)))),
         intents,
         lastProactiveAt: num(value.lastProactiveAt),
+        conv: normalizeConv(value.conv),
         recent: Array.isArray(value.recent) ? value.recent.filter((r): r is string => typeof r === 'string').slice(-RECENT_LINES) : [],
       };
     }

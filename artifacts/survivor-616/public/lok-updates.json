@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 145,
+      "version": "0.42.6",
+      "date": "2026-10-20",
+      "publishedAt": "2026-10-20T23:50:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "LOK Chat Remembers The Thread",
+      "body": [
+        "The crew now follow a conversation. Say \"why\" or \"tell me more\" and they go deeper, answer \"yes\" or \"no\" when they ask you something, and keep talking when you share how you feel instead of changing the subject.",
+        "Every crew member has more to say about their own world, and the closer you get the more they open up. Longer replies sometimes arrive as two messages, and the quick replies change to fit what you are talking about."
+      ]
+    },
+    {
       "number": 144,
       "version": "0.42.5",
       "date": "2026-10-20",

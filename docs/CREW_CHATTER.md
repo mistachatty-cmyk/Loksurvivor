@@ -160,6 +160,28 @@ Behavior worth knowing:
 - **#hideout channel:** every line `crewLineFor` produces (taps and strip chatter) is logged
   (`logCrewLine`), so the strip and the chat stay one conversation.
 
+### Conversation depth (v0.42.6)
+
+Replies are no longer one-shot. `engine/lokChatTalk.ts` reads what a message is *like* (a feeling, a question,
+"why", "more", yes / no / not sure, "what about her?") and `ChatThread.conv` (saved per person: current topic and
+depth, a pending question, how deep each topic went, last person discussed) carries the conversation forward.
+Only ids and counts are saved, never what the player typed.
+
+- **Topics with layers** (`data/lokChatTopics.ts`): shared topics (city, food, music, fear, enemies, gear, sleep,
+  friends, dreams, the past) plus a few per ally (`ALLY_TOPICS`). Layer 1 is for anyone, layer 2 opens at *friend*,
+  layer 3 at *close*; "why" / "tell me more" / asking again goes one layer deeper, a stranger is told it is for
+  later. Single-layer topics are reactions (compliment, teasing, sorry, "are you real").
+- **They ask back** (`QUESTIONS`): about 30% of replies end with a question; the next short answer (yes / no / not
+  sure / a feeling / anything) gets an in-voice reaction. They also offer a topic ("Want to hear about the shop?")
+  and take a yes. "Want me to go on?" after a layer works the same way.
+- **No dead ends:** unrecognized text is answered by shape, a feeling line, small talk, an honest "I don't know",
+  then an offer. Memory callbacks (last area, last topic) appear in friend greetings.
+- **Feel:** long replies sometimes arrive as two bubbles; typing pace follows the ally's temperament; quick replies
+  switch to Yes / Not really / Not sure while a question waits, and "Tell me more" while a topic has layers left.
+
+Adding a topic: a `TopicDef` in `ALLY_TOPICS` (3 layers) or `SHARED_TOPICS`; allies without one fall back to a
+ladder built from their voice, so nobody is empty. Open: ally-to-ally lines in #hideout, reaction taps.
+
 Adding to it: a new ally needs a `CREW_CONFIDES` entry (the test fails otherwise); opinions about other
 crew are optional (a role-based line is the fallback). A new intent is a row in `INTENT_RULES`, a
 template set in `INTENT_TEMPLATES` (or a branch in `oneReply`), and a quick reply in `quickReplies`.

@@ -315,3 +315,179 @@ describe('LOK Chat actions', () => {
     assert.equal(getLokChat().channel.at(-1)?.roomName, 'The Roof');
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* Conversation depth                                                  */
+/* ------------------------------------------------------------------ */
+
+import { ALLY_TOPICS, FEELING_LINES, HOOKS, QUESTIONS, SHARED_TOPICS, SMALLTALK_LINES, TOPIC_DEFLECTIONS } from '@/game/data/lokChatTopics';
+import { emptyConv, splitReply, type ConvState } from '@/game/engine/lokChat';
+
+/** One player message in a running conversation: the reply, and the thread's conversation after it. */
+function talk(allyId: string, message: string, conv: ConvState, extra: Partial<ChatContext> = {}, seed = 5) {
+  const ctx = ctxFor(allyId, { ...extra, conv });
+  const detected = detectIntent(message, ctx.others);
+  const reply = replyToIntent(detected, ctx, createRng(seed));
+  return reply;
+}
+
+describe('LOK Chat conversations', () => {
+  it('does not give up on things it has no keyword for: feelings, small talk and statements all get an answer', () => {
+    for (const message of ['i am so tired', 'lol', 'hmm', 'ok', 'my day was weird', 'ugh i am furious', 'i feel lonely', 'what is the meaning of it all?']) {
+      const reply = talk('vee', message, emptyConv());
+      assert.ok(reply.text.length > 6, message);
+      assert.ok(!/not sure what you mean|i have no idea what that was|you lost me/i.test(reply.text), `${message}: ${reply.text}`);
+    }
+    const tired = talk('vee', 'i am so tired', emptyConv());
+    assert.equal(tired.intent, 'feeling');
+    assert.ok(FEELING_LINES.tired.some((line) => tired.text.startsWith(line.slice(0, 20))), tired.text);
+  });
+
+  it('follows a topic down its layers as you keep going, and holds back what closeness has not unlocked', () => {
+    let conv = emptyConv();
+    const first = talk('nyx', 'tell me about your paint', conv, { affinity: 0 });
+    assert.equal(first.intent, 'topic');
+    conv = first.conv;
+    assert.equal(conv.topic?.key, 'walls');
+    assert.equal(conv.depths.walls, 1);
+    // A stranger is told the surface; the next layer is for friends.
+    const second = talk('nyx', 'why', conv, { affinity: 0 });
+    assert.equal(second.intent, 'followUp');
+    assert.ok(TOPIC_DEFLECTIONS.some((line) => second.text.startsWith(line.slice(0, 18))), second.text);
+    assert.equal(second.conv.depths.walls, 1, 'a held-back layer is not spent');
+    // As a friend the same words go deeper.
+    const friend = talk('nyx', 'why', conv, { affinity: AFFINITY_THRESHOLDS.friend });
+    assert.equal(friend.conv.depths.walls, 2);
+    assert.ok(ALLY_TOPICS.nyx![0]!.layers[1]!.some((line) => friend.text.includes(line.slice(0, 25))), friend.text);
+  });
+
+  it('keeps a pending question and understands a yes, a no and a shrug', () => {
+    for (const [message, expected] of [['yes', 'yes'], ['nope', 'no'], ['maybe', 'unsure']] as const) {
+      let conv: ConvState = { ...emptyConv(), pending: 'q:ate' };
+      const q = QUESTIONS.find((x) => x.id === 'ate')!;
+      const reply = talk('mamajo', message, conv);
+      assert.equal(reply.intent, 'followUp');
+      assert.equal(reply.conv.pending === 'q:ate', false, 'the question is answered once');
+      assert.ok(q[expected].some((line) => reply.text.includes(line.slice(0, 18))), `${message}: ${reply.text}`);
+      conv = reply.conv;
+    }
+  });
+
+  it('keeps going when you say yes to "want me to go on?"', () => {
+    const start = talk('denny', 'tell me about the river', emptyConv(), { affinity: 50 }, 1);
+    let conv = start.conv;
+    if (conv.pending !== 'more') conv = { ...conv, pending: 'more' };
+    const next = talk('denny', 'yes', conv, { affinity: 50 });
+    assert.equal(next.conv.depths.river, 2);
+    assert.equal(next.conv.pending === 'more', false, 'the offer was taken up');
+  });
+
+  it('remembers who you were talking about for "what about her?"', () => {
+    const asked = talk('vee', 'what do you think of mama jo', emptyConv());
+    assert.equal(asked.conv.lastSubjectId, 'mamajo');
+    const again = talk('vee', 'and what about her', asked.conv);
+    assert.equal(again.subjectId, 'mamajo');
+  });
+
+  it('offers a topic when it is unsure, and takes it up on a yes', () => {
+    let offered: ConvState | undefined;
+    for (let seed = 1; seed < 40 && !offered; seed += 1) {
+      const r = talk('cinder', 'my day was weird', emptyConv(), {}, seed);
+      if (r.conv.pending.startsWith('offer:')) offered = r.conv;
+    }
+    assert.ok(offered, 'a fallback offers something to talk about');
+    const taken = talk('cinder', 'sure', offered!);
+    assert.equal(taken.intent === 'topic' || taken.intent === 'followUp', true);
+    assert.ok(Object.keys(taken.conv.depths).length > 0);
+  });
+
+  it('is never fooled into echoing what the player typed', () => {
+    for (const message of ['zebrafish quokka marmalade', 'i am so tired zebrafish', 'why marmalade', 'tell me about the quokka paint']) {
+      for (const ally of ['vee', 'nyx', 'archivist']) {
+        assert.ok(!/zebrafish|quokka|marmalade/i.test(talk(ally, message, emptyConv()).text), message);
+      }
+    }
+  });
+
+  it('scripted chats never fall back to "I do not follow" and never repeat a line', () => {
+    for (const ally of ALLIES) {
+      for (const tone of ['family', 'wry'] as const) {
+        let conv = emptyConv();
+        const seen = new Set<string>();
+        const recent: string[] = [];
+        let seed = 100;
+        for (const message of ['hi', 'tell me about the city', 'why', 'lol', 'i am tired', 'yes', 'what about food', 'tell me more', 'hmm', 'ok', 'tell me about friends', 'bye']) {
+          const ctx = ctxFor(ally.id, { tone, conv, affinity: 60 });
+          const reply = replyToIntent(detectIntent(message, ctx.others), ctx, createRng(seed += 7), recent);
+          assert.ok(!/not sure what you mean|have no idea what that was|you lost me|come again\?/i.test(reply.text), `${ally.id}/${tone}/${message}: ${reply.text}`);
+          assert.ok(!seen.has(reply.text), `${ally.id}/${tone} repeated: ${reply.text}`);
+          seen.add(reply.text);
+          recent.push(reply.text);
+          conv = reply.conv;
+        }
+      }
+    }
+  });
+
+  it('every ally has something deeper to talk about, and the authored text is clean', () => {
+    const strings: string[] = [];
+    for (const topic of [...SHARED_TOPICS, ...Object.values(ALLY_TOPICS).flat()]) for (const layer of topic.layers) strings.push(...layer);
+    for (const list of Object.values(FEELING_LINES)) strings.push(...list);
+    for (const list of Object.values(SMALLTALK_LINES)) strings.push(...list);
+    for (const q of QUESTIONS) strings.push(q.ask, ...q.yes, ...q.no, ...q.unsure, ...q.other);
+    strings.push(...HOOKS, ...TOPIC_DEFLECTIONS);
+    for (const s of strings) assert.ok(!BANNED.test(s), `banned word in authored text: ${s}`);
+    for (const ally of ALLIES) {
+      const ctx = ctxFor(ally.id, { affinity: 60 });
+      const reply = replyToIntent(detectIntent('tell me about your life before all this', ctx.others), ctx, createRng(3));
+      assert.equal(reply.intent, 'topic');
+      assert.ok(!/[<>{}|]/.test(reply.text), reply.text);
+    }
+  });
+
+  it('rendered chat replies stay clean over many seeds and conversation states', () => {
+    for (const ally of ALLIES) {
+      for (let seed = 0; seed < 40; seed += 1) {
+        const pendings = ['', 'more', 'offer:city', 'q:scariest', 'q:ate'];
+        const conv: ConvState = { ...emptyConv(), pending: pendings[seed % pendings.length]!, topic: { key: 'city', depth: seed % 3 }, depths: { city: seed % 3 }, lastTopicLabel: 'the city', lastSubjectId: 'vee' };
+        for (const message of ['hello there', 'i am scared', 'yes', 'no', 'tell me more', 'why', 'what do you think about vee', 'zzz', 'how do i get better at gear']) {
+          const ctx = ctxFor(ally.id, { conv, tone: seed % 2 ? 'wry' : 'family', affinity: [0, 15, 60][seed % 3]! });
+          const text = replyToIntent(detectIntent(message, ctx.others), ctx, createRng(seed * 31 + 7)).text;
+          assert.ok(text.length > 2 && text.length < 480, `${ally.id}/${message}: ${text}`);
+          assert.ok(!/[<>{}|]/.test(text) && !BANNED.test(text), `${ally.id}/${message}: ${text}`);
+        }
+      }
+    }
+  });
+
+  it('sometimes splits a long reply into two bubbles, and keeps short ones whole', () => {
+    const long = 'That is a good question and it deserves a proper answer, so I will give you one. I think about it more than I let on, honestly, and more than I should.';
+    const pieces = new Set<number>();
+    for (let seed = 0; seed < 20; seed += 1) pieces.add(splitReply(long, createRng(seed)).length);
+    assert.deepEqual([...pieces].sort(), [1, 2]);
+    for (const part of splitReply(long, () => 0.9)) assert.ok(part.length > 20);
+    assert.deepEqual(splitReply('Short one.', createRng(1)), ['Short one.']);
+  });
+});
+
+describe('LOK Chat conversation state', () => {
+  it('saves and restores the conversation, and shrugs off junk', () => {
+    const conv: ConvState = { topic: { key: 'walls', depth: 2 }, pending: 'more', depths: { walls: 2 }, asked: ['ate'], lastSubjectId: 'vee', lastTopicLabel: 'the walls' };
+    const saved = appendMessage(emptyState(), 'nyx', { id: '1', from: 'me', text: 'hi', at: 1 });
+    const withConv = { ...saved, threads: { nyx: { ...threadOf(saved, 'nyx'), conv } } };
+    assert.deepEqual(threadOf(normalizeLokChat(JSON.parse(JSON.stringify(withConv))), 'nyx').conv, conv);
+    assert.deepEqual(threadOf(normalizeLokChat({ threads: { nyx: { messages: [], conv: 'nope' } } }), 'nyx').conv, emptyConv());
+    const odd = threadOf(normalizeLokChat({ threads: { nyx: { messages: [], conv: { topic: { key: 5 }, depths: { a: 'x', b: 99 }, asked: [1, 'ok'] } } } }), 'nyx').conv;
+    assert.equal(odd.topic, null);
+    assert.equal(odd.depths.b, 5);
+    assert.deepEqual(odd.asked, ['ok']);
+  });
+
+  it('saves the conversation after a send, so the next message can follow on', async () => {
+    resetLokChatForTests();
+    const rng = createRng(11);
+    sendToAlly({ allyId: 'nyx', text: 'tell me about your paint', buildContext: (id, affinity) => ctxFor(id, { affinity }), now: 1000, rng, instant: true });
+    assert.equal(threadOf(getLokChat(), 'nyx').conv.topic?.key, 'walls');
+    await new Promise((r) => setTimeout(r, 900));
+  });
+});

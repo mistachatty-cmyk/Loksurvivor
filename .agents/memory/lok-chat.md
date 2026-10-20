@@ -14,5 +14,10 @@ Full handoff in `docs/CREW_CHATTER.md` (section "LOK Chat"). Decisions to keep:
 - **Every ally needs `CREW_CONFIDES`** (two lines); opinions in `CREW_RELATIONS` are optional.
 - Content rules are the crew-talk rules (kid-safe, no profanity, never the banned naming word); the banned-word
   regexp in `lokChat.test.ts` mirrors `crewTalk.test.ts`. `kill`, `hell` and `ass` are on it, so reword rather than allow.
+- **Conversation depth (0.42.6):** `ChatThread.conv` (`engine/lokChatTalk.ts` `ConvState`) holds topic, depth, a pending
+  question and last person talked about; ids and counts only, never player text. `converse()` in `engine/lokChat.ts`
+  order: answer a pending question, then why/more follow-up, then keyword topic (unless a STRONG classic intent),
+  then fallback by feeling/shape, else the classic intent templates. Layers unlock by tier (1/2/3). Tests that pin
+  exact confide text must not get an appended question (confide never asks one back).
 - Verify: `node --import tsx --test src/game/lokChat.test.ts`, `e2e/lok-chat.spec.ts`; visual check by seeding a save
   with `rescuedAllyIds` and opening `/?screen=hub`.

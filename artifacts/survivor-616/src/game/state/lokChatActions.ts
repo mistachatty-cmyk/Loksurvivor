@@ -12,6 +12,7 @@ import {
   detectIntent,
   proactiveLine,
   replyToIntent,
+  splitReply,
   typingMs,
   type AffinityTier,
   type ChatContext,
@@ -27,10 +28,13 @@ import {
   markRead,
   newMessageId,
   recordIntent,
+  setConv,
   setProactiveAt,
   threadOf,
   updateLokChat,
 } from '@/game/state/lokChatStore';
+
+import { crewTemperamentFor, DEFAULT_CREW_TEMPERAMENT } from '@/game/data/crewTemperaments';
 
 export type ContextBuilder = (allyId: string, affinity: number) => ChatContext;
 
@@ -67,27 +71,36 @@ export function sendToAlly(input: {
 }): SendResult {
   const { allyId, buildContext, now, rng } = input;
   const before = threadOf(getLokChat(), allyId);
-  const ctx = buildContext(allyId, before.affinity);
+  const ctx = { ...buildContext(allyId, before.affinity), conv: before.conv };
   const detected = input.detected ?? detectIntent(input.text, ctx.others);
   const reply = replyToIntent(detected, ctx, rng, before.recent);
-  const delayMs = input.instant ? 250 : typingMs(reply.text);
+  // Quick people answer fast and slow ones take their time; long replies sometimes come as two bubbles.
+  const pace = Math.max(0.6, Math.min(1.5, DEFAULT_CREW_TEMPERAMENT.speed / crewTemperamentFor(allyId).speed));
+  const parts = splitReply(reply.text, rng);
+  const delayMs = input.instant ? 250 : typingMs(parts[0]!, pace);
+  const secondMs = input.instant ? 250 : Math.round(typingMs(parts[1] ?? '', pace) * 0.7);
 
   let tierUp: AffinityTier | undefined;
   updateLokChat((s) => {
     let next = appendMessage(s, allyId, { id: newMessageId(now), from: ME, text: input.text, at: now });
     next = recordIntent(next, allyId, reply.intent);
+    next = setConv(next, allyId, reply.conv);
     const gained = addAffinity(next, allyId, affinityGain(reply.intent, before.intents[reply.intent] ?? 0));
     tierUp = gained.tierUp;
     return gained.state;
   });
 
   setTimeout(() => {
-    deliver(allyId, reply.text, now + delayMs);
-    if (tierUp) {
-      const warmer = buildContext(allyId, threadOf(getLokChat(), allyId).affinity);
-      setTimeout(() => deliver(allyId, proactiveLine('tierUp', warmer, rng), now + delayMs + 1400), input.instant ? 300 : 1400);
-    }
-    input.onDelivered?.();
+    deliver(allyId, parts[0]!, now + delayMs);
+    const finish = (extra: number): void => {
+      if (tierUp) {
+        const warmer = buildContext(allyId, threadOf(getLokChat(), allyId).affinity);
+        setTimeout(() => deliver(allyId, proactiveLine('tierUp', warmer, rng), now + delayMs + extra + 1400), input.instant ? 300 : 1400);
+      }
+      input.onDelivered?.();
+    };
+    if (parts[1]) setTimeout(() => { deliver(allyId, parts[1]!, now + delayMs + secondMs); finish(secondMs); }, secondMs);
+    else finish(0);
   }, delayMs);
 
   return { reply, tierUp, delayMs };

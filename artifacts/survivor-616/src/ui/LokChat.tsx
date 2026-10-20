@@ -13,7 +13,7 @@ import { ArrowLeft, Hash, Send, X } from 'lucide-react';
 import { prefersReducedMotion } from '@/anim/motion';
 import { useT } from '@/lib/i18n';
 import { allyRig } from '@/game/data/progression';
-import { MAX_MESSAGE_CHARS, affinityTier, quickReplies, type AffinityTier, type QuickReply } from '@/game/engine/lokChat';
+import { MAX_MESSAGE_CHARS, affinityTier, detectedFromQuick, quickReplies, type AffinityTier, type QuickReply } from '@/game/engine/lokChat';
 import { sendToAlly, setOpenThread, type ContextBuilder } from '@/game/state/lokChatActions';
 import { ME, clearLokChat, totalUnread, useLokChat, type ChatMessage } from '@/game/state/lokChatStore';
 import type { AllyDef } from '@/game/types';
@@ -144,7 +144,7 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
     sendToAlly({
       allyId: id,
       text: clean,
-      detected: detected ? { intent: detected.intent, subject: detected.subject } : undefined,
+      detected: detected ? detectedFromQuick(detected) : undefined,
       buildContext,
       now: Date.now(),
       rng: Math.random,
@@ -155,10 +155,10 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
   };
 
   const suggestions = useMemo<QuickReply[]>(
-    () => (ally ? quickReplies(buildContext(ally.id, thread?.affinity ?? 0), thread?.intents ?? {}) : []),
+    () => (ally ? quickReplies({ ...buildContext(ally.id, thread?.affinity ?? 0), conv: thread?.conv }, thread?.intents ?? {}) : []),
     // Re-pick suggestions as the conversation moves on (each reply changes what has been asked).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ally?.id, thread?.affinity, thread?.intents],
+    [ally?.id, thread?.affinity, thread?.intents, thread?.conv],
   );
 
   const selectRow = (id: string) => { setSelected(id); setShowList(false); };
