@@ -901,7 +901,7 @@ export class DemoDaySession {
     this.levelUpChoices = choices;
     this.phase = 'levelup';
     this.keys.clear();
-    this.showMenu(buildLevelUp(this.win.document, world.level, choices, (choice) => this.pickUpgrade(choice)));
+    this.showMenu(buildLevelUp(this.win.document, world.level, choices, (choice) => this.pickUpgrade(choice), () => void this.stop(true)));
   }
 
   private pickUpgrade(choice: UpgradeDef): void {
