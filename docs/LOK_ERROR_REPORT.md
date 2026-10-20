@@ -9,6 +9,7 @@ own repo and be sold as a LOK Ecosystem plugin.
 - **Dev**: exact `file:line:col`, the code line (source-mapped through the Vite dev server) and the component stack.
 - **Production / no source access**: "LOK doesn't have access to the code behind this one." Messages and stacks
   are never shown (they can carry API responses). The report ID and build ID are.
+- The player may type a short description (redacted, 500 chars, stored as `report.note`) and tick "send automatically from now on" (same setting as Settings). After a send, LokServer shows a small animated thank-you (reduced-motion safe).
 - Buttons: Copy report, Download .md, Send to LOK (only when a cloud sink exists), Try again, Close.
 
 ## Switch

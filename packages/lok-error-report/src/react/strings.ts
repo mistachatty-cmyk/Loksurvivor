@@ -28,6 +28,11 @@ export interface LokErrorStrings {
   chip: string;
   chipOpen: string;
   privacy: string;
+  noteLabel: string;
+  notePlaceholder: string;
+  autoSend: string;
+  thanksTitle: string;
+  thanksBody: string;
 }
 
 /** LOK voice: LokServer, the owl who keeps the lights on. Kid-safe, calm, a little hoo. */
@@ -64,4 +69,9 @@ export const defaultStrings: LokErrorStrings = {
   chip: 'LokServer caught a flicker',
   chipOpen: 'See what happened',
   privacy: 'Nothing leaves your device unless you press Send.',
+  noteLabel: 'What happened? (optional)',
+  notePlaceholder: 'Tell LokServer what you were doing when it broke.',
+  autoSend: 'Send crash reports to LOK automatically from now on',
+  thanksTitle: 'Hoo, thank you!',
+  thanksBody: 'LokServer passed it on. You just helped fix the lights.',
 };

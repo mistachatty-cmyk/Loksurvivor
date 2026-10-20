@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 144,
+      "version": "0.42.5",
+      "date": "2026-10-20",
+      "publishedAt": "2026-10-20T23:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Tell LokServer What Happened",
+      "body": [
+        "When the game catches a crash, you can now type what you were doing before you send the report, and tick a box to send future crash reports automatically. Both are optional, and nothing is sent unless you press Send or turn automatic sending on.",
+        "After a report goes to LOK, LokServer says thank you."
+      ]
+    },
+    {
       "number": 143,
       "version": "0.42.4",
       "date": "2026-10-20",

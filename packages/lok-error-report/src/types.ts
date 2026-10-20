@@ -81,6 +81,8 @@ export interface ErrorReport {
   breadcrumbs: Breadcrumb[];
   /** Set by the dev tooling when the original code could be located. */
   source?: ResolvedSource;
+  /** What the player typed about what happened (redacted, capped). Only ever set when they chose to. */
+  note?: string;
 }
 
 /** What a sink may hand back to enrich the report (the dev plugin returns `source`). */

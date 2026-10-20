@@ -67,13 +67,17 @@ export interface FeedbackSubmit {
  */
 export function lokFeedbackSink(source: string, submit: FeedbackSubmit): ReportSink & { sent(report: ErrorReport): boolean } {
   const sentFingerprints = new Set<string>();
+  const sentKeys = new Set<string>();
   return {
     id: 'lok-feedback',
     sent: (report) => sentFingerprints.has(report.fingerprint),
     async send(report) {
-      if (sentFingerprints.has(report.fingerprint)) return;
+      // A description added after an automatic send is new information, so it goes as its own row.
+      const key = `${report.fingerprint}|${report.note ?? ''}`;
+      if (sentKeys.has(key)) return;
       const { error } = await submit({ source, category: 'bug', message: toFeedbackMessage(report) });
       if (error) throw new Error(error.message);
+      sentKeys.add(key);
       sentFingerprints.add(report.fingerprint);
     },
   };

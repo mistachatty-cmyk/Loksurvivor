@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 
+import { redact } from '../redact';
 import { locationLabel, toMarkdown, toPlainSummary } from '../format';
 import type { ErrorReport } from '../types';
 import { defaultStrings, type LokErrorStrings } from './strings';
@@ -15,13 +16,22 @@ export interface LokCrashPopupProps {
   onSend?: (report: ErrorReport) => Promise<void>;
   /** True once the report was already sent (so the button reads Sent). */
   alreadySent?: boolean;
+  /** Current automatic-send choice; with `onAutoSendChange` the pop-up offers the checkbox. */
+  autoSend?: boolean;
+  onAutoSendChange?: (on: boolean) => void;
   accent?: string;
 }
 
 const FLICKER_CSS = `
 @keyframes lok-flicker { 0%,100%{opacity:1} 46%{opacity:1} 48%{opacity:.25} 50%{opacity:1} 52%{opacity:.4} 54%{opacity:1} }
 .lok-owl-eye { animation: lok-flicker 3.2s infinite; transform-origin: center; }
-@media (prefers-reduced-motion: reduce) { .lok-owl-eye { animation: none; } }
+@keyframes lok-thanks-rise { 0%{opacity:0;transform:translateY(8px) scale(.6)} 25%{opacity:1} 100%{opacity:0;transform:translateY(-34px) scale(1)} }
+@keyframes lok-thanks-hop { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-7px)} 60%{transform:translateY(-3px)} }
+@keyframes lok-thanks-in { from{opacity:0;transform:scale(.94)} to{opacity:1;transform:none} }
+.lok-thanks { animation: lok-thanks-in .28s ease-out both; }
+.lok-thanks-owl { animation: lok-thanks-hop 1.1s ease-in-out 2; }
+.lok-spark { animation: lok-thanks-rise 1.6s ease-out infinite; opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .lok-owl-eye, .lok-thanks, .lok-thanks-owl { animation: none; } .lok-spark { animation: none; opacity: .8; } }
 `;
 
 /** LokServer, drawn in code (no image asset): two round eyes in a tufted body. */
@@ -35,6 +45,27 @@ function Owl({ accent }: { accent: string }) {
       <circle cx="31" cy="23" r="2.2" fill={accent} />
       <path d="M22 30l2 3 2-3z" fill="#e879f9" />
     </svg>
+  );
+}
+
+/** The thank-you: LokServer hops and little lights drift up. Drawn in code, plays for a moment. */
+function Thanks({ accent, title, body }: { accent: string; title: string; body: string }) {
+  const sparks = [{ x: 6, d: 0, c: accent }, { x: 22, d: 0.35, c: '#e879f9' }, { x: 38, d: 0.7, c: '#fde047' }, { x: 54, d: 0.2, c: accent }, { x: 70, d: 0.55, c: '#e879f9' }];
+  return (
+    <div className="lok-thanks" style={{ ...box, borderColor: `${accent}88`, display: 'flex', gap: 12, alignItems: 'center' }} data-testid="lok-crash-thanks" role="status">
+      <div className="lok-thanks-owl" style={{ position: 'relative', width: 56, height: 56, flex: 'none' }}>
+        <Owl accent={accent} />
+      </div>
+      <div style={{ position: 'relative', flex: 1, minHeight: 40 }}>
+        <p style={{ margin: 0, font: '800 16px ui-sans-serif, system-ui' }}>{title}</p>
+        <p style={{ margin: '2px 0 0', fontSize: 13, opacity: 0.8 }}>{body}</p>
+        <svg viewBox="0 0 80 20" width="80" height="20" aria-hidden="true" style={{ position: 'absolute', right: 0, top: -6, overflow: 'visible' }}>
+          {sparks.map((s, i) => (
+            <path key={i} className="lok-spark" style={{ animationDelay: `${s.d}s` }} d={`M${s.x} 10l1.6 3.4 3.4 1.6-3.4 1.6L${s.x} 20l-1.6-3.4L${s.x - 5} 15l3.4-1.6z`} fill={s.c} />
+          ))}
+        </svg>
+      </div>
+    </div>
   );
 }
 
@@ -59,16 +90,23 @@ function download(report: ErrorReport) {
  * exact file, line and code. Anywhere else it says LOK has no access to the code, and shows
  * nothing that could carry private data: no message, no stack.
  */
-export function LokCrashPopup({ report, strings = defaultStrings, fatal = false, onClose, onRetry, onSend, alreadySent = false, accent = '#22d3ee' }: LokCrashPopupProps) {
+export function LokCrashPopup({ report, strings = defaultStrings, fatal = false, onClose, onRetry, onSend, alreadySent = false, autoSend = false, onAutoSendChange, accent = '#22d3ee' }: LokCrashPopupProps) {
   const [copied, setCopied] = useState(false);
-  const [sendState, setSendState] = useState<'idle' | 'sending' | 'sent' | 'failed'>(alreadySent ? 'sent' : 'idle');
+  const [sendState, setSendState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+  const [note, setNote] = useState('');
+  const [auto, setAuto] = useState(autoSend);
   const dev = report.mode === 'dev';
   const resolved = report.source?.frames[0];
   const cat = strings.categories[report.category] ?? strings.categories.unknown;
 
+  const withNote = (): ErrorReport => {
+    const text = redact(note.trim(), 500);
+    return text ? { ...report, note: text } : report;
+  };
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(dev ? toMarkdown(report) : toPlainSummary(report));
+      const r = withNote();
+      await navigator.clipboard.writeText(dev ? toMarkdown(r) : toPlainSummary(r) + (r.note ? `\n${r.note}` : ''));
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch { /* clipboard blocked */ }
@@ -76,7 +114,7 @@ export function LokCrashPopup({ report, strings = defaultStrings, fatal = false,
   const send = async () => {
     if (!onSend) return;
     setSendState('sending');
-    try { await onSend(report); setSendState('sent'); } catch { setSendState('failed'); }
+    try { await onSend(withNote()); setSendState('sent'); } catch { setSendState('failed'); }
   };
 
   return (
@@ -147,6 +185,27 @@ export function LokCrashPopup({ report, strings = defaultStrings, fatal = false,
           </div>
         ) : null}
 
+        {onSend && sendState !== 'sent' ? (
+          <label style={{ display: 'block', marginTop: 10 }}>
+            <span style={label}>{strings.noteLabel}</span>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value.slice(0, 500))}
+              placeholder={strings.notePlaceholder}
+              rows={3}
+              maxLength={500}
+              data-testid="lok-crash-note"
+              style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', font: '14px/1.4 ui-sans-serif, system-ui', color: 'inherit', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.2)', padding: 8 }}
+            />
+          </label>
+        ) : null}
+        {onSend && onAutoSendChange ? (
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, fontSize: 12, opacity: 0.85, cursor: 'pointer' }}>
+            <input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); onAutoSendChange(e.target.checked); }} data-testid="lok-crash-auto" />
+            {strings.autoSend}
+          </label>
+        ) : null}
+        {sendState === 'sent' || alreadySent ? <Thanks accent={accent} title={strings.thanksTitle} body={strings.thanksBody} /> : null}
         <p style={{ margin: '10px 0 0', font: '11px ui-monospace, monospace', opacity: 0.55 }}>
           {strings.reportId(report.id)} · {strings.build(report.appVersion, report.buildId)} · {strings.seen(report.count)}
         </p>
@@ -155,7 +214,7 @@ export function LokCrashPopup({ report, strings = defaultStrings, fatal = false,
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {fatal && onRetry ? <button type="button" style={{ ...btn, borderColor: accent, color: accent }} onClick={onRetry} data-testid="lok-crash-retry">{strings.retry}</button> : null}
           <button type="button" style={btn} onClick={copy} data-testid="lok-crash-copy">{copied ? strings.copied : strings.copy}</button>
-          <button type="button" style={btn} onClick={() => download(report)} data-testid="lok-crash-download">{strings.download}</button>
+          <button type="button" style={btn} onClick={() => download(withNote())} data-testid="lok-crash-download">{strings.download}</button>
           {onSend ? (
             <button type="button" style={btn} disabled={sendState === 'sending' || sendState === 'sent'} onClick={send} data-testid="lok-crash-send">
               {sendState === 'sending' ? strings.sending : sendState === 'sent' ? strings.sent : strings.send}

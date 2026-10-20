@@ -10,6 +10,10 @@ export interface LokCrashBoundaryProps {
   children: ReactNode;
   strings?: LokErrorStrings;
   onSend?: (report: ErrorReport) => Promise<void>;
+  autoSend?: boolean;
+  onAutoSendChange?: (on: boolean) => void;
+  /** Whether this crash already went to LOK (so the pop-up opens on the thank-you). */
+  isSent?: (report: ErrorReport) => boolean;
   /** What to show when LokErrorReport is switched off: the app's own plain fallback. */
   fallbackWhenOff: (error: Error, reset: () => void) => ReactNode;
   /** Changing this clears a caught error (pass the route to recover on navigation). */
@@ -64,6 +68,9 @@ export class LokCrashBoundary extends Component<LokCrashBoundaryProps, State> {
         strings={this.props.strings ?? defaultStrings}
         onRetry={this.reset}
         onSend={this.props.onSend}
+        autoSend={this.props.autoSend}
+        onAutoSendChange={this.props.onAutoSendChange}
+        alreadySent={this.props.isSent?.(report)}
         accent={this.props.accent}
       />
     );

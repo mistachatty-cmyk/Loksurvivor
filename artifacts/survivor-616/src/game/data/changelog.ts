@@ -1643,6 +1643,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'You can turn this off, or see your crash log, in Settings under LOK Error Report.',
     ],
   },
+  {
+    version: '0.42.5',
+    date: '2026-10-20',
+    publishedAt: '2026-10-20T23:30:00Z',
+    kind: 'update',
+    title: 'Tell LokServer What Happened',
+    body: [
+      'When the game catches a crash, you can now type what you were doing before you send the report, and tick a box to send future crash reports automatically. Both are optional, and nothing is sent unless you press Send or turn automatic sending on.',
+      'After a report goes to LOK, LokServer says thank you.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -59,3 +59,19 @@ describe('LokCrashPopup', () => {
     }
   });
 });
+
+describe('player note and thanks', () => {
+  it('offers a description box and the auto-send choice when sending is available', () => {
+    const html = renderToStaticMarkup(<LokCrashPopup report={report({ mode: 'prod' })} onSend={async () => {}} onAutoSendChange={() => {}} />);
+    assert.match(html, /data-testid="lok-crash-note"/);
+    assert.match(html, /data-testid="lok-crash-auto"/);
+    assert.doesNotMatch(html, /lok-crash-thanks/);
+  });
+  it('shows the thank-you when the crash already went to LOK', () => {
+    const html = renderToStaticMarkup(<LokCrashPopup report={report({ mode: 'prod' })} onSend={async () => {}} alreadySent />);
+    assert.match(html, /data-testid="lok-crash-thanks"/);
+  });
+  it('has no note box without a cloud to send to', () => {
+    assert.doesNotMatch(renderToStaticMarkup(<LokCrashPopup report={report({ mode: 'prod' })} />), /lok-crash-note/);
+  });
+});

@@ -72,6 +72,16 @@ describe('other sinks', () => {
     assert.equal(sink.sent(report(1)), true);
   });
 
+  it('lokFeedbackSink sends again when the player adds a description after an automatic send', async () => {
+    const rows: { message: string }[] = [];
+    const sink = lokFeedbackSink('616_survivor', async (input) => { rows.push(input); return { error: null }; });
+    await sink.send(report(1));
+    await sink.send({ ...report(1), note: 'it froze when I opened the map' });
+    await sink.send({ ...report(1), note: 'it froze when I opened the map' });
+    assert.equal(rows.length, 2);
+    assert.match(rows[1]!.message, /it froze when I opened the map/);
+  });
+
   it('repoDocsSink posts with the dev header and returns the located source', async () => {
     let headers: Record<string, string> = {};
     const sink = repoDocsSink({ fetchImpl: async (_u, init) => { headers = init.headers; return { ok: true, json: async () => ({ source: { frames: [{ file: 'src/a.ts', line: 2, col: 1 }] } }) }; } });

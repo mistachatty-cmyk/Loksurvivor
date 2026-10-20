@@ -33,5 +33,10 @@ export function lokErrorStrings(): LokErrorStrings {
     chip: k('chip'),
     chipOpen: k('chipOpen'),
     privacy: k('privacy'),
+    noteLabel: k('noteLabel'),
+    notePlaceholder: k('notePlaceholder'),
+    autoSend: k('autoSend'),
+    thanksTitle: k('thanksTitle'),
+    thanksBody: k('thanksBody'),
   };
 }

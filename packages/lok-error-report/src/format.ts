@@ -47,6 +47,7 @@ export function toMarkdown(report: ErrorReport, opts: { occurrences?: number; fi
     '',
   ];
   const body: string[] = [];
+  if (report.note) body.push('## What the player said', '', ...report.note.split('\n').map((l) => `> ${l}`), '');
   const resolved = report.source?.frames ?? [];
   if (resolved.length > 0) {
     body.push('## Where it happened', '');
@@ -139,6 +140,7 @@ export function toFeedbackMessage(report: ErrorReport, maxLength = 3500): string
     at: iso(report.at), n: report.count, path: report.path, ctx: report.context,
     frames: report.stack.filter((f) => f.app).slice(0, 6).map((f) => `${f.fn ?? '?'} ${f.file}:${f.line}:${f.col}`),
     crumbs: report.breadcrumbs.slice(-8).map((b) => `${b.type}:${b.text}`),
+    ...(report.note ? { note: report.note } : {}),
   };
   const head = `[${report.id}] ${report.name}: ${oneLine(report.message)}`.slice(0, 300);
   const text = `${head}\n${JSON.stringify(compact)}`;

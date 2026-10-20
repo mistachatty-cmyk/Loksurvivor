@@ -9,6 +9,10 @@ export interface LokErrorHostProps {
   reporter: Reporter;
   strings?: LokErrorStrings;
   onSend?: (report: ErrorReport) => Promise<void>;
+  autoSend?: boolean;
+  onAutoSendChange?: (on: boolean) => void;
+  /** Whether this crash already went to LOK (so the pop-up opens on the thank-you). */
+  isSent?: (report: ErrorReport) => boolean;
   accent?: string;
 }
 
@@ -22,7 +26,7 @@ const chip: CSSProperties = {
  * Crashes that are not render crashes (a thrown error in a timer, a rejected promise) leave the app
  * running, so they get a small chip instead of a full screen. One at a time; the chip opens the pop-up.
  */
-export function LokErrorHost({ reporter, strings = defaultStrings, onSend, accent }: LokErrorHostProps) {
+export function LokErrorHost({ reporter, strings = defaultStrings, onSend, autoSend, onAutoSendChange, isSent, accent }: LokErrorHostProps) {
   const [pending, setPending] = useState<ErrorReport | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -38,6 +42,9 @@ export function LokErrorHost({ reporter, strings = defaultStrings, onSend, accen
         report={pending}
         strings={strings}
         onSend={onSend}
+        autoSend={autoSend}
+        onAutoSendChange={onAutoSendChange}
+        alreadySent={isSent?.(pending)}
         accent={accent}
         onClose={() => { setOpen(false); setPending(null); }}
       />
