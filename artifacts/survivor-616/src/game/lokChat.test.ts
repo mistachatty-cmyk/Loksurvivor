@@ -26,6 +26,7 @@ import {
   ME,
   addAffinity,
   appendMessage,
+  clearLokChat,
   emptyState,
   getLokChat,
   logChannel,
@@ -254,6 +255,13 @@ describe('LOK Chat store', () => {
     assert.equal(s.channel.length, CHANNEL_ENTRIES);
     const again = logChannel(s, { id: 'x', from: 'vee', text: s.channel[s.channel.length - 1]!.text, at: 1 });
     assert.equal(again, s);
+  });
+
+  it('clearing forgets every thread, relationship and channel line', () => {
+    resetLokChatForTests(logChannel(addAffinity(appendMessage(emptyState(), 'vee', { id: '1', from: ME, text: 'hi', at: 1 }), 'vee', 20).state, { id: 'c', from: 'vee', text: 'yo', at: 2 }));
+    assert.ok(Object.keys(getLokChat().threads).length > 0);
+    clearLokChat();
+    assert.deepEqual(getLokChat(), emptyState());
   });
 
   it('survives garbage in storage without throwing, keeping only what it can trust', () => {

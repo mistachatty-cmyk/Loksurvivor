@@ -207,6 +207,11 @@ export function subscribeLokChat(listener: () => void): () => void {
   return () => { listeners.delete(listener); };
 }
 
+/** Forget every conversation, relationship and channel line on this device. */
+export function clearLokChat(): void {
+  updateLokChat(() => emptyState());
+}
+
 /** For tests: forget everything held in memory. */
 export function resetLokChatForTests(next: LokChatState = emptyState()): void {
   state = next;

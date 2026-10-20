@@ -1597,7 +1597,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'LOK Chat',
     body: [
       'Your crew now have a chat window. Open LOK Chat from the hideout and message anyone you have rescued: type whatever you like or tap a suggestion. They answer in their own voice and know what is going on: how your last run went, your LokPet, the weather, the room, and what they think of the rest of the crew.',
-      'The more you talk, the better they know you. Friends open up with a personal story, close friends say so, and the crew will message you first after a run, after a long time away, or at the start and end of the day. The #hideout channel keeps everything the crew say around the hideout, and it all stays on your device.',
+      'The more you talk, the better they know you. Friends open up with a personal story, close friends say so, and the crew will message you first after a run, after a long time away, or at the start and end of the day. The #hideout channel keeps everything the crew say around the hideout. It all stays on your device, and a Clear button wipes it whenever you like.',
     ],
   },
 ];

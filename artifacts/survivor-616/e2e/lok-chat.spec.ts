@@ -60,6 +60,11 @@ test.describe('LOK Chat', () => {
     await page.getByTestId('lok-chat-row-deacon').click();
     await expect(page.getByTestId('lok-chat-message-mine')).toHaveCount(1);
     await expect(page.getByTestId('lok-chat-message-theirs')).toHaveCount(1);
+
+    // Clear wipes the conversation (after a confirmation).
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByTestId('button-lok-chat-clear').click();
+    await expect(page.getByTestId('lok-chat-message-mine')).toHaveCount(0);
   });
 
   test('on a phone the chat list and the conversation take turns', async ({ page }) => {

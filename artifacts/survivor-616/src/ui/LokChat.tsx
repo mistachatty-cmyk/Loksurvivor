@@ -15,7 +15,7 @@ import { useT } from '@/lib/i18n';
 import { allyRig } from '@/game/data/progression';
 import { MAX_MESSAGE_CHARS, affinityTier, quickReplies, type AffinityTier, type QuickReply } from '@/game/engine/lokChat';
 import { sendToAlly, setOpenThread, type ContextBuilder } from '@/game/state/lokChatActions';
-import { ME, totalUnread, useLokChat, type ChatMessage } from '@/game/state/lokChatStore';
+import { ME, clearLokChat, totalUnread, useLokChat, type ChatMessage } from '@/game/state/lokChatStore';
 import type { AllyDef } from '@/game/types';
 
 import { RigPortrait } from './RigPortrait';
@@ -100,7 +100,6 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const reduceMotion = prefersReducedMotion();
 
   const ally = allies.find((a) => a.id === selected);
@@ -118,6 +117,16 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
   }, [onClose]);
 
   useEffect(() => { inputRef.current?.focus(); }, [selected]);
+
+  // Hand focus back to whatever opened the window (the hub's LOK Chat button) when it closes.
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    return () => { if (opener && typeof opener.focus === 'function') opener.focus(); };
+  }, []);
+
+  const clearAll = () => {
+    if (window.confirm(t('lokChat.clearConfirm'))) clearLokChat();
+  };
 
   const messageCount = thread?.messages.length ?? 0;
   const channelCount = channel.length;
@@ -157,7 +166,6 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
   return (
     <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/75 p-2 sm:p-4" data-testid="lok-chat" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div
-        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="lok-chat-title"
@@ -167,7 +175,8 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
           <LokMark />
           <h2 id="lok-chat-title" className="font-mono text-xs font-black uppercase tracking-[.3em] text-white">{t('lokChat.title')}</h2>
           <span className="hidden font-mono text-[9px] uppercase tracking-widest text-white/40 sm:inline">{t('lokChat.footer')}</span>
-          <button type="button" onClick={onClose} className="ml-auto inline-flex h-9 w-9 items-center justify-center border border-white/15 text-white/70 hover:border-white/50 hover:text-white" aria-label={t('lokChat.close')} data-testid="button-lok-chat-close"><X className="h-4 w-4" /></button>
+          <button type="button" onClick={clearAll} className="ml-auto border border-white/15 px-2 py-2 font-mono text-[9px] font-bold uppercase tracking-widest text-white/55 hover:border-white/40 hover:text-white" data-testid="button-lok-chat-clear">{t('lokChat.clear')}</button>
+          <button type="button" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center border border-white/15 text-white/70 hover:border-white/50 hover:text-white" aria-label={t('lokChat.close')} data-testid="button-lok-chat-close"><X className="h-4 w-4" /></button>
         </header>
 
         <div className="flex min-h-0 flex-1">
