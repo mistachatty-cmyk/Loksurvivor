@@ -160,6 +160,8 @@ Behavior worth knowing:
 - **#hideout channel:** every line `crewLineFor` produces (taps and strip chatter) is logged
   (`logCrewLine`), so the strip and the chat stay one conversation.
 
+> Where this is going (living crew, presence, community): `docs/LOK_CHAT_ROADMAP.md`.
+
 ### Conversation depth (v0.42.6)
 
 Replies are no longer one-shot. `engine/lokChatTalk.ts` reads what a message is *like* (a feeling, a question,

@@ -19,5 +19,7 @@ Full handoff in `docs/CREW_CHATTER.md` (section "LOK Chat"). Decisions to keep:
   order: answer a pending question, then why/more follow-up, then keyword topic (unless a STRONG classic intent),
   then fallback by feeling/shape, else the classic intent templates. Layers unlock by tier (1/2/3). Tests that pin
   exact confide text must not get an appended question (confide never asks one back).
+- **Roadmap:** `docs/LOK_CHAT_ROADMAP.md` is the plan for making this a living, dynamic community (phases A-G, decisions
+  to confirm, safety rules). Nothing past v0.42.6 is built; free-text player-to-player chat needs an explicit owner decision first.
 - Verify: `node --import tsx --test src/game/lokChat.test.ts`, `e2e/lok-chat.spec.ts`; visual check by seeding a save
   with `rescuedAllyIds` and opening `/?screen=hub`.
