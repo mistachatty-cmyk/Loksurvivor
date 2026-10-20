@@ -15,6 +15,12 @@ Rules that apply to every item (from `CLAUDE.md` and `docs/LOK_COST_DISCIPLINE.m
 - Do **not** rip out the analyser or the beat-reactive gameplay. The aim is to make
   them cheap, optional and safe, not to remove a feature the game is built around.
 
+> **Second pass (same day):** `docs/soundtrack-song-audit-2026-10-20.md` audits the song
+> files and adds items to this plan: volume through a gain node, level-matching tracks 03 and
+> 07, retuning the Monroe Strip music-event thresholds, an intro retry that only starts the
+> song, reconnecting the analyser on every resume, and two small content fixes. Fold them
+> into Patch A (the intro and resume fixes) and Patch B (the rest).
+
 ## Order of work, and why
 
 I cannot reproduce the crash here (no device), so the order is: **measure first,

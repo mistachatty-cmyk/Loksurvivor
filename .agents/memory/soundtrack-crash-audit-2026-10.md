@@ -26,6 +26,25 @@ CSS, or the error boundary. Full detail is in `docs/soundtrack-crash-audit-2026-
   caller re-renders on each `timeupdate`.
 - The recovery listener resumes only `'suspended'`; Safari also uses `'interrupted'`.
 
+## Second pass: the songs themselves (docs/soundtrack-song-audit-2026-10-20.md)
+
+- All 12 bundled `.m4a` files are valid (full decode clean, index first, mono AAC about
+  24 kbps). Nothing is keyed to how far through a song you are. The game never edits a song;
+  songs only drive gameplay through `reactivity.ts` and Monroe Strip's `musicEvents`.
+- A real Chromium run (phone viewport, autoplay blocked, WAV copies) played all 12 songs
+  through 10/30/60/70/90% with no error, crash panel or heap growth. The crash is still
+  unreproduced; suspect phone memory or graphics pressure (and the title screen's bot game),
+  which a page error would never show. Use the Patch A crash trail to settle it.
+- 9 of 12 songs are mastered to full scale; tracks 03 and 07 are about 11 dB quieter. Monroe
+  Strip's bass trigger (0.75) is met 86 to 98 percent of the time and its energy trigger
+  (0.85) never fires (real energy tops out near 0.45). Retune against real band values.
+- No gain node: volume is `audio.volume`, which iOS ignores. Route volume through a gain node.
+- Bugs to fix: `IntroScreen` retry toggles instead of starting (pauses the title song when
+  autoplay is allowed); `togglePlay` resume never restarts the analyser; Studio's random pick
+  can choose a locked song; `HubScreen` calls `playTrackOnRepeat('rbm')`, an id that no longer
+  exists.
+- Tools to re-run: `docs/audit-tools/`. A saved-progress injection for tests needs `version: 1`.
+
 ## Status
 
 Audit only, no code changed. Typecheck clean, 1020 tests green. The crash was **not**
