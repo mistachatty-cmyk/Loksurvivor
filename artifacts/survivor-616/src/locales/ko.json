@@ -934,5 +934,7 @@
   "lokChat.quick.advice": "조언이 있나요?",
   "lokChat.quick.joke": "농담 하나 들려줘",
   "lokChat.quick.weather": "날씨는 어때요?",
-  "lokChat.quick.confide": "진짜 말 좀 해봐"
+  "lokChat.quick.confide": "진짜 말 좀 해봐",
+  "lokChat.clear": "지우기",
+  "lokChat.clearConfirm": "이 기기에서 모든 LOK Chat 대화를 삭제하시겠습니까? 이는 또한 승무원이 귀하를 얼마나 잘 아는지도 재설정합니다."
 }

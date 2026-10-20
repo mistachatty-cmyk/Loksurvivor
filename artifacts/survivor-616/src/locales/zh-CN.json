@@ -934,5 +934,7 @@
   "lokChat.quick.advice": "有什么建议吗？",
   "lokChat.quick.joke": "给我讲个笑话",
   "lokChat.quick.weather": "天气怎么样？",
-  "lokChat.quick.confide": "告诉我一些真实的事情"
+  "lokChat.quick.confide": "告诉我一些真实的事情",
+  "lokChat.clear": "清除",
+  "lokChat.clearConfirm": "清除此设备上的所有 LOK Chat 对话吗？这也会重置船员对你的了解程度。"
 }

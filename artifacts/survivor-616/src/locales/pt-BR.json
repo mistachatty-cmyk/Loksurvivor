@@ -934,5 +934,7 @@
   "lokChat.quick.advice": "Algum conselho?",
   "lokChat.quick.joke": "Conte-me uma piada",
   "lokChat.quick.weather": "Como está o tempo?",
-  "lokChat.quick.confide": "Diga-me algo real"
+  "lokChat.quick.confide": "Diga-me algo real",
+  "lokChat.clear": "Limpar",
+  "lokChat.clearConfirm": "Limpar todas as conversas LOK Chat neste dispositivo? Isso também redefine o quão bem a tripulação conhece você."
 }
