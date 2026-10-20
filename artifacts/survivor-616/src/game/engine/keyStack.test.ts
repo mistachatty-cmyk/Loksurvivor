@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
+import { keyStackPose } from '@/game/render/draw';
 import { KEY_STACK_JOIN_MS, KEY_STACK_LIFE_MS, collectSkeletonKey, createWorld, stepWorld, type World } from '@/game/engine/world';
 
 const neutralInput = { moveX: 0, moveY: 0, aimX: 1, aimY: 0, dash: false, special: false, ultimate: false } as unknown as Parameters<typeof stepWorld>[2];
@@ -47,4 +48,19 @@ test('the stack expires after about a second idle and a later key starts a fresh
   collectSkeletonKey(w, 1);
   assert.equal(w.keyStack?.count, 1);
   assert.equal(w.skeletonKeysGained, 3);
+});
+
+test('reduced motion keeps the stack still: no spring, rise, fan or trailing', () => {
+  const w = quietWorld();
+  collectSkeletonKey(w, 2);
+  w.player.vx = 200;
+  w.player.vy = 100;
+  w.now += 50;
+  const still = keyStackPose(w, false);
+  assert.deepEqual([still.popScale, still.rise, still.fan, still.trailX, still.trailY], [1, 0, 0, 0, 0]);
+  const lively = keyStackPose(w, true);
+  assert.ok(lively.popScale > 1 && lively.fan > 0 && lively.trailX < 0);
+  w.now += KEY_STACK_LIFE_MS - 100;
+  assert.ok(keyStackPose(w, false).alpha < 1, 'still fades out');
+  assert.equal(keyStackPose(w, false).rise, 0);
 });

@@ -1600,6 +1600,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The more you talk, the better they know you. Friends open up with a personal story, close friends say so, and the crew will message you first after a run, after a long time away, or at the start and end of the day. The #hideout channel keeps everything the crew say around the hideout. It all stays on your device, and a Clear button wipes it whenever you like.',
     ],
   },
+  {
+    version: '0.42.1',
+    date: '2026-10-20',
+    publishedAt: '2026-10-20T12:00:00Z',
+    kind: 'hotfix',
+    title: 'Calmer Key Stacks',
+    body: [
+      'With reduced motion on, collected skeleton keys now sit still above you and simply fade out, with no spring, wobble, rise or trailing.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -6509,6 +6509,26 @@ function drawCascadePopup(ctx: CanvasRenderingContext2D, w: World, popup: Popup,
 const KEY_GLYPHS_MAX = 5;
 
 /**
+ * Where the key stack is drawn this frame. With motion off (reduced-motion players) the stack
+ * is still, with no spring, wobble, rise or trailing, and only fades.
+ */
+export function keyStackPose(w: World, motion: boolean) {
+  const stack = w.keyStack;
+  const sinceLast = stack ? w.now - stack.lastAt : 0;
+  const fading = sinceLast > KEY_STACK_LIFE_MS - 250;
+  const alpha = fading ? Math.max(0, (KEY_STACK_LIFE_MS - sinceLast) / 250) : 1;
+  const p = w.player;
+  return {
+    alpha,
+    rise: motion && fading ? (1 - alpha) * 10 : 0,
+    popScale: motion ? 1 + Math.sin(Math.min(1, sinceLast / 180) * Math.PI) * 0.45 : 1,
+    fan: motion ? 0.28 : 0,
+    trailX: motion ? -p.vx * 0.09 : 0,
+    trailY: motion ? Math.abs(p.vy) * 0.03 : 0,
+  };
+}
+
+/**
  * Keys picked up together stack above the player for about a second: each new key pops in
  * with a small spring, the stack trails the player slightly (so it never reads as glued to
  * the sprite), then it rises and fades. One "xN KEY" label replaces a popup per key.
@@ -6516,28 +6536,22 @@ const KEY_GLYPHS_MAX = 5;
 function drawKeyStack(ctx: CanvasRenderingContext2D, w: World, visualBudget: NonNullable<Viewport['visualBudget']>) {
   const stack = w.keyStack;
   if (!stack) return;
-  const sinceLast = w.now - stack.lastAt;
-  const fade = sinceLast > KEY_STACK_LIFE_MS - 250 ? Math.max(0, (KEY_STACK_LIFE_MS - sinceLast) / 250) : 1;
-  if (fade <= 0) return;
-  const rise = sinceLast > KEY_STACK_LIFE_MS - 250 ? (1 - fade) * 10 : 0;
+  const pose = keyStackPose(w, w.effectMotionEnabled);
+  if (pose.alpha <= 0) return;
   const p = w.player;
-  // Trail behind the player's motion.
-  const baseX = p.x - p.vx * 0.09;
-  const baseY = p.y - p.radius - 20 - rise - Math.abs(p.vy) * 0.03;
+  const baseX = p.x + pose.trailX;
+  const baseY = p.y - p.radius - 20 - pose.rise - pose.trailY;
   const shown = Math.min(stack.count, KEY_GLYPHS_MAX);
   ctx.save();
-  ctx.globalAlpha = fade;
+  ctx.globalAlpha = pose.alpha;
   if (visualBudget !== 'minimal') {
     for (let i = 0; i < shown; i += 1) {
-      // Newest key pops: scale overshoots then settles over 180 ms.
-      const isNewest = i === shown - 1;
-      const pop = isNewest ? Math.min(1, sinceLast / 180) : 1;
-      const scale = isNewest ? 1 + Math.sin(pop * Math.PI) * 0.45 : 1;
+      const scale = i === shown - 1 ? pose.popScale : 1;
       const x = baseX + (i - (shown - 1) / 2) * 7;
       const y = baseY - i * 5;
       ctx.save();
       ctx.translate(x, y);
-      ctx.rotate((i - (shown - 1) / 2) * 0.28);
+      ctx.rotate((i - (shown - 1) / 2) * pose.fan);
       ctx.scale(scale, scale);
       ctx.shadowColor = '#fde68a';
       ctx.shadowBlur = 8;
