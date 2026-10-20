@@ -42,6 +42,13 @@ export interface PlaytimeTrackerOptions {
    * the person has agreed to optional storage. Default: signed-out play is not counted.
    */
   allowAnonymous?: () => boolean;
+  /**
+   * Count signed-out play that has NOT agreed to optional storage, in a separate cookieless
+   * "guest" tally (`gsix_playtime_add_guest`): only the app name and the seconds are sent, no
+   * identifier, nothing stored on the device. Skipped for browsers sending Global Privacy
+   * Control or Do Not Track. Default false. Disclose it in your privacy policy if you turn it on.
+   */
+  countGuests?: boolean;
   /** Seconds between reports. Default 30; the server accepts at most 90 per report. */
   flushEverySeconds?: number;
 }
@@ -79,6 +86,16 @@ function anonymousId(): string | null {
     return null;
   }
 }
+
+/** Browsers can ask not to be tracked (Global Privacy Control, Do Not Track): honour it. */
+function guestCountingAllowed(): boolean {
+  const nav = navigator as Navigator & { globalPrivacyControl?: boolean; msDoNotTrack?: string };
+  const dnt = nav.doNotTrack ?? (window as Window & { doNotTrack?: string }).doNotTrack ?? nav.msDoNotTrack;
+  return nav.globalPrivacyControl !== true && dnt !== "1" && dnt !== "yes";
+}
+
+/** Guest reports are capped server-side at this many seconds per call. */
+const GUEST_REPORT_SECONDS = 30;
 
 function isFramed(): boolean {
   try {
@@ -124,17 +141,31 @@ export function startPlaytimeTracker(options: PlaytimeTrackerOptions): PlaytimeT
     }
   }, 1000);
 
-  const send = async (seconds: number): Promise<boolean> => {
-    const signedIn = token !== null;
-    if (!signedIn && !options.allowAnonymous?.()) return true; // nothing to send; drop it
+  type Mode = "account" | "anon" | "guest" | null;
+  const currentMode = (): Mode => {
+    if (token !== null) return "account";
+    if (options.allowAnonymous?.()) return "anon";
+    return options.countGuests && guestCountingAllowed() ? "guest" : null;
+  };
+
+  const send = async (seconds: number, mode: Mode): Promise<boolean> => {
+    if (!mode) return true; // nothing to send; drop it
     const headers: Record<string, string> = { apikey: options.publishableKey, "Content-Type": "application/json" };
-    if (token) headers.Authorization = `Bearer ${token}`;
+    let fn = "gsix_playtime_add";
+    let body: Record<string, unknown>;
+    if (mode === "guest") {
+      fn = "gsix_playtime_add_guest";
+      body = { p_app_key: options.appKey, p_seconds: seconds };
+    } else {
+      if (mode === "account" && token) headers.Authorization = `Bearer ${token}`;
+      body = { p_app_key: options.appKey, p_seconds: seconds, p_client: mode === "account" ? null : anonymousId() };
+    }
     try {
-      const response = await fetch(`${options.supabaseUrl}/rest/v1/rpc/gsix_playtime_add`, {
+      const response = await fetch(`${options.supabaseUrl}/rest/v1/rpc/${fn}`, {
         method: "POST",
         headers,
         keepalive: true,
-        body: JSON.stringify({ p_app_key: options.appKey, p_seconds: seconds, p_client: signedIn ? null : anonymousId() }),
+        body: JSON.stringify(body),
       });
       return response.ok;
     } catch {
@@ -143,11 +174,12 @@ export function startPlaytimeTracker(options: PlaytimeTrackerOptions): PlaytimeT
   };
 
   const flush = async () => {
-    const whole = Math.min(Math.floor(carry), MAX_REPORT_SECONDS);
+    const mode = currentMode();
+    const whole = Math.min(Math.floor(carry), mode === "guest" ? GUEST_REPORT_SECONDS : MAX_REPORT_SECONDS);
     if (whole < 1 || sending) return;
     carry -= whole;
     sending = true;
-    const ok = await send(whole);
+    const ok = await send(whole, mode);
     sending = false;
     if (!ok) carry = Math.min(RESTORE_CAP_SECONDS, carry + whole);
   };
