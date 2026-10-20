@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 140,
+      "version": "0.42.1",
+      "date": "2026-10-20",
+      "publishedAt": "2026-10-20T12:00:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Calmer Key Stacks",
+      "body": [
+        "With reduced motion on, collected skeleton keys now sit still above you and simply fade out, with no spring, wobble, rise or trailing."
+      ]
+    },
+    {
       "number": 139,
       "version": "0.42.0",
       "date": "2026-10-19",
