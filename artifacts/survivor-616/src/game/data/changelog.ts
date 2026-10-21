@@ -1632,6 +1632,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Achievements you had already earned before this update are shown as earned, with the date marked as unknown. From now on, each new one is stamped with the day you get it.',
     ],
   },
+  {
+    version: '0.42.4',
+    date: '2026-10-20',
+    publishedAt: '2026-10-20T23:45:00Z',
+    kind: 'update',
+    title: 'Artists: Get Your Music in the Game',
+    body: [
+      'Making music? The Music panel now has a Submit your music button. Add your name, your email and the name of the song or project, and it opens an email to the Lok and GSix team with everything filled in. Attach your WAV, MP3, M4A or FLAC file and send it. Music for other Lok and GSix apps and games is welcome too.',
+      'This is the first piece of a shared Lok tool that other Lok apps and games will be able to switch on as well. Nothing is uploaded from the game: the email goes out through your own email app.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
