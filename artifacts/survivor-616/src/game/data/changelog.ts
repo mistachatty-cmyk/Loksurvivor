@@ -1632,16 +1632,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Achievements you had already earned before this update are shown as earned, with the date marked as unknown. From now on, each new one is stamped with the day you get it.',
     ],
   },
-  {
-    version: '0.42.4',
-    date: '2026-10-21',
-    publishedAt: '2026-10-21T12:00:00Z',
-    kind: 'hotfix',
-    title: 'Classic Menu Is Back',
-    body: [
-      'The Hideout main menu now starts with the classic corner controls for everyone. If you prefer the newer control dock, you can switch to it from the layout button or Settings.',
-    ],
-  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
