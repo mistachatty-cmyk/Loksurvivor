@@ -2,16 +2,15 @@ import { useSyncExternalStore } from 'react';
 
 export type UiChromeLayout = 'new' | 'classic';
 
-// Start the new control dock for everyone. The previous key could retain an
-// old "classic" choice indefinitely, leaving mission/run controls pinned over
-// the hideout after an update. The classic layout remains available by opting
-// into it again from the layout toggle or Settings.
-const KEY = 'survivor616.ui.chrome-layout.v2';
+// Classic corners are the default for everyone. The key is versioned so an
+// earlier choice does not carry over; the new control dock remains available
+// by opting into it from the layout toggle or Settings.
+const KEY = 'survivor616.ui.chrome-layout.v3';
 const CHANGE_EVENT = 'survivor616.ui.chrome-layout-change';
 
 export function getUiChromeLayout(): UiChromeLayout {
-  try { return localStorage.getItem(KEY) === 'classic' ? 'classic' : 'new'; }
-  catch { return 'new'; }
+  try { return localStorage.getItem(KEY) === 'new' ? 'new' : 'classic'; }
+  catch { return 'classic'; }
 }
 
 export function setUiChromeLayout(layout: UiChromeLayout): void {
@@ -29,5 +28,5 @@ function subscribe(onChange: () => void): () => void {
 }
 
 export function useUiChromeLayout(): UiChromeLayout {
-  return useSyncExternalStore(subscribe, getUiChromeLayout, () => 'new');
+  return useSyncExternalStore(subscribe, getUiChromeLayout, () => 'classic');
 }
