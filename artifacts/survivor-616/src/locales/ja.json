@@ -8,7 +8,7 @@
   "settings.textSize.large": "大",
   "settings.textSize.xlarge": "特大",
   "settings.arrivalDiscs.title": "隠れ家の外にあるフローティングディスク",
-  "settings.arrivalDiscs.body": "到着画面の雨の上に、サウンドトラックがゆっくりと回転するディスクとして表示されます。中央のディスクをタップして再生します。デフォルトではオフです。いつもの到着風景は変わりません。",
+  "settings.arrivalDiscs.body": "到着画面の雨の上に、サウンドトラックがゆっくりと回転するディスクとして表示されます。中央のディスクをタップして再生します。単純な雨のシーンの場合はこれをオフにします。",
   "hub.room.jukebox.label": "ジュークボックスルーム",
   "hub.room.jukebox.description": "ディスクと暗い部屋",
   "jukebox.title": "ジュークボックスルーム",

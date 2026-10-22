@@ -8,7 +8,7 @@
   "settings.textSize.large": "대형",
   "settings.textSize.xlarge": "특대형",
   "settings.arrivalDiscs.title": "은신처 외부에 떠 있는 디스크",
-  "settings.arrivalDiscs.body": "도착 화면의 비 위에서 천천히 회전하는 디스크로 사운드트랙을 표시합니다. 재생하려면 가운데 디스크를 탭하세요. 기본적으로 꺼져 있습니다. 일반적인 도착 장면은 변경되지 않았습니다.",
+  "settings.arrivalDiscs.body": "도착 화면의 비 위에서 천천히 회전하는 디스크로 사운드트랙을 표시합니다. 재생하려면 가운데 디스크를 탭하세요. 일반 비가 내리는 장면에서는 이 기능을 끄세요.",
   "hub.room.jukebox.label": "주크박스 룸",
   "hub.room.jukebox.description": "디스크와 암실",
   "jukebox.title": "주크박스 룸",
