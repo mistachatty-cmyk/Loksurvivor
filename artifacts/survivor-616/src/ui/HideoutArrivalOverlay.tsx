@@ -17,7 +17,7 @@ import { motion } from 'framer-motion';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
 import { weatherClass } from '@/game/data/hideout';
 import type { CharacterDef, HideoutSceneDef, SpritePalette } from '@/game/types';
-import { readArrivalDiscsEnabled } from '@/lib/arrivalDiscs';
+import { readArrivalDiscsEnabled, writeArrivalDiscsSetting } from '@/lib/arrivalDiscs';
 import { readReactiveBg } from '@/lib/jukeboxPrefs';
 import { ReactiveBackdrop } from './ReactiveBackdrop';
 import { armDiscGuard, resetDiscGuard } from '@/lib/discGuard';
@@ -30,6 +30,51 @@ import { RigPortrait } from './RigPortrait';
 // never part of the first-load bundle for anyone who has it off.
 const loadDiscShelf = () => optionalImport(() => import('./ArrivalDiscShelf'));
 const ArrivalDiscShelf = lazy(loadDiscShelf);
+
+const RELOAD_FLAG = 'survivor616.arrival-discs-reload.v1';
+const SLOW_LOAD_MS = 8000;
+
+function reloadOnce(): boolean {
+  try {
+    if (window.sessionStorage.getItem(RELOAD_FLAG)) return false;
+    window.sessionStorage.setItem(RELOAD_FLAG, '1');
+  } catch {
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
+
+/** Shown when the disc shelf fails to load or draw: never a silent blank, always a way to try again. */
+function DiscsFailedCard() {
+  const t = useT();
+  // The arrival screen comes before anything the player can lose, so one automatic refresh is safe and
+  // fixes the common cause (a page from before an update asking for a code file that moved).
+  useEffect(() => {
+    reloadOnce();
+  }, []);
+  return (
+    <button
+      type="button"
+      onClick={() => window.location.reload()}
+      className="absolute inset-x-6 top-[8dvh] z-10 mx-auto max-w-xs border border-amber-300/50 bg-[#2a1a05]/80 px-4 py-3 text-left text-sm text-amber-100"
+      data-testid="button-arrival-discs-failed"
+    >
+      <span className="block font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300">{t('arrival.discsFailed.title')}</span>
+      <span className="mt-1 block leading-snug">{t('arrival.discsFailed.body')}</span>
+    </button>
+  );
+}
+
+/** While the shelf loads: nothing, until it has taken suspiciously long, then the retry card. */
+function DiscsLoadingFallback() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => setSlow(true), SLOW_LOAD_MS);
+    return () => window.clearTimeout(id);
+  }, []);
+  return slow ? <DiscsFailedCard /> : null;
+}
 
 export interface HideoutArrivalOverlayProps {
   character: CharacterDef;
@@ -126,8 +171,8 @@ export function HideoutArrivalOverlay({
           data-testid="arrival-disc-shelf"
         >
           {/* A failed disc chunk must never take the arrival screen down with it. */}
-          <ErrorBoundary FallbackComponent={() => null}>
-            <Suspense fallback={null}>
+          <ErrorBoundary FallbackComponent={DiscsFailedCard}>
+            <Suspense fallback={<DiscsLoadingFallback />}>
               <ArrivalDiscShelf
                 lite={discSafety.lite || retryDiscs}
                 onPlay={() => {
@@ -139,6 +184,21 @@ export function HideoutArrivalOverlay({
             </Suspense>
           </ErrorBoundary>
         </div>
+      ) : null}
+
+      {!wantsDiscs ? (
+        <button
+          type="button"
+          onClick={() => {
+            writeArrivalDiscsSetting(true);
+            resetDiscGuard();
+            window.location.reload();
+          }}
+          className="absolute left-1/2 top-[6dvh] z-10 -translate-x-1/2 border border-white/20 bg-black/40 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/60"
+          data-testid="button-arrival-discs-off"
+        >
+          {t('arrival.discsOff.body')}
+        </button>
       ) : null}
 
       {discsPaused ? (

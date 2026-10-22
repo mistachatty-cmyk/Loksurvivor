@@ -14,6 +14,7 @@ import DiscCascadeCarousel from '@/components/ui/disc-cascade-carousel';
 import { albumTracks, discItemFor, startingDisc, type DiscTrack } from '@/game/audio/jukeboxDiscs';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { watchDiscGuard } from '@/lib/discGuard';
+import { useT } from '@/lib/i18n';
 import { setCrashScreen } from '@/lib/lokCrash';
 import { readDiscPulse } from '@/lib/discPulse';
 import { DiscPulse } from './DiscPulse';
@@ -24,6 +25,7 @@ const DISC_SIZE = 'clamp(150px, 46vw, 300px)';
 
 export default function ArrivalDiscShelf({ lite, onPlay }: { lite?: boolean; onPlay?: () => void }) {
   useEffect(() => watchDiscGuard(), []);
+  const t = useT();
   const { tracks, currentTrack, isPlaying, playTrack, togglePlay, soundtrackObjectiveCompletions } = useMusicPlayer();
   const [hint, setHint] = useState<DiscTrack | null>(null);
   const [pulseLevel] = useState(readDiscPulse);
@@ -34,7 +36,13 @@ export default function ArrivalDiscShelf({ lite, onPlay }: { lite?: boolean; onP
   const first = useMemo(() => startingDisc(discTracks, currentTrack?.id ?? null), [discTracks, currentTrack?.id]);
 
   const [center, setCenter] = useState<number | null>(null);
-  if (items.length === 0) return null;
+  if (items.length === 0) {
+    return (
+      <p className="mx-auto mt-[6dvh] max-w-xs px-6 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-white/50" data-testid="arrival-discs-empty">
+        {t('arrival.discsEmpty.body')}
+      </p>
+    );
+  }
   const centerIndex = center ?? first;
   const centerTrack = discTracks[centerIndex];
 
