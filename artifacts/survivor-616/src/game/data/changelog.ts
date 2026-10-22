@@ -1708,6 +1708,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The floating discs now use a lighter look on phones and keep fewer discs loaded at once, so scrolling and playing them no longer runs a phone out of memory. If the page ever closes unexpectedly while the discs are showing, the game switches them to the lightest mode, and turns them off if it happens twice in a row. You can still turn them back on in Settings.',
     ],
   },
+  {
+    version: '0.42.11',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T21:00:00Z',
+    kind: 'update',
+    title: 'Blueprint Discs',
+    body: [
+      'Discs you have not unlocked yet now look like see-through blueprints. Tap one and Lok tells you how many run objectives it takes to open it, and how many you have left.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

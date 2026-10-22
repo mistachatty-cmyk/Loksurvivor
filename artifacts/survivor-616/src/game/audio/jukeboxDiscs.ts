@@ -45,7 +45,7 @@ export const LOKIFED_DISC_STYLES: Record<number, DiscStyle> = {
 };
 
 /** A locked disc stays a disc, just dim and sealed, like a locked card. */
-const SEALED_PALETTE: [string, string, string] = ['#17181c', '#2c2f36', '#4b4f59'];
+const SEALED_PALETTE: [string, string, string] = ['rgba(0,0,0,0)', '#7dd3fc', '#7dd3fc'];
 
 /** The bundled album, in track order. Player-added local files never get a disc. */
 export function albumTracks<T extends DiscTrack>(tracks: readonly T[]): T[] {
@@ -64,9 +64,9 @@ export function discItemFor(track: DiscTrack): DiscCascadeItem {
     return {
       title: track.title,
       label: 'Sealed',
-      pattern: 'rings',
+      pattern: 'blueprint',
       palette: SEALED_PALETTE,
-      ink: '#8b909c',
+      ink: '#7dd3fc',
       fine: `Finish ${need} objectives to open  ·  Track ${num}`,
     };
   }
@@ -85,4 +85,11 @@ export function startingDisc(discTracks: readonly DiscTrack[], playingId: string
   if (playing >= 0) return playing;
   const open = discTracks.findIndex((t) => !t.locked);
   return open >= 0 ? open : 0;
+}
+
+/** What a sealed disc still needs: total objectives to open it, how many are done, how many remain. */
+export function sealedProgress(track: DiscTrack, completed: number): { need: number; have: number; left: number } {
+  const need = Math.max(0, track.unlockObjectiveCount ?? 0);
+  const have = Math.max(0, Math.floor(completed));
+  return { need, have: Math.min(have, need), left: Math.max(0, need - have) };
 }

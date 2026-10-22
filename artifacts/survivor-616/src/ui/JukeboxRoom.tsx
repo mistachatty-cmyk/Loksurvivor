@@ -17,6 +17,8 @@ import { albumTracks, discItemFor, startingDisc } from '@/game/audio/jukeboxDisc
 import { formatTime, useMusicPlayer } from '@/game/audio/musicPlayer';
 import { armDiscGuard, watchDiscGuard } from '@/lib/discGuard';
 import { useT } from '@/lib/i18n';
+import { SealedDiscHint } from './SealedDiscHint';
+import type { DiscTrack } from '@/game/audio/jukeboxDiscs';
 import { useTheaterLevel } from '@/lib/useTheaterLevel';
 
 const MIX_KEY = 'survivor616.jukebox.theater-mix.v1';
@@ -37,7 +39,8 @@ export interface JukeboxRoomProps {
 export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
   const t = useT();
   const music = useMusicPlayer();
-  const { tracks, currentTrack, isPlaying, playTrack, togglePlay, next, previous, seek, progressSec, durationSec, setTheaterTone } = music;
+  const { tracks, currentTrack, isPlaying, playTrack, togglePlay, next, previous, seek, progressSec, durationSec, setTheaterTone, soundtrackObjectiveCompletions } = music;
+  const [hint, setHint] = useState<DiscTrack | null>(null);
   const [theaterMix, setTheaterMix] = useState(readMix);
   const { level, wake } = useTheaterLevel({ paused: !isPlaying, theaterMix });
   const [safety] = useState(armDiscGuard);
@@ -188,13 +191,24 @@ export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
             ariaLabel={t('jukebox.title')}
             onSelect={(_item, index) => {
               const track = discTracks[index];
-              if (!track || track.locked) return;
+              if (!track) return;
+              if (track.locked) {
+                setHint(track);
+                return;
+              }
+              setHint(null);
               if (currentTrack?.id === track.id) togglePlay();
               else playTrack(track.id);
             }}
           />
         ) : null}
       </div>
+
+      {hint ? (
+        <div className="absolute inset-x-0 top-[calc(14dvh+58dvh)] z-50 px-4">
+          <SealedDiscHint track={hint} completed={soundtrackObjectiveCompletions} onClose={() => setHint(null)} />
+        </div>
+      ) : null}
 
       <div className="absolute inset-x-0 bottom-0 flex flex-col gap-3 bg-gradient-to-t from-black/80 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10" style={uiStyle}>
         <p className="truncate text-center font-mono text-xs uppercase tracking-[0.25em] text-white/70">
