@@ -1945,6 +1945,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Fulton Back Alley now has two panes of glass and two ice blocks to play with.',
     ],
   },
+  {
+    version: '0.42.32',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T00:50:00Z',
+    kind: 'hotfix',
+    title: 'Discs Outside the Hideout',
+    body: [
+      'Fixed the floating discs sometimes not showing up on the Outside the hideout screen. If the disc shelf fails to load or draw, you now get a clear card with a refresh button (and the game tries one refresh by itself) instead of a silent empty screen.',
+      'If you turned the discs off, a small note on that screen now says so and turns them back on with a tap. An empty shelf says why too.',
+      'A bad visit no longer parks the discs for good: the pause wears off after a day, and a paused shelf can no longer count its own pause as another bad visit.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
