@@ -14,6 +14,9 @@ import { motion } from 'framer-motion';
 import { MapPin, Lock, Clock, AlertTriangle, CheckCircle2, Infinity, Skull, PencilRuler, Copy, Maximize2, Compass, Layers, Sparkles, Eye } from 'lucide-react';
 import { useState } from 'react';
 
+import { useT } from '@/lib/i18n';
+import { useSelectedMap, writeSelectedMap } from '@/lib/selectedMap';
+
 export interface AreaSelectProps {
   onBack: () => void;
   onLaunch: (areaId: string, challengeIds: string[]) => void;
@@ -55,6 +58,13 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
   const challenges = availableChallengeContracts(meta);
   const [selectedChallengeIds, setSelectedChallengeIds] = useState<string[]>([]);
   const [filter, setFilter] = useState<AreaPlaylist>('standard');
+  const t = useT();
+  const selectedMapId = useSelectedMap();
+  /** First tap picks the map (Head out on the nav bar then launches it); a second tap on the picked map plays it. */
+  const pickMap = (id: string) => {
+    if (selectedMapId === id) onLaunch(id, selectedChallengeIds);
+    else writeSelectedMap(id);
+  };
 
   const inFilter = (area: (typeof unlockedAreas)[number], nextFilter: AreaPlaylist) => {
     const category = areaCategory(area);
@@ -218,11 +228,14 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.05 }}
               type="button"
-              onClick={() => launchable && onLaunch(map.id, selectedChallengeIds)}
+              onClick={() => launchable && pickMap(map.id)}
               disabled={!launchable}
               className="group relative flex h-64 w-full flex-col overflow-hidden border border-cyan-200/30 bg-card text-left transition-colors hover:border-cyan-200"
               data-testid={`button-custom-map-${map.id}`}
             >
+              {selectedMapId === map.id && (
+                <span className="absolute left-0 top-0 z-30 bg-primary px-2 py-1 font-mono text-[9px] font-black uppercase tracking-widest text-primary-foreground" data-testid="badge-map-selected">{t('areas.selected')} · {t('areas.tapAgain')}</span>
+              )}
               <div className="absolute inset-0 z-0">
                 <div className="absolute inset-0 z-10 bg-[#071116]/80 transition-colors group-hover:bg-[#071116]/60" />
                 <div className="absolute inset-0 z-10 bg-gradient-to-t from-background via-background/90 to-background/20" />
@@ -260,14 +273,19 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.05 }}
               type="button"
-              onClick={() => onLaunch(area.id, selectedChallengeIds)}
+              onClick={() => pickMap(area.id)}
+              aria-pressed={selectedMapId === area.id}
               className={`group relative w-full text-left border bg-card overflow-hidden flex flex-col transition-all h-64 ${
-                area.endless
+                selectedMapId === area.id ? 'ring-2 ring-primary border-primary ' : ''
+              }${area.endless
                   ? 'border-cyan-500/30 hover:border-cyan-400 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)]'
                   : 'border-border hover:border-primary'
               }`}
               data-testid={`button-area-${area.id}`}
             >
+              {selectedMapId === area.id && (
+                <span className="absolute left-0 top-0 z-30 bg-primary px-2 py-1 font-mono text-[9px] font-black uppercase tracking-widest text-primary-foreground" data-testid="badge-map-selected">{t('areas.selected')} · {t('areas.tapAgain')}</span>
+              )}
               {/* Backdrop */}
               <div className="absolute inset-0 z-0">
                 <div className="absolute inset-0 bg-background/80 group-hover:bg-background/60 transition-colors z-10" />

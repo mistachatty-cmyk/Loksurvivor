@@ -82,6 +82,7 @@ import { setCrashScreen } from '@/lib/lokCrash';
 import { SETTINGS_FOCUS_KEY } from '@/lib/jukeboxPrefs';
 import { CrashRecoveryPrompt } from '@/ui/CrashRecoveryPrompt';
 import { MenuDock } from '@/ui/MenuDock';
+import { readSelectedMap } from '@/lib/selectedMap';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
 import { RunSetupScreen } from '@/ui/RunSetupScreen';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
@@ -100,7 +101,7 @@ const WeaponTrainingArenaScreen = lazy(() => import('@/ui/WeaponTrainingArenaScr
 const queryClient = new QueryClient();
 
 /** Full-screen moments where a persistent menu would intrude. */
-const DOCK_HIDDEN_SCREENS = ['jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'hub', 'run-setup', 'run', 'arena', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle', 'weapon-training-arena'];
+const DOCK_HIDDEN_SCREENS = ['jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle', 'weapon-training-arena'];
 
 /** Screens with no payload that browser Back may return to. */
 const HISTORY_SCREENS = new Set(['intro', 'hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'locker', 'recovery', 'vendor', 'workshop', 'card-shop', 'lok-shop', 'weapon-bans', 'jukebox', 'settings', 'palette-store', 'sound-booth', 'account', 'feedback', 'weapon-training-arena']);
@@ -509,6 +510,15 @@ function Game() {
     [goHub, openLooks, sfx],
   );
 
+  /** Head out from the nav bar: straight into the selected map, or the map list when none is picked. */
+  const headOut = useCallback(() => {
+    sfx.play('uiNav');
+    const id = readSelectedMap();
+    const playable = id && (unlockedAreas.some((area) => area.id === id) || meta.customMaps.some((map) => map.id === id));
+    if (playable) prepareRun({ areaId: id, challengeIds: [] });
+    else setScreen({ name: 'areas' });
+  }, [meta.customMaps, prepareRun, sfx, unlockedAreas]);
+
   /** Where the title screen leads once the player is ready: the starter pet meeting, or the hideout. */
   function enterAfterIntro() {
     if (!meta.starterLokPetOnboardingComplete && meta.totalRuns === 0 && meta.savedLokPets.length === 0) {
@@ -835,7 +845,7 @@ function Game() {
         showButton={screen.name === 'hub'}
         onGo={goToScreen}
       />
-      {!DOCK_HIDDEN_SCREENS.includes(screen.name) && <MenuDock screenName={screen.name} onGo={goToScreen} />}
+      {!DOCK_HIDDEN_SCREENS.includes(screen.name) && <MenuDock screenName={screen.name} onGo={goToScreen} onHeadOut={headOut} />}
       {!['jukebox', 'photosensitivity-notice', 'intro', 'run-setup', 'run', 'arena', 'starter-lokpet-encounter', 'weapon-training-arena'].includes(screen.name) &&
         (screen.name !== 'hub' || meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
           <div

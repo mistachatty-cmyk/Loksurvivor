@@ -1843,6 +1843,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Roll the look button on the title screen now matches the Live feed button: same size and shape, with its name shown, and level with it along the bottom.',
     ],
   },
+  {
+    version: '0.42.24',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T00:03:30Z',
+    kind: 'update',
+    title: 'Head Out Bar',
+    body: [
+      'The Head out button is now joined to the top of the bottom nav bar, so they always sit together, on every page including the hideout. A faint Quick tag sits above it with the name of the map you picked.',
+      'On Where tonight? tap a map to pick it (a second tap plays it). Head out then goes straight to that map from anywhere; with no map picked it opens the map list.',
+      'The separate sticky Head out button and its setting are gone, since the bar replaces them.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

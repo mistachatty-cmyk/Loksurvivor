@@ -1209,3 +1209,6 @@ body:has(.supporter-bar--inline) .supporter-bar:not(.supporter-bar--inline) { di
 @keyframes dp-spin { to { transform: rotate(360deg); } }
 @keyframes dp-spin-rev { to { transform: rotate(-360deg); } }
 @media (prefers-reduced-motion: reduce) { .dpulse-ring, .dpulse-arc { animation: none; } .dpulse-ring { opacity: .3; transform: scale(1.2); } }
+
+/* Hidden while the hideout arrival scene or the photosensitivity notice is up. */
+body[data-hide-dock] [data-testid='menu-dock'] { display: none; }
