@@ -16,6 +16,8 @@
   "crash.recovered.copy": "보고서 복사",
   "crash.recovered.copied": "복사됨",
   "crash.recovered.close": "닫기",
+  "arrival.discsPaused.title": "디스크가 일시 중지되었습니다.",
+  "arrival.discsPaused.body": "디스크가 상영되는 동안 게임이 종료되어 잠시 휴식을 취했습니다. 가장 가벼운 모드로 되돌리려면 탭하세요.",
   "jukebox.sealed.title": "밀봉된 디스크 · 트랙 {{n}}",
   "jukebox.sealed.hint": "Lok: {{need}} 실행 목표를 모두 완료하여 이 목표를 엽니다. {{have}}를 완료했으므로 {{left}}를 진행하세요.",
   "jukebox.sealed.close": "알았어요",

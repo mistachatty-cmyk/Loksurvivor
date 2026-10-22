@@ -16,6 +16,8 @@
   "crash.recovered.copy": "复印报告",
   "crash.recovered.copied": "已复制",
   "crash.recovered.close": "解雇",
+  "arrival.discsPaused.title": "光盘已暂停",
+  "arrival.discsPaused.body": "比赛在光盘播放时结束，所以他们休息了一会儿。点击可将它们恢复到最亮模式。",
   "jukebox.sealed.title": "密封盘·轨道{{n}}",
   "jukebox.sealed.hint": "Lok：累计完成{{need}}运行目标即可开启此一。你已经完成了{{have}}，那么{{left}}就可以了。",
   "jukebox.sealed.close": "知道了",

@@ -16,6 +16,8 @@
   "crash.recovered.copy": "Copier le rapport",
   "crash.recovered.copied": "Copié",
   "crash.recovered.close": "Rejeter",
+  "arrival.discsPaused.title": "Disques en pause",
+  "arrival.discsPaused.body": "Le jeu s'est terminé pendant que les disques apparaissaient, alors ils ont fait une pause. Appuyez pour les ramener dans le mode le plus léger.",
   "jukebox.sealed.title": "Disque scellé · Chenille {{n}}",
   "jukebox.sealed.hint": "Lok : terminez les objectifs de course {{need}} au total pour ouvrir celui-ci. Vous avez fait {{have}}, donc {{left}} c'est parti.",
   "jukebox.sealed.close": "Je l'ai compris",
