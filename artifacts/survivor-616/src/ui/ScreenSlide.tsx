@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode, type TouchEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type TouchEvent } from 'react';
 
 import { slideKind, swipeTargetId, type SlideKind } from '@/lib/screenSlide';
 
@@ -19,8 +19,21 @@ function swipeBlocked(target: EventTarget | null): boolean {
   return false;
 }
 
+function prefersReducedMotion(): boolean {
+  try {
+    return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  } catch {
+    return false;
+  }
+}
+
+/** The slide lasts well under this; it is only a safety net for a missed animation-end event. */
+const SLIDE_GUARD_MS = 420;
+
 interface Props {
   screenName: string;
+  /** Pages make room under the persistent nav dock when it is showing. */
+  dockVisible?: boolean;
   /** Finger swipes between dock pages only run while this is true (menus showing, no overlay up). */
   swipeEnabled: boolean;
   onSwipe: (pageId: string) => void;
@@ -33,10 +46,18 @@ interface Props {
  * page. Enter-only on purpose: the old screen unmounts straight away, so canvas runs and audio never
  * linger behind an exit animation.
  */
-export function ScreenSlide({ screenName, swipeEnabled, onSwipe, children }: Props) {
-  const [state, setState] = useState<{ name: string; kind: SlideKind }>({ name: screenName, kind: 'none' });
+export function ScreenSlide({ screenName, dockVisible = false, swipeEnabled, onSwipe, children }: Props) {
+  const [state, setState] = useState<{ name: string; kind: SlideKind; animating: boolean }>({ name: screenName, kind: 'none', animating: false });
   // Derived during render: the kind is decided the moment the screen name changes, before first paint of the new screen.
-  if (state.name !== screenName) setState({ name: screenName, kind: slideKind(state.name, screenName) });
+  if (state.name !== screenName) {
+    const kind = prefersReducedMotion() ? 'none' : slideKind(state.name, screenName);
+    setState({ name: screenName, kind, animating: kind !== 'none' });
+  }
+  useEffect(() => {
+    if (!state.animating) return;
+    const id = window.setTimeout(() => setState((current) => (current.name === state.name ? { ...current, animating: false } : current)), SLIDE_GUARD_MS);
+    return () => window.clearTimeout(id);
+  }, [state.animating, state.name]);
   const touch = useRef<{ x: number; y: number; t: number } | null>(null);
 
   const onTouchStart = (event: TouchEvent) => {
@@ -55,9 +76,21 @@ export function ScreenSlide({ screenName, swipeEnabled, onSwipe, children }: Pro
     if (id) onSwipe(id);
   };
 
+  // While sliding, the page is cropped to one screen tall. A long page (the card shop is over 11,000 px) animated whole
+  // becomes one giant layer, which a phone browser can run out of memory on and close the tab.
+  const style: CSSProperties = {};
+  if (state.animating) {
+    style.maxHeight = '100dvh';
+    style.overflow = 'hidden';
+  }
+  if (dockVisible) style.padding = '0 0 var(--menu-dock-h, 0px) var(--menu-dock-w, 0px)';
   return (
     <div
       key={screenName}
+      style={style}
+      onAnimationEnd={(event) => {
+        if (event.target === event.currentTarget) setState((current) => ({ ...current, animating: false }));
+      }}
       className={state.kind === 'none' ? undefined : `screen-slide screen-slide-${state.kind}`}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}

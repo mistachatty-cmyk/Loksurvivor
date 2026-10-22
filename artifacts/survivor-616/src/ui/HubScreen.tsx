@@ -20,7 +20,6 @@ import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
-import { NotificationMailbox } from './NotificationMailbox';
 import { CollapsibleSection } from './CollapsibleSection';
 import { HideoutPreview, type HideoutPetInfo, type HideoutPropInfo, type PlayCue, type StripNotice } from './HideoutPreview';
 import { HideoutPlayBar } from './HideoutPlayBar';
@@ -48,7 +47,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords, ScanEye, Dog, HelpCircle, Clapperboard, Bug } from 'lucide-react';
 import { LorePopup } from './LorePopup';
-import { LokChatLauncher, LokChatOverlay } from './LokChat';
+import { LokChatLauncher } from './LokChat';
+import { useChatContextBuilder } from './LokChatHost';
+import { openLokChat, useLokChatOpen } from '@/lib/lokChatOpen';
 import type { CrewActivityIcon, HubPanel } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
@@ -260,23 +261,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   };
 
   // LOK Chat: what a crew member knows when you message them.
-  const [showLokChat, setShowLokChat] = useState(false);
-  const buildChatContext = (allyId: string, affinity: number): ChatContext => {
-    const ally = rescuedAllies.find((candidate) => candidate.id === allyId) ?? rescuedAllies[0]!;
-    const run = lastRun ? { cleared: lastRun.cleared, kills: lastRun.kills, areaName: AREAS.find((area) => area.id === lastRun.areaId)?.name ?? lastRun.areaId } : undefined;
-    return {
-      self: { id: ally.id, name: ally.name, role: ally.role },
-      others: rescuedAllies.filter((other) => other.id !== ally.id).map((other) => ({ id: other.id, name: other.name, role: other.role })),
-      roomName: HUB_ROOMS_BY_ID[ally.room]?.name ?? ally.room,
-      crewHere: rescuedAllies.filter((other) => other.room === ally.room && other.id !== ally.id).map((other) => other.name),
-      weather: getHideoutScene(ally.room).weather,
-      hour: new Date().getHours(),
-      lastRun: run,
-      petName: companion ? petCallName(companion) : undefined,
-      tone: getCrewTalkTone(),
-      affinity,
-    };
-  };
+  const lokChat = useLokChatOpen();
+  const showLokChat = lokChat.open;
+  const buildChatContext = useChatContextBuilder();
   const proactiveKeyRef = useRef('');
   useEffect(() => {
     if (rescuedAllies.length === 0) return;
@@ -640,7 +627,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
     >
       <NotificationToasts />
-      <NotificationMailbox />
       {chromeLayout === 'classic' ? <>
       {/* Classic corner controls remain available in Settings. */}
       <button
@@ -750,7 +736,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       <div className="flex flex-wrap items-center gap-2">
         {onBack ? <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-white/40 hover:text-white" data-testid="button-hub-back-to-intro" aria-label="Back to title"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
         <button type="button" onClick={() => setShowLorePopup(true)} aria-haspopup="dialog" aria-expanded={showLorePopup} className="inline-flex min-h-10 items-center gap-2 border border-red-500/60 bg-red-950/40 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-red-100 hover:border-red-300" data-testid="button-hub-mission-briefing" title={t('hub.missionBriefingTitle')}><ShieldAlert className="h-4 w-4 text-red-400" />{t('hub.missionBriefing')}</button>
-        {rescuedAllies.length > 0 ? <LokChatLauncher onOpen={() => setShowLokChat(true)} /> : null}
+        {rescuedAllies.length > 0 ? <LokChatLauncher onOpen={() => openLokChat()} /> : null}
         <HideoutEndgameDock onOpen={onOpen} compact />
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
@@ -759,7 +745,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       </div>
     </div>
         ) : null}
-        {chromeLayout === 'classic' && rescuedAllies.length > 0 ? <div className="mb-3 flex flex-wrap items-center gap-2"><LokChatLauncher onOpen={() => setShowLokChat(true)} /></div> : null}
+        {chromeLayout === 'classic' && rescuedAllies.length > 0 ? <div className="mb-3 flex flex-wrap items-center gap-2"><LokChatLauncher onOpen={() => openLokChat()} /></div> : null}
         {chromeLayout === 'classic' ? <HideoutEndgameDock onOpen={onOpen} /> : null}
         {meta.hideoutPreviewEnabled && (
           <HideoutPreview
@@ -1510,14 +1496,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
 
       <AnimatePresence>
         {showLorePopup && <LorePopup onClose={() => setShowLorePopup(false)} />}
-        {showLokChat && (
-          <LokChatOverlay
-            allies={rescuedAllies}
-            buildContext={buildChatContext}
-            roomNameOf={(ally) => HUB_ROOMS_BY_ID[ally.room]?.name ?? ally.room}
-            onClose={() => setShowLokChat(false)}
-          />
-        )}
       </AnimatePresence>
     </motion.div>
   );

@@ -8,21 +8,34 @@
  * Fixed overlay, rendered from HubScreen the way LorePopup is.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Hash, Send, X } from 'lucide-react';
+import { ArrowLeft, Hash, Mail, Send, X } from 'lucide-react';
 
 import { prefersReducedMotion } from '@/anim/motion';
 import { useT } from '@/lib/i18n';
 import { allyRig } from '@/game/data/progression';
+import { runChatCommand, type CommandResult } from '@/game/engine/chatCommands';
+import { useMeta } from '@/game/state/metaStore';
+import { fireCheatFx } from '@/lib/cheatFx';
+import type { LokChatView } from '@/lib/lokChatOpen';
 import { MAX_MESSAGE_CHARS, affinityTier, quickReplies, type AffinityTier, type QuickReply } from '@/game/engine/lokChat';
 import { sendToAlly, setOpenThread, type ContextBuilder } from '@/game/state/lokChatActions';
 import { ME, clearLokChat, totalUnread, useLokChat, type ChatMessage } from '@/game/state/lokChatStore';
 import type { AllyDef } from '@/game/types';
 
 import { CheatBar } from './CheatBar';
+import { MailboxPanel } from './MailboxPanel';
 import { RigPortrait } from './RigPortrait';
 import { useCheats } from './useCheats';
 
 const CHANNEL = 'channel';
+const MAIL = 'mail';
+/** How many of the bot's lines stay on screen. */
+const TOY_LINES = 6;
+
+interface ToyLine {
+  id: number;
+  text: string;
+}
 
 const handleOf = (ally: AllyDef): string => `@${ally.id}.lok`;
 
@@ -82,15 +95,22 @@ export interface LokChatOverlayProps {
   roomNameOf: (ally: AllyDef) => string;
   /** Open this conversation first. */
   initialId?: string | null;
+  /** Open straight to a view (the mailbox) instead of a conversation. */
+  initialView?: LokChatView | null;
   onClose: () => void;
 }
 
-export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, onClose }: LokChatOverlayProps) {
+export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, initialView, onClose }: LokChatOverlayProps) {
   const t = useT();
+  const { meta } = useMeta();
+  const unreadMail = meta.trainingMailbox.filter((entry) => !entry.read).length;
   const threads = useLokChat((s) => s.threads);
   const channel = useLokChat((s) => s.channel);
   const firstId = useMemo(() => {
+    if (initialView === 'mail') return MAIL;
     if (initialId && (initialId === CHANNEL || allies.some((a) => a.id === initialId))) return initialId;
+    // New mail comes first: opening the chat with something waiting shows it.
+    if (unreadMail > 0) return MAIL;
     return allies.find((a) => (threads[a.id]?.unread ?? 0) > 0)?.id ?? allies[0]?.id ?? CHANNEL;
     // Only the first render decides what opens; later unread changes must not yank you elsewhere.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -107,6 +127,41 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
   const inputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const reduceMotion = prefersReducedMotion();
+
+  const [toys, setToys] = useState<ToyLine[]>([]);
+  const toySeq = useRef(0);
+  const pushToy = (text: string) => {
+    toySeq.current += 1;
+    const line = { id: toySeq.current, text };
+    setToys((list) => [...list, line].slice(-TOY_LINES));
+  };
+  const describe = (result: CommandResult & { kind: 'say' }): string => {
+    const params: Record<string, string | number> = { ...(result.params ?? {}) };
+    for (const [name, key] of Object.entries(result.paramKeys ?? {})) params[name] = t(key as never);
+    return t(result.key as never, params as never);
+  };
+  /** Runs a typed `/command`. Returns true when the text was one (so it is not also sent as chat). */
+  const runToy = (text: string): boolean => {
+    const result = runChatCommand(text, { rng: Math.random, now: new Date() });
+    if (!result) return false;
+    switch (result.kind) {
+      case 'say':
+        pushToy(describe(result));
+        break;
+      case 'fx':
+        fireCheatFx(result.fx);
+        pushToy(t(`cheat.fx.${result.fx}` as never));
+        break;
+      case 'open':
+        setSelected(MAIL);
+        setShowList(false);
+        break;
+      case 'clear':
+        setToys([]);
+        break;
+    }
+    return true;
+  };
 
   const ally = allies.find((a) => a.id === selected);
   const thread = selected ? threads[selected] : undefined;
@@ -143,6 +198,10 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
 
   const send = (text: string, detected?: QuickReply) => {
     if (!detected) {
+      if (runToy(text)) {
+        setDraft('');
+        return;
+      }
       const cheat = runCheat(text);
       if (cheat.handled) {
         setCheatNote(cheat.message);
@@ -150,7 +209,12 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
         return;
       }
     }
-    if (!ally) return;
+    if (!ally) {
+      // The channel and the mailbox are not conversations; point at what can be typed here.
+      if (text.trim()) pushToy(t('lokChat.cmd.pickSomeone'));
+      setDraft('');
+      return;
+    }
     const clean = text.trim().slice(0, MAX_MESSAGE_CHARS);
     if (!clean) return;
     const id = ally.id;
@@ -177,6 +241,42 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
 
   const selectRow = (id: string) => { setSelected(id); setShowList(false); };
 
+  /** The bot's replies to /commands: short-lived lines above the typing box, never saved. */
+  const toyStrip = toys.length > 0 ? (
+    <div className="mb-2 max-h-28 space-y-1 overflow-y-auto border border-emerald-300/25 bg-emerald-400/5 px-2 py-1.5" role="log" aria-live="polite" data-testid="lok-chat-toys">
+      {toys.map((line) => (
+        <p key={line.id} className="text-xs leading-snug text-emerald-50/90">
+          <span className="mr-1.5 font-mono text-[9px] font-bold uppercase tracking-wider text-emerald-300">{t('lokChat.bot')}</span>
+          {line.text}
+        </p>
+      ))}
+    </div>
+  ) : null;
+
+  /** A typing box for the channel and mailbox: no one to message there, but the tricks work. */
+  const trickComposer = (
+    <div className="border-t border-white/10 p-2">
+      {cheatNote ? <p className="mb-2 border border-cyan-300/40 bg-cyan-400/10 px-2 py-1 text-xs text-cyan-100" role="status" data-testid="cheat-chat-note">{cheatNote}</p> : null}
+      {toyStrip}
+      <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); send(draft); }}>
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          maxLength={MAX_MESSAGE_CHARS}
+          placeholder={t('lokChat.commandPlaceholder')}
+          aria-label={t('lokChat.commandPlaceholder')}
+          autoComplete="off"
+          className="min-h-10 min-w-0 flex-1 border border-white/20 bg-black/50 px-3 text-sm text-white placeholder:text-white/35 focus:border-cyan-200/70 focus:outline-none"
+          data-testid="lok-chat-trick-input"
+        />
+        <button type="submit" disabled={!draft.trim()} className="inline-flex min-h-10 items-center gap-2 border border-emerald-300/50 bg-emerald-400/15 px-3 font-mono text-[10px] font-bold uppercase tracking-widest text-emerald-50 hover:bg-emerald-400/25 disabled:opacity-40" data-testid="lok-chat-trick-send">
+          <Send className="h-4 w-4" />{t('lokChat.send')}
+        </button>
+      </form>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/75 p-2 sm:p-4" data-testid="lok-chat" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div
@@ -196,6 +296,20 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
         <div className="flex min-h-0 flex-1">
           {/* Conversations */}
           <nav aria-label={t('lokChat.chats')} className={`${showList ? 'flex' : 'hidden'} min-h-0 w-full shrink-0 flex-col overflow-y-auto border-r border-white/10 bg-black/30 md:flex md:w-64`}>
+            <button
+              type="button"
+              onClick={() => selectRow(MAIL)}
+              aria-current={selected === MAIL}
+              className={`flex items-center gap-3 border-b border-white/5 px-3 py-3 text-left hover:bg-white/5 ${selected === MAIL ? 'bg-white/10' : ''}`}
+              data-testid="lok-chat-row-mail"
+            >
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center border border-amber-300/40 bg-amber-400/10 text-amber-200"><Mail className="h-5 w-5" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-black text-white">{t('lokChat.mail')}</span>
+                <span className="block truncate text-[11px] text-white/50">{t('lokChat.mailBlurb')}</span>
+              </span>
+              {unreadMail > 0 ? <span className="min-w-5 rounded-full bg-rose-500 px-1.5 text-center text-[10px] font-black leading-5 text-white" aria-label={t('lokChat.mailUnread', { count: unreadMail })} data-testid="lok-chat-mail-badge">{unreadMail}</span> : null}
+            </button>
             <button
               type="button"
               onClick={() => selectRow(CHANNEL)}
@@ -242,7 +356,20 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
 
           {/* Conversation */}
           <section className={`${showList ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-1 flex-col md:flex`}>
-            {selected === CHANNEL || !ally ? (
+            {selected === MAIL ? (
+              <>
+                <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
+                  <button type="button" onClick={() => setShowList(true)} className="inline-flex h-9 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/70 hover:text-white md:hidden" aria-label={t('lokChat.back')}><ArrowLeft className="h-4 w-4" /></button>
+                  <Mail className="h-4 w-4 text-amber-200" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-black">{t('lokChat.mail')}</p>
+                    <p className="truncate text-[11px] text-white/50">{t('lokChat.mailBlurb')}</p>
+                  </div>
+                </div>
+                <MailboxPanel />
+                {trickComposer}
+              </>
+            ) : selected === CHANNEL || !ally ? (
               <>
                 <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
                   <button type="button" onClick={() => setShowList(true)} className="inline-flex h-9 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/70 hover:text-white md:hidden" aria-label={t('lokChat.back')}><ArrowLeft className="h-4 w-4" /></button>
@@ -270,6 +397,7 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
                   })}
                   <div ref={endRef} />
                 </div>
+                {trickComposer}
               </>
             ) : (
               <>
@@ -318,6 +446,7 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
                       {showCheatBar ? <div className="mt-2 max-h-48 overflow-y-auto"><CheatBar /></div> : null}
                     </div>
                   ) : null}
+                  {toyStrip}
                   <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label={t('lokChat.suggested')}>
                     {suggestions.map((q) => (
                       <button

@@ -14,7 +14,8 @@ export const DOCK_PAGES: readonly DockPage[] = [
   { id: 'hub', screens: ['hub'] },
   { id: 'areas', screens: ['areas'] },
   { id: 'roster', screens: ['roster'] },
-  { id: 'card-shop', screens: ['card-shop', 'lok-shop', 'vendor', 'workshop'] },
+  { id: 'card-shop', screens: ['card-shop', 'vendor', 'workshop'] },
+  { id: 'lok-shop', screens: ['lok-shop'] },
   { id: 'settings', screens: ['settings'] },
 ];
 
