@@ -9,3 +9,4 @@ Spec and handoff log: `docs/jukebox-spec.md`. Shared logic: `packages/lok-jukebo
 - The id `pulse-jukebox` is a hideout prop that opens the Soundtrack panel; the room is `jukebox-room`. Do not merge them.
 - Discs are procedural (`jukeboxDiscs.ts`); locked tracks show as sealed discs. No artist or licensing text on discs.
 - Opt-in arrival discs: Settings row, flag `survivor616.arrival-discs.v1`.
+- Performance rule (2026-10-22): the room's grade writes opacity onto two small layers (refs, ~12 fps). No filters and no per-frame CSS variables on an ancestor of the discs; swiping only browses. See `mobile-stability-2026-10-22.md`.

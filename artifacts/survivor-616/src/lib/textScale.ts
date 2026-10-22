@@ -19,7 +19,11 @@ export function getTextSize(): TextSize {
 
 export function applyTextSize(size: TextSize = getTextSize()): void {
   if (typeof document === 'undefined') return;
-  document.documentElement.style.fontSize = size === 'normal' ? '' : `${PERCENT[size]}%`;
+  // The fluid base size lives in index.css; the setting only multiplies it.
+  const root = document.documentElement;
+  root.style.fontSize = '';
+  if (size === 'normal') root.style.removeProperty('--text-scale');
+  else root.style.setProperty('--text-scale', String(PERCENT[size] / 100));
 }
 
 export function setTextSize(size: TextSize): void {

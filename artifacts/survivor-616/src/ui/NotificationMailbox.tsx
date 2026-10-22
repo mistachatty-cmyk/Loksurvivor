@@ -19,8 +19,8 @@ export function NotificationMailbox() {
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="fixed bottom-20 right-3 z-[80] inline-flex min-h-10 items-center gap-2 border border-cyan-200/45 bg-slate-950/95 px-3 font-mono text-[9px] font-black uppercase tracking-widest text-cyan-100 shadow-lg hover:bg-cyan-950/90 sm:bottom-4 sm:right-4" aria-label={t('training.mailbox.open')} data-testid="button-notification-mailbox">
-        <Mail size={15} />{t('training.mailbox.label')}
+      <button type="button" onClick={() => setOpen(true)} className="fixed bottom-20 right-3 z-[80] inline-flex min-h-10 min-w-10 items-center justify-center gap-2 border border-cyan-200/45 bg-slate-950/95 px-3 font-mono text-[9px] font-black uppercase tracking-widest text-cyan-100 shadow-lg hover:bg-cyan-950/90 sm:bottom-4 sm:right-4" aria-label={t('training.mailbox.open')} data-testid="button-notification-mailbox">
+        <Mail size={15} /><span className="hidden sm:inline">{t('training.mailbox.label')}</span>
         {unread > 0 && <span className="min-w-5 rounded-full bg-rose-500 px-1.5 py-0.5 text-center text-[9px] text-white" aria-label={t('training.mailbox.unread', { n: unread })}>{unread}</span>}
       </button>
 

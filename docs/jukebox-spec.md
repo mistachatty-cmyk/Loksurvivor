@@ -117,3 +117,8 @@ Owner: Eric. Goal: Jukebox Room + arrival discs + shared `@lok/jukebox`. Scope: 
 3. Locked tracks sealed in the Jukebox (match in-game gating)? Default yes.
 4. Arcade Box: unlock persists forever once picked up, with the box also respawning each Neon Arcade run? Default persistent unlock only; respawn is optional polish.
 5. Disc shelf on the arrival screen: off by default, on for screenshots? Default yes.
+
+## Findings after first phone test (2026-10-22)
+- Arrival discs worked on iPhone. The Jukebox Room crashed Safari's tab (content-process crash): full-screen hue-rotate filter, per-frame CSS variables on the room root, and a track switch for every disc swiped past. Fixed in 0.42.9 (grade on two small layers at ~12 fps, swipe only browses). Still to confirm on a real iPhone.
+- A stale home-screen build showed the white error page after a deploy; now reloads once. Crash reports added (0.42.8).
+- Full notes and optimization ideas: `.agents/memory/mobile-stability-2026-10-22.md`.

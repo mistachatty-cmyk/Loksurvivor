@@ -1686,6 +1686,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The seizure and photosensitivity warning has a cleaner, simpler layout with a slow, gentle glow. It still never flashes, and reduced motion turns the glow off.',
     ],
   },
+  {
+    version: '0.42.9',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T17:00:00Z',
+    kind: 'hotfix',
+    title: 'Phone Fixes',
+    body: [
+      'The Jukebox Room is lighter on phones: the color grade no longer redraws the whole screen, and swiping the discs only browses until you tap the middle one to play it.',
+      'Menus now scale smoothly with your screen width, so text and buttons are no longer oversized on phones. The Text size setting still works on top of that, and the notification button is a small icon on phones.',
+      'The photosensitivity warning is now a short title and one sentence with a gentle animation. Tap More info for the full guidance.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
