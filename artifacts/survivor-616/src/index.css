@@ -1191,13 +1191,15 @@ body:has(.supporter-bar--inline) .supporter-bar:not(.supporter-bar--inline) { di
 @property --dp-c { syntax: '<color>'; inherits: true; initial-value: #7dd3fc; }
 .dpulse {
   position: absolute; left: 50%; top: 52%; aspect-ratio: 1 / 1; transform: translate(-50%, -50%);
-  pointer-events: none; opacity: 0; transition: opacity 700ms ease, --dp-c 900ms ease;
+  pointer-events: none; opacity: 0; transition: opacity 700ms ease;
 }
 .dpulse[data-active] { opacity: 1; }
 .dpulse-halo, .dpulse-rings, .dpulse-ring, .dpulse-arc { position: absolute; inset: 0; border-radius: 9999px; }
 .dpulse-halo { background: radial-gradient(closest-side, transparent 62%, color-mix(in srgb, var(--dp-c) 55%, transparent) 82%, transparent 100%); will-change: transform, opacity; }
 .dpulse-rings { will-change: transform; }
-.dpulse-ring { border: 2px solid var(--dp-c); box-shadow: 0 0 14px color-mix(in srgb, var(--dp-c) 60%, transparent); opacity: 0; animation: dp-ring 4.8s linear infinite; }
+.dpulse-ring { border: 2px solid var(--dp-c); opacity: 0; animation: dp-ring 4.8s linear infinite; will-change: transform, opacity; }
+.dpulse-beat { position: absolute; inset: 0; border-radius: 9999px; border: 3px solid var(--dp-c); opacity: 0; will-change: transform, opacity; }
+.dpulse[data-switch] { opacity: 0; transition: opacity 160ms ease; }
 .dpulse-arc {
   inset: -6%; background: conic-gradient(from 0deg, transparent 0 52%, var(--dp-c) 100%);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
@@ -1205,7 +1207,7 @@ body:has(.supporter-bar--inline) .supporter-bar:not(.supporter-bar--inline) { di
   animation: dp-spin 9s linear infinite; opacity: .85;
 }
 .dpulse-arc-b { inset: -14%; animation: dp-spin-rev 14s linear infinite; opacity: .5; }
-@keyframes dp-ring { 0% { transform: scale(.98); opacity: 0; } 14% { opacity: .55; } 100% { transform: scale(1.65); opacity: 0; } }
+@keyframes dp-ring { 0% { transform: scale(.98); opacity: 0; } 14% { opacity: .55; } 100% { transform: scale(1.34); opacity: 0; } }
 @keyframes dp-spin { to { transform: rotate(360deg); } }
 @keyframes dp-spin-rev { to { transform: rotate(-360deg); } }
 @media (prefers-reduced-motion: reduce) { .dpulse-ring, .dpulse-arc { animation: none; } .dpulse-ring { opacity: .3; transform: scale(1.2); } }

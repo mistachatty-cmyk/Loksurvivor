@@ -20,3 +20,31 @@ export function writeDiscPulse(level: DiscPulseLevel): void {
     /* storage blocked: the choice just will not persist */
   }
 }
+
+/** Individual effects inside the pulse, each its own switch. Device-local. */
+export type DiscFxKey = 'halo' | 'rings' | 'arcs' | 'beat' | 'tempoSpin' | 'size';
+export const DISC_FX_KEYS: readonly DiscFxKey[] = ['halo', 'rings', 'arcs', 'beat', 'tempoSpin', 'size'] as const;
+export type DiscFx = Record<DiscFxKey, boolean>;
+/** "size" moves the real disc, so it starts off. */
+export const DEFAULT_DISC_FX: DiscFx = { halo: true, rings: true, arcs: true, beat: true, tempoSpin: true, size: false };
+const FX_KEY = 'survivor616.disc-fx.v1';
+
+export function readDiscFx(): DiscFx {
+  try {
+    const raw = window.localStorage.getItem(FX_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Partial<DiscFx>) : {};
+    const out = { ...DEFAULT_DISC_FX };
+    for (const key of DISC_FX_KEYS) if (typeof parsed[key] === 'boolean') out[key] = parsed[key] as boolean;
+    return out;
+  } catch {
+    return { ...DEFAULT_DISC_FX };
+  }
+}
+
+export function writeDiscFx(fx: DiscFx): void {
+  try {
+    window.localStorage.setItem(FX_KEY, JSON.stringify(fx));
+  } catch {
+    /* storage blocked: the choice just will not persist */
+  }
+}

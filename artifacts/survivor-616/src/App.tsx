@@ -515,9 +515,9 @@ function Game() {
     sfx.play('uiNav');
     const id = readSelectedMap();
     const playable = id && (unlockedAreas.some((area) => area.id === id) || meta.customMaps.some((map) => map.id === id));
-    if (playable) prepareRun({ areaId: id, challengeIds: [] });
+    if (playable) attemptTravelEncounter('run-launch', undefined, () => prepareRun({ areaId: id, challengeIds: [] }));
     else setScreen({ name: 'areas' });
-  }, [meta.customMaps, prepareRun, sfx, unlockedAreas]);
+  }, [attemptTravelEncounter, meta.customMaps, prepareRun, sfx, unlockedAreas]);
 
   /** Where the title screen leads once the player is ready: the starter pet meeting, or the hideout. */
   function enterAfterIntro() {

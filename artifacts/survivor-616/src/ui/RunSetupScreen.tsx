@@ -92,6 +92,8 @@ export function RunSetupScreen({ intent, areaId, challengeIds = [], onBack, onCo
   const ownedUiThemes = UI_THEMES.filter((theme) => ownedUiThemeIds.includes(theme.id));
   const activeSwatchId = activeUiThemeSwatchId(meta);
   const paletteIndex = Math.max(0, ownedPalettes.findIndex((palette) => palette.id === meta.activePaletteId));
+  // The slider walks the interface themes you own (what the list below shows); a lone palette gave it nothing to slide through.
+  const themeIndex = Math.max(0, ownedUiThemes.findIndex((theme) => theme.id === meta.uiTheme));
   const runtimeTier = detectRuntimePerformanceTier();
   const customMap = areaId ? meta.customMaps.find((map) => map.id === areaId) : undefined;
   const briefingArea = areaId ? unlockedAreas.find((area) => area.id === areaId) ?? (customMap ? customMapToArea(customMap) : undefined) : undefined;
@@ -310,10 +312,10 @@ export function RunSetupScreen({ intent, areaId, challengeIds = [], onBack, onCo
             <div className="grid gap-4 lg:grid-cols-2">
               <section className="border border-white/15 bg-white/[.03] p-4 lg:col-span-2" data-testid="looks-palette-slider">
                 <div className="flex items-center justify-between gap-3">
-                  <div><h3 className="text-sm font-black uppercase">Theme palette slider</h3><p className="mt-1 text-xs text-white/55">Slide through every palette you own. The interface updates immediately.</p></div>
-                  <span className="font-mono text-[10px] font-bold uppercase text-cyan-100">{ownedPalettes[paletteIndex]?.name ?? 'Default'}</span>
+                  <div><h3 className="text-sm font-black uppercase">Theme palette slider</h3><p className="mt-1 text-xs text-white/55">Slide through every theme you own. The interface updates immediately.</p></div>
+                  <span className="font-mono text-[10px] font-bold uppercase text-cyan-100">{ownedUiThemes.length > 1 ? ownedUiThemes[themeIndex]?.name : ownedPalettes[paletteIndex]?.name ?? 'Default'}</span>
                 </div>
-                <input type="range" min={0} max={Math.max(0, ownedPalettes.length - 1)} value={paletteIndex} onChange={(event) => { const palette = ownedPalettes[Number(event.target.value)]; if (palette) equipPalette(palette.id); }} className="mt-4 w-full accent-cyan-300" aria-label="Theme palette" />
+                <input type="range" min={0} max={Math.max(0, (ownedUiThemes.length > 1 ? ownedUiThemes.length : ownedPalettes.length) - 1)} value={ownedUiThemes.length > 1 ? themeIndex : paletteIndex} onChange={(event) => { const index = Number(event.target.value); if (ownedUiThemes.length > 1) { const theme = ownedUiThemes[index]; if (theme) equipUiTheme(theme.id); } else { const palette = ownedPalettes[index]; if (palette) equipPalette(palette.id); } }} className="mt-4 w-full accent-cyan-300" aria-label="Theme palette" />
               </section>
               <section className="border border-white/15 bg-white/[.03] p-4 lg:col-span-2" data-testid="looks-game-theme">
                 <h3 className="text-sm font-black uppercase">Game interface theme</h3>

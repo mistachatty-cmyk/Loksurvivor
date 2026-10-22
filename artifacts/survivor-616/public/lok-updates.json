@@ -7,6 +7,24 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 164,
+      "version": "0.42.25",
+      "date": "2026-10-23",
+      "publishedAt": "2026-10-23T00:04:30Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Disc Effects, Your Way",
+      "body": [
+        "Disc pulse now has six switches in Jukebox & soundtracks settings: bass halo, rings, arcs, beat pulse, tempo spin and disc size. Beat pulse is locked to the song itself, bursting out on every beat and harder on the bar line. Tempo spin turns the arcs at the song's BPM. Disc size makes the disc itself breathe with the music (off by default).",
+        "Changing song now fades the effect out, changes its colour while hidden, and fades it back in. Rings stay inside the gap to the neighbouring discs instead of showing behind them.",
+        "The heavy effect layers start a moment after a song begins and no longer use animated glows, to go easier on phones while a disc is starting.",
+        "The theme slider in the Look Lab now slides through the interface themes you own.",
+        "Head out on the nav bar now also runs the same travel checks as starting from the map list."
+      ]
+    },
+    {
       "number": 163,
       "version": "0.42.24",
       "date": "2026-10-23",
