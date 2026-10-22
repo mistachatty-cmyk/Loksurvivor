@@ -65,11 +65,18 @@ import { useT, useLocale } from '@/lib/i18n';
 import { grpdArmoryLocation, grpdAvailableSeals } from '@/game/data/grpdArmory';
 import { travelLeadPet } from '@/game/data/travelEncounters';
 import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
+import { PhotosensitivityNotice, photosensitivityNoticeHidden } from './PhotosensitivityNotice';
 import { HideoutDirectionPanel } from './HideoutDirectionPanel';
 import { HideoutEndgameDock } from './HideoutEndgameDock';
 
 /** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
 let hasShownHideoutArrivalThisSession = false;
+let forceHideoutArrival = false;
+
+/** The title screen calls this so the arrival scene always plays right after the intro, even if it already ran this page load or is switched off. */
+export function requestHideoutArrival(): void {
+  forceHideoutArrival = true;
+}
 
 export type { HubPanel };
 
@@ -468,8 +475,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const [isPageVisible, setIsPageVisible] = useState(true);
   const [showCurrencyGlossary, setShowCurrencyGlossary] = useState(false);
   const [showArrival, setShowArrival] = useState(
-    () => meta.hideoutArrivalEnabled && !hasShownHideoutArrivalThisSession,
+    () => forceHideoutArrival || (meta.hideoutArrivalEnabled && !hasShownHideoutArrivalThisSession),
   );
+  const [showNotice, setShowNotice] = useState(false);
   const [showLorePopup, setShowLorePopup] = useState(false);
   const [crewCommand, setCrewCommand] = useState<{ seq: number; kind: 'help' | 'encourage'; line: string } | undefined>();
   const commandCrew = (kind: 'help' | 'encourage') => {
@@ -589,6 +597,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         ensureAudioContext={ensureAudioContext}
         onEnter={() => {
           hasShownHideoutArrivalThisSession = true;
+          if (!photosensitivityNoticeHidden()) setShowNotice(true);
+          forceHideoutArrival = false;
           setShowArrival(false);
         }}
       />
@@ -601,6 +611,25 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       animate={{ opacity: 1 }}
       className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
     >
+      {showNotice ? (
+        <PhotosensitivityNotice
+          onContinue={() => setShowNotice(false)}
+          backdrop={
+            <HideoutPreview
+              rig={selectedCharacter.rig}
+              palette={selectedCharacterPalette}
+              height={200}
+              className="w-full"
+              pets={hideoutPets}
+              weather="clear"
+              biome={scene.biome}
+              accent={scene.homeAccent}
+              eventsMode="off"
+              sceneStyle="block"
+            />
+          }
+        />
+      ) : null}
       <NotificationToasts />
       <NotificationMailbox />
       {chromeLayout === 'classic' ? <>
@@ -710,23 +739,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       </AnimatePresence>
 
       <div className={`relative z-20 flex-1 flex flex-col p-6 ${meta.hideoutStickyHeadOutEnabled ? 'pb-24 sm:pb-6' : 'pb-6'}`}>
-        {chromeLayout === 'new' ? (
-          <div className="hub-dock sm:sticky top-0 z-[60] mb-4 flex flex-col gap-2 border border-white/15 bg-black/90 p-3 shadow-xl backdrop-blur sm:p-4 lg:flex-row lg:items-center" data-testid="hub-control-dock">
-            <div className="flex flex-wrap items-center gap-2">
-              {onBack ? <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-white/40 hover:text-white" data-testid="button-hub-back-to-intro" aria-label="Back to title"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
-              <button type="button" onClick={() => setShowLorePopup(true)} aria-haspopup="dialog" aria-expanded={showLorePopup} className="inline-flex min-h-10 items-center gap-2 border border-red-500/60 bg-red-950/40 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-red-100 hover:border-red-300" data-testid="button-hub-mission-briefing" title={t('hub.missionBriefingTitle')}><ShieldAlert className="h-4 w-4 text-red-400" />{t('hub.missionBriefing')}</button>
-              {(meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
-                <button type="button" onClick={onOpenRunSetup} className="inline-flex min-h-10 items-center gap-2 border border-cyan-200/45 bg-slate-950/70 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 hover:border-cyan-100" data-testid="button-open-run-setup" title={t('hub.looksLokpetsTitle')}><Sparkles className="h-4 w-4 text-cyan-200" />{t('common.looksLokpets')}</button>
-              )}
-              {rescuedAllies.length > 0 ? <LokChatLauncher onOpen={() => setShowLokChat(true)} /> : null}
-              <HideoutEndgameDock onOpen={onOpen} compact />
-            </div>
-            <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
-              {companion ? <div className="flex min-w-0 max-w-full items-center gap-2 border border-pink-200/35 bg-slate-950/80 p-2" data-testid="hideout-lokpet-companion"><LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={36} /><div className="min-w-0"><p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p><p className="font-mono text-[8px] uppercase tracking-wider text-white/55">{companion.stamina > 0 ? 'At your side' : meta.handheldDigiScopeOwned ? 'Resting in DigiScope' : 'Resting at the kennel'}</p></div></div> : null}
-              <MusicNowPlaying placement="inline" />
-            </div>
-          </div>
-        ) : null}
         {chromeLayout === 'classic' && rescuedAllies.length > 0 ? <div className="mb-3 flex flex-wrap items-center gap-2"><LokChatLauncher onOpen={() => setShowLokChat(true)} /></div> : null}
         {chromeLayout === 'classic' ? <HideoutEndgameDock onOpen={onOpen} /> : null}
         {meta.hideoutPreviewEnabled && (
@@ -745,7 +757,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             firstEventDelayMs={import.meta.env.DEV && new URLSearchParams(window.location.search).has('fastPetEvents') ? 600 : undefined}
             props={hideoutPropInfos}
             interactive={meta.hideoutInteractive}
-            keyboardActive={!showArrival && !showLorePopup && !showCurrencyGlossary && !showLokChat}
+            keyboardActive={!showArrival && !showNotice && !showLorePopup && !showCurrencyGlossary && !showLokChat}
             notice={stripNotice}
             crewSpeak={crewLineFor}
             say={crewSay}
@@ -817,6 +829,23 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               )}
               <p className="text-primary text-xs uppercase tracking-[0.3em] font-bold mb-2">{t('hub.kicker')}</p>
               <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-md">{t('hub.title')}</h1>
+              {chromeLayout === 'new' ? (
+                <div className="hub-dock mt-4 mb-2 flex flex-col gap-2 border border-white/15 bg-black/90 p-3 shadow-xl backdrop-blur sm:p-4 lg:flex-row lg:items-center" data-testid="hub-control-dock">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {onBack ? <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-white/40 hover:text-white" data-testid="button-hub-back-to-intro" aria-label="Back to title"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
+                    <button type="button" onClick={() => setShowLorePopup(true)} aria-haspopup="dialog" aria-expanded={showLorePopup} className="inline-flex min-h-10 items-center gap-2 border border-red-500/60 bg-red-950/40 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-red-100 hover:border-red-300" data-testid="button-hub-mission-briefing" title={t('hub.missionBriefingTitle')}><ShieldAlert className="h-4 w-4 text-red-400" />{t('hub.missionBriefing')}</button>
+                    {(meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
+                      <button type="button" onClick={onOpenRunSetup} className="inline-flex min-h-10 items-center gap-2 border border-cyan-200/45 bg-slate-950/70 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 hover:border-cyan-100" data-testid="button-open-run-setup" title={t('hub.looksLokpetsTitle')}><Sparkles className="h-4 w-4 text-cyan-200" />{t('common.looksLokpets')}</button>
+                    )}
+                    {rescuedAllies.length > 0 ? <LokChatLauncher onOpen={() => setShowLokChat(true)} /> : null}
+                    <HideoutEndgameDock onOpen={onOpen} compact />
+                  </div>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
+                    {companion ? <div className="flex min-w-0 max-w-full items-center gap-2 border border-pink-200/35 bg-slate-950/80 p-2" data-testid="hideout-lokpet-companion"><LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={36} /><div className="min-w-0"><p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p><p className="font-mono text-[8px] uppercase tracking-wider text-white/55">{companion.stamina > 0 ? 'At your side' : meta.handheldDigiScopeOwned ? 'Resting in DigiScope' : 'Resting at the kennel'}</p></div></div> : null}
+                    <MusicNowPlaying placement="inline" />
+                  </div>
+                </div>
+              ) : null}
             </div>
             <div className="text-left sm:text-right border-l-2 sm:border-l-0 sm:border-r-2 border-primary pl-4 sm:pl-0 sm:pr-4">
               <div className="mb-1 flex items-center gap-1.5 justify-start sm:justify-end">

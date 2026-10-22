@@ -1738,6 +1738,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The hideout walk scene now fills the full width of a phone screen and scales its height with the screen instead of looking squished. The control buttons at the top are tighter and scroll with the page on phones, so they stop covering the screen.',
     ],
   },
+  {
+    version: '0.42.14',
+    date: '2026-10-22',
+    publishedAt: '2026-10-23T01:00:00Z',
+    kind: 'update',
+    title: 'Smooth Way In',
+    body: [
+      'The Outside the hideout scene now always plays after the title screen. The photosensitivity notice moved to right after Step inside, so it is the last thing before the hideout, and your operator and LokPets show faintly behind it, fading through the three theater levels until you touch the screen.',
+      'The hideout button bar (Back, Mission briefing, Looks, Lok chat, music) now sits right under the HIDEOUT headline.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

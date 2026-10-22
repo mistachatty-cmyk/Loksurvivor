@@ -8,7 +8,9 @@
  */
 import { ArrowRight, ChevronDown, Move, ShieldAlert, Sun, Zap } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+
+import { useTheaterLevel } from '@/lib/useTheaterLevel';
 
 import { useT } from '@/lib/i18n';
 
@@ -33,8 +35,12 @@ function rememberHidden(hidden: boolean): void {
   }
 }
 
-export function PhotosensitivityNotice({ onContinue }: { onContinue: () => void }) {
+/** Backdrop strength for each of the three theater levels: clear, then fainter, then nearly gone until a touch wakes it. */
+const BACKDROP_OPACITY = [0, 0.55, 0.28, 0.1] as const;
+
+export function PhotosensitivityNotice({ onContinue, backdrop }: { onContinue: () => void; backdrop?: ReactNode }) {
   const t = useT();
+  const { level, wake } = useTheaterLevel({ paused: false, theaterMix: false });
   const reduce = Boolean(useReducedMotion());
   const [leaving, setLeaving] = useState(false);
   const [dontShow, setDontShow] = useState(false);
@@ -64,7 +70,7 @@ export function PhotosensitivityNotice({ onContinue }: { onContinue: () => void 
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#06070b] px-5 py-5 text-white"
+      className="fixed inset-0 z-[400] flex items-center justify-center overflow-y-auto bg-[#06070b] px-5 py-5 text-white"
       initial={{ opacity: reduce ? 1 : 0 }}
       animate={{ opacity: leaving ? 0 : 1 }}
       transition={{ duration: reduce ? 0 : FADE_S, ease: 'easeInOut' }}
@@ -73,7 +79,18 @@ export function PhotosensitivityNotice({ onContinue }: { onContinue: () => void 
       aria-labelledby="photosensitivity-title"
       aria-describedby="photosensitivity-body"
       data-testid="screen-photosensitivity-notice"
+      onPointerDown={wake}
+      onKeyDown={wake}
     >
+      {backdrop ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 bottom-0 flex h-[46%] items-end overflow-hidden transition-opacity duration-[1600ms] ease-in-out"
+          style={{ opacity: reduce ? BACKDROP_OPACITY[2] : BACKDROP_OPACITY[level.level] ?? 0.1 }}
+        >
+          {backdrop}
+        </div>
+      ) : null}
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">
         <motion.div
           className="absolute inset-x-0 bottom-0 h-[65%] bg-[radial-gradient(ellipse_at_50%_100%,rgba(251,146,60,0.2),transparent_65%)]"
