@@ -1800,6 +1800,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The quick look switch is back in the bottom left of the title screen: tap the dice to roll to the next look. The extra palette button beside Looks & LokPets was removed.',
     ],
   },
+  {
+    version: '0.42.20',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T23:59:59Z',
+    kind: 'hotfix',
+    title: 'No More Resets',
+    body: [
+      'Bringing the discs back no longer restarts the game. If the discs cannot load after an update, they just stay away and the rest of the screen keeps working. The disc code is also loaded ahead of time so the tap is instant.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

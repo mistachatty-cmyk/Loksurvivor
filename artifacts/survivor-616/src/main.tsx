@@ -11,12 +11,18 @@ import { MotionConfig } from 'framer-motion';
 import { applyMotionMode, getMotionMode, registerLiveFeedLoad } from '@/anim/motion';
 import { initLocalization } from '@/lib/i18n';
 import { lokCrash, startCrashWatch } from '@/lib/lokCrash';
+import { optionalChunkLoading } from '@/lib/optionalChunk';
 
 // After a deploy, an already-open or home-screen copy can ask for a code chunk
 // that no longer exists. Reload once to pick up the new build instead of
 // showing the error page. The session flag stops a reload loop.
 window.addEventListener('vite:preloadError', (event) => {
   lokCrash.capture((event as Event & { payload?: unknown }).payload ?? 'preload error', 'chunk');
+  // An optional piece failed to load: let it fail quietly rather than resetting the app.
+  if (optionalChunkLoading()) {
+    event.preventDefault();
+    return;
+  }
   try {
     if (window.sessionStorage.getItem('survivor616.chunk-reload') === '1') return;
     window.sessionStorage.setItem('survivor616.chunk-reload', '1');
