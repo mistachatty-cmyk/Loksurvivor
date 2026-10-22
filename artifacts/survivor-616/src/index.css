@@ -1306,3 +1306,26 @@ body[data-hide-dock] [data-testid='menu-dock'] { display: none; }
 .sbooth-bars i { width: 3px; height: 100%; border-radius: 2px; background: hsl(var(--sb-hue, 200) 85% 62%); transform-origin: bottom; animation: sbooth-eq .5s ease-in-out infinite alternate; }
 @keyframes sbooth-eq { from { transform: scaleY(.25); } to { transform: scaleY(1); } }
 @media (prefers-reduced-motion: reduce) { .sbooth-bars i { animation: none; transform: scaleY(.7); } }
+
+
+/* Page-to-page slide: the new screen arrives from the side its page sits on in the nav dock. */
+@keyframes screen-slide-from-right {
+  from { opacity: 0; transform: translate3d(34px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes screen-slide-from-left {
+  from { opacity: 0; transform: translate3d(-34px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes screen-slide-rise {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.screen-slide { animation-duration: 280ms; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); animation-fill-mode: backwards; }
+.screen-slide-next { animation-name: screen-slide-from-right; }
+.screen-slide-prev { animation-name: screen-slide-from-left; }
+.screen-slide-rise { animation-name: screen-slide-rise; animation-duration: 240ms; }
+html { overflow-x: clip; }
+@media (prefers-reduced-motion: reduce) {
+  .screen-slide { animation: none; }
+}

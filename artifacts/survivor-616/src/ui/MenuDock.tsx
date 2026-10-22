@@ -2,6 +2,7 @@ import { ArrowRight, Home, Map, Search, Settings, ShoppingBag, Users, type Lucid
 
 import { useMeta } from '@/game/state/metaStore';
 import { useT, type MessageKey } from '@/lib/i18n';
+import { pageScreens } from '@/lib/screenSlide';
 import { useSelectedMap } from '@/lib/selectedMap';
 
 export const OPEN_GO_TO_EVENT = 'survivor616:open-go-to';
@@ -15,11 +16,11 @@ interface DockItem {
 }
 
 const ITEMS: DockItem[] = [
-  { id: 'hub', label: 'goto.hub', icon: Home, screens: ['hub'] },
-  { id: 'areas', label: 'goto.areas', icon: Map, screens: ['areas'] },
-  { id: 'roster', label: 'goto.roster', icon: Users, screens: ['roster'] },
-  { id: 'card-shop', label: 'goto.cardShop', icon: ShoppingBag, screens: ['card-shop', 'lok-shop', 'vendor', 'workshop'] },
-  { id: 'settings', label: 'goto.settings', icon: Settings, screens: ['settings'] },
+  { id: 'hub', label: 'goto.hub', icon: Home, screens: pageScreens('hub') },
+  { id: 'areas', label: 'goto.areas', icon: Map, screens: pageScreens('areas') },
+  { id: 'roster', label: 'goto.roster', icon: Users, screens: pageScreens('roster') },
+  { id: 'card-shop', label: 'goto.cardShop', icon: ShoppingBag, screens: pageScreens('card-shop') },
+  { id: 'settings', label: 'goto.settings', icon: Settings, screens: pageScreens('settings') },
 ];
 
 interface Props {

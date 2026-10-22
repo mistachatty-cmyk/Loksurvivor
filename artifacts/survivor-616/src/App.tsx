@@ -83,6 +83,7 @@ import { setCrashScreen } from '@/lib/lokCrash';
 import { SETTINGS_FOCUS_KEY } from '@/lib/jukeboxPrefs';
 import { CrashRecoveryPrompt } from '@/ui/CrashRecoveryPrompt';
 import { MenuDock } from '@/ui/MenuDock';
+import { ScreenSlide } from '@/ui/ScreenSlide';
 import { readSelectedMap } from '@/lib/selectedMap';
 import { readTutorialDone, writeTutorialDone } from '@/lib/tutorial';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
@@ -891,7 +892,13 @@ function Game() {
 
   return (
     <>
-      {renderScreen()}
+      <ScreenSlide
+        screenName={screen.name}
+        swipeEnabled={!DOCK_HIDDEN_SCREENS.includes(screen.name) && !choiceEvent && !travelEncounter}
+        onSwipe={goToScreen}
+      >
+        {renderScreen()}
+      </ScreenSlide>
       <CrashRecoveryPrompt />
       {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && screen.name !== 'photosensitivity-notice' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena'].includes(screen.name) ? 'default' : 'menu'} />}
       <GoToPalette
