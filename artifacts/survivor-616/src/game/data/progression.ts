@@ -465,6 +465,20 @@ export const HUB_ROOMS: HubRoomDef[] = [
     features: ['weapon-bans'],
   },
   {
+    id: 'jukebox-room',
+    kind: 'travel',
+    name: 'Jukebox Room',
+    subtitle: 'Neon Arcade, back wall',
+    description:
+      'A dark room behind the cabinets where the arcade’s old jukebox finally has somewhere to play. Pick a disc, sit back, and let the room follow the music.',
+    backdrop: 'art/street.jpeg',
+    biome: 'archive',
+    // Placeholder name. Opens by beating Neon Arcade and picking up the Arcade
+    // Box (see metaStore). Selecting it launches the room through App routing.
+    unlock: { kind: 'discovery', discoveryId: 'arcade-box' },
+    features: ['jukebox'],
+  },
+  {
     id: 'the-back-room',
     kind: 'hideout',
     name: 'The Back Room',
@@ -564,6 +578,7 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'floodline-breach-log', name: 'Floodline Exchange Ledger', blurb: 'A transit ledger that kept printing 616 after the roots reached the platforms.' },
   { id: 'gen-fitting-floor-log', name: 'Fitting Floor Swatch Book', blurb: 'A swatch book of palettes, skins and hats that kept adding pages while the floor was being repainted around it.' },
   { id: 'glassroot-annex-log', name: 'Glassroot Field Note', blurb: 'A field note mapping false trees around the buried shrine.' },
+  { id: 'arcade-box', name: 'The Arcade Box', blurb: 'A hum-warm crate from the Neon Arcade floor, full of old discs. Someone should hear them.' },
   { id: 'breach-616-plate', name: 'The 616 Plate', blurb: 'A fractured station plate found under the Floodline relays. Its rain-worn number follows you home.' },
   { id: 'transit-coil-found', name: 'The Transit Coil', blurb: 'An intact rail coil that powers the Catenary Harpoon.' },
   { id: 'grpd-station-found', name: 'GRPD Station — Division St.', blurb: 'A precinct nobody decommissioned on paper. The lights are still department-metered.' },

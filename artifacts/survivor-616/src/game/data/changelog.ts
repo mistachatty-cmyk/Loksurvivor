@@ -1643,6 +1643,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'If your browser sends Global Privacy Control or Do Not Track, nothing is sent at all. Signing in still saves your time to your own account as before.',
     ],
   },
+  {
+    version: '0.42.5',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T12:00:00Z',
+    kind: 'update',
+    title: 'The Jukebox Room',
+    body: [
+      'Beat Neon Arcade and pick up the Arcade Box that waits on the floor there, and a new place opens: the Jukebox Room. It is a dark, full-screen room where the Lokifed soundtrack plays as slow-turning discs, and the colors of the room follow the music.',
+      'Stay still and the room settles in. The controls fade out, and with Theater Mix on the sound opens up with more low end. Touch the screen and everything comes back. You can turn Theater Mix off in the room.',
+      'Settings also has an opt-in row to float the same discs outside the hideout on the arrival screen.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

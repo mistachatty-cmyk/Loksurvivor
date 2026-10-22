@@ -6701,11 +6701,11 @@ function drawMapSetPieces(ctx: CanvasRenderingContext2D, w: World) {
       ctx.beginPath(); ctx.arc(entry.x, entry.y, 45 + Math.sin(w.now / 380) * 4, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
-    if (!active && (entry.kind === 'cache' || entry.kind === 'plate' || entry.kind === 'coil')) {
-      ctx.save(); ctx.strokeStyle = entry.kind === 'plate' ? '#fbbf24' : '#67e8f9'; ctx.fillStyle = '#071116';
+    if (!active && (entry.kind === 'cache' || entry.kind === 'plate' || entry.kind === 'coil' || entry.kind === 'arcade-box')) {
+      ctx.save(); ctx.strokeStyle = entry.kind === 'plate' ? '#fbbf24' : entry.kind === 'arcade-box' ? '#ff2ec4' : '#67e8f9'; ctx.fillStyle = '#071116';
       ctx.lineWidth = 3; ctx.fillRect(entry.x - 17, entry.y - 17, 34, 34); ctx.strokeRect(entry.x - 17, entry.y - 17, 34, 34);
       ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#e0f2fe'; ctx.fillText(entry.kind === 'plate' ? '616' : entry.kind === 'coil' ? '⚡' : '▣', entry.x, entry.y);
+      ctx.fillStyle = '#e0f2fe'; ctx.fillText(entry.kind === 'plate' ? '616' : entry.kind === 'coil' ? '⚡' : entry.kind === 'arcade-box' ? '♪' : '▣', entry.x, entry.y);
       ctx.restore();
     }
   }

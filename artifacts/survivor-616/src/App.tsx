@@ -89,6 +89,7 @@ import { SectorCommandScreen } from '@/ui/SectorCommandScreen';
 import { ArenaSetupScreen } from '@/ui/ArenaSetupScreen';
 import { ArenaJoinScreen } from '@/ui/ArenaJoinScreen';
 import { ArenaScreen } from '@/game/ArenaScreen';
+const JukeboxRoom = lazy(() => import('@/ui/JukeboxRoom'));
 const StudioScreen = lazy(() => import('@/ui/StudioScreen').then(m => ({ default: m.StudioScreen })));
 const RunScreen = lazy(() => import('@/game/RunScreen').then(m => ({ default: m.RunScreen })));
 const WeaponTrainingArenaScreen = lazy(() => import('@/ui/WeaponTrainingArenaScreen').then(m => ({ default: m.WeaponTrainingArenaScreen })));
@@ -96,10 +97,10 @@ const WeaponTrainingArenaScreen = lazy(() => import('@/ui/WeaponTrainingArenaScr
 const queryClient = new QueryClient();
 
 /** Full-screen moments where a persistent menu would intrude. */
-const DOCK_HIDDEN_SCREENS = ['intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'hub', 'run-setup', 'run', 'arena', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle', 'weapon-training-arena'];
+const DOCK_HIDDEN_SCREENS = ['jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'hub', 'run-setup', 'run', 'arena', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle', 'weapon-training-arena'];
 
 /** Screens with no payload that browser Back may return to. */
-const HISTORY_SCREENS = new Set(['intro', 'hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'locker', 'recovery', 'vendor', 'workshop', 'card-shop', 'lok-shop', 'weapon-bans', 'settings', 'palette-store', 'sound-booth', 'account', 'feedback', 'weapon-training-arena']);
+const HISTORY_SCREENS = new Set(['intro', 'hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'locker', 'recovery', 'vendor', 'workshop', 'card-shop', 'lok-shop', 'weapon-bans', 'jukebox', 'settings', 'palette-store', 'sound-booth', 'account', 'feedback', 'weapon-training-arena']);
 
 type Screen =
   | { name: 'intro' }
@@ -119,6 +120,7 @@ type Screen =
   | { name: 'card-shop'; tab?: 'sleeve' | 'binder' | 'singles' }
   | { name: 'lok-shop' }
   | { name: 'weapon-bans' }
+  | { name: 'jukebox' }
   | { name: 'grpd-armory' }
   | { name: 'settings' }
   | { name: 'palette-store' }
@@ -173,6 +175,11 @@ function initialScreen(): Screen {
   if (typeof window !== 'undefined') {
     const roomCode = new URLSearchParams(window.location.search).get('room');
     if (roomCode) return { name: 'arena-join', initialCode: roomCode };
+  }
+  // Hidden preview of the Jukebox Room (`?jukebox`), honoured in every build
+  // so it can be tried before the Arcade Box is found.
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('jukebox')) {
+    return { name: 'jukebox' };
   }
   if (import.meta.env.DEV && typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
@@ -299,6 +306,9 @@ function Game() {
         break;
       case 'weapon-bans':
         setScreen({ name: 'weapon-bans' });
+        break;
+      case 'jukebox':
+        setScreen({ name: 'jukebox' });
         break;
       case 'grpd-armory':
         setScreen({ name: 'grpd-armory' });
@@ -560,6 +570,13 @@ function Game() {
               });
               return;
             }
+            if (nextRoomId === 'jukebox-room') {
+              attemptTravelEncounter('hub-room', nextRoomId, () => {
+                sfx.play('uiNav');
+                setScreen({ name: 'jukebox' });
+              });
+              return;
+            }
             attemptTravelEncounter('hub-room', nextRoomId, () => { sfx.play('uiNav'); setRoomId(nextRoomId); });
           }}
           onOpen={openPanel}
@@ -692,6 +709,13 @@ function Game() {
     case 'weapon-bans':
       return <WeaponBansScreen onBack={goHub} />;
 
+    case 'jukebox':
+      return (
+        <Suspense fallback={null}>
+          <JukeboxRoom onClose={goHub} />
+        </Suspense>
+      );
+
     case 'grpd-armory':
       return <GrpdArmoryScreen onBack={() => { setRoomId(grpdArmoryLocation(meta.grpdArmoryAnchor, unlockedRooms.some((room) => room.id === 'grpd-station')) === 'hideout' ? 'main-floor' : 'grpd-station'); goHub(); }} />;
 
@@ -780,15 +804,15 @@ function Game() {
   return (
     <>
       {renderScreen()}
-      {!(screen.name === 'hub' && chromeLayout === 'new') && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena'].includes(screen.name) ? 'default' : 'menu'} />}
+      {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena'].includes(screen.name) ? 'default' : 'menu'} />}
       <GoToPalette
         unlockedFeatures={unlockedFeatures}
-        disabled={['intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena'].includes(screen.name)}
+        disabled={['jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena'].includes(screen.name)}
         showButton={screen.name === 'hub'}
         onGo={goToScreen}
       />
       {!DOCK_HIDDEN_SCREENS.includes(screen.name) && <MenuDock screenName={screen.name} onGo={goToScreen} />}
-      {!['intro', 'hub', 'run-setup', 'run', 'arena', 'starter-lokpet-encounter', 'weapon-training-arena'].includes(screen.name) && (
+      {!['jukebox', 'intro', 'hub', 'run-setup', 'run', 'arena', 'starter-lokpet-encounter', 'weapon-training-arena'].includes(screen.name) && (
         <button type="button" onClick={openLooks} className="fixed right-[max(0.75rem,var(--safe-right))] top-[max(0.75rem,var(--safe-top))] z-[110] inline-flex min-h-11 active:scale-95 items-center gap-2 border border-cyan-200/35 bg-slate-950/85 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-xl backdrop-blur transition hover:border-cyan-100" data-testid="button-global-looks-lokpets"><Sparkles className="h-4 w-4 text-cyan-200" />Looks & LokPets</button>
       )}
       {choiceEvent && (

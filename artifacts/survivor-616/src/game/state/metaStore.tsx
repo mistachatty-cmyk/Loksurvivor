@@ -4305,6 +4305,8 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       }
       for (const findId of result.mapFindIds ?? []) {
         if (findId === 'breach-616-plate' || findId === 'transit-coil-found') discoveryIds = addUnique(discoveryIds, findId);
+        // The Arcade Box only counts once Neon Arcade has been beaten (this run or before).
+        if (findId === 'arcade-box' && discoveryIds.includes('arcade-high-score')) discoveryIds = addUnique(discoveryIds, 'arcade-box');
       }
       const discoveredRelic = result.cleared && result.discoveryId
         ? RELIC_BY_DISCOVERY_ID[result.discoveryId]

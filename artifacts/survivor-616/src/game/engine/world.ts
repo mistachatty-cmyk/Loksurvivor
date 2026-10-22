@@ -12607,6 +12607,11 @@ export function interactWithMap(w: World): boolean {
     w.mapFindIds.add('breach-616-plate');
     pushAlert(w, 'Breach 616 theme found');
     pushSfx(w, 'lootBox');
+  } else if (entry.kind === 'arcade-box') {
+    // Spawns every Neon Arcade run, so it stays reachable on return runs.
+    w.mapFindIds.add('arcade-box');
+    pushAlert(w, 'Arcade Box picked up');
+    pushSfx(w, 'lootBox');
   } else if (entry.kind === 'coil') {
     w.mapFindIds.add('transit-coil-found');
     const def = WEAPONS_BY_ID['catenary-harpoon'];
