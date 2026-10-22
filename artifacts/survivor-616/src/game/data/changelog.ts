@@ -1956,6 +1956,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'If you turned the discs off, a small note on that screen now says so and turns them back on with a tap. An empty shelf says why too.',
       'A bad visit no longer parks the discs for good: the pause wears off after a day, and a paused shelf can no longer count its own pause as another bad visit.',
     ],
+  },  {
+    version: '0.42.33',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T01:00:00Z',
+    kind: 'update',
+    title: 'Slide and Swipe',
+    body: [
+      'Moving between pages now slides. Go to a page further along the bottom bar and it glides in from the right; go back and it glides in from the left. Other screens ease up into place.',
+      'You can swipe with a finger to move between the bottom-bar pages: Hideout, Map, Roster, Card Shop and Settings. Swipe left for the next page, right for the previous one.',
+      'Swipes are ignored where a sideways drag already does something, such as scrolling rows of tabs, sliders, text boxes, pop-ups and the arrival screen, and plain up and down scrolling never turns a page. Reduced-motion devices skip the slide.',
+    ],
   },
 ];
 
