@@ -1892,6 +1892,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'When an update lands while the game is open, it refreshes itself to pick up the new version. That refresh used to drop you on the title screen, even in the middle of starting a match. It now returns you to the same screen, and straight back into the match you were starting.',
     ],
   },
+  {
+    version: '0.42.28',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T00:07:30Z',
+    kind: 'update',
+    title: 'Share Any Moment',
+    body: [
+      'The match-over screen now leads with a big Head to hideout button, with Run it back and Share beside it.',
+      'Share opens a new panel. The Card tab shows your run card and sends it through your device share sheet or saves it. It can also send your result and the game link to X, Facebook, Reddit, WhatsApp, Telegram, Bluesky, email or text, or copy it.',
+      'The new Clips tab lets you pick any part of the match you just played: the last half minute is kept in short pieces on your device, alongside your highlight moments. Pick one or several, then share or save them. Nothing is uploaded unless you share it.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

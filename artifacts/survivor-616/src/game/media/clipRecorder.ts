@@ -46,6 +46,27 @@ export interface CapturedHighlightClip {
   assetId: string;
 }
 
+/** A recent stretch of the run kept for the match-over clip picker. */
+export interface RecentSegment {
+  startMs: number;
+  endMs: number;
+  blob: Blob;
+}
+
+/**
+ * The last stretch of the finished run (about 36 s in 3 s pieces), kept in memory only so the player can
+ * pick any part of it to share from the match-over screen. Cleared when the next run's capture starts.
+ */
+let recentSegments: RecentSegment[] = [];
+
+export function getRecentSegments(): RecentSegment[] {
+  return recentSegments;
+}
+
+export function clearRecentSegments(): void {
+  recentSegments = [];
+}
+
 function pickMimeType(): string | undefined {
   const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
   for (const type of candidates) {
@@ -118,6 +139,7 @@ export function createClipRecorder(getCanvas: () => HTMLCanvasElement | null) {
     if (started || !supported) return;
     const canvas = getCanvas();
     if (!canvas) return;
+    clearRecentSegments();
     try {
       stream = canvas.captureStream(CAPTURE_FPS);
     } catch {
@@ -170,6 +192,7 @@ export function createClipRecorder(getCanvas: () => HTMLCanvasElement | null) {
   async function finalize(nowMs: number): Promise<CapturedHighlightClip[]> {
     if (!supported || !started) return [];
     finishSegment(nowMs);
+    recentSegments = segments.map((segment) => ({ ...segment }));
     if (stream) {
       for (const track of stream.getTracks()) track.stop();
       stream = null;
