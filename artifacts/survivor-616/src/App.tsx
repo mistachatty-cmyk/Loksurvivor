@@ -172,7 +172,31 @@ interface PendingTravelEncounter {
  * Lets a screen be opened directly (e.g. `?screen=areas`) so any part of the
  * game can be reached without replaying progress. Only honoured in dev.
  */
+const RESUME_SCREENS = new Set(['hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'recovery', 'vendor', 'workshop', 'card-shop', 'weapon-bans', 'settings', 'account', 'feedback']);
+
+/** After the automatic reload that picks up a new build, return to where the player was (never the title screen). */
+function resumeScreen(): Screen | null {
+  try {
+    const raw = window.sessionStorage.getItem('survivor616.reload-resume');
+    if (!raw) return null;
+    window.sessionStorage.removeItem('survivor616.reload-resume');
+    const saved = JSON.parse(raw) as { screen?: string; at?: number };
+    if (!saved.screen || !saved.at || Date.now() - saved.at > 20_000) return null;
+    if (saved.screen === 'run') {
+      const run = JSON.parse(window.sessionStorage.getItem('survivor616.pending-run') ?? 'null') as { areaId?: string; challengeIds?: string[] } | null;
+      return run?.areaId ? { name: 'run', areaId: run.areaId, challengeIds: run.challengeIds ?? [] } : { name: 'areas' };
+    }
+    return RESUME_SCREENS.has(saved.screen) ? ({ name: saved.screen } as Screen) : null;
+  } catch {
+    return null;
+  }
+}
+
 function initialScreen(): Screen {
+  if (typeof window !== 'undefined') {
+    const resumed = resumeScreen();
+    if (resumed) return resumed;
+  }
   // `?room=CODE` is the shareable arena-invite link -- honoured in every
   // build (not dev-only like the rest of this function), since it's how a
   // friend actually joins a LokSurvivorArena online room.
@@ -264,6 +288,11 @@ function Game() {
   const prepareRun = useCallback((run: Omit<Extract<Screen, { name: 'run' }>, 'name'>) => {
     // Looks & LokPets is a persistent preference surface, not a mandatory
     // pre-match interruption. The floating hideout control can reopen it.
+    try {
+      window.sessionStorage.setItem('survivor616.pending-run', JSON.stringify({ areaId: run.areaId, challengeIds: run.challengeIds ?? [] }));
+    } catch {
+      /* resume just falls back to the map list */
+    }
     setScreen({ name: 'run', ...run });
   }, []);
 

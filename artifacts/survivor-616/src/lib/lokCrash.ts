@@ -17,6 +17,10 @@ export function setCrashScreen(name: string): void {
   currentScreen = name;
 }
 
+export function getCrashScreen(): string {
+  return currentScreen;
+}
+
 export function crashReportsEnabled(): boolean {
   try {
     return window.localStorage.getItem(OFF_KEY) !== '1';
