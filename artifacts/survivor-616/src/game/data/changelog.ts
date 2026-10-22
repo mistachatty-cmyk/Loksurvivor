@@ -1967,6 +1967,20 @@ export const CHANGELOG: ChangelogEntry[] = [
       'You can swipe with a finger to move between the bottom-bar pages: Hideout, Map, Roster, Card Shop and Settings. Swipe left for the next page, right for the previous one.',
       'Swipes are ignored where a sideways drag already does something, such as scrolling rows of tabs, sliders, text boxes, pop-ups and the arrival screen, and plain up and down scrolling never turns a page. Reduced-motion devices skip the slide.',
     ],
+  },  {
+    version: '0.42.34',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T01:30:00Z',
+    kind: 'update',
+    title: 'LOK Chat Everywhere and New Fits',
+    body: [
+      'Fixed the Card Shop closing the page on iPhone. The new page slide was animating the whole very long page at once; it now only animates one screen of it.',
+      'The bottom bar and Head out button no longer cover the end of every page. Each page now leaves room for them.',
+      'The bottom bar now has LokShop and LOK Chat. LOK Chat opens from any page, shows a badge for new chats and mail, and opens straight to your Mail when something is waiting. The floating Mailbox button is gone: Mail is the first row inside LOK Chat.',
+      'New things to type in LOK Chat, in any view: /roll 2d6, /flip, /8ball, /pick, /rps, /rate, /fortune, /vibe, /616, /me, /shrug, /time, /confetti, /disco, /mail and /clear. Type /help for the list. The bot replies on this device only and nothing is saved.',
+      'New Fits: a featured expansion playlist from guest artists, open from the start. DJ Misfit leads it with His Beat. Find it in the Music screen. More songs will be added over time.',
+      'The walking crew on the photosensitivity screen are brighter again, with a gentle swell instead of fading almost out.',
+    ],
   },
 ];
 

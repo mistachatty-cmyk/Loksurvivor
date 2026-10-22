@@ -84,6 +84,7 @@ import { SETTINGS_FOCUS_KEY } from '@/lib/jukeboxPrefs';
 import { CrashRecoveryPrompt } from '@/ui/CrashRecoveryPrompt';
 import { MenuDock } from '@/ui/MenuDock';
 import { ScreenSlide } from '@/ui/ScreenSlide';
+import { LokChatHost } from '@/ui/LokChatHost';
 import { readSelectedMap } from '@/lib/selectedMap';
 import { readTutorialDone, writeTutorialDone } from '@/lib/tutorial';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
@@ -894,12 +895,14 @@ function Game() {
     <>
       <ScreenSlide
         screenName={screen.name}
+        dockVisible={!DOCK_HIDDEN_SCREENS.includes(screen.name)}
         swipeEnabled={!DOCK_HIDDEN_SCREENS.includes(screen.name) && !choiceEvent && !travelEncounter}
         onSwipe={goToScreen}
       >
         {renderScreen()}
       </ScreenSlide>
       <CrashRecoveryPrompt />
+      <LokChatHost />
       {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && screen.name !== 'photosensitivity-notice' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena'].includes(screen.name) ? 'default' : 'menu'} />}
       <GoToPalette
         unlockedFeatures={unlockedFeatures}

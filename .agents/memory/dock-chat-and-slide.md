@@ -1,0 +1,8 @@
+# Nav dock, page slide, LOK Chat host (0.42.33–0.42.34)
+
+- **Dock order and swipe order are one list**: `lib/screenSlide.ts` `DOCK_PAGES` (Hideout, Map, Roster, Cards, LokShop, Settings). `MenuDock` takes its `screens` from it. LOK Chat is a dock button, not a page, so it is not in the swipe order.
+- **Slide wrapper must never animate a tall page whole.** The card shop is 11,000+ px; a transform on the full page made one giant layer and Safari closed the tab ("Page closed unexpectedly on card-shop", 0.42.33). `ScreenSlide` crops the page to `100dvh` while the 280 ms slide plays, enter-only, and skips it for reduced motion.
+- **Pages make room for the dock** through `--menu-dock-h` / `--menu-dock-w`, measured by `MenuDock` with a ResizeObserver and applied as padding on the `ScreenSlide` wrapper. New dock items need no per-page padding.
+- **One LOK Chat window**: `ui/LokChatHost.tsx` is mounted in `App.tsx`; open it with `openLokChat()` / `openLokChat('mail')` from `lib/lokChatOpen.ts`. It opens to the mailbox when mail is unread. The floating Mailbox button is gone; `MailboxPanel` lives inside chat.
+- **Chat tricks** are records in `game/engine/chatCommands.ts` returning message keys (`lokChat.cmd.*` in `en.json`); `chatCommands.test.ts` fails if a key is missing. Replies are never saved.
+- **New Fits** (`musicPlayer.tsx` `NEW_FITS_TRACKS`) is the guest-artist expansion album, open from the start, starting with DJ Misfit's "His Beat". Add a song by adding a file under `public/music/dj-misfit-new-fits/` and a record. It has no `trackNumber`, so it does not get a disc on the arrival shelf yet.

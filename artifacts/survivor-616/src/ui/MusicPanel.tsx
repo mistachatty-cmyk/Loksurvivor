@@ -6,7 +6,8 @@
  */
 import { useRef, useState } from 'react';
 import { formatBytes } from '@/game/audio/localTrackLibrary';
-import { formatTime, useMusicPlayer, type Track } from '@/game/audio/musicPlayer';
+import { formatTime, NEW_FITS_ALBUM_ID, useMusicPlayer, type Track } from '@/game/audio/musicPlayer';
+import { useT } from '@/lib/i18n';
 import { ScreenLayout } from './ScreenLayout';
 import {
   Play,
@@ -43,6 +44,9 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const anyFileInputRef = useRef<HTMLInputElement>(null);
   const player = useMusicPlayer();
+  const t = useT();
+  const newFits = player.albums.find((album) => album.id === NEW_FITS_ALBUM_ID);
+  const newFitsTracks = newFits ? newFits.trackIds.map((id) => player.tracks.find((track) => track.id === id)).filter((track): track is Track => Boolean(track)) : [];
   const [dragActive, setDragActive] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkValue, setLinkValue] = useState('');
@@ -265,6 +269,33 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
               </span>
             </div>
           </section>
+
+          {newFitsTracks.length > 0 && (
+            <section className="mb-5 border border-fuchsia-300/40 bg-fuchsia-400/5 p-4" aria-labelledby="new-fits-title" data-testid="section-new-fits">
+              <p id="new-fits-title" className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-fuchsia-200">
+                <Disc3 className="h-4 w-4" /> {t('music.newFits.kicker')}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-white">{newFits?.title}</p>
+              <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">{t('music.newFits.body')}</p>
+              <ul className="mt-3 flex flex-col gap-2">
+                {newFitsTracks.map((track) => (
+                  <li key={track.id}>
+                    <button
+                      type="button"
+                      onClick={() => player.playTrack(track.id)}
+                      className="flex min-h-11 w-full items-center justify-between gap-3 border border-fuchsia-300/30 bg-black/30 px-3 py-2 text-left text-sm text-white transition hover:border-fuchsia-200"
+                      data-testid={`button-new-fits-${track.id}`}
+                    >
+                      <span className="truncate">{track.title}</span>
+                      <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-fuchsia-200">
+                        {player.currentTrack?.id === track.id && player.isPlaying ? t('music.newFits.pause') : t('music.newFits.play')}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {player.streamingEmbeds.length > 0 && (
             <section className="mb-6 border border-primary/35 bg-card/70 p-4" aria-labelledby="streaming-shelf-title">

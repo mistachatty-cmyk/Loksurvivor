@@ -41,8 +41,8 @@ function rememberHidden(hidden: boolean): void {
   }
 }
 
-/** Backdrop strength for each of the three theater levels: clear, then fainter, then nearly gone until a touch wakes it. */
-const BACKDROP_OPACITY = [0, 0.55, 0.28, 0.1] as const;
+/** Backdrop strength for each of the three theater levels: clear, then fainter, then dimmer but still clearly visible until a touch wakes it. */
+const BACKDROP_OPACITY = [0, 1, 0.85, 0.62] as const;
 
 export function PhotosensitivityNotice({ onContinue, backdrop }: { onContinue: () => void; backdrop?: ReactNode }) {
   const t = useT();
@@ -93,9 +93,12 @@ export function PhotosensitivityNotice({ onContinue, backdrop }: { onContinue: (
         <div
           aria-hidden="true"
           className="pointer-events-none fixed inset-x-0 bottom-0 flex h-[46%] items-end overflow-hidden transition-opacity duration-[1600ms] ease-in-out"
-          style={{ opacity: reduce ? BACKDROP_OPACITY[2] : BACKDROP_OPACITY[level.level] ?? 0.1 }}
+          style={{ opacity: reduce ? BACKDROP_OPACITY[2] : BACKDROP_OPACITY[level.level] ?? 0.62 }}
         >
-          {backdrop}
+          {/* A slow swell so the walkers stay easy to see but never sit perfectly still. */}
+          <motion.div className="flex h-full w-full items-end" {...breathe(1, 0.78, 6)}>
+            {backdrop}
+          </motion.div>
         </div>
       ) : null}
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">

@@ -91,3 +91,4 @@
 - [LOK Chat](lok-chat.md) — two-way crew messenger in the hideout built on the procedural chat rules (intent keywords + live facts + crew voices), device-local threads, relationship tiers, proactive messages and a #hideout channel; no AI at runtime, replies never echo player text.
 - [Jukebox Room](jukebox.md) — dark theater room for the Lokifed discs: three theater levels, post-analyser dampen filters, Arcade Box unlock, shared `@lok/jukebox` package, `?jukebox` preview.
 - [Mobile stability and sizing](mobile-stability-2026-10-22.md) — why the Jukebox Room crashed iPhone Safari, the fluid root font size, the short photosensitivity screen, crash reports, and optimization notes.
+- [Dock, slide and chat host](dock-chat-and-slide.md) — one dock/swipe page list, crop tall pages while sliding (card-shop crash), dock padding vars, single LOK Chat host with mailbox and tricks, New Fits guest album.

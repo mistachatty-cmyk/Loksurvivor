@@ -55,6 +55,15 @@ const unraveled = `${ALBUM_BASE}09-unraveled.m4a`;
 const nullVoid = `${ALBUM_BASE}10-null-void.m4a`;
 const exoBite = `${ALBUM_BASE}11-exo-bite-brkn.m4a`;
 
+/**
+ * "New Fits": a featured expansion album from guest artists, starting with DJ Misfit. Bare bones on
+ * purpose -- add a track by adding one file under `public/music/dj-misfit-new-fits/` and one record to
+ * `NEW_FITS_TRACKS`. Unlike the Lokifed album these songs are open from the start.
+ */
+const NEW_FITS_BASE = `${import.meta.env.BASE_URL}music/dj-misfit-new-fits/`;
+export const NEW_FITS_ALBUM_ID = 'album-dj-misfit-new-fits';
+export const NEW_FITS_TITLE = 'DJ Misfit — New Fits';
+
 export interface Track {
   id: string;
   /** Display name, defaults to the filename without extension. */
@@ -267,7 +276,7 @@ const ALBUM_CREDITS_STORAGE_KEY = 'survivor616.album-credit-links.v1';
 const AUTO_START_STORAGE_KEY = 'survivor616.music.autostart';
 const LOKIFED_TAKE_ONE = 'Lokifed — Take 1';
 
-const BUNDLED_TRACKS: Track[] = (
+const LOKIFED_TRACKS: Track[] = (
   [
     { id: 'lokifed-00-data-spark', title: 'Data Spark — Hidden Track 0', url: dataSpark, source: 'bundled', trackNumber: 0, unlockObjectiveCount: 0 },
     { id: 'lokifed-01-save-my-grace', title: 'Save My Grace', url: saveMyGrace, source: 'bundled', trackNumber: 1, unlockObjectiveCount: 1 },
@@ -284,11 +293,23 @@ const BUNDLED_TRACKS: Track[] = (
   ] as const
 ).map((track) => ({ ...track, album: LOKIFED_TAKE_ONE, size: 0, duration: null }));
 
-const BUNDLED_ALBUMS: SoundtrackAlbum[] = [{
-  id: 'album-lokifed-take-1',
-  title: LOKIFED_TAKE_ONE,
-  trackIds: BUNDLED_TRACKS.map((track) => track.id),
-}];
+const NEW_FITS_TRACKS: Track[] = (
+  [
+    { id: 'newfits-01-his-beat', title: 'His Beat — DJ Misfit', url: `${NEW_FITS_BASE}01-his-beat.m4a`, source: 'bundled', unlockObjectiveCount: 0 },
+  ] as const
+).map((track) => ({ ...track, album: NEW_FITS_TITLE, size: 0, duration: null }));
+
+/** Every built-in song, Lokifed first so the title-screen default stays Data Spark. */
+const BUNDLED_TRACKS: Track[] = [...LOKIFED_TRACKS, ...NEW_FITS_TRACKS];
+
+const BUNDLED_ALBUMS: SoundtrackAlbum[] = [
+  {
+    id: 'album-lokifed-take-1',
+    title: LOKIFED_TAKE_ONE,
+    trackIds: LOKIFED_TRACKS.map((track) => track.id),
+  },
+  { id: NEW_FITS_ALBUM_ID, title: NEW_FITS_TITLE, trackIds: NEW_FITS_TRACKS.map((track) => track.id) },
+];
 
 const BUNDLED_ALBUM_PLAYLISTS: Playlist[] = BUNDLED_ALBUMS.map((album) => ({
   id: album.id,

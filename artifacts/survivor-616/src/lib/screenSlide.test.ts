@@ -6,14 +6,16 @@ import { DOCK_PAGES, dockIndexFor, slideKind, swipeTargetId } from './screenSlid
 test('dock pages own distinct screens', () => {
   const all = DOCK_PAGES.flatMap((page) => page.screens);
   assert.equal(new Set(all).size, all.length);
-  assert.equal(dockIndexFor('lok-shop'), dockIndexFor('card-shop'));
+  assert.equal(dockIndexFor('vendor'), dockIndexFor('card-shop'));
+  assert.equal(dockIndexFor('lok-shop'), dockIndexFor('card-shop') + 1);
   assert.equal(dockIndexFor('run'), -1);
 });
 
 test('slideKind follows the dock order and skips canvas screens', () => {
   assert.equal(slideKind('hub', 'areas'), 'next');
   assert.equal(slideKind('settings', 'roster'), 'prev');
-  assert.equal(slideKind('card-shop', 'lok-shop'), 'rise');
+  assert.equal(slideKind('card-shop', 'vendor'), 'rise');
+  assert.equal(slideKind('card-shop', 'lok-shop'), 'next');
   assert.equal(slideKind('hub', 'bestiary'), 'rise');
   assert.equal(slideKind('areas', 'run'), 'none');
   assert.equal(slideKind('run', 'summary'), 'none');
@@ -30,4 +32,5 @@ test('swipes pick the neighbouring page and ignore scrolling, short or slow drag
   assert.equal(swipeTargetId('areas', { dx: -120, dy: 0, ms: 1500 }), null, 'too slow');
   assert.equal(swipeTargetId('bestiary', { dx: -120, dy: 0, ms: 200 }), null, 'not a dock page');
   assert.equal(swipeTargetId('lok-shop', { dx: -120, dy: 0, ms: 200 }), 'settings');
+  assert.equal(swipeTargetId('vendor', { dx: -120, dy: 0, ms: 200 }), 'lok-shop');
 });
