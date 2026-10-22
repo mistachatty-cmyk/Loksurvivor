@@ -1,3 +1,6 @@
+import { useState } from 'react';
+
+import { formatReport, lokCrash } from '@/lib/lokCrash';
 import {
   Component,
   type ComponentType,
@@ -37,6 +40,15 @@ function toError(value: unknown): Error {
 }
 
 function DefaultFallback({ error, resetError }: ErrorFallbackProps) {
+  const report = lokCrash.last();
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    if (!report) return;
+    void navigator.clipboard
+      ?.writeText(formatReport(report))
+      .then(() => setCopied(true))
+      .catch(() => undefined);
+  };
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 p-6">
       <div className="max-w-lg w-full text-center">
@@ -52,6 +64,19 @@ function DefaultFallback({ error, resetError }: ErrorFallbackProps) {
           <pre className="mt-4 overflow-x-auto rounded bg-gray-100 p-3 text-left text-xs text-gray-800">
             {error.message || String(error)}
           </pre>
+        ) : null}
+        {report ? (
+          <p className="mt-3 font-mono text-xs text-gray-500">Error code {report.fingerprint}</p>
+        ) : null}
+        {report ? (
+          <button
+            type="button"
+            onClick={copy}
+            className="mt-3 rounded border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+            data-testid="button-copy-crash-report"
+          >
+            {copied ? 'Copied' : 'Copy error report'}
+          </button>
         ) : null}
         <button
           type="button"

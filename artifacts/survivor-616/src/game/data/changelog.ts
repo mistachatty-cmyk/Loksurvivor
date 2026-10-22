@@ -1675,6 +1675,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'If the game was open while a new version arrived, some screens could show a "Something went wrong" page. The game now reloads itself once to pick up the new version, and the floating discs can no longer take the arrival screen down if they fail to load.',
     ],
   },
+  {
+    version: '0.42.8',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T16:00:00Z',
+    kind: 'update',
+    title: 'Crash Reports And A Calmer Warning',
+    body: [
+      'If the game crashes, the error page now shows a short error code and a Copy error report button. The report is also sent to the shared Lok project so it can be fixed: only the error text, game version, screen name and browser type, never an account or device id. Browsers set to Do Not Track never send, and Settings has a switch to turn sending off.',
+      'The seizure and photosensitivity warning has a cleaner, simpler layout with a slow, gentle glow. It still never flashes, and reduced motion turns the glow off.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

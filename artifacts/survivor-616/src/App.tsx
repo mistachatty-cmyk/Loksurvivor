@@ -78,6 +78,7 @@ import { eventPetFor, pickChoiceEvent } from '@/game/engine/choiceEvents';
 import { eventsLeftToday } from '@/game/engine/hideoutRewards';
 import { getFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
 import { GoToPalette } from '@/ui/GoToPalette';
+import { setCrashScreen } from '@/lib/lokCrash';
 import { MenuDock } from '@/ui/MenuDock';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
 import { RunSetupScreen } from '@/ui/RunSetupScreen';
@@ -225,6 +226,7 @@ function Game() {
   useEffect(() => { void restoreStudioAppearances().catch(() => {}); }, []);
   const { meta, markOnboarded, selectedCharacter, completeRun, completeSectorMission, enterHideout, unlockedAreas, unlockedRooms } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen());
+  useEffect(() => setCrashScreen(screen.name), [screen.name]);
   const chromeLayout = useUiChromeLayout();
   const looksReturnRef = useRef<Screen | null>(null);
   const screenRef = useRef<Screen>(screen);
@@ -804,7 +806,7 @@ function Game() {
   return (
     <>
       {renderScreen()}
-      {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena'].includes(screen.name) ? 'default' : 'menu'} />}
+      {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && screen.name !== 'photosensitivity-notice' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena'].includes(screen.name) ? 'default' : 'menu'} />}
       <GoToPalette
         unlockedFeatures={unlockedFeatures}
         disabled={['jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena'].includes(screen.name)}
@@ -812,7 +814,7 @@ function Game() {
         onGo={goToScreen}
       />
       {!DOCK_HIDDEN_SCREENS.includes(screen.name) && <MenuDock screenName={screen.name} onGo={goToScreen} />}
-      {!['jukebox', 'intro', 'hub', 'run-setup', 'run', 'arena', 'starter-lokpet-encounter', 'weapon-training-arena'].includes(screen.name) && (
+      {!['jukebox', 'photosensitivity-notice', 'intro', 'hub', 'run-setup', 'run', 'arena', 'starter-lokpet-encounter', 'weapon-training-arena'].includes(screen.name) && (
         <button type="button" onClick={openLooks} className="fixed right-[max(0.75rem,var(--safe-right))] top-[max(0.75rem,var(--safe-top))] z-[110] inline-flex min-h-11 active:scale-95 items-center gap-2 border border-cyan-200/35 bg-slate-950/85 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-xl backdrop-blur transition hover:border-cyan-100" data-testid="button-global-looks-lokpets"><Sparkles className="h-4 w-4 text-cyan-200" />Looks & LokPets</button>
       )}
       {choiceEvent && (

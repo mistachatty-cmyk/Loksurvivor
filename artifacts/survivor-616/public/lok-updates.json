@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 147,
+      "version": "0.42.8",
+      "date": "2026-10-22",
+      "publishedAt": "2026-10-22T16:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Crash Reports And A Calmer Warning",
+      "body": [
+        "If the game crashes, the error page now shows a short error code and a Copy error report button. The report is also sent to the shared Lok project so it can be fixed: only the error text, game version, screen name and browser type, never an account or device id. Browsers set to Do Not Track never send, and Settings has a switch to turn sending off.",
+        "The seizure and photosensitivity warning has a cleaner, simpler layout with a slow, gentle glow. It still never flashes, and reduced motion turns the glow off."
+      ]
+    },
+    {
       "number": 146,
       "version": "0.42.7",
       "date": "2026-10-22",

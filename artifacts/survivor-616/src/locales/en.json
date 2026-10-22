@@ -20,6 +20,8 @@
   "jukebox.pause": "Pause",
   "jukebox.close": "Leave the Jukebox Room",
   "jukebox.theaterMix": "Theater mix (clearer sound when the screen goes dark)",
+  "settings.crashReports.title": "Send crash reports",
+  "settings.crashReports.body": "If the game crashes, send the error text, game version, screen name and browser type so it can be fixed. No account, no device id, nothing about you. Browsers set to Do Not Track never send.",
   "settings.audioLevel.volume": "Volume",
   "settings.audioLevel.sfxTitle": "Gameplay SFX volume",
   "settings.audioLevel.sfxDescription": "How loud hits, pickups and menu sounds play on this device. Changes apply right away.",
