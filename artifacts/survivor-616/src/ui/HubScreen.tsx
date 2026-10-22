@@ -65,7 +65,7 @@ import { useT, useLocale } from '@/lib/i18n';
 import { grpdArmoryLocation, grpdAvailableSeals } from '@/game/data/grpdArmory';
 import { travelLeadPet } from '@/game/data/travelEncounters';
 import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
-import { PhotosensitivityNotice, photosensitivityNoticeHidden } from './PhotosensitivityNotice';
+import { PhotosensitivityNotice, photosensitivityNoticeHidden, photosensitivityNoticeSeenThisSession } from './PhotosensitivityNotice';
 import { HideoutDirectionPanel } from './HideoutDirectionPanel';
 import { HideoutEndgameDock } from './HideoutEndgameDock';
 
@@ -477,7 +477,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const [showArrival, setShowArrival] = useState(
     () => forceHideoutArrival || (meta.hideoutArrivalEnabled && !hasShownHideoutArrivalThisSession),
   );
-  const [showNotice, setShowNotice] = useState(false);
+  const [showNotice, setShowNotice] = useState(() => forceHideoutArrival && !photosensitivityNoticeHidden() && !photosensitivityNoticeSeenThisSession());
   const [showLorePopup, setShowLorePopup] = useState(false);
   const [crewCommand, setCrewCommand] = useState<{ seq: number; kind: 'help' | 'encourage'; line: string } | undefined>();
   const commandCrew = (kind: 'help' | 'encourage') => {
@@ -587,32 +587,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
 
   if (!activeRoom) return null;
 
-  if (showArrival) {
+  if (showNotice) {
     return (
-      <HideoutArrivalOverlay
-        character={selectedCharacter}
-        palette={selectedCharacterPalette}
-        scene={scene}
-        ambienceEnabled={meta.hideoutAmbienceEnabled}
-        ensureAudioContext={ensureAudioContext}
-        onEnter={() => {
-          hasShownHideoutArrivalThisSession = true;
-          if (!photosensitivityNoticeHidden()) setShowNotice(true);
-          forceHideoutArrival = false;
-          setShowArrival(false);
-        }}
-      />
-    );
-  }
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
-    >
-      {showNotice ? (
-        <PhotosensitivityNotice
+      <PhotosensitivityNotice
           onContinue={() => setShowNotice(false)}
           backdrop={
             <HideoutPreview
@@ -629,7 +606,33 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             />
           }
         />
-      ) : null}
+      
+    );
+  }
+
+  if (showArrival) {
+    return (
+      <HideoutArrivalOverlay
+        character={selectedCharacter}
+        palette={selectedCharacterPalette}
+        scene={scene}
+        ambienceEnabled={meta.hideoutAmbienceEnabled}
+        ensureAudioContext={ensureAudioContext}
+        onEnter={() => {
+          hasShownHideoutArrivalThisSession = true;
+          forceHideoutArrival = false;
+          setShowArrival(false);
+        }}
+      />
+    );
+  }
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
+    >
       <NotificationToasts />
       <NotificationMailbox />
       {chromeLayout === 'classic' ? <>
