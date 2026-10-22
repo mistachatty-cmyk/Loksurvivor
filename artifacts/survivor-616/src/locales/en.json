@@ -16,6 +16,8 @@
   "crash.recovered.copy": "Copy report",
   "crash.recovered.copied": "Copied",
   "crash.recovered.close": "Dismiss",
+  "arrival.discsPaused.title": "Discs paused",
+  "arrival.discsPaused.body": "The game closed while the discs were showing, so they took a break. Tap to bring them back in the lightest mode.",
   "jukebox.sealed.title": "Sealed disc · Track {{n}}",
   "jukebox.sealed.hint": "Lok: finish {{need}} run objectives in total to open this one. You have done {{have}}, so {{left}} to go.",
   "jukebox.sealed.close": "Got it",

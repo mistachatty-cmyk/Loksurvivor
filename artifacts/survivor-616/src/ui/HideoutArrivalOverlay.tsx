@@ -18,7 +18,8 @@ import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience
 import { weatherClass } from '@/game/data/hideout';
 import type { CharacterDef, HideoutSceneDef, SpritePalette } from '@/game/types';
 import { readArrivalDiscsEnabled } from '@/lib/arrivalDiscs';
-import { armDiscGuard } from '@/lib/discGuard';
+import { armDiscGuard, resetDiscGuard } from '@/lib/discGuard';
+import { useT } from '@/lib/i18n';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { RigPortrait } from './RigPortrait';
 
@@ -51,7 +52,12 @@ export function HideoutArrivalOverlay({
   const [entering, setEntering] = useState(false);
   // The guard also decides lite mode: a phone, or a visit that last ended badly.
   const [discSafety] = useState(() => (readArrivalDiscsEnabled() ? armDiscGuard() : { lite: true, off: false }));
-  const discsEnabled = readArrivalDiscsEnabled() && !discSafety.off;
+  const t = useT();
+  // After two bad visits the discs stay off, but the player can try them again (in the lightest mode) from here.
+  const [retryDiscs, setRetryDiscs] = useState(false);
+  const wantsDiscs = readArrivalDiscsEnabled();
+  const discsEnabled = wantsDiscs && (!discSafety.off || retryDiscs);
+  const discsPaused = wantsDiscs && discSafety.off && !retryDiscs;
 
   useEffect(() => {
     if (!ambienceEnabled) return;
@@ -111,10 +117,32 @@ export function HideoutArrivalOverlay({
           {/* A failed disc chunk must never take the arrival screen down with it. */}
           <ErrorBoundary FallbackComponent={() => null}>
             <Suspense fallback={null}>
-              <ArrivalDiscShelf lite={discSafety.lite} />
+              <ArrivalDiscShelf
+                lite={discSafety.lite || retryDiscs}
+                onPlay={() => {
+                  // A disc replaces the rain bed: one audio source at a time keeps phones steady.
+                  ambienceRef.current?.stop();
+                  ambienceRef.current = null;
+                }}
+              />
             </Suspense>
           </ErrorBoundary>
         </div>
+      ) : null}
+
+      {discsPaused ? (
+        <button
+          type="button"
+          onClick={() => {
+            resetDiscGuard();
+            setRetryDiscs(true);
+          }}
+          className="absolute inset-x-6 top-[8dvh] z-10 mx-auto max-w-xs border border-sky-300/50 bg-[#0a2540]/80 px-4 py-3 text-left text-sm text-sky-100"
+          data-testid="button-arrival-discs-retry"
+        >
+          <span className="block font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-sky-300">{t('arrival.discsPaused.title')}</span>
+          <span className="mt-1 block leading-snug">{t('arrival.discsPaused.body')}</span>
+        </button>
       ) : null}
 
       <motion.div

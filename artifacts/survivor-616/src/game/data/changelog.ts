@@ -1769,6 +1769,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Going back from the hideout (your phone back swipe or the browser Back button) now returns you to the title screen instead of getting stuck behind the one-time notice and starter screens.',
     ],
   },
+  {
+    version: '0.42.17',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T23:59:50Z',
+    kind: 'update',
+    title: 'Slimmer Hideout',
+    body: [
+      'The hideout buttons are back above the walk scene as one slim swipeable row on phones, and the scene options are a single row too, so the screen takes far less vertical space.',
+      'If the game closes while the floating discs are showing, the discs now offer a "Discs paused" card you can tap to bring them back in the lightest mode. Playing a disc also quiets the rain sound, so only one thing is playing audio at a time.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
