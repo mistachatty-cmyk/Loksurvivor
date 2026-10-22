@@ -9,6 +9,8 @@
   "settings.textSize.xlarge": "Extra grande",
   "settings.arrivalDiscs.title": "Discos flutuantes fora do esconderijo",
   "settings.arrivalDiscs.body": "Mostre a trilha sonora como discos girando lentamente acima da chuva na tela de chegada. Toque no disco do meio para reproduzi-lo. Desativado por padrão; a cena habitual de chegada permanece inalterada.",
+  "hub.room.jukebox.label": "Sala Jukebox",
+  "hub.room.jukebox.description": "Discos e um quarto escuro",
   "jukebox.title": "Sala Jukebox",
   "jukebox.pick": "Toque em um disco",
   "jukebox.seek": "Procure",

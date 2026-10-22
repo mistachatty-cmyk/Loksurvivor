@@ -9,6 +9,8 @@
   "settings.textSize.xlarge": "Extra grande",
   "settings.arrivalDiscs.title": "Discos flotantes fuera del escondite.",
   "settings.arrivalDiscs.body": "Muestra la banda sonora como discos que giran lentamente sobre la lluvia en la pantalla de llegada. Toque el disco del medio para reproducirlo. Desactivado de forma predeterminada; La escena habitual de llegada no ha cambiado.",
+  "hub.room.jukebox.label": "Sala de máquina de discos",
+  "hub.room.jukebox.description": "Discos y un cuarto oscuro.",
   "jukebox.title": "Sala de máquina de discos",
   "jukebox.pick": "Toca un disco",
   "jukebox.seek": "buscar",
