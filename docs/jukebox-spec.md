@@ -102,7 +102,7 @@ type JukeboxTrack = {
 
 ## 11. Handoff log
 - [x] Phase 0: recon done. Files touched: `docs/jukebox-spec.md` only. Verified: repo structure, soundtrack files and catalog, audio graph, hub room pattern, arrival overlay, discovery flow. Not run: install, typecheck, tests (no code changed yet).
-- [ ] Phase 1
+- [x] Phase 1: carousel saved to `artifacts/survivor-616/src/components/ui/disc-cascade-carousel.tsx` (unmodified from 23dev), plus `disc-cascade-carousel.test.ts` (10 tests on the pure motion/label helpers) and `docs/ecosystem-components/disc-cascade-carousel.md` (usage and Lok rules). No new dependencies (React only). Verified: `pnpm install --frozen-lockfile`, `pnpm typecheck` clean, carousel tests 10/10. Not run: full `pnpm test` and `pnpm build` (the component is not imported anywhere yet, so a build would not exercise it); no changelog bump because nothing player-visible changed. Skipped on purpose: the Unsplash demo (cost discipline). Still to do for the "ecosystem lock": copy the component, test and doc into the `Lok-EcoSystsem` repo (not attached).
 - [ ] Phase 2
 - [ ] Phase 3
 - [ ] Phase 4
