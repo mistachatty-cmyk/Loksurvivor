@@ -1,4 +1,4 @@
-import { useCallback, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -51,7 +51,8 @@ import { UiTransparencyControls } from './UiTransparencyControls';
 import { MotionSetting, ShakeSetting } from './MotionToggle';
 import { ScrollbarSetting } from './ScrollbarSetting';
 import { TextSizeSetting } from './TextSizeSetting';
-import { ArrivalDiscsToggle } from './ArrivalDiscsToggle';
+import { JukeboxSettings } from './JukeboxSettings';
+import { SETTINGS_FOCUS_KEY } from '@/lib/jukeboxPrefs';
 import { CrashReportsToggle } from './CrashReportsToggle';
 import { FullscreenSetting } from './FullscreenSetting';
 import { ControlsSettings } from './ControlsSettings';
@@ -77,6 +78,8 @@ import { getAmbienceVolumePercent, getSfxVolumePercent, setAmbienceVolumePercent
 
 export interface SettingsPanelProps {
   onBack: () => void;
+  /** Opens another screen by id (used by the music section's shortcuts). */
+  onOpenScreen?: (id: string) => void;
   onOpenLooksAndLokPets?: () => void;
 }
 
@@ -85,6 +88,7 @@ const SETTINGS_DESTINATIONS = [
   { id: 'settings-display', label: 'Display and performance', terms: 'graphics frame rate fog zoom fullscreen' },
   { id: 'settings-ui-layout', label: 'UI layout', terms: 'new dock classic corners music mission briefing looks companion' },
   { id: 'settings-audio', label: 'Audio and atmosphere', terms: 'music sound effects ambience weather' },
+  { id: 'settings-jukebox', label: 'Jukebox and soundtracks', terms: 'music disc pulse theater volume soundtrack jukebox room library' },
   { id: 'settings-gameplay', label: 'Gameplay', terms: 'travel encounter fight style live mode building entrances' },
   { id: 'settings-hideout', label: 'Hideout and intro', terms: 'hideout arrival weather pets events notices sticky splash title intro physics' },
   { id: 'settings-controls', label: 'Controls', terms: 'tilt steering gyro sensitivity touch' },
@@ -329,8 +333,19 @@ function BuildingEntrySetting() {
   );
 }
 
-export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelProps) {
+export function SettingsPanel({ onBack, onOpenLooksAndLokPets, onOpenScreen }: SettingsPanelProps) {
   const [noticeSeconds, setNoticeSeconds] = useState<HideoutNoticeSeconds>(getHideoutNoticeSeconds);
+  // The Jukebox Room can send you straight to the music section.
+  useEffect(() => {
+    try {
+      const target = window.sessionStorage.getItem(SETTINGS_FOCUS_KEY);
+      if (!target) return;
+      window.sessionStorage.removeItem(SETTINGS_FOCUS_KEY);
+      window.setTimeout(() => document.getElementById(target)?.scrollIntoView({ block: 'start' }), 120);
+    } catch {
+      /* storage blocked */
+    }
+  }, []);
   const t = useT();
   const chromeLayout = useUiChromeLayout();
   const {
@@ -904,6 +919,8 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
+        <JukeboxSettings onOpenScreen={onOpenScreen} />
+
         <section id="settings-gameplay" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-gameplay-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
@@ -986,7 +1003,6 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </button>
                 </div>
               </div>
-              <ArrivalDiscsToggle />
               <CrashReportsToggle />
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

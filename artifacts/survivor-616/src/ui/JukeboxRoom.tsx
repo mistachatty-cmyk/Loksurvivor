@@ -8,7 +8,7 @@
  * The first touch at Level 3 only wakes the room; it never presses a button.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pause, Play, SkipBack, SkipForward, X } from 'lucide-react';
+import { Library, Pause, Play, Settings2, SkipBack, SkipForward, X } from 'lucide-react';
 import { dampenToTone, gradeFrom, groupBands, IDLE_BANDS, smoothBands, type GroupedBands } from '@lok/jukebox';
 
 import DiscCascadeCarousel from '@/components/ui/disc-cascade-carousel';
@@ -21,28 +21,25 @@ import { setCrashScreen } from '@/lib/lokCrash';
 import { SealedDiscHint } from './SealedDiscHint';
 import type { DiscTrack } from '@/game/audio/jukeboxDiscs';
 import { useTheaterLevel } from '@/lib/useTheaterLevel';
+import { readDiscPulse } from '@/lib/discPulse';
+import { readTheaterMix, writeTheaterMix } from '@/lib/jukeboxPrefs';
+import { DiscPulse } from './DiscPulse';
 
-const MIX_KEY = 'survivor616.jukebox.theater-mix.v1';
 const FADE_MS = 900;
-
-function readMix(): boolean {
-  try {
-    return window.localStorage.getItem(MIX_KEY) !== '0';
-  } catch {
-    return true;
-  }
-}
 
 export interface JukeboxRoomProps {
   onClose: () => void;
+  /** Shortcuts so the room never feels like a dead end. */
+  onOpenMusic?: () => void;
+  onOpenSettings?: () => void;
 }
 
-export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
+export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: JukeboxRoomProps) {
   const t = useT();
   const music = useMusicPlayer();
   const { tracks, currentTrack, isPlaying, playTrack, togglePlay, next, previous, seek, progressSec, durationSec, setTheaterTone, soundtrackObjectiveCompletions } = music;
   const [hint, setHint] = useState<DiscTrack | null>(null);
-  const [theaterMix, setTheaterMix] = useState(readMix);
+  const [theaterMix, setTheaterMix] = useState(readTheaterMix);
   const { level, wake } = useTheaterLevel({ paused: !isPlaying, theaterMix });
   const [safety] = useState(armDiscGuard);
   useEffect(() => watchDiscGuard(), []);
@@ -52,6 +49,7 @@ export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
 
   const discTracks = useMemo(() => albumTracks(tracks), [tracks]);
   const items = useMemo(() => discTracks.map(discItemFor), [discTracks]);
+  const [pulseLevel] = useState(readDiscPulse);
   const current = useMemo(() => {
     const i = discTracks.findIndex((d) => d.id === currentTrack?.id);
     return i >= 0 ? i : startingDisc(discTracks, null);
@@ -59,11 +57,7 @@ export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
   const palette = items[current]?.palette ?? ['#0a0a0f', '#888', '#c8a24a'];
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(MIX_KEY, theaterMix ? '1' : '0');
-    } catch {
-      // Preference just will not persist.
-    }
+    writeTheaterMix(theaterMix);
   }, [theaterMix]);
 
   // Muffle / open the mix with the level. Always hand the sound back on exit.
@@ -174,6 +168,14 @@ export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
 
       <div className="absolute inset-x-0 top-[14dvh] h-[58dvh]">
         {items.length > 0 ? (
+          <DiscPulse
+            color={items[current]?.palette?.[1] ?? '#7dd3fc'}
+            active={isPlaying}
+            level={pulseLevel}
+            discSize="clamp(170px, 50vw, 340px)"
+          />
+        ) : null}
+        {items.length > 0 ? (
           <DiscCascadeCarousel
             items={items}
             index={current}
@@ -240,6 +242,22 @@ export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
           <input type="checkbox" checked={theaterMix} onChange={(e) => setTheaterMix(e.target.checked)} />
           {t('jukebox.theaterMix')}
         </label>
+      </div>
+
+      <div
+        className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] flex items-center gap-1 text-white/80"
+        style={uiStyle}
+      >
+        {onOpenMusic ? (
+          <button type="button" onClick={onOpenMusic} aria-label={t('jukebox.library')} title={t('jukebox.library')} className="p-2" data-testid="button-jukebox-library">
+            <Library size={22} />
+          </button>
+        ) : null}
+        {onOpenSettings ? (
+          <button type="button" onClick={onOpenSettings} aria-label={t('jukebox.settings')} title={t('jukebox.settings')} className="p-2" data-testid="button-jukebox-settings">
+            <Settings2 size={22} />
+          </button>
+        ) : null}
       </div>
 
       <button
