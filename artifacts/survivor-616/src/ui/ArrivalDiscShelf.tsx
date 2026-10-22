@@ -15,31 +15,45 @@ import { albumTracks, discItemFor, startingDisc, type DiscTrack } from '@/game/a
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { watchDiscGuard } from '@/lib/discGuard';
 import { setCrashScreen } from '@/lib/lokCrash';
+import { readDiscPulse } from '@/lib/discPulse';
+import { DiscPulse } from './DiscPulse';
 import { SealedDiscHint } from './SealedDiscHint';
 
 const SHELF_HEIGHT = '54dvh';
+const DISC_SIZE = 'clamp(150px, 46vw, 300px)';
 
 export default function ArrivalDiscShelf({ lite, onPlay }: { lite?: boolean; onPlay?: () => void }) {
   useEffect(() => watchDiscGuard(), []);
   const { tracks, currentTrack, isPlaying, playTrack, togglePlay, soundtrackObjectiveCompletions } = useMusicPlayer();
   const [hint, setHint] = useState<DiscTrack | null>(null);
+  const [pulseLevel] = useState(readDiscPulse);
   const discTracks = useMemo(() => albumTracks(tracks), [tracks]);
   const items = useMemo(() => discTracks.map(discItemFor), [discTracks]);
   // Fixed at mount: the carousel owns the position after that, and a changing
   // default would only matter if the list itself changed under it.
   const first = useMemo(() => startingDisc(discTracks, currentTrack?.id ?? null), [discTracks, currentTrack?.id]);
 
+  const [center, setCenter] = useState<number | null>(null);
   if (items.length === 0) return null;
+  const centerIndex = center ?? first;
+  const centerTrack = discTracks[centerIndex];
 
   return (
     <>
+    <DiscPulse
+      color={items[centerIndex]?.palette?.[1] ?? '#7dd3fc'}
+      active={isPlaying && Boolean(centerTrack) && currentTrack?.id === centerTrack?.id}
+      level={pulseLevel}
+      discSize={DISC_SIZE}
+    />
     <DiscCascadeCarousel
       items={items}
       defaultIndex={first}
       loop
       lite={lite ?? true}
       height={SHELF_HEIGHT}
-      discSize="clamp(150px, 46vw, 300px)"
+      discSize={DISC_SIZE}
+      onIndexChange={setCenter}
       background="transparent"
       frame={false}
       details={false}

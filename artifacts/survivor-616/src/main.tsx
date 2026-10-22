@@ -33,6 +33,16 @@ window.addEventListener('vite:preloadError', (event) => {
   window.location.reload();
 });
 
+// The reload-once flag only guards against an immediate reload loop. After the page has run happily for a
+// while, forget it, so a later deploy can be picked up with another single reload.
+window.setTimeout(() => {
+  try {
+    window.sessionStorage.removeItem('survivor616.chunk-reload');
+  } catch {
+    /* storage blocked */
+  }
+}, 20_000);
+
 function describeUnknown(value: unknown): string {
   if (typeof value === 'string') return value;
   try {

@@ -79,6 +79,7 @@ import { eventsLeftToday } from '@/game/engine/hideoutRewards';
 import { getFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
 import { GoToPalette } from '@/ui/GoToPalette';
 import { setCrashScreen } from '@/lib/lokCrash';
+import { SETTINGS_FOCUS_KEY } from '@/lib/jukeboxPrefs';
 import { CrashRecoveryPrompt } from '@/ui/CrashRecoveryPrompt';
 import { MenuDock } from '@/ui/MenuDock';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
@@ -723,7 +724,18 @@ function Game() {
     case 'jukebox':
       return (
         <Suspense fallback={null}>
-          <JukeboxRoom onClose={goHub} />
+          <JukeboxRoom
+            onClose={goHub}
+            onOpenMusic={() => goToScreen('music')}
+            onOpenSettings={() => {
+              try {
+                window.sessionStorage.setItem(SETTINGS_FOCUS_KEY, 'settings-jukebox');
+              } catch {
+                /* storage blocked */
+              }
+              goToScreen('settings');
+            }}
+          />
         </Suspense>
       );
 
@@ -731,7 +743,7 @@ function Game() {
       return <GrpdArmoryScreen onBack={() => { setRoomId(grpdArmoryLocation(meta.grpdArmoryAnchor, unlockedRooms.some((room) => room.id === 'grpd-station')) === 'hideout' ? 'main-floor' : 'grpd-station'); goHub(); }} />;
 
     case 'settings':
-      return <SettingsPanel onBack={goHub} />;
+      return <SettingsPanel onBack={goHub} onOpenScreen={goToScreen} />;
 
     case 'palette-store':
       return <PaletteGalleryPanel onBack={goHub} onSignIn={() => setScreen({ name: 'account' })} />;

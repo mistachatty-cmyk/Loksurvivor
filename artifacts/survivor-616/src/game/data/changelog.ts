@@ -1810,6 +1810,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Bringing the discs back no longer restarts the game. If the discs cannot load after an update, they just stay away and the rest of the screen keeps working. The disc code is also loaded ahead of time so the tap is instant.',
     ],
   },
+  {
+    version: '0.42.21',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T00:00:30Z',
+    kind: 'update',
+    title: 'Pulsing Discs',
+    body: [
+      'The playing disc now has a neon pulse around it that moves with the music: a halo that follows the bass and kicks on each hit, three rings that drift in and out of step with each other, and slow turning arcs. It loops without a seam, takes on the colour of each disc, and eases between songs.',
+      'Settings has a new Jukebox & soundtracks section with all the music options together: volume, react to the music, the floating discs, disc pulse (Off, Soft or Full), theater mix, and shortcuts to the Jukebox Room and the music library.',
+      'The Jukebox Room has Music library and Music settings buttons in its top left. A tab left open across an update now recovers with one reload more reliably.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
