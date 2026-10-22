@@ -1655,6 +1655,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Settings also has an opt-in row to float the same discs outside the hideout on the arrival screen.',
     ],
   },
+  {
+    version: '0.42.6',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T14:00:00Z',
+    kind: 'update',
+    title: 'Discs In The Rain',
+    body: [
+      'The floating Lokifed discs now show on the Outside the hideout screen by default. Tap the middle disc to play it. If you want the plain rain scene back, turn it off in Settings.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

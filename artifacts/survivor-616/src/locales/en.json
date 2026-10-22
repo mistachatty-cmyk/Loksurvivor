@@ -8,7 +8,7 @@
   "settings.textSize.large": "Large",
   "settings.textSize.xlarge": "Extra large",
   "settings.arrivalDiscs.title": "Floating discs outside the hideout",
-  "settings.arrivalDiscs.body": "Show the soundtrack as slow-turning discs above the rain on the arrival screen. Tap the middle disc to play it. Off by default; the usual arrival scene is unchanged.",
+  "settings.arrivalDiscs.body": "Show the soundtrack as slow-turning discs above the rain on the arrival screen. Tap the middle disc to play it. Turn this off for the plain rain scene.",
   "hub.room.jukebox.label": "Jukebox Room",
   "hub.room.jukebox.description": "Discs and a dark room",
   "jukebox.title": "Jukebox Room",
