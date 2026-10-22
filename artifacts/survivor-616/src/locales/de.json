@@ -8,7 +8,7 @@
   "settings.textSize.large": "Groß",
   "settings.textSize.xlarge": "Extra groß",
   "settings.arrivalDiscs.title": "Schwebende Scheiben außerhalb des Verstecks",
-  "settings.arrivalDiscs.body": "Zeigen Sie den Soundtrack als sich langsam drehende Scheiben über dem Regen auf dem Ankunftsbildschirm an. Tippen Sie auf die mittlere Disc, um sie abzuspielen. Standardmäßig deaktiviert; Die übliche Ankunftsszene bleibt unverändert.",
+  "settings.arrivalDiscs.body": "Zeigen Sie den Soundtrack als sich langsam drehende Scheiben über dem Regen auf dem Ankunftsbildschirm an. Tippen Sie auf die mittlere Disc, um sie abzuspielen. Schalten Sie dies für die einfache Regenszene aus.",
   "hub.room.jukebox.label": "Jukebox-Raum",
   "hub.room.jukebox.description": "Scheiben und ein dunkler Raum",
   "jukebox.title": "Jukebox-Raum",
