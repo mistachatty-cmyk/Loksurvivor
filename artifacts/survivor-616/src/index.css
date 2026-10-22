@@ -749,6 +749,14 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 :root[data-scrollbar='hidden'] *::-webkit-scrollbar { display: none; }
 
 @layer base {
+  /* Dynamic UI scale: every rem-based size follows the screen width on phones
+     (13.5px at 390 wide, 16px from ~465 up). The Text size setting multiplies it. */
+  html {
+    font-size: calc(clamp(13.5px, 3.45vw, 16px) * var(--text-scale, 1));
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   * {
     @apply border-border;
   }

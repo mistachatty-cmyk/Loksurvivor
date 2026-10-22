@@ -40,6 +40,8 @@ export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
   const [theaterMix, setTheaterMix] = useState(readMix);
   const { level, wake } = useTheaterLevel({ paused: !isPlaying, theaterMix });
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const glowRef = useRef<HTMLDivElement | null>(null);
+  const vigRef = useRef<HTMLDivElement | null>(null);
 
   const discTracks = useMemo(() => albumTracks(tracks), [tracks]);
   const items = useMemo(() => discTracks.map(discItemFor), [discTracks]);
@@ -63,43 +65,46 @@ export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
   }, [level.dampen, setTheaterTone]);
   useEffect(() => () => setTheaterTone(null), [setTheaterTone]);
 
-  // Color grade from the shared beat feed (never a second analyser).
+  // Color grade from the shared beat feed (never a second analyser). It writes
+  // opacity straight onto two small layers, about 12 times a second: never onto
+  // an ancestor of the 3D discs (that restyles all of them) and never through a
+  // full-screen filter. Both made phone browsers run out of memory.
   useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    const set = (g: { glow: number; hue: number; vignette: number; grain: number }) => {
-      root.style.setProperty('--jb-glow', g.glow.toFixed(3));
-      root.style.setProperty('--jb-hue', `${g.hue.toFixed(1)}deg`);
-      root.style.setProperty('--jb-vig', g.vignette.toFixed(3));
-      root.style.setProperty('--jb-grain', g.grain.toFixed(3));
+    const glow = glowRef.current;
+    const vig = vigRef.current;
+    if (!glow || !vig) return;
+    const paint = (g: { glow: number; vignette: number }) => {
+      glow.style.opacity = (0.12 + g.glow * 0.5).toFixed(3);
+      vig.style.opacity = g.vignette.toFixed(3);
     };
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     if (reduced) {
-      set(gradeFrom(IDLE_BANDS, 0.3));
+      paint(gradeFrom(IDLE_BANDS, 0.3));
       return;
     }
-    let raf = 0;
+    let timer = 0;
     let last = performance.now();
     let smooth: GroupedBands = IDLE_BANDS;
-    const tick = (now: number) => {
-      raf = requestAnimationFrame(tick);
-      const dt = now - last;
-      last = now;
+    const tick = () => {
+      const now = performance.now();
       const frame = beatBus.read();
-      smooth = smoothBands(smooth, groupBands(frame.bands), dt);
-      set(gradeFrom(smooth, frame.energy));
+      smooth = smoothBands(smooth, groupBands(frame.bands), now - last);
+      last = now;
+      paint(gradeFrom(smooth, frame.energy));
+    };
+    const start = () => {
+      window.clearInterval(timer);
+      last = performance.now();
+      timer = window.setInterval(tick, 80);
     };
     const onVisibility = () => {
-      cancelAnimationFrame(raf);
-      if (!document.hidden) {
-        last = performance.now();
-        raf = requestAnimationFrame(tick);
-      }
+      if (document.hidden) window.clearInterval(timer);
+      else start();
     };
-    raf = requestAnimationFrame(tick);
+    start();
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
-      cancelAnimationFrame(raf);
+      window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
@@ -136,7 +141,6 @@ export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
     <div
       ref={rootRef}
       className="fixed inset-0 z-50 overflow-hidden bg-black text-white"
-      style={{ '--jb-glow': 0.3, '--jb-hue': '0deg', '--jb-vig': 0.6, '--jb-grain': 0.04 } as React.CSSProperties}
       onMouseMove={wake}
       onKeyDown={wake}
       data-testid="screen-jukebox-room"
@@ -145,18 +149,20 @@ export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
       aria-label={t('jukebox.title')}
     >
       <div
+        ref={glowRef}
         className="absolute inset-0"
         aria-hidden="true"
         style={{
           background: `radial-gradient(ellipse at 50% 45%, ${palette[1]} 0%, ${palette[2]} 28%, ${palette[0]} 70%, #000 100%)`,
-          opacity: 'calc(0.12 + var(--jb-glow) * 0.5)' as unknown as number,
-          filter: 'hue-rotate(var(--jb-hue))',
+          opacity: 0.2,
+          transition: 'background 1.2s ease',
         }}
       />
       <div
+        ref={vigRef}
         className="pointer-events-none absolute inset-0"
         aria-hidden="true"
-        style={{ background: 'radial-gradient(ellipse at center, transparent 35%, #000 130%)', opacity: 'var(--jb-vig)' as unknown as number }}
+        style={{ background: 'radial-gradient(ellipse at center, transparent 35%, #000 130%)', opacity: 0.6 }}
       />
 
       <div className="absolute inset-x-0 top-[14dvh] h-[58dvh]">
@@ -164,10 +170,6 @@ export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
           <DiscCascadeCarousel
             items={items}
             index={current}
-            onIndexChange={(index) => {
-              const track = discTracks[index];
-              if (track && !track.locked && track.id !== currentTrack?.id) playTrack(track.id);
-            }}
             loop
             height="58dvh"
             discSize="clamp(170px, 50vw, 340px)"
