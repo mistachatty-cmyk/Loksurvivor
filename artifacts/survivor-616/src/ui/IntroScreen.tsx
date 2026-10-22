@@ -4,7 +4,7 @@
  */
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, ShieldAlert, Sparkles, Megaphone } from 'lucide-react';
+import { X, ShieldAlert, Sparkles, Megaphone, Dices } from 'lucide-react';
 
 import { useAuth } from '@/state/authStore';
 import { useMeta } from '@/game/state/metaStore';
@@ -52,7 +52,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
   const t = useT();
   const { available, session } = useAuth();
   const showSignIn = Boolean(onSignIn) && available && !session;
-  const { meta, checkHiddenThemeReload } = useMeta();
+  const { meta, checkHiddenThemeReload, cycleUiLook } = useMeta();
   const player = useMusicPlayer();
   // Picked once per mount, not per render -- a fresh one shows up whenever
   // the title screen loads, Minecraft-main-menu-splash style.
@@ -116,6 +116,18 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
       className="intro-screen min-h-[100dvh] flex flex-col items-center justify-center p-6 sm:p-8 text-center bg-black text-white relative overflow-hidden"
       data-intro-event={introEvent}
     >
+      {/* Quick theme switch: one tap rolls to the next look. */}
+      <button
+        type="button"
+        onClick={cycleUiLook}
+        aria-label="Roll the look"
+        title="Roll the look"
+        className="fixed bottom-[max(1rem,var(--safe-bottom))] left-[max(1rem,var(--safe-left))] z-30 inline-flex min-h-11 items-center gap-2 border border-white/25 bg-black/70 px-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/75 backdrop-blur transition hover:border-white/60 hover:text-white active:scale-95"
+        data-testid="button-intro-roll-look"
+      >
+        <Dices className="h-4 w-4" aria-hidden="true" />
+        <span className="hidden sm:inline">Roll the look</span>
+      </button>
       {/* A bot-piloted run of the real game plays behind the copy below --
           random character, random area, rotating scenes. See AttractMode.tsx. */}
       <Suspense fallback={null}>

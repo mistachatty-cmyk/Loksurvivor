@@ -1790,6 +1790,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Looks & LokPets button is back in the top right of every screen after the title, including the hideout, along with a new palette button beside it that switches to your next UI theme in one tap. On phones both are compact icons.',
     ],
   },
+  {
+    version: '0.42.19',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T23:59:58Z',
+    kind: 'hotfix',
+    title: 'Quick Look Switch',
+    body: [
+      'The quick look switch is back in the bottom left of the title screen: tap the dice to roll to the next look. The extra palette button beside Looks & LokPets was removed.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
