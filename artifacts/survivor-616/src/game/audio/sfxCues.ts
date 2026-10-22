@@ -41,6 +41,9 @@ export type SfxCueId =
   | 'waveStart'
   | 'bossWarning'
   | 'obstacleBreak'
+  | 'blockCrack'
+  | 'glassShatter'
+  | 'iceShatter'
   | 'uiClick'
   | 'uiNav'
   | 'purchase'
@@ -93,6 +96,12 @@ export const SFX_CUE_BASE: Record<SfxCueId, SfxCueBaseParams> = {
   waveStart: { wave: 'square', freqStart: 220, freqEnd: 330, durationMs: 260, gain: 0.2 },
   bossWarning: { wave: 'square', freqStart: 160, freqEnd: 110, durationMs: 460, gain: 0.26, noiseMix: 0.15 },
   obstacleBreak: { wave: 'square', freqStart: 150, freqEnd: 60, durationMs: 160, gain: 0.2, noiseMix: 0.5 },
+  /** A short, bright tick as glass or ice takes a hit and a crack runs. */
+  blockCrack: { wave: 'triangle', freqStart: 2400, freqEnd: 1500, durationMs: 55, gain: 0.12, noiseMix: 0.35 },
+  /** Glass going all at once: a high noisy crash that falls away. */
+  glassShatter: { wave: 'sawtooth', freqStart: 3200, freqEnd: 520, durationMs: 300, gain: 0.2, noiseMix: 0.8 },
+  /** Ice cracking apart: lower and duller, with a deep thud under it. */
+  iceShatter: { wave: 'triangle', freqStart: 1500, freqEnd: 180, durationMs: 340, gain: 0.22, noiseMix: 0.6 },
   uiClick: { wave: 'sine', freqStart: 720, freqEnd: 640, durationMs: 35, gain: 0.1 },
   uiNav: { wave: 'sine', freqStart: 520, freqEnd: 660, durationMs: 60, gain: 0.11 },
   purchase: { wave: 'triangle', freqStart: 600, freqEnd: 900, durationMs: 180, gain: 0.18 },
@@ -158,6 +167,9 @@ export const MIN_RETRIGGER_MS: Partial<Record<SfxCueId, number>> = {
   kill: 45,
   bossKill: 200,
   obstacleBreak: 70,
+  blockCrack: 60,
+  glassShatter: 90,
+  iceShatter: 90,
   pickupXp: 120,
   pickupCred: 120,
   pickupHealth: 150,

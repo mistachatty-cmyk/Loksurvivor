@@ -106,6 +106,11 @@ export const AREAS: AreaDef[] = [
       { x: -250, y: -40, w: 54, h: 54, kind: 'crate-breakable', propVariant: 'light-breakable' },
       { x: 250, y: 40, w: 108, h: 26, kind: 'bench', propVariant: 'fixed-bench' },
       { x: 0, y: 80, w: 70, h: 54, kind: 'pothole', pothole: { trigger: 'ground-shock' } },
+      // Shop-front glass and a frozen delivery: the glass cracks and shatters, the ice slides and leaves a slick trail.
+      { x: -110, y: 170, w: 72, h: 44, kind: 'glass-block' },
+      { x: 110, y: -40, w: 72, h: 44, kind: 'glass-block' },
+      { x: -150, y: -120, w: 56, h: 52, kind: 'ice-block' },
+      { x: 70, y: 175, w: 56, h: 52, kind: 'ice-block' },
     ],
     durationSec: 150,
     threat: 'rising',

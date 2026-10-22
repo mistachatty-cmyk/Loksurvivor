@@ -1931,6 +1931,20 @@ export const CHANGELOG: ChangelogEntry[] = [
       'A hidden Cheat bar now exists for testers. Dev Mode stays locked until the secret phrase is typed into LOK Chat. After that the Cheat bar (in LOK Chat and Settings) can grant any resource, open or relock every unlock, and play a few Easter eggs, which anyone can also trigger by typing confetti, disco, 616 or konami in LOK Chat.',
     ],
   },
+  {
+    version: '0.42.31',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T00:40:00Z',
+    kind: 'update',
+    title: 'Glass and Ice',
+    body: [
+      'New ice blocks. Shove one and it slides a long way across the floor, leaving a slick icy trail behind it. Anyone who walks onto the trail, you included, keeps their momentum and slides on past where they meant to stop or turn, and other props coast farther on it too. When an ice block finally breaks it bursts into frost and a slippery puddle.',
+      'New glass panes. They hold until you crack them, then shatter.',
+      'Cracks are much more detailed. Every hit grows a web of deep fractures, branches and hairlines out from exactly where it landed, drawn in layers so they look cut into the surface, with a white flash and a little shake on each hit. Glass gets a spider-web of rings, ice splits along long clean fault lines and frosts over.',
+      'Breaking plays out in frames: a white flash with every crack lit, then the block splits into dozens of shards that fly out from the point of impact, spin, bounce up and settle on the floor before fading, with a shock ring, glints, glass dust or frost mist, and new glass and ice shatter sounds.',
+      'Fulton Back Alley now has two panes of glass and two ice blocks to play with.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
