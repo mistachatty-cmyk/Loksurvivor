@@ -20,12 +20,14 @@ import type { CharacterDef, HideoutSceneDef, SpritePalette } from '@/game/types'
 import { readArrivalDiscsEnabled } from '@/lib/arrivalDiscs';
 import { armDiscGuard, resetDiscGuard } from '@/lib/discGuard';
 import { useT } from '@/lib/i18n';
+import { optionalImport } from '@/lib/optionalChunk';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { RigPortrait } from './RigPortrait';
 
 // Opt-in floating CDs (Settings, or `?arrivalDiscs`). Lazy so the carousel is
 // never part of the first-load bundle for anyone who has it off.
-const ArrivalDiscShelf = lazy(() => import('./ArrivalDiscShelf'));
+const loadDiscShelf = () => optionalImport(() => import('./ArrivalDiscShelf'));
+const ArrivalDiscShelf = lazy(loadDiscShelf);
 
 export interface HideoutArrivalOverlayProps {
   character: CharacterDef;
@@ -58,6 +60,11 @@ export function HideoutArrivalOverlay({
   const wantsDiscs = readArrivalDiscsEnabled();
   const discsEnabled = wantsDiscs && (!discSafety.off || retryDiscs);
   const discsPaused = wantsDiscs && discSafety.off && !retryDiscs;
+
+  // When the discs are paused, fetch their code now so tapping the card is instant and never waits on the network.
+  useEffect(() => {
+    if (discsPaused) loadDiscShelf().catch(() => {});
+  }, [discsPaused]);
 
   useEffect(() => {
     if (!ambienceEnabled) return;
