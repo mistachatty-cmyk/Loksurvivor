@@ -16,6 +16,8 @@
   "crash.recovered.copy": "Bericht kopieren",
   "crash.recovered.copied": "Kopiert",
   "crash.recovered.close": "Entlassen",
+  "arrival.discsPaused.title": "Discs angehalten",
+  "arrival.discsPaused.body": "Das Spiel wurde geschlossen, während die Scheiben gezeigt wurden, also machten sie eine Pause. Tippen Sie, um sie wieder in den hellsten Modus zu versetzen.",
   "jukebox.sealed.title": "Versiegelte Scheibe · Spur {{n}}",
   "jukebox.sealed.hint": "Lok: Schließe insgesamt {{need}}-Laufziele ab, um dieses zu öffnen. Sie haben {{have}} erledigt, also kommt noch {{left}}.",
   "jukebox.sealed.close": "Verstanden",

@@ -16,6 +16,8 @@
   "crash.recovered.copy": "Copiar informe",
   "crash.recovered.copied": "copiado",
   "crash.recovered.close": "Descartar",
+  "arrival.discsPaused.title": "Discos en pausa",
+  "arrival.discsPaused.body": "El juego terminó mientras se mostraban los discos, así que se tomaron un descanso. Toca para recuperarlos en el modo más ligero.",
   "jukebox.sealed.title": "Disco sellado · Pista {{n}}",
   "jukebox.sealed.hint": "Lok: finaliza los objetivos de ejecución {{need}} en total para abrir este. Has hecho {{have}}, así que {{left}} está listo.",
   "jukebox.sealed.close": "Lo tengo",

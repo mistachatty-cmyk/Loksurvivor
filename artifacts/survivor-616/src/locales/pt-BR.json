@@ -16,6 +16,8 @@
   "crash.recovered.copy": "Copiar relatório",
   "crash.recovered.copied": "Copiado",
   "crash.recovered.close": "Dispensar",
+  "arrival.discsPaused.title": "Discos pausados",
+  "arrival.discsPaused.body": "O jogo encerrou enquanto os discos eram exibidos, então eles fizeram uma pausa. Toque para trazê-los de volta ao modo mais leve.",
   "jukebox.sealed.title": "Disco selado · Track {{n}}",
   "jukebox.sealed.hint": "Lok: termine os objetivos de execução do {{need}} no total para abrir este. Você fez {{have}}, então {{left}} continua.",
   "jukebox.sealed.close": "Entendi",

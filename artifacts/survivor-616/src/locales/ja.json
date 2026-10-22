@@ -16,6 +16,8 @@
   "crash.recovered.copy": "レポートのコピー",
   "crash.recovered.copied": "コピーされました",
   "crash.recovered.close": "解雇する",
+  "arrival.discsPaused.title": "ディスクが一時停止されました",
+  "arrival.discsPaused.body": "ディスクが表示されている間にゲームが終了したため、休憩を取りました。タップすると、最も軽いモードに戻ります。",
   "jukebox.sealed.title": "シールドディスク・トラック{{n}}",
   "jukebox.sealed.hint": "Lok: {{need}} の実行目標を合計で完了すると、これが開きます。 {{have}} を完了したので、次は {{left}} です。",
   "jukebox.sealed.close": "分かりました",
