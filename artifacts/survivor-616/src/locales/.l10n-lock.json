@@ -1,5 +1,7 @@
 {
   "de": {
+    "areas.selected": "9a976fc228b6",
+    "areas.tapAgain": "1e4db2faeab8",
     "arrival.discsPaused.body": "b4d6ace4e03e",
     "arrival.discsPaused.title": "68775a34d739",
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -57,6 +59,8 @@
     "crash.recovered.copied": "8e3df45a49db",
     "crash.recovered.copy": "4ed2589d4684",
     "crash.recovered.title": "b30949ab521f",
+    "dock.headOut": "958a1be9caf6",
+    "dock.quick": "7ef6f2ac8c65",
     "egg.bridge-616.line": "11ece49b9e6a",
     "egg.bridge-616.title": "c7c684be2e24",
     "egg.owl-wink.line": "a0d4485a8a32",
@@ -1002,6 +1006,8 @@
     "wallet.signIn": "ada2e9e96fa9"
   },
   "es": {
+    "areas.selected": "9a976fc228b6",
+    "areas.tapAgain": "1e4db2faeab8",
     "arrival.discsPaused.body": "b4d6ace4e03e",
     "arrival.discsPaused.title": "68775a34d739",
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -1059,6 +1065,8 @@
     "crash.recovered.copied": "8e3df45a49db",
     "crash.recovered.copy": "4ed2589d4684",
     "crash.recovered.title": "b30949ab521f",
+    "dock.headOut": "958a1be9caf6",
+    "dock.quick": "7ef6f2ac8c65",
     "egg.bridge-616.line": "11ece49b9e6a",
     "egg.bridge-616.title": "c7c684be2e24",
     "egg.owl-wink.line": "a0d4485a8a32",
@@ -2004,6 +2012,8 @@
     "wallet.signIn": "ada2e9e96fa9"
   },
   "fr": {
+    "areas.selected": "9a976fc228b6",
+    "areas.tapAgain": "1e4db2faeab8",
     "arrival.discsPaused.body": "b4d6ace4e03e",
     "arrival.discsPaused.title": "68775a34d739",
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -2061,6 +2071,8 @@
     "crash.recovered.copied": "8e3df45a49db",
     "crash.recovered.copy": "4ed2589d4684",
     "crash.recovered.title": "b30949ab521f",
+    "dock.headOut": "958a1be9caf6",
+    "dock.quick": "7ef6f2ac8c65",
     "egg.bridge-616.line": "11ece49b9e6a",
     "egg.bridge-616.title": "c7c684be2e24",
     "egg.owl-wink.line": "a0d4485a8a32",
@@ -3006,6 +3018,8 @@
     "wallet.signIn": "ada2e9e96fa9"
   },
   "ja": {
+    "areas.selected": "9a976fc228b6",
+    "areas.tapAgain": "1e4db2faeab8",
     "arrival.discsPaused.body": "b4d6ace4e03e",
     "arrival.discsPaused.title": "68775a34d739",
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -3063,6 +3077,8 @@
     "crash.recovered.copied": "8e3df45a49db",
     "crash.recovered.copy": "4ed2589d4684",
     "crash.recovered.title": "b30949ab521f",
+    "dock.headOut": "958a1be9caf6",
+    "dock.quick": "7ef6f2ac8c65",
     "egg.bridge-616.line": "11ece49b9e6a",
     "egg.bridge-616.title": "c7c684be2e24",
     "egg.owl-wink.line": "a0d4485a8a32",
@@ -4008,6 +4024,8 @@
     "wallet.signIn": "ada2e9e96fa9"
   },
   "ko": {
+    "areas.selected": "9a976fc228b6",
+    "areas.tapAgain": "1e4db2faeab8",
     "arrival.discsPaused.body": "b4d6ace4e03e",
     "arrival.discsPaused.title": "68775a34d739",
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -4065,6 +4083,8 @@
     "crash.recovered.copied": "8e3df45a49db",
     "crash.recovered.copy": "4ed2589d4684",
     "crash.recovered.title": "b30949ab521f",
+    "dock.headOut": "958a1be9caf6",
+    "dock.quick": "7ef6f2ac8c65",
     "egg.bridge-616.line": "11ece49b9e6a",
     "egg.bridge-616.title": "c7c684be2e24",
     "egg.owl-wink.line": "a0d4485a8a32",
@@ -5010,6 +5030,8 @@
     "wallet.signIn": "ada2e9e96fa9"
   },
   "pt-BR": {
+    "areas.selected": "9a976fc228b6",
+    "areas.tapAgain": "1e4db2faeab8",
     "arrival.discsPaused.body": "b4d6ace4e03e",
     "arrival.discsPaused.title": "68775a34d739",
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -5067,6 +5089,8 @@
     "crash.recovered.copied": "8e3df45a49db",
     "crash.recovered.copy": "4ed2589d4684",
     "crash.recovered.title": "b30949ab521f",
+    "dock.headOut": "958a1be9caf6",
+    "dock.quick": "7ef6f2ac8c65",
     "egg.bridge-616.line": "11ece49b9e6a",
     "egg.bridge-616.title": "c7c684be2e24",
     "egg.owl-wink.line": "a0d4485a8a32",
@@ -6012,6 +6036,8 @@
     "wallet.signIn": "ada2e9e96fa9"
   },
   "zh-CN": {
+    "areas.selected": "9a976fc228b6",
+    "areas.tapAgain": "1e4db2faeab8",
     "arrival.discsPaused.body": "b4d6ace4e03e",
     "arrival.discsPaused.title": "68775a34d739",
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -6069,6 +6095,8 @@
     "crash.recovered.copied": "8e3df45a49db",
     "crash.recovered.copy": "4ed2589d4684",
     "crash.recovered.title": "b30949ab521f",
+    "dock.headOut": "958a1be9caf6",
+    "dock.quick": "7ef6f2ac8c65",
     "egg.bridge-616.line": "11ece49b9e6a",
     "egg.bridge-616.title": "c7c684be2e24",
     "egg.owl-wink.line": "a0d4485a8a32",

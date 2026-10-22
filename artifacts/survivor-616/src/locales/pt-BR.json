@@ -1,5 +1,9 @@
 {
   "goto.dockLabel": "Menu principal",
+  "dock.headOut": "Saia",
+  "dock.quick": "Rápido",
+  "areas.selected": "Selecionado",
+  "areas.tapAgain": "Toque novamente para jogar",
   "goto.search": "Pesquisar",
   "settings.textSize.title": "Tamanho do texto",
   "settings.textSize.body": "Aumenta ou diminui o texto do menu. Útil em um telefone, TV ou tela de fliperama do outro lado da sala.",

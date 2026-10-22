@@ -1,5 +1,9 @@
 {
   "goto.dockLabel": "Menú principal",
+  "dock.headOut": "Salir",
+  "dock.quick": "Rápido",
+  "areas.selected": "Seleccionado",
+  "areas.tapAgain": "Toca de nuevo para jugar",
   "goto.search": "Buscar",
   "settings.textSize.title": "Tamaño del texto",
   "settings.textSize.body": "Hace que el texto del menú sea más grande o más pequeño. Útil en un teléfono, un televisor o una pantalla de juegos al otro lado de la habitación.",

@@ -1,5 +1,9 @@
 {
   "goto.dockLabel": "Hauptmenü",
+  "dock.headOut": "Geh raus",
+  "dock.quick": "Schnell",
+  "areas.selected": "Ausgewählt",
+  "areas.tapAgain": "Zum Abspielen erneut tippen",
   "goto.search": "Suchen",
   "settings.textSize.title": "Textgröße",
   "settings.textSize.body": "Vergrößert oder verkleinert den Menütext. Hilfreich auf einem Telefon, einem Fernseher oder einem Arcade-Bildschirm auf der anderen Seite des Raumes.",
