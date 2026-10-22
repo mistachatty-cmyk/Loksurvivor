@@ -7,6 +7,8 @@
   "settings.textSize.normal": "normales",
   "settings.textSize.large": "Grande",
   "settings.textSize.xlarge": "Extra grande",
+  "settings.arrivalDiscs.title": "Discos flotantes fuera del escondite.",
+  "settings.arrivalDiscs.body": "Muestra la banda sonora como discos que giran lentamente sobre la lluvia en la pantalla de llegada. Toque el disco del medio para reproducirlo. Desactivado de forma predeterminada; La escena habitual de llegada no ha cambiado.",
   "settings.audioLevel.volume": "Volumen",
   "settings.audioLevel.sfxTitle": "Volumen SFX del juego",
   "settings.audioLevel.sfxDescription": "Qué tan fuertes se reproducen los golpes, las pastillas y los sonidos del menú en este dispositivo. Los cambios se aplican de inmediato.",

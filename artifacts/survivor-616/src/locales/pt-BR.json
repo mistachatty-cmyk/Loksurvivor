@@ -7,6 +7,8 @@
   "settings.textSize.normal": "Normais",
   "settings.textSize.large": "Grande",
   "settings.textSize.xlarge": "Extra grande",
+  "settings.arrivalDiscs.title": "Discos flutuantes fora do esconderijo",
+  "settings.arrivalDiscs.body": "Mostre a trilha sonora como discos girando lentamente acima da chuva na tela de chegada. Toque no disco do meio para reproduzi-lo. Desativado por padrão; a cena habitual de chegada permanece inalterada.",
   "settings.audioLevel.volume": "Volume",
   "settings.audioLevel.sfxTitle": "Volume SFX da jogabilidade",
   "settings.audioLevel.sfxDescription": "Como batidas altas, captadores e sons de menu são reproduzidos neste dispositivo. As alterações são aplicadas imediatamente.",

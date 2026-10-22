@@ -7,6 +7,8 @@
   "settings.textSize.normal": "보통",
   "settings.textSize.large": "대형",
   "settings.textSize.xlarge": "특대형",
+  "settings.arrivalDiscs.title": "은신처 외부에 떠 있는 디스크",
+  "settings.arrivalDiscs.body": "도착 화면의 비 위에서 사운드트랙을 천천히 회전하는 디스크로 표시합니다. 재생하려면 가운데 디스크를 탭하세요. 기본적으로 꺼져 있습니다. 일반적인 도착 장면은 변경되지 않았습니다.",
   "settings.audioLevel.volume": "볼륨",
   "settings.audioLevel.sfxTitle": "게임플레이 SFX 볼륨",
   "settings.audioLevel.sfxDescription": "이 기기에서 히트, 픽업, 메뉴 사운드가 얼마나 크게 재생되는지입니다. 변경사항은 즉시 적용됩니다.",

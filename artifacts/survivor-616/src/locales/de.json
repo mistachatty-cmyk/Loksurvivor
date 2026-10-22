@@ -7,6 +7,8 @@
   "settings.textSize.normal": "Normal",
   "settings.textSize.large": "Groß",
   "settings.textSize.xlarge": "Extra groß",
+  "settings.arrivalDiscs.title": "Schwebende Scheiben außerhalb des Verstecks",
+  "settings.arrivalDiscs.body": "Zeigen Sie den Soundtrack als sich langsam drehende Scheiben über dem Regen auf dem Ankunftsbildschirm an. Tippen Sie auf die mittlere Disc, um sie abzuspielen. Standardmäßig deaktiviert; Die übliche Ankunftsszene bleibt unverändert.",
   "settings.audioLevel.volume": "Lautstärke",
   "settings.audioLevel.sfxTitle": "Gameplay-SFX-Lautstärke",
   "settings.audioLevel.sfxDescription": "Wie laute Schläge, Tonabnehmer und Menütöne auf diesem Gerät abgespielt werden. Änderungen gelten sofort.",
