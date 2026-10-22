@@ -1632,6 +1632,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Achievements you had already earned before this update are shown as earned, with the date marked as unknown. From now on, each new one is stamped with the day you get it.',
     ],
   },
+  {
+    version: '0.42.4',
+    date: '2026-10-21',
+    publishedAt: '2026-10-21T12:00:00Z',
+    kind: 'update',
+    title: 'Guests Count Too',
+    body: [
+      'Time played without signing in now adds to the GSix guest total on gsix.online. Only the app name and the number of seconds are sent: nothing is saved on your device, nothing identifies you, and it is kept apart from the main total.',
+      'If your browser sends Global Privacy Control or Do Not Track, nothing is sent at all. Signing in still saves your time to your own account as before.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
