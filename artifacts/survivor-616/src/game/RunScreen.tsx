@@ -76,6 +76,7 @@ import {
   updateArtisteDraw,
   primePhysicsObject,
   rollUpgradeChoices,
+  previewUpgradeChoices,
   setStormCloudMode,
   stepWorld,
   throwSelectedFrozenEnemies,
@@ -110,6 +111,8 @@ import { HazardImmuneBadge } from '@/ui/HazardImmuneBadge';
 import { Minimap } from '@/ui/Minimap';
 import { MusicPanel } from '@/ui/MusicPanel';
 import { LevelUpAnnouncement, LevelUpFlash } from '@/anim/components/LevelUpFlash';
+import { useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
+import { RunGameBar, type GameBarChip } from './RunGameBar';
 import { LootFeed, type LootPickup } from '@/anim/components/LootPop';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
@@ -331,6 +334,9 @@ export function RunScreen({
   );
   const [hudMinimized, setHudMinimized] = useState(false);
   const [levelUpMinimized, setLevelUpMinimized] = useState(true);
+  // The Live Game Bar is the new UI's run chrome; Classic keeps the separate corner buttons and panels.
+  const barUi = useUiChromeLayout() === 'new';
+  const [previewChoices, setPreviewChoices] = useState<UpgradeDef[]>([]);
   const [queuedPrizes, setQueuedPrizes] = useState<LootPrizeDef[]>([]);
   const claimedLootRef = useRef(new Set<LootPrizeDef>());
   const claimReelPrize = useCallback((prize: LootPrizeDef) => {
@@ -1081,7 +1087,7 @@ export function RunScreen({
           setPhaseBoth('over');
         } else if (world.pendingLevelUps > 0) {
           if (upgradeChoicesRef.current.length === 0) {
-            const nextChoices = rollUpgradeChoices(world);
+            const nextChoices = previewUpgradeChoices(world);
             upgradeChoicesRef.current = nextChoices;
             setChoices(nextChoices);
           }
@@ -1372,7 +1378,7 @@ export function RunScreen({
   const advancePastLevelUpStep = useCallback(
     (world: World) => {
       if (world.pendingLevelUps > 0) {
-        const nextChoices = rollUpgradeChoices(world);
+        const nextChoices = previewUpgradeChoices(world);
         upgradeChoicesRef.current = nextChoices;
         setChoices(nextChoices);
       } else {
@@ -1534,6 +1540,20 @@ export function RunScreen({
     const t = window.setTimeout(() => setDungeonTransition(null), 700);
     return () => window.clearTimeout(t);
   }, [dungeonTransition]);
+
+  // Keep the bar's "next level-up" options current: they only change when the build does, so a slow tick is plenty.
+  useEffect(() => {
+    if (!barUi) return;
+    const refresh = () => {
+      const world = worldRef.current;
+      if (!world) return;
+      const next = previewUpgradeChoices(world);
+      setPreviewChoices((current) => (current.length === next.length && current.every((upgrade, index) => upgrade.id === next[index]!.id) ? current : next));
+    };
+    refresh();
+    const id = window.setInterval(refresh, 1000);
+    return () => window.clearInterval(id);
+  }, [barUi, phase, hud?.level, choices.length]);
 
   const hpPct = hud ? (hud.hp / Math.max(1, hud.maxHp)) * 100 : 100;
   const xpPct = hud ? (hud.xp / Math.max(1, hud.xpToNext)) * 100 : 0;
@@ -2220,7 +2240,7 @@ export function RunScreen({
       ) : null}
 
       {/* Artiste: arm the next freeform pointer route. Hidden for every other character. */}
-      {character.artisteDraw ? (
+      {!barUi && character.artisteDraw ? (
         <button
           type="button"
           onClick={() => {
@@ -2243,7 +2263,7 @@ export function RunScreen({
       ) : null}
 
       {/* Zero Day: freeze cast button. Hidden for every other character. */}
-      {character.freezeThrow ? (
+      {!barUi && character.freezeThrow ? (
         <button
           type="button"
           onClick={() => { if (worldRef.current) castFreezeCone(worldRef.current); }}
@@ -2255,7 +2275,7 @@ export function RunScreen({
       ) : null}
 
       {/* Crew call-in: the next rescued ally in line. Hidden until someone with a call-in is rescued. */}
-      {hud?.callIn ? (
+      {!barUi && hud?.callIn ? (
         <button
           type="button"
           onClick={() => { callInRequestRef.current = true; }}
@@ -2270,7 +2290,7 @@ export function RunScreen({
       ) : null}
 
       {/* Dash: on-screen for touch and mouse; Shift (or the controller's dash button) works too. */}
-      {controlSettings.touch.dashButton ? (
+      {!barUi && controlSettings.touch.dashButton ? (
         <button
           type="button"
           onClick={() => { dashRequestRef.current = true; }}
@@ -2285,6 +2305,7 @@ export function RunScreen({
       ) : null}
 
       {/* Ultimate */}
+      {!barUi ? (
       <button
         type="button"
         onClick={triggerUltimate}
@@ -2300,6 +2321,75 @@ export function RunScreen({
       >
         {hud?.ultimateActive ? 'Active' : hud && hud.ultimateReadyPct >= 100 ? character.ultimate.name : `${Math.floor(hud?.ultimateReadyPct ?? 0)}%`}
       </button>
+      ) : null}
+
+      {barUi && (phase === 'playing' || phase === 'levelup') ? (
+        <RunGameBar
+          level={hud?.level ?? 1}
+          xp={hud?.xp ?? 0}
+          xpToNext={hud?.xpToNext ?? 1}
+          choices={choices}
+          preview={previewChoices}
+          paused={phase === 'levelup'}
+          rerollsLeft={hud?.rerollsRemaining ?? 0}
+          onPick={pickUpgrade}
+          onReroll={rerollChoices}
+          onSkip={skipUpgrade}
+          renderIcon={(upgrade) => {
+            const cardWeapon = resolveCardWeapon(upgrade);
+            return cardWeapon ? <WeaponIcon weaponId={cardWeapon.id} kind={cardWeapon.kind} color={cardWeapon.color} size={18} className="shrink-0" /> : null;
+          }}
+          ultimate={{
+            testId: 'button-ultimate',
+            ariaLabel: character.ultimate.name,
+            label: hud?.ultimateActive ? 'Active' : hud && hud.ultimateReadyPct >= 100 ? character.ultimate.name : `${Math.floor(hud?.ultimateReadyPct ?? 0)}%`,
+            pct: hud?.ultimateReadyPct ?? 0,
+            ready: (hud?.ultimateReadyPct ?? 0) >= 100,
+            accent: character.palette.accent,
+            onPress: triggerUltimate,
+          }}
+          dash={controlSettings.touch.dashButton ? {
+            testId: 'button-dash',
+            ariaLabel: 'Dash',
+            label: 'Dash',
+            pct: hud?.dashReadyPct ?? 100,
+            accent: character.palette.accent,
+            onPress: () => { dashRequestRef.current = true; },
+          } : undefined}
+          callIn={hud?.callIn ? {
+            testId: 'button-call-in',
+            ariaLabel: `Call ${hud.callIn.name}: ${hud.callIn.label}`,
+            label: hud.callIn.name,
+            pct: hud.callIn.readyPct,
+            accent: '#fbbf24',
+            onPress: () => { callInRequestRef.current = true; },
+          } : undefined}
+          chips={(() => {
+            const chips: GameBarChip[] = [];
+            if (character.artisteDraw) {
+              chips.push({
+                id: 'draw',
+                label: artisteArmed ? 'Cancel draw' : 'Draw',
+                tone: 'fuchsia',
+                active: artisteArmed,
+                onPress: () => {
+                  const world = worldRef.current;
+                  if (!world?.artisteDraw) return;
+                  if (world.artisteDraw.armed) {
+                    cancelArtisteDraw(world);
+                    setArtisteArmed(false);
+                    return;
+                  }
+                  if (armArtisteDraw(world)) setArtisteArmed(true);
+                },
+              });
+            }
+            if (character.freezeThrow) chips.push({ id: 'freeze', label: 'Freeze', tone: 'emerald', onPress: () => { if (worldRef.current) castFreezeCone(worldRef.current); } });
+            if (choices.length > 0 && hud?.crewRumor?.rumorId === 'pantry-surge' && hud.crewRumor.ready) chips.push({ id: 'pantry-heal', label: 'Pantry heal', tone: 'amber', onPress: claimRumorHeal });
+            return chips;
+          })()}
+        />
+      ) : null}
 
       <ChestTally count={hud?.lootBoxesOpened ?? 0} />
       <HazardImmuneBadge active={hud?.hazardImmune ?? false} />
@@ -2392,7 +2482,7 @@ export function RunScreen({
       ) : null}
 
       {/* Level up */}
-      {phase === 'levelup' && meta.levelUpPausesEnabled ? (
+      {phase === 'levelup' && meta.levelUpPausesEnabled && !barUi ? (
         <div
           className="ui-fade-in absolute inset-0 flex items-end justify-start bg-black/55 p-3"
           style={{
@@ -2461,7 +2551,7 @@ export function RunScreen({
         </div>
       ) : null}
 
-      {phase === 'playing' && !meta.levelUpPausesEnabled && choices.length > 0 ? (
+      {phase === 'playing' && !meta.levelUpPausesEnabled && choices.length > 0 && !barUi ? (
         <div
           className={`pointer-events-none absolute bottom-3 left-3 z-40 ${levelUpMinimized ? 'w-fit' : 'w-[min(56vw,190px)]'}`}
           data-testid="panel-continuous-levelup"

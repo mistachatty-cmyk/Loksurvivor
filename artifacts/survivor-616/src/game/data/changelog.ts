@@ -1981,6 +1981,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       'New Fits: a featured expansion playlist from guest artists, open from the start. DJ Misfit leads it with His Beat. Find it in the Music screen. More songs will be added over time.',
       'The walking crew on the photosensitivity screen are brighter again, with a gentle swell instead of fading almost out.',
     ],
+  },  {
+    version: '0.42.35',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T02:00:00Z',
+    kind: 'update',
+    title: 'Live Game Bar',
+    body: [
+      'New in-run interface, now the default: the Live Game Bar. One compact strip along the bottom of the screen holds everything you reach for, so it stays off the action.',
+      'An XP bar runs across the top of it, dim while you build up. Below it, the three options your next level-up will offer are shown ahead of time. They are the real ones: the options you see are exactly what you get when the level lands, and they only change when your build does.',
+      'When the XP bar fills, it lights up gold with a shine moving across and the three skills glow and become tappable. Tap one to take it, with a burst. Reroll and skip sit right beside the bar. It works the same whether your level-ups pause the run or keep going.',
+      'On the right: your power-up, dash and crew call-in buttons, with Draw, Freeze and the pantry heal as small buttons just above when they apply.',
+      'Prefer the old look? Settings has New UI and Classic corners. Classic keeps the separate corner buttons and the level-up panels exactly as they were.',
+    ],
   },
 ];
 

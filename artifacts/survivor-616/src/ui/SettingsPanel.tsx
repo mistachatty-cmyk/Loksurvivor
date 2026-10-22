@@ -492,10 +492,10 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets, onOpenScreen }: S
       <div className="mx-auto max-w-5xl lg:columns-2 lg:gap-x-6 [&>*]:mb-6 [&>*]:break-inside-avoid">
         <SettingsJumpNav />
         <section id="settings-ui-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="settings-ui-layout">
-          <h2 className="text-xl font-black uppercase text-white">Hideout control layout</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">The new dock keeps Mission Briefing, Looks & LokPets, your companion, and music above the walking scene. Classic keeps the original corner positions.</p>
+          <h2 className="text-xl font-black uppercase text-white">Control layout</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">The new UI keeps Mission Briefing, Looks & LokPets, your companion, and music above the walking scene, and puts the Live Game Bar along the bottom of every run: your XP, the next level-up options ahead of time, and the power-up, dash and crew buttons in one compact strip. Classic keeps the original corner positions and separate buttons.</p>
           <div className="mt-4 flex flex-wrap gap-2">
-            {(['new', 'classic'] as const).map((layout) => <button key={layout} type="button" onClick={() => setUiChromeLayout(layout)} aria-pressed={chromeLayout === layout} className={`min-h-11 border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider ${chromeLayout === layout ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:border-primary hover:text-white'}`} data-testid={`button-ui-layout-${layout}`}>{layout === 'new' ? 'New dock' : 'Classic corners'}</button>)}
+            {(['new', 'classic'] as const).map((layout) => <button key={layout} type="button" onClick={() => setUiChromeLayout(layout)} aria-pressed={chromeLayout === layout} className={`min-h-11 border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider ${chromeLayout === layout ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:border-primary hover:text-white'}`} data-testid={`button-ui-layout-${layout}`}>{layout === 'new' ? 'New UI' : 'Classic corners'}</button>)}
           </div>
         </section>
         <section id="settings-update-notices" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="settings-update-notices">

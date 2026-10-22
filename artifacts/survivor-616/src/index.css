@@ -1329,3 +1329,73 @@ html { overflow-x: clip; }
 @media (prefers-reduced-motion: reduce) {
   .screen-slide { animation: none; }
 }
+
+
+/* Live Game Bar (new run UI): dim until the level fills, then glow, shine and a burst on every pick. */
+@keyframes game-bar-shine {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(260%); }
+}
+@keyframes game-bar-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(251, 191, 36, 0.35), inset 0 0 8px rgba(251, 191, 36, 0.12); }
+  50% { box-shadow: 0 0 22px rgba(251, 191, 36, 0.7), inset 0 0 14px rgba(251, 191, 36, 0.25); }
+}
+@keyframes game-bar-label {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@keyframes game-bar-ring {
+  0% { transform: scale(0.15); opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@keyframes game-bar-name {
+  0% { transform: translateY(6px) scale(0.9); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translateY(-22px) scale(1.05); opacity: 0; }
+}
+.game-bar-ready { animation: game-bar-pulse 1.6s ease-in-out infinite; }
+.game-bar-xp-ready { position: relative; overflow: hidden; box-shadow: 0 0 12px rgba(251, 191, 36, 0.8); }
+.game-bar-xp-ready::after,
+.game-bar-card-ready::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: game-bar-shine 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+.game-bar-card-ready { box-shadow: 0 0 12px rgba(251, 191, 36, 0.35); }
+.game-bar-card-ready:hover { box-shadow: 0 0 18px rgba(251, 191, 36, 0.65); }
+.game-bar-label-ready { animation: game-bar-label 1s ease-in-out infinite; }
+.game-bar-power-ready { animation: game-bar-pulse 1.4s ease-in-out infinite; }
+.game-bar-burst { display: flex; align-items: center; justify-content: center; }
+.game-bar-burst-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 140px;
+  height: 140px;
+  margin: -70px 0 0 -70px;
+  border-radius: 9999px;
+  border: 2px solid rgba(253, 224, 71, 0.9);
+  box-shadow: 0 0 18px rgba(253, 224, 71, 0.7);
+  animation: game-bar-ring 650ms ease-out forwards;
+}
+.game-bar-burst-ring-late { animation-delay: 140ms; opacity: 0; animation-fill-mode: forwards; border-color: rgba(110, 231, 255, 0.9); box-shadow: 0 0 18px rgba(110, 231, 255, 0.6); }
+.game-bar-burst-name {
+  position: relative;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #fde68a;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.9);
+  animation: game-bar-name 800ms ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-bar-ready, .game-bar-power-ready, .game-bar-label-ready, .game-bar-burst-ring, .game-bar-burst-name { animation: none; }
+  .game-bar-xp-ready::after, .game-bar-card-ready::after { animation: none; display: none; }
+  .game-bar-burst { display: none; }
+}

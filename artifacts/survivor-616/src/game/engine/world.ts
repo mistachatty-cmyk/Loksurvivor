@@ -6216,7 +6216,7 @@ export function relicRecipeEligibility(
 /** Level-up rerolls granted per run (flat cap, no meta-progression scaling yet). */
 const LEVEL_UP_REROLLS_PER_RUN = 3;
 
-export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
+export function rollUpgradeChoices(w: World, count = 3, rng: () => number = w.rng): UpgradeDef[] {
   const pool: UpgradeDef[] = UPGRADES.filter((u) => {
     if (u.weaponKinds && !w.weapons.some((weapon) => u.weaponKinds!.includes(weapon.def.kind))) return false;
     return (w.upgradeStacks[u.id] ?? 0) < u.maxStacks;
@@ -6291,7 +6291,7 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
   const available = [...pool];
   while (picks.length < count && available.length > 0) {
     const totalWeight = available.reduce((sum, u) => sum + u.weight, 0);
-    let roll = w.rng() * totalWeight;
+    let roll = rng() * totalWeight;
     let index = 0;
     for (let i = 0; i < available.length; i += 1) {
       roll -= available[i]!.weight;
@@ -6304,6 +6304,34 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
     available.splice(index, 1);
   }
   return picks;
+}
+
+/**
+ * A number that stays the same until the player's build changes: how many level-ups are behind them,
+ * plus what they hold and how far each piece has grown. Level-up choices are drawn from it, so the
+ * options the Live Game Bar shows ahead of time are exactly the ones offered when the level arrives.
+ */
+export function levelUpPreviewSeed(w: World): number {
+  // `level - pendingLevelUps` is the same just before and just after the level lands.
+  let seed = (w.level - w.pendingLevelUps) * 7919;
+  for (const [id, stacks] of Object.entries(w.upgradeStacks)) {
+    for (let i = 0; i < id.length; i += 1) seed = Math.imul(seed ^ id.charCodeAt(i), 16777619);
+    seed = Math.imul(seed ^ stacks, 2246822519);
+  }
+  for (const weapon of w.weapons) {
+    for (let i = 0; i < weapon.def.id.length; i += 1) seed = Math.imul(seed ^ weapon.def.id.charCodeAt(i), 16777619);
+    seed = Math.imul(seed ^ weapon.level, 3266489917);
+  }
+  for (const passive of w.passives) {
+    for (let i = 0; i < passive.def.id.length; i += 1) seed = Math.imul(seed ^ passive.def.id.charCodeAt(i), 16777619);
+    seed = Math.imul(seed ^ passive.stacks, 668265263);
+  }
+  return seed >>> 0;
+}
+
+/** The next level-up's options, without spending the run's random stream. Same build, same options. */
+export function previewUpgradeChoices(w: World, count = 3): UpgradeDef[] {
+  return rollUpgradeChoices(w, count, createRng(levelUpPreviewSeed(w)));
 }
 
 export function isWeaponUnlockedForLoot(weapon: WeaponDef, unlockedCharacterIds: readonly string[], findIds: readonly string[] = []): boolean {
