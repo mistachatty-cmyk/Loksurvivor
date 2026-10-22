@@ -10,7 +10,7 @@ export interface RunHudSignal {
   ttlMs?: number;
 }
 
-export type RunHudZoneId = 'top-bar' | 'primary-signal' | 'intel-drawer' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+export type RunHudZoneId = 'top-bar' | 'primary-signal' | 'intel-drawer' | 'bottom-left' | 'bottom-center' | 'bottom-right' | 'bottom-bar';
 
 export interface RunHudZoneDefinition {
   id: RunHudZoneId;
@@ -28,6 +28,8 @@ export const RUN_HUD_ZONES: Record<RunHudZoneId, RunHudZoneDefinition> = {
   'bottom-left': { id: 'bottom-left', occupancy: 'player-opened', maxHeightPx: 270, maxWidthPx: 190, capturesInput: true },
   'bottom-center': { id: 'bottom-center', occupancy: 'player-opened', maxHeightPx: 150, maxWidthPx: 240, capturesInput: true },
   'bottom-right': { id: 'bottom-right', occupancy: 'permanent', maxHeightPx: 80, maxWidthPx: 80, capturesInput: true },
+  /** The Live Game Bar (new UI): XP, next level-up options and the action buttons in one strip. Replaces the bottom-right buttons. */
+  'bottom-bar': { id: 'bottom-bar', occupancy: 'permanent', maxHeightPx: 80, capturesInput: true },
 };
 
 export const RUN_HUD_ZONE_CLASSES: Record<RunHudZoneId, string> = {
@@ -37,6 +39,7 @@ export const RUN_HUD_ZONE_CLASSES: Record<RunHudZoneId, string> = {
   'bottom-left': 'absolute bottom-3 left-3 max-h-[min(32dvh,270px)]',
   'bottom-center': 'absolute bottom-2 left-1/2 max-h-[min(24dvh,150px)] w-[min(72vw,240px)] -translate-x-1/2',
   'bottom-right': 'absolute bottom-5 right-3 h-16 w-16 sm:bottom-8 sm:right-6 sm:h-20 sm:w-20',
+  'bottom-bar': 'absolute inset-x-0 bottom-0',
 };
 
 export function runHudArenaBudget(viewportHeightPx: number): { protectedHeightPx: number; protectedRatio: number } {
