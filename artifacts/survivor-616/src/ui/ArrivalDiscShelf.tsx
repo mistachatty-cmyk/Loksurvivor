@@ -19,7 +19,7 @@ import { SealedDiscHint } from './SealedDiscHint';
 
 const SHELF_HEIGHT = '54dvh';
 
-export default function ArrivalDiscShelf({ lite }: { lite?: boolean }) {
+export default function ArrivalDiscShelf({ lite, onPlay }: { lite?: boolean; onPlay?: () => void }) {
   useEffect(() => watchDiscGuard(), []);
   const { tracks, currentTrack, isPlaying, playTrack, togglePlay, soundtrackObjectiveCompletions } = useMusicPlayer();
   const [hint, setHint] = useState<DiscTrack | null>(null);
@@ -58,6 +58,7 @@ export default function ArrivalDiscShelf({ lite }: { lite?: boolean }) {
           return;
         }
         setHint(null);
+        onPlay?.();
         if (currentTrack?.id === track.id && isPlaying) togglePlay();
         else playTrack(track.id);
       }}

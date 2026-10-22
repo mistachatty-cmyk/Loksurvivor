@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 156,
+      "version": "0.42.17",
+      "date": "2026-10-22",
+      "publishedAt": "2026-10-22T23:59:50Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Slimmer Hideout",
+      "body": [
+        "The hideout buttons are back above the walk scene as one slim swipeable row on phones, and the scene options are a single row too, so the screen takes far less vertical space.",
+        "If the game closes while the floating discs are showing, the discs now offer a \"Discs paused\" card you can tap to bring them back in the lightest mode. Playing a disc also quiets the rain sound, so only one thing is playing audio at a time."
+      ]
+    },
+    {
       "number": 155,
       "version": "0.42.16",
       "date": "2026-10-22",

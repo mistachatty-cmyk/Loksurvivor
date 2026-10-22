@@ -742,6 +742,23 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       </AnimatePresence>
 
       <div className={`relative z-20 flex-1 flex flex-col p-6 ${meta.hideoutStickyHeadOutEnabled ? 'pb-24 sm:pb-6' : 'pb-6'}`}>
+        {chromeLayout === 'new' ? (
+    <div className="hub-dock mb-3 flex flex-col gap-2 border border-white/15 bg-black/90 p-3 shadow-xl backdrop-blur sm:p-4 lg:flex-row lg:items-center" data-testid="hub-control-dock">
+      <div className="flex flex-wrap items-center gap-2">
+        {onBack ? <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-white/40 hover:text-white" data-testid="button-hub-back-to-intro" aria-label="Back to title"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
+        <button type="button" onClick={() => setShowLorePopup(true)} aria-haspopup="dialog" aria-expanded={showLorePopup} className="inline-flex min-h-10 items-center gap-2 border border-red-500/60 bg-red-950/40 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-red-100 hover:border-red-300" data-testid="button-hub-mission-briefing" title={t('hub.missionBriefingTitle')}><ShieldAlert className="h-4 w-4 text-red-400" />{t('hub.missionBriefing')}</button>
+        {(meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
+          <button type="button" onClick={onOpenRunSetup} className="inline-flex min-h-10 items-center gap-2 border border-cyan-200/45 bg-slate-950/70 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 hover:border-cyan-100" data-testid="button-open-run-setup" title={t('hub.looksLokpetsTitle')}><Sparkles className="h-4 w-4 text-cyan-200" />{t('common.looksLokpets')}</button>
+        )}
+        {rescuedAllies.length > 0 ? <LokChatLauncher onOpen={() => setShowLokChat(true)} /> : null}
+        <HideoutEndgameDock onOpen={onOpen} compact />
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
+        {companion ? <div className="flex min-w-0 max-w-full items-center gap-2 border border-pink-200/35 bg-slate-950/80 p-2" data-testid="hideout-lokpet-companion"><LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={36} /><div className="min-w-0"><p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p><p className="font-mono text-[8px] uppercase tracking-wider text-white/55">{companion.stamina > 0 ? 'At your side' : meta.handheldDigiScopeOwned ? 'Resting in DigiScope' : 'Resting at the kennel'}</p></div></div> : null}
+        <MusicNowPlaying placement="inline" />
+      </div>
+    </div>
+        ) : null}
         {chromeLayout === 'classic' && rescuedAllies.length > 0 ? <div className="mb-3 flex flex-wrap items-center gap-2"><LokChatLauncher onOpen={() => setShowLokChat(true)} /></div> : null}
         {chromeLayout === 'classic' ? <HideoutEndgameDock onOpen={onOpen} /> : null}
         {meta.hideoutPreviewEnabled && (
@@ -803,7 +820,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             onSwitch={setFocusPetId}
           />
         ) : null}
-        <div className="mb-5 flex flex-wrap items-center gap-2 rounded border border-white/10 bg-black/50 px-3 py-2" data-testid="hideout-scene-controls">
+        <div className="hub-rail mb-5 flex flex-wrap items-center gap-2 rounded border border-white/10 bg-black/50 px-3 py-2" data-testid="hideout-scene-controls">
           <span className="text-[10px] font-black uppercase tracking-widest text-primary">{t('hideout.scene.title' as never)}</span>
           {([['cage', 'hideout.scene.cage'], ['block', 'hideout.scene.oldBlock']] as const).map(([style, labelKey]) => (
             <button key={style} type="button" onClick={() => setHideoutSceneStyle(style)} aria-pressed={meta.hideoutSceneStyle === style} className={`rounded border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${meta.hideoutSceneStyle === style ? 'border-primary bg-primary text-primary-foreground' : 'border-white/15 bg-white/5 text-white/70 hover:bg-white/15'}`} data-testid={`button-hideout-scene-${style}`}>{t(labelKey as never)}</button>
@@ -816,8 +833,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           <button type="button" disabled={!rescuedAllies.length} onClick={() => commandCrew('encourage')} className="rounded border border-pink-300/50 bg-pink-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-pink-100 enabled:hover:bg-pink-400/20 disabled:opacity-40" data-testid="button-hideout-encourage">{t('hideout.scene.encourage' as never)}</button>
           <button type="button" onClick={() => setUiChromeLayout(chromeLayout === 'new' ? 'classic' : 'new')} className="ml-auto border border-white/20 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wide text-white/65 hover:border-primary hover:text-white" data-testid="button-toggle-hub-layout">{chromeLayout === 'new' ? 'Classic corners' : 'New control dock'}</button>
         </div>
-        <header className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+        <header className="mb-4 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4 sm:gap-4 sm:mb-8">
             <div>
               {onBack && chromeLayout === 'classic' && (
                 <button
@@ -832,23 +849,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               )}
               <p className="text-primary text-xs uppercase tracking-[0.3em] font-bold mb-2">{t('hub.kicker')}</p>
               <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-md">{t('hub.title')}</h1>
-              {chromeLayout === 'new' ? (
-                <div className="hub-dock mt-4 mb-2 flex flex-col gap-2 border border-white/15 bg-black/90 p-3 shadow-xl backdrop-blur sm:p-4 lg:flex-row lg:items-center" data-testid="hub-control-dock">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {onBack ? <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-white/40 hover:text-white" data-testid="button-hub-back-to-intro" aria-label="Back to title"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
-                    <button type="button" onClick={() => setShowLorePopup(true)} aria-haspopup="dialog" aria-expanded={showLorePopup} className="inline-flex min-h-10 items-center gap-2 border border-red-500/60 bg-red-950/40 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-red-100 hover:border-red-300" data-testid="button-hub-mission-briefing" title={t('hub.missionBriefingTitle')}><ShieldAlert className="h-4 w-4 text-red-400" />{t('hub.missionBriefing')}</button>
-                    {(meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
-                      <button type="button" onClick={onOpenRunSetup} className="inline-flex min-h-10 items-center gap-2 border border-cyan-200/45 bg-slate-950/70 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 hover:border-cyan-100" data-testid="button-open-run-setup" title={t('hub.looksLokpetsTitle')}><Sparkles className="h-4 w-4 text-cyan-200" />{t('common.looksLokpets')}</button>
-                    )}
-                    {rescuedAllies.length > 0 ? <LokChatLauncher onOpen={() => setShowLokChat(true)} /> : null}
-                    <HideoutEndgameDock onOpen={onOpen} compact />
-                  </div>
-                  <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
-                    {companion ? <div className="flex min-w-0 max-w-full items-center gap-2 border border-pink-200/35 bg-slate-950/80 p-2" data-testid="hideout-lokpet-companion"><LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={36} /><div className="min-w-0"><p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p><p className="font-mono text-[8px] uppercase tracking-wider text-white/55">{companion.stamina > 0 ? 'At your side' : meta.handheldDigiScopeOwned ? 'Resting in DigiScope' : 'Resting at the kennel'}</p></div></div> : null}
-                    <MusicNowPlaying placement="inline" />
-                  </div>
-                </div>
-              ) : null}
             </div>
             <div className="text-left sm:text-right border-l-2 sm:border-l-0 sm:border-r-2 border-primary pl-4 sm:pl-0 sm:pr-4">
               <div className="mb-1 flex items-center gap-1.5 justify-start sm:justify-end">

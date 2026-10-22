@@ -1158,8 +1158,30 @@ header, nav, [data-testid='roster-layout-toggle'] { opacity: calc(var(--ui-opaci
 /* A shop shows the inline supporter bar; don't also stack the bottom strip. */
 body:has(.supporter-bar--inline) .supporter-bar:not(.supporter-bar--inline) { display: none; }
 
-/* Phone: the hub control dock scrolls with the page and its buttons are tighter, so it stops eating the screen. */
-@media (max-width: 480px) {
-  .hub-dock { gap: 0.375rem; padding: 0.5rem; }
-  .hub-dock button { padding-inline: 0.5rem; letter-spacing: 0.06em; }
+/* Phone: the hub control dock is one slim, swipeable chip rail instead of three stacked rows. */
+@media (max-width: 640px) {
+  .hub-dock {
+    flex-direction: row; flex-wrap: nowrap; align-items: center; overflow-x: auto; gap: 0.375rem; padding: 0.375rem;
+    scrollbar-width: none; scroll-snap-type: x proximity; overscroll-behavior-x: contain;
+    -webkit-mask-image: linear-gradient(90deg, #000 90%, transparent); mask-image: linear-gradient(90deg, #000 90%, transparent);
+  }
+  .hub-dock::-webkit-scrollbar { display: none; }
+  .hub-dock > div { display: contents; }
+  .hub-dock > div > * { flex: none; scroll-snap-align: start; }
+  .hub-dock button { min-height: 2.25rem; padding-inline: 0.625rem; letter-spacing: 0.05em; }
+  .hub-dock [data-testid="button-hub-back-to-intro"] { font-size: 0; gap: 0; padding-inline: 0.5rem; }
+  .hub-dock [data-testid="hideout-lokpet-companion"] { padding: 0.25rem 0.5rem 0.25rem 0.25rem; }
+  .hub-dock [data-testid="hideout-lokpet-companion"] p + p { display: none; }
+  .hub-dock [data-testid="hideout-lokpet-companion"] svg, .hub-dock [data-testid="hideout-lokpet-companion"] canvas { width: 28px; height: 28px; }
+}
+
+/* Phone: option rows become one slim swipeable rail rather than wrapping onto several lines. */
+@media (max-width: 640px) {
+  .hub-rail {
+    flex-wrap: nowrap; overflow-x: auto; gap: 0.375rem; padding: 0.375rem 0.5rem; margin-bottom: 0.75rem;
+    scrollbar-width: none; overscroll-behavior-x: contain;
+    -webkit-mask-image: linear-gradient(90deg, #000 90%, transparent); mask-image: linear-gradient(90deg, #000 90%, transparent);
+  }
+  .hub-rail::-webkit-scrollbar { display: none; }
+  .hub-rail > * { flex: none; white-space: nowrap; }
 }
