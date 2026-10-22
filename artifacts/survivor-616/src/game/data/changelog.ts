@@ -1855,6 +1855,20 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The separate sticky Head out button and its setting are gone, since the bar replaces them.',
     ],
   },
+  {
+    version: '0.42.25',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T00:04:30Z',
+    kind: 'update',
+    title: 'Disc Effects, Your Way',
+    body: [
+      'Disc pulse now has six switches in Jukebox & soundtracks settings: bass halo, rings, arcs, beat pulse, tempo spin and disc size. Beat pulse is locked to the song itself, bursting out on every beat and harder on the bar line. Tempo spin turns the arcs at the song\'s BPM. Disc size makes the disc itself breathe with the music (off by default).',
+      'Changing song now fades the effect out, changes its colour while hidden, and fades it back in. Rings stay inside the gap to the neighbouring discs instead of showing behind them.',
+      'The heavy effect layers start a moment after a song begins and no longer use animated glows, to go easier on phones while a disc is starting.',
+      'The theme slider in the Look Lab now slides through the interface themes you own.',
+      'Head out on the nav bar now also runs the same travel checks as starting from the map list.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { useMusicPlayer, formatTime } from '@/game/audio/musicPlayer';
 import { useMeta } from '@/game/state/metaStore';
-import { DISC_PULSE_LEVELS, readDiscPulse, writeDiscPulse, type DiscPulseLevel } from '@/lib/discPulse';
+import { DISC_FX_KEYS, DISC_PULSE_LEVELS, readDiscFx, readDiscPulse, writeDiscFx, writeDiscPulse, type DiscFx, type DiscPulseLevel } from '@/lib/discPulse';
 import { useT } from '@/lib/i18n';
 import { REACTIVE_BG_LEVELS, readReactiveBg, readTheaterMix, writeReactiveBg, writeTheaterMix, type ReactiveBgLevel } from '@/lib/jukeboxPrefs';
 import { ArrivalDiscsToggle } from './ArrivalDiscsToggle';
@@ -32,6 +32,7 @@ export function JukeboxSettings({ onOpenScreen }: { onOpenScreen?: (id: string) 
   const player = useMusicPlayer();
   const [pulse, setPulse] = useState<DiscPulseLevel>(readDiscPulse);
   const [mix, setMix] = useState(readTheaterMix);
+  const [fx, setFx] = useState<DiscFx>(readDiscFx);
   const [bg, setBg] = useState<ReactiveBgLevel>(readReactiveBg);
   const roomOpen = unlockedRooms.some((room) => room.id === 'jukebox-room');
 
@@ -73,6 +74,21 @@ export function JukeboxSettings({ onOpenScreen }: { onOpenScreen?: (id: string) 
                 {t(`settings.jukebox.pulse.${level}` as never)}
               </button>
             ))}
+          </Row>
+
+          <Row title={t('settings.jukebox.fx')} body={t('settings.jukebox.fxBody')}>
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              {DISC_FX_KEYS.map((key) => (
+                <button
+                  key={key} type="button" aria-pressed={fx[key]}
+                  onClick={() => { const next = { ...fx, [key]: !fx[key] }; writeDiscFx(next); setFx(next); }}
+                  className={`border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${fx[key] ? ON : OFF}`}
+                  data-testid={`button-disc-fx-${key}`}
+                >
+                  {t(`settings.jukebox.fx.${key}` as never)}
+                </button>
+              ))}
+            </div>
           </Row>
 
           <Row title={t('settings.jukebox.bg')} body={t('settings.jukebox.bgBody')}>
