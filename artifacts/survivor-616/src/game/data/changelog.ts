@@ -1869,6 +1869,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Head out on the nav bar now also runs the same travel checks as starting from the map list.',
     ],
   },
+  {
+    version: '0.42.26',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T00:05:30Z',
+    kind: 'update',
+    title: 'Bigger Reactions',
+    body: [
+      'Disc pulse now has Low, Medium and High. Low is the gentle pulse from before. Medium adds a ring of spectrum bars around the disc that rise and fall with the bass, mids and treble. High is big and bold: taller bars, a wider halo and rings, and a colour wash that swells with the bass across the whole scene. High is the new default.',
+      'Moving from disc to disc now fires a change burst, a bright ring that sweeps out as the colour switches.',
+      'While a song plays and you browse to a different disc, the halo, beat pulse, shimmer, spectrum and wash keep reacting (a little softer) instead of going quiet.',
+      'New switches in Disc effects: Treble shimmer, Change burst, Spectrum and Colour wash.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

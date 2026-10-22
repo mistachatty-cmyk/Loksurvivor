@@ -43,6 +43,7 @@ export default function ArrivalDiscShelf({ lite, onPlay }: { lite?: boolean; onP
     <DiscPulse
       color={items[centerIndex]?.palette?.[1] ?? '#7dd3fc'}
       active={isPlaying && Boolean(centerTrack) && currentTrack?.id === centerTrack?.id}
+      playing={isPlaying}
       level={pulseLevel}
       discSize={DISC_SIZE}
     />

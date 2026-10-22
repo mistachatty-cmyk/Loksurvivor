@@ -1,15 +1,16 @@
 /** How strongly the floating discs pulse to the music. Device-local, like the other disc settings. */
-export type DiscPulseLevel = 'off' | 'soft' | 'full';
+/** Low (the original, gentle), Medium, High (big and bold). Stored values keep their old names. */
+export type DiscPulseLevel = 'off' | 'soft' | 'full' | 'wild';
 
 const KEY = 'survivor616.disc-pulse.v1';
-export const DISC_PULSE_LEVELS: readonly DiscPulseLevel[] = ['off', 'soft', 'full'] as const;
+export const DISC_PULSE_LEVELS: readonly DiscPulseLevel[] = ['off', 'soft', 'full', 'wild'] as const;
 
 export function readDiscPulse(): DiscPulseLevel {
   try {
     const raw = window.localStorage.getItem(KEY);
-    return raw === 'off' || raw === 'soft' || raw === 'full' ? raw : 'full';
+    return raw === 'off' || raw === 'soft' || raw === 'full' || raw === 'wild' ? raw : 'wild';
   } catch {
-    return 'full';
+    return 'wild';
   }
 }
 
@@ -22,11 +23,11 @@ export function writeDiscPulse(level: DiscPulseLevel): void {
 }
 
 /** Individual effects inside the pulse, each its own switch. Device-local. */
-export type DiscFxKey = 'halo' | 'rings' | 'arcs' | 'beat' | 'tempoSpin' | 'size';
-export const DISC_FX_KEYS: readonly DiscFxKey[] = ['halo', 'rings', 'arcs', 'beat', 'tempoSpin', 'size'] as const;
+export type DiscFxKey = 'halo' | 'rings' | 'arcs' | 'beat' | 'shimmer' | 'burst' | 'spectrum' | 'wash' | 'tempoSpin' | 'size';
+export const DISC_FX_KEYS: readonly DiscFxKey[] = ['halo', 'rings', 'arcs', 'beat', 'shimmer', 'burst', 'spectrum', 'wash', 'tempoSpin', 'size'] as const;
 export type DiscFx = Record<DiscFxKey, boolean>;
 /** "size" moves the real disc, so it starts off. */
-export const DEFAULT_DISC_FX: DiscFx = { halo: true, rings: true, arcs: true, beat: true, tempoSpin: true, size: false };
+export const DEFAULT_DISC_FX: DiscFx = { halo: true, rings: true, arcs: true, beat: true, shimmer: true, burst: true, spectrum: true, wash: true, tempoSpin: true, size: false };
 const FX_KEY = 'survivor616.disc-fx.v1';
 
 export function readDiscFx(): DiscFx {
