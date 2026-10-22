@@ -84,11 +84,11 @@
   "settings.audioLevel.ambienceTitle": "Hideout ambience volume",
   "settings.audioLevel.ambienceDescription": "How loud the room sound plays on this device. Changes apply the next time you enter the hideout.",
   "settings.audioLevel.turnedOff": "Turn this layer on above to hear it.",
-  "goto.open": "Go to\u2026",
-  "goto.placeholder": "Search screens and rooms\u2026",
+  "goto.open": "Go to…",
+  "goto.placeholder": "Search screens and rooms…",
   "goto.empty": "Nothing matches that.",
   "goto.hint": "Ctrl K or /",
-  "goto.locked": "Locked \u2014 find {room}",
+  "goto.locked": "Locked — find {room}",
   "goto.group.play": "Play",
   "goto.group.collect": "Collect & shop",
   "goto.group.hideout": "Hideout & media",
@@ -111,22 +111,18 @@
   "goto.settings": "Settings",
   "goto.account": "Account",
   "goto.feedback": "Feedback",
-
   "common.back": "Back",
   "common.looksLokpets": "Looks & LokPets",
-
   "intro.enterHideout": "Enter the hideout",
   "intro.updates.aria": "Game updates",
   "intro.updates.dismissAria": "Dismiss update notice",
   "intro.updates.heading": "Updates & Patch Notes",
-
   "hub.kicker": "The Sanctum",
   "hub.title": "Hideout",
   "hub.missionBriefing": "MISSION BRIEFING",
   "hub.missionBriefingTitle": "Classified Intel & Digi-Verse Lore",
   "hub.looksLokpetsTitle": "Change LokPets and looks anytime",
   "hub.sessionStats": "Session Stats",
-
   "hub.room.runs.label": "Head out",
   "hub.room.runs.description": "Hit the streets",
   "hub.room.roster.label": "Roster",
@@ -173,7 +169,6 @@
   "hub.room.frog-ranch.description": "Jeremey Frogster's frog habitat",
   "hub.room.director-terminal.label": "Director Terminal",
   "hub.room.director-terminal.description": "Read and select Director personalities",
-
   "settings.damageNumbers.title": "Damage numbers",
   "settings.damageNumbers.classic": "Classic",
   "settings.damageNumbers.cascade": "Cascade",
@@ -208,11 +203,9 @@
   "controls.touch.doubleTap": "Double-tap to dash",
   "controls.touch.doubleTapHint": "Double-tap the playfield to dash toward the tap.",
   "controls.reset": "Reset all controls",
-
   "settings.language.title": "Language",
   "settings.language.description": "Pick a language, or leave this on Match my device to follow your browser or phone language, including when you change it. Translations are made automatically, so some wording may be off, and anything not translated yet stays in English. This device only.",
   "settings.language.auto": "Match my device",
-
   "settings.fightStyle.title": "Travel fight style",
   "settings.fightStyle.description": "How a travel encounter plays out. Classic is the original card-throw popup. The other three use your lead LokPet on the arena engine, and their layout adapts to your screen. This device only.",
   "settings.fightStyle.classic.label": "Classic",
@@ -223,7 +216,6 @@
   "settings.fightStyle.duo.blurb": "Operator and LokPet fight together: pick a LokPet move and an operator assist every round. Bring your selected team and swap LokPets mid-fight.",
   "settings.fightStyle.arena.label": "Arena",
   "settings.fightStyle.arena.blurb": "The full battle: every move including finishers, Cheer, up to twenty rounds. Bring your selected team and swap LokPets mid-fight.",
-
   "overlay.title": "Demo Day",
   "overlay.hp": "HP",
   "overlay.level": "LV {{level}}",
@@ -304,7 +296,6 @@
   "overlay.stat.hp": "HP",
   "overlay.stat.speed": "Speed",
   "overlay.stat.power": "Power",
-
   "hub.nav.hideout.title": "Hideout",
   "hub.nav.hideout.note": "Safe rooms. Nothing in here will jump you.",
   "hub.nav.travel.title": "Travel",
@@ -318,13 +309,11 @@
   "hub.armory.hideoutEntranceBlurb": "The Luvitnot keeper holds a safe entrance here",
   "hub.armory.relocatedEntrance": "Relocated GRPD Armory",
   "hub.armory.stationUnfound": "The GRPD Station is still unfound, so the keeper holds the Armory in the hideout for now.",
-
   "fight.companion.atYourSide": "At your side",
   "fight.switch.title": "Switch LokPet",
   "fight.switch.hint": "Costs your turn. The opponent still strikes.",
   "fight.switch.down": "Down",
   "fight.switch.active": "Out",
-
   "hideout.prop.bell-cord.label": "Bell cord",
   "hideout.scene.title": "Hideout scene",
   "hideout.scene.description": "Your operator, selected LokPets, and rescued crew are animated together in the cage. Switch to the old block scene any time.",
@@ -564,7 +553,6 @@
   "settings.hideout.off": "Off",
   "settings.hideout.normal": "Normal",
   "settings.hideout.rarely": "Rarely",
-
   "hideout.care.scratch.label": "Scratch",
   "hideout.care.scratch.hint": "Behind the ears. Shy and sleepy pets love it.",
   "hideout.care.scratch.loved": "{{pet}} melts into your hand and will not let you stop.",
@@ -610,7 +598,6 @@
   "hideout.play.rank.partner": "Partner",
   "hideout.play.rank.soulbound": "Soulbound",
   "hideout.play.switch": "Switch pet",
-
   "hideout.event.stray-at-the-door.title": "Stray at the door",
   "hideout.event.stray-at-the-door.body": "A thin stray is sitting by the door, watching you with one ear up.",
   "hideout.event.stray-at-the-door.c.feed": "Set out some food",
@@ -700,7 +687,6 @@
   "hideout.event.long-way-round.c.follow": "Follow {{pet}}",
   "hideout.event.long-way-round.o.follow.1": "{{pet}} leads you to a spot with a view. You both sit and watch the street.",
   "hideout.event.long-way-round.o.follow.2": "{{pet}} leads you in a circle and looks extremely pleased with itself.",
-
   "hideout.event.ui.kicker": "Something came up",
   "hideout.event.ui.close": "Close",
   "hideout.event.ui.ok": "OK",
@@ -709,7 +695,6 @@
   "hideout.event.ui.fizzle": "You almost found something special, but the moment slips away. You still come away with a little.",
   "hideout.event.ui.gone": "This moment has already passed.",
   "hideout.event.ui.fallbackPet": "your LokPet",
-
   "sleeve.title": "Sleeve Counter",
   "sleeve.intro": "Dress up your LokPacks. Wrappers, card backs and card frames are cosmetic only: they never change pack odds, prices or card stats.",
   "sleeve.motion.label": "Card motion",
@@ -727,7 +712,6 @@
   "sleeve.buy": "Buy · {{cost}} CC",
   "settings.cardMotion.title": "Card motion",
   "settings.cardMotion.body": "Pack wrappers, card backs and card frames can tilt toward your cursor and shimmer. Full does both, Subtle only reacts when you hover, Off keeps everything still. Devices set to reduce motion stay still automatically.",
-
   "forge.nav.aria": "Forge screens",
   "forge.nav.operators": "Operators",
   "forge.nav.enemies": "Enemies",
@@ -751,7 +735,6 @@
   "forge.variants.edit": "Edit",
   "forge.variants.delete": "Delete",
   "forge.variants.nameLabel": "Custom name",
-
   "endgame.runs.master": "Use my customs in runs",
   "endgame.runs.masterBody": "Master switch. Off keeps every custom operator, enemy look and LokPet look out of your runs. They stay saved.",
   "endgame.runs.allOn": "All on",
@@ -842,7 +825,6 @@
   "booster.empty": "No boosters yet. The bin is well stocked. Honest.",
   "booster.ghostLabel": "Ghost copy",
   "sleeve.locked.visualizer": "Needs the LokPack Visualizer (LOK Shop)",
-
   "training.hub.title": "Training Arena",
   "training.hub.open": "Test the unlocked weapon rack against a Dust Mite.",
   "training.hub.locked": "Training Arena · Locked",
@@ -1029,5 +1011,28 @@
   "lokChat.quick.weather": "How's the weather?",
   "lokChat.quick.confide": "Tell me something real",
   "lokChat.clear": "Clear",
-  "lokChat.clearConfirm": "Clear every LOK Chat conversation on this device? This also resets how well the crew know you."
+  "lokChat.clearConfirm": "Clear every LOK Chat conversation on this device? This also resets how well the crew know you.",
+  "share.title": "Share your run",
+  "share.close": "Close",
+  "share.tab.card": "Card",
+  "share.tab.clips": "Clips",
+  "share.cardAlt": "Your run card",
+  "share.drawing": "Drawing your card…",
+  "share.cardFailed": "Couldn't draw the card. Try again.",
+  "share.native": "Share…",
+  "share.saveImage": "Save image",
+  "share.sendTo": "Send the message to",
+  "share.linkNote": "These carry your result and the game link. To send the picture or clips, use Share… or Save.",
+  "share.copy": "Copy text",
+  "share.copied": "Copied",
+  "share.copyFailed": "Couldn't copy",
+  "share.shared": "Shared",
+  "share.saved": "Saved to your device",
+  "share.clipsIntro": "Pick any part of the match you just played. The last half minute is kept in short pieces, along with your highlight moments. Everything stays on your device until you share it.",
+  "share.noClips": "No clips were recorded this time. Clip capture needs a browser that can record the game, and it only keeps the most recent stretch.",
+  "share.shareClips": "Share ({count})",
+  "share.saveClips": "Save clips",
+  "summary.headToHideout": "Head to hideout",
+  "summary.runItBack": "Run it back",
+  "summary.share": "Share"
 }

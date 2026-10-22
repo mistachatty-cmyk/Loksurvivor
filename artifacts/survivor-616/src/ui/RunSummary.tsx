@@ -18,11 +18,14 @@ import { RigPortrait } from './RigPortrait';
 import { WeaponIcon } from './WeaponIcon';
 import { AccountNudge } from './AccountNudge';
 import { AnimatedNumber } from './AnimatedNumber';
-import { ShareRecapButton } from './ShareRecapButton';
+import { runShareText } from '@/lib/sharePlatforms';
+import { useT } from '@/lib/i18n';
+import { formatClock } from '@lok/recap';
 import { PetGrowthRecap } from './PetGrowthRecap';
 import type { GameRunSummaryLike } from '@lok/recap';
 import { loadMediaAssets } from '@/game/audio/localMediaStore';
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { Share2 } from 'lucide-react';
 import { useAuth } from '@/state/authStore';
 import { motion } from 'framer-motion';
 import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound, Flame, Music } from 'lucide-react';
@@ -32,6 +35,7 @@ import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
 import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 
+const ShareSheet = lazy(() => import('./ShareSheet'));
 const RunRecapPlayer = lazy(() => import('@lok/recap/player').then((module) => ({ default: module.RunRecapPlayer })));
 
 export interface RunSummaryProps {
@@ -89,6 +93,8 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
   const characterRankAfter = characterRankTitle(characterLevelAfter);
   const { session, user } = useAuth();
   const [showAfterAction, setShowAfterAction] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const t = useT();
   const [clipUrlsByAssetId, setClipUrlsByAssetId] = useState<Record<string, string>>({});
 
   // Resolve captured-clip ids to local blob URLs for the after-action report's
@@ -942,28 +948,49 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
         )}
 
         {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 pt-4">
-          <button 
-            type="button" 
-            onClick={onRetry} 
-            className="flex-1 bg-primary text-primary-foreground py-4 font-black uppercase tracking-widest text-sm hover:bg-white transition-colors" 
-            data-testid="button-run-again"
-          >
-            Run it back
-          </button>
+        <div className="flex flex-col gap-3 pt-4" data-testid="run-summary-actions">
           <button
             type="button"
             onClick={onReturnToHub}
-            className="flex-1 border border-border bg-card text-white py-4 font-black uppercase tracking-widest text-sm hover:border-primary transition-colors"
+            className="min-h-14 w-full bg-primary px-4 py-4 text-sm font-black uppercase tracking-widest text-primary-foreground transition-colors hover:bg-white"
             data-testid="button-return-hub"
           >
-            Back to Hideout
+            {t('summary.headToHideout')}
           </button>
-          <ShareRecapButton
-            summary={recapSummary}
-            className="flex-1 border border-primary/40 bg-primary/5 text-primary py-4 font-black uppercase tracking-widest text-sm hover:border-primary transition-colors disabled:opacity-50"
-          />
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={onRetry}
+              className="flex-1 border border-border bg-card py-4 text-sm font-black uppercase tracking-widest text-white transition-colors hover:border-primary"
+              data-testid="button-run-again"
+            >
+              {t('summary.runItBack')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              className="inline-flex flex-1 items-center justify-center gap-2 border border-primary/40 bg-primary/5 py-4 text-sm font-black uppercase tracking-widest text-primary transition-colors hover:border-primary"
+              data-testid="button-share-recap"
+            >
+              <Share2 className="h-4 w-4" aria-hidden="true" />
+              {t('summary.share')}
+            </button>
+          </div>
         </div>
+
+        {shareOpen ? (
+          <Suspense fallback={null}>
+            <ShareSheet
+              summary={recapSummary}
+              text={runShareText(area.name, formatClock(result.survivedSec), result.kills)}
+              highlightClips={(result.highlights ?? []).flatMap((highlight) => {
+                const url = highlight.clipAssetId ? clipUrlsByAssetId[highlight.clipAssetId] : undefined;
+                return url && highlight.clipAssetId ? [{ id: highlight.clipAssetId, label: highlight.label, url }] : [];
+              })}
+              onClose={() => setShareOpen(false)}
+            />
+          </Suspense>
+        ) : null}
 
       </div>
     </ScreenLayout>
