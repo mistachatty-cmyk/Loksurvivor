@@ -20,6 +20,8 @@
   "jukebox.pause": "Pausa",
   "jukebox.close": "Saia da sala Jukebox",
   "jukebox.theaterMix": "Mixagem de teatro (som mais nítido quando a tela escurece)",
+  "settings.crashReports.title": "Enviar relatórios de falhas",
+  "settings.crashReports.body": "Se o jogo travar, envie o texto do erro, versão do jogo, nome de tela e tipo de navegador para que possa ser corrigido. Nenhuma conta, nenhum ID de dispositivo, nada sobre você. Os navegadores configurados para Do Not Track nunca enviam.",
   "settings.audioLevel.volume": "Volume",
   "settings.audioLevel.sfxTitle": "Volume SFX da jogabilidade",
   "settings.audioLevel.sfxDescription": "Como batidas altas, captadores e sons de menu são reproduzidos neste dispositivo. As alterações são aplicadas imediatamente.",

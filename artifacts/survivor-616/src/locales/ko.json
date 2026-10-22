@@ -20,6 +20,8 @@
   "jukebox.pause": "일시중지",
   "jukebox.close": "주크박스 룸에서 나가기",
   "jukebox.theaterMix": "극장 믹스(화면이 어두워지면 더 선명한 소리)",
+  "settings.crashReports.title": "충돌 보고서 보내기",
+  "settings.crashReports.body": "게임이 충돌하는 경우 문제를 해결할 수 있도록 오류 텍스트, 게임 버전, 화면 이름, 브라우저 유형을 보내주세요. 계정도, 장치 ID도, 당신에 관한 어떤 것도 없습니다. 추적 안 함으로 설정된 브라우저는 전송하지 않습니다.",
   "settings.audioLevel.volume": "볼륨",
   "settings.audioLevel.sfxTitle": "게임플레이 SFX 볼륨",
   "settings.audioLevel.sfxDescription": "이 기기에서 히트, 픽업, 메뉴 사운드가 얼마나 크게 재생되는지입니다. 변경사항은 즉시 적용됩니다.",

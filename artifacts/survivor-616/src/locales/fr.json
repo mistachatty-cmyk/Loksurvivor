@@ -20,6 +20,8 @@
   "jukebox.pause": "Pause",
   "jukebox.close": "Quittez la salle du Jukebox",
   "jukebox.theaterMix": "Mixage cinéma (son plus clair lorsque l'écran s'assombrit)",
+  "settings.crashReports.title": "Envoyer des rapports d'erreur",
+  "settings.crashReports.body": "Si le jeu plante, envoyez le texte d'erreur, la version du jeu, le nom d'écran et le type de navigateur afin que le problème puisse être corrigé. Pas de compte, pas d'identifiant d'appareil, rien sur vous. Les navigateurs configurés sur Do Not Track n’envoient jamais.",
   "settings.audioLevel.volume": "Volume",
   "settings.audioLevel.sfxTitle": "Volume SFX du gameplay",
   "settings.audioLevel.sfxDescription": "La puissance des hits, des micros et des sons de menu sur cet appareil. Les modifications s’appliquent immédiatement.",
