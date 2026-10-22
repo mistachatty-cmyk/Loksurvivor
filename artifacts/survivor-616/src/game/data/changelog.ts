@@ -1833,6 +1833,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Jukebox & soundtracks settings now also hold Autoplay, Random order (shuffle, remembered between visits) and Repeat, so you can set up the music without opening the player.',
     ],
   },
+  {
+    version: '0.42.23',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T00:02:30Z',
+    kind: 'update',
+    title: 'Title Screen Tidy',
+    body: [
+      'The Roll the look button on the title screen now matches the Live feed button: same size and shape, with its name shown, and level with it along the bottom.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

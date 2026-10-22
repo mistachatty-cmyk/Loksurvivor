@@ -122,11 +122,11 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
         onClick={cycleUiLook}
         aria-label="Roll the look"
         title="Roll the look"
-        className="fixed bottom-[max(1rem,var(--safe-bottom))] left-[max(1rem,var(--safe-left))] z-30 inline-flex min-h-11 items-center gap-2 border border-white/25 bg-black/70 px-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/75 backdrop-blur transition hover:border-white/60 hover:text-white active:scale-95"
+        className="fixed bottom-4 left-4 z-30 flex items-center gap-1.5 rounded-full border border-white/15 bg-black/40 px-3 py-1.5 text-[10px] uppercase tracking-widest text-white/60 transition-colors hover:border-white/30 hover:text-white/90 active:scale-95"
         data-testid="button-intro-roll-look"
       >
-        <Dices className="h-4 w-4" aria-hidden="true" />
-        <span className="hidden sm:inline">Roll the look</span>
+        <Dices className="h-3 w-3" aria-hidden="true" />
+        Roll the look
       </button>
       {/* A bot-piloted run of the real game plays behind the copy below --
           random character, random area, rotating scenes. See AttractMode.tsx. */}
