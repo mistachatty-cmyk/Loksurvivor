@@ -1882,6 +1882,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'New switches in Disc effects: Treble shimmer, Change burst, Spectrum and Colour wash.',
     ],
   },
+  {
+    version: '0.42.27',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T00:06:30Z',
+    kind: 'update',
+    title: 'Stay Where You Were',
+    body: [
+      'When an update lands while the game is open, it refreshes itself to pick up the new version. That refresh used to drop you on the title screen, even in the middle of starting a match. It now returns you to the same screen, and straight back into the match you were starting.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

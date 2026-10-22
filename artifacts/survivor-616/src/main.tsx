@@ -10,7 +10,7 @@ import { applyTextSize } from '@/lib/textScale';
 import { MotionConfig } from 'framer-motion';
 import { applyMotionMode, getMotionMode, registerLiveFeedLoad } from '@/anim/motion';
 import { initLocalization } from '@/lib/i18n';
-import { lokCrash, startCrashWatch } from '@/lib/lokCrash';
+import { getCrashScreen, lokCrash, startCrashWatch } from '@/lib/lokCrash';
 import { optionalChunkLoading } from '@/lib/optionalChunk';
 
 // After a deploy, an already-open or home-screen copy can ask for a code chunk
@@ -30,6 +30,12 @@ window.addEventListener('vite:preloadError', (event) => {
     return;
   }
   event.preventDefault();
+  // Remember where the player was, so the reload puts them back instead of on the title screen.
+  try {
+    window.sessionStorage.setItem('survivor616.reload-resume', JSON.stringify({ screen: getCrashScreen(), at: Date.now() }));
+  } catch {
+    /* the reload still happens, just from the title screen */
+  }
   window.location.reload();
 });
 
