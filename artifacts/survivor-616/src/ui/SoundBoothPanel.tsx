@@ -20,7 +20,23 @@ const TIER_BADGE_CLASS = {
 const PREVIEW_CUES = ['hit', 'levelUp', 'ultimate'] as const;
 const PREVIEW_STEP_MS = 260;
 
+/** A stable accent per pack so every card reads as its own sound, derived from the id (no per-pack art). */
+const packHue = (id: string): number => {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
+  return h;
+};
+
+/** Five bars that dance while a pack previews (CSS only). */
+function PreviewBars({ hue }: { hue: number }) {
+  return (
+    <span className="sbooth-bars" aria-hidden="true" style={{ ['--sb-hue' as string]: String(hue) }}>
+      {[0, 1, 2, 3, 4].map((i) => <i key={i} style={{ animationDelay: `${i * 70}ms` }} />)}
+    </span>
+  );
+}
 interface Props { onBack: () => void }
+
 
 export function SoundBoothPanel({ onBack }: Props) {
   const { meta, buySoundPack, equipSoundPack, setSfxEnabled } = useMeta();
@@ -93,19 +109,22 @@ export function SoundBoothPanel({ onBack }: Props) {
                   const equipped = meta.activeSoundPackId === pack.id;
                   const affordable = meta.lootTokens >= pack.cost;
                   const previewing = previewingId === pack.id;
+                  const hue = packHue(pack.id);
                   return (
                     <article
                       key={pack.id}
-                      className={`border p-2.5 transition-transform sm:p-4 ${equipped ? 'border-primary bg-primary/5' : 'border-border bg-background'}`}
+                      className={`sbooth-card relative overflow-hidden border p-2.5 transition-transform sm:p-4 ${equipped ? 'border-primary bg-primary/5' : 'border-border bg-background'}`}
                       style={previewing ? {
+                        ['--sb-hue' as string]: String(hue),
                         transform: `scale(${1 + audioFrame.energy * 0.03})`,
                         boxShadow: `0 0 ${14 + audioFrame.energy * 18}px hsl(var(--primary) / ${0.15 + audioFrame.energy * 0.25})`,
                       } : undefined}
                       data-testid={`card-sound-pack-${pack.id}`}
                     >
+                      <span className="absolute inset-x-0 top-0 h-1" style={{ background: `linear-gradient(90deg, hsl(${hue} 85% 60%), hsl(${(hue + 60) % 360} 85% 62%))` }} aria-hidden="true" />
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="text-sm font-black uppercase tracking-wide text-white">{pack.name}</h3>
-                        {equipped ? <Check className="h-4 w-4 shrink-0 text-primary" aria-label="Equipped" /> : null}
+                        {previewing ? <PreviewBars hue={hue} /> : equipped ? <Check className="h-4 w-4 shrink-0 text-primary" aria-label="Equipped" /> : null}
                       </div>
                       <span className={`mt-2 inline-block border px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-widest ${TIER_BADGE_CLASS[pack.tier ?? 'standard']}`}>{pack.tier ?? 'standard'}</span>
                       <p className="mt-2 min-h-12 text-xs leading-relaxed text-muted-foreground">{pack.description}</p>

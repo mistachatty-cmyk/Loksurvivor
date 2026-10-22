@@ -18,7 +18,9 @@ import { sendToAlly, setOpenThread, type ContextBuilder } from '@/game/state/lok
 import { ME, clearLokChat, totalUnread, useLokChat, type ChatMessage } from '@/game/state/lokChatStore';
 import type { AllyDef } from '@/game/types';
 
+import { CheatBar } from './CheatBar';
 import { RigPortrait } from './RigPortrait';
+import { useCheats } from './useCheats';
 
 const CHANNEL = 'channel';
 
@@ -98,6 +100,10 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
   const [showList, setShowList] = useState(false);
   const [typing, setTyping] = useState<Record<string, boolean>>({});
   const [draft, setDraft] = useState('');
+  // Cheat phrases typed into chat run instead of being sent; the master phrase is the only way dev access turns on.
+  const { run: runCheat, devAccess } = useCheats();
+  const [cheatNote, setCheatNote] = useState('');
+  const [showCheatBar, setShowCheatBar] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const reduceMotion = prefersReducedMotion();
@@ -136,6 +142,14 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
   }, [messageCount, channelCount, isTyping, selected, reduceMotion]);
 
   const send = (text: string, detected?: QuickReply) => {
+    if (!detected) {
+      const cheat = runCheat(text);
+      if (cheat.handled) {
+        setCheatNote(cheat.message);
+        setDraft('');
+        return;
+      }
+    }
     if (!ally) return;
     const clean = text.trim().slice(0, MAX_MESSAGE_CHARS);
     if (!clean) return;
@@ -295,6 +309,15 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
                 </div>
 
                 <div className="border-t border-white/10 p-2">
+                  {cheatNote ? <p className="mb-2 border border-cyan-300/40 bg-cyan-400/10 px-2 py-1 text-xs text-cyan-100" role="status" data-testid="cheat-chat-note">{cheatNote}</p> : null}
+                  {devAccess ? (
+                    <div className="mb-2">
+                      <button type="button" onClick={() => setShowCheatBar((open) => !open)} aria-expanded={showCheatBar} data-testid="button-chat-cheat-bar" className="border border-cyan-300/40 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-cyan-100">
+                        {t('cheat.chatNote')}
+                      </button>
+                      {showCheatBar ? <div className="mt-2 max-h-48 overflow-y-auto"><CheatBar /></div> : null}
+                    </div>
+                  ) : null}
                   <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label={t('lokChat.suggested')}>
                     {suggestions.map((q) => (
                       <button

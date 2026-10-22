@@ -114,6 +114,7 @@ import { LootFeed, type LootPickup } from '@/anim/components/LootPop';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
 import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
+import { useT } from '@/lib/i18n';
 
 /**
  * Screen point -> world point, using the same camera math `renderWorld` uses.
@@ -1310,7 +1311,21 @@ export function RunScreen({
     return () => cancelAnimationFrame(raf);
   }, [setPhaseBoth]);
 
+  // Safety net: if the closing screen is still up long after it should have handed over, offer a way out.
+  const tr = useT();
+  const [overStuck, setOverStuck] = useState(false);
+  useEffect(() => {
+    if (phase !== 'over') { setOverStuck(false); return; }
+    const timer = window.setTimeout(() => setOverStuck(true), 7000);
+    return () => window.clearTimeout(timer);
+  }, [phase]);
+
   // Hand the result back once the closing beat has played.
+  // The hand-off timer must survive re-renders: `onFinish` is a fresh closure on every App render, so listing it
+  // (or the prize lists) as effect deps cancelled and re-armed the 1.1 s timer each time, and a busy UI kept
+  // "Block cleared" on screen forever. Latest values live in a ref and the effect depends on `phase` alone.
+  const handoffRef = useRef({ claimReelPrize, finalRewardMultiplier, onFinish, queuedPrizes, reel });
+  handoffRef.current = { claimReelPrize, finalRewardMultiplier, onFinish, queuedPrizes, reel };
   useEffect(() => {
     if (phase !== 'over' || finishedRef.current) return;
     const world = worldRef.current;
@@ -1318,19 +1333,35 @@ export function RunScreen({
     const timer = window.setTimeout(async () => {
       if (finishedRef.current) return;
       finishedRef.current = true;
-      for (const prize of [...world.pendingReel, ...queuedPrizes, ...(reel ? [reel.prize] : [])]) claimReelPrize(prize);
+      const { claimReelPrize, finalRewardMultiplier, onFinish, queuedPrizes, reel } = handoffRef.current;
+      // Nothing below may keep the run from handing over its result: a throw here used to leave the
+      // "Block cleared" screen frozen with no way out.
+      try {
+        for (const prize of [...world.pendingReel, ...queuedPrizes, ...(reel ? [reel.prize] : [])]) claimReelPrize(prize);
+      } catch (error) {
+        console.error('claiming reel prizes failed', error);
+      }
       const result = buildResult(world, finalRewardMultiplier);
-      const highlights = highlightRecorderRef.current.getHighlights();
-      const clips = await clipRecorderRef.current.finalize(world.now);
-      const clipAssetIdByKey = new Map(clips.map((clip) => [`${clip.kind}:${clip.atMs}`, clip.assetId]));
-      result.highlights = highlights.map((highlight) => {
-        const clipAssetId = clipAssetIdByKey.get(`${highlight.kind}:${highlight.atMs}`);
-        return clipAssetId ? { ...highlight, clipAssetId } : highlight;
-      });
+      try {
+        const highlights = highlightRecorderRef.current.getHighlights();
+        // Clip saving is a nicety: a stalled IndexedDB write (Safari) or a throw must never strand the
+        // "Block cleared" screen, so give it a short deadline and carry on without clips.
+        const clips = await Promise.race([
+          clipRecorderRef.current.finalize(world.now).catch(() => []),
+          new Promise<Awaited<ReturnType<typeof clipRecorderRef.current.finalize>>>((resolve) => window.setTimeout(() => resolve([]), 2500)),
+        ]);
+        const clipAssetIdByKey = new Map(clips.map((clip) => [`${clip.kind}:${clip.atMs}`, clip.assetId]));
+        result.highlights = highlights.map((highlight) => {
+          const clipAssetId = clipAssetIdByKey.get(`${highlight.kind}:${highlight.atMs}`);
+          return clipAssetId ? { ...highlight, clipAssetId } : highlight;
+        });
+      } catch (error) {
+        console.error('saving run highlights failed', error);
+      }
       onFinish(result);
     }, 1100);
     return () => window.clearTimeout(timer);
-  }, [claimReelPrize, finalRewardMultiplier, onFinish, phase, queuedPrizes, reel]);
+  }, [phase]);
 
   /** After a level-up step resolves (picked or skipped): roll the next choices if another is owed, else close out. */
   const advancePastLevelUpStep = useCallback(
@@ -2744,6 +2775,11 @@ export function RunScreen({
                 ? 'FELL THROUGH'
                 : 'Down'}
           </h2>
+          {overStuck ? (
+            <button type="button" onClick={onAbort} data-testid="button-over-escape" className="pointer-events-auto absolute bottom-[18%] border border-white/40 bg-black/70 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white">
+              {tr('run.overEscape')}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

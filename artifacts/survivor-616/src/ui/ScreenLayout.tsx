@@ -48,8 +48,9 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
       style={visitTheme ? visitThemeStyle(visitTheme) : undefined}
       data-ui-theme={meta.uiTheme}
       data-ui-swatch={activeUiThemeSwatchId(meta)}
-      className={`min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden ${className}`}
+      className={`min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden menu-fresh ${className}`}
     >
+      <div className="menu-fresh-glow" aria-hidden="true" />
       {backdrop && (
         <div className="absolute inset-0 z-0 pointer-events-none">
           <div className="absolute inset-0 bg-background/90 z-10" />
@@ -80,7 +81,7 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
             </button>
           )}
           {subtitle && <p className="text-primary text-xs uppercase tracking-[0.3em] font-bold mb-2">{subtitle}</p>}
-          <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-md">{title}</h1>
+          <h1 className="menu-fresh-title text-4xl md:text-5xl font-black text-white drop-shadow-md">{title}</h1>
           {visitTheme && (
             <p className="mt-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" data-testid="text-gsix-visit-theme">
               Wearing your GSix theme ·{' '}

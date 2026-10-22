@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { CheatFxLayer } from '@/ui/CheatFxLayer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -380,6 +381,7 @@ function Game() {
 
   const handleFinish = useCallback(
     (result: RunResult) => {
+      // Bookkeeping must never strand the player on the closing screen: if any step throws, still show the summary.
       const fatigueBefore = meta.fatigueByCharacter[result.characterId] ?? 0;
       const fatigueAfter = Math.min(MAX_FATIGUE_PCT, fatigueBefore + FATIGUE_PER_RUN_PCT);
       const dailyContracts = advanceDailyContracts(
@@ -390,7 +392,9 @@ function Game() {
         },
         result,
       );
-      const resultWithFatigue = {
+      let resultWithFatigue: RunResult = result;
+      try {
+      resultWithFatigue = {
         ...result,
         fieldCreatureSeed: result.cleared && !result.missionId && !meta.clearedAreaIds.includes(result.areaId)
           ? `field:${result.areaId}`
@@ -422,6 +426,9 @@ function Game() {
         (enemyId) => getEnemy(enemyId).family === 'Boss',
       );
       if (killedBoss) earnLokTokens('boss_kill', runRef);
+      } catch (error) {
+        console.error('run bookkeeping failed', error);
+      }
 
       setScreen({ name: 'summary', result: resultWithFatigue });
     },
@@ -955,6 +962,7 @@ function Providers({ children }: { children: ReactNode }) {
               <MusicProvider>
                 {children}
                 <FocusWidgetMount />
+                <CheatFxLayer />
               </MusicProvider>
             </LokEconomyProvider>
           </CloudSyncProvider>

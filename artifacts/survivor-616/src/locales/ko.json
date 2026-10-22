@@ -1030,7 +1030,7 @@
   "share.saved": "기기에 저장됨",
   "share.clipsIntro": "방금 플레이한 경기의 일부를 선택하세요. 마지막 30분은 하이라이트 순간과 함께 짧은 부분으로 유지됩니다. 공유할 때까지 모든 내용은 기기에 유지됩니다.",
   "share.noClips": "이번에는 녹화된 클립이 없습니다. 클립 캡처에는 게임을 녹화할 수 있는 브라우저가 필요하며 가장 최근의 내용만 유지합니다.",
-  "share.shareClips": "공유 ({{count}})",
+  "share.shareClips": "공유 ({{{count}}})",
   "share.saveClips": "클립 저장",
   "summary.headToHideout": "은신처로 향하세요",
   "summary.runItBack": "다시 실행해 보세요",

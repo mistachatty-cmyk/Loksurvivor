@@ -2231,6 +2231,7 @@ type Action =
   | { type: 'setThemeCycleCollection'; collection: 'starter' | 'owned' }
   | { type: 'checkHiddenThemeReload' }
   | { type: 'unlockDevModeAccess' }
+  | { type: 'cheatGrant'; amounts: Partial<Record<'cred' | 'lootTokens' | 'cardCredits' | 'skeletonKeys' | 'lokPetTreats' | 'petElixirs', number>> }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
@@ -3616,6 +3617,26 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'unlockDevModeAccess':
       return { ...state, meta: { ...state.meta, devModeAccessUnlocked: true } };
 
+    case 'cheatGrant': {
+      // Cheat bar payouts: only after the master phrase opened dev access, never on a fresh save.
+      if (!state.meta.devModeAccessUnlocked) return state;
+      const add = (current: number, amount: number | undefined, cap = 99_999_999) =>
+        amount && amount > 0 ? Math.min(cap, current + Math.floor(amount)) : current;
+      const m = state.meta;
+      return {
+        ...state,
+        meta: {
+          ...m,
+          cred: add(m.cred, action.amounts.cred),
+          lootTokens: add(m.lootTokens, action.amounts.lootTokens),
+          cardCredits: add(m.cardCredits, action.amounts.cardCredits),
+          skeletonKeys: add(m.skeletonKeys, action.amounts.skeletonKeys),
+          lokPetTreats: add(m.lokPetTreats, action.amounts.lokPetTreats),
+          petElixirs: add(m.petElixirs, action.amounts.petElixirs, ELIXIR_CAP),
+        },
+      };
+    }
+
     case 'setDevModeAllUnlocks':
       if (!state.meta.devModeAccessUnlocked) return state;
       return {
@@ -4101,11 +4122,16 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'dismissNotifications': {
       const ids = new Set(action.ids);
+      // A dismissed or timed-out toast is filed in the Mailbox so it is never simply lost.
+      const archived = state.meta.pendingNotifications.filter((n) => ids.has(n.id) && !state.meta.trainingMailbox.some((entry) => entry.id === n.id));
       return {
         ...state,
         meta: {
           ...state.meta,
           pendingNotifications: state.meta.pendingNotifications.filter((n) => !ids.has(n.id)),
+          trainingMailbox: archived.length > 0
+            ? [...state.meta.trainingMailbox, ...archived.map((n) => ({ ...n, read: false, kept: false }))].slice(-100)
+            : state.meta.trainingMailbox,
         },
       };
     }
@@ -4692,6 +4718,7 @@ export interface MetaContextValue {
   setThemeCycleCollection: (collection: 'starter' | 'owned') => void;
   checkHiddenThemeReload: () => void;
   unlockDevModeAccess: () => void;
+  cheatGrant: (amounts: Partial<Record<'cred' | 'lootTokens' | 'cardCredits' | 'skeletonKeys' | 'lokPetTreats' | 'petElixirs', number>>) => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
@@ -4930,6 +4957,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setThemeCycleCollection = useCallback((collection: 'starter' | 'owned') => dispatch({ type: 'setThemeCycleCollection', collection }), []);
   const checkHiddenThemeReload = useCallback(() => dispatch({ type: 'checkHiddenThemeReload' }), []);
   const unlockDevModeAccess = useCallback(() => dispatch({ type: 'unlockDevModeAccess' }), []);
+  const cheatGrant = useCallback(
+    (amounts: Partial<Record<'cred' | 'lootTokens' | 'cardCredits' | 'skeletonKeys' | 'lokPetTreats' | 'petElixirs', number>>) =>
+      dispatch({ type: 'cheatGrant', amounts }),
+    [],
+  );
   const setDevModeAllUnlocks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
     [],
@@ -5261,6 +5293,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setThemeCycleCollection,
       checkHiddenThemeReload,
       unlockDevModeAccess,
+      cheatGrant,
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
       setLevelUpPauses,
@@ -5455,6 +5488,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setThemeCycleCollection,
     checkHiddenThemeReload,
     unlockDevModeAccess,
+    cheatGrant,
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
     setLevelUpPauses,

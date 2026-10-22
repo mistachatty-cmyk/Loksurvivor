@@ -31,6 +31,7 @@ import { toast } from '@/hooks/use-toast';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
 import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
+import { CheatBar } from './CheatBar';
 import { DAMAGE_NUMBER_STYLES } from '@/game/data/damageNumbers';
 import { importForgeState } from '@/game/state/operatorForgeStore';
 import { parseSaveArchive, serializeSaveArchive } from '@/game/state/saveArchive';
@@ -1995,6 +1996,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets, onOpenScreen }: S
                     Dev Mode: {meta.devModeAllUnlocks ? 'On' : 'Off'}
                   </button>
                 </div>
+                <div className="mt-4" data-testid="settings-cheat-bar"><CheatBar /></div>
                 <div className="mt-4 border-t border-primary/20 pt-3" data-testid="dev-run-tool-registry">
                   <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Registered run diagnostics</p>
                   <p className="mt-1 text-xs text-muted-foreground">Enable Dev Mode, start a run, then open Intel to use these without changing progression.</p>
