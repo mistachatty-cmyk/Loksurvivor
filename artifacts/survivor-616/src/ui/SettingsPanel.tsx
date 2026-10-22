@@ -1218,31 +1218,6 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets, onOpenScreen }: S
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Sticky Head Out button</h3>
-                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                      Keeps a Head Out button pinned to the bottom of the screen on phones, so it's reachable
-                      without scrolling. Turn it off to go back to the classic layout with only the button in
-                      the main grid.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setHideoutStickyHeadOut(!meta.hideoutStickyHeadOutEnabled)}
-                    aria-pressed={meta.hideoutStickyHeadOutEnabled}
-                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                      meta.hideoutStickyHeadOutEnabled
-                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
-                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
-                    }`}
-                    data-testid="button-toggle-hideout-sticky-head-out"
-                  >
-                    {meta.hideoutStickyHeadOutEnabled ? 'On' : 'Off'}
-                  </button>
-                </div>
-              </div>
-              <div className="mt-3 border border-border/70 bg-background/50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
                     <h3 className="text-sm font-black uppercase tracking-wide text-white">Splash text</h3>
                     <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
                       The rotating one-liner next to the title on the opening screen -- a fresh one shows up each

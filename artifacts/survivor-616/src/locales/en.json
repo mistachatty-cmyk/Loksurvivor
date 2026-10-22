@@ -1,5 +1,9 @@
 {
   "goto.dockLabel": "Main menu",
+  "dock.headOut": "Head out",
+  "dock.quick": "Quick",
+  "areas.selected": "Selected",
+  "areas.tapAgain": "Tap again to play",
   "goto.search": "Search",
   "settings.textSize.title": "Text size",
   "settings.textSize.body": "Makes menu text bigger or smaller. Helpful on a phone, a TV or an arcade screen across the room.",

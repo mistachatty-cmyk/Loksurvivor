@@ -479,6 +479,12 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   );
   const [showNotice, setShowNotice] = useState(() => forceHideoutArrival && !photosensitivityNoticeHidden() && !photosensitivityNoticeSeenThisSession());
   const [showLorePopup, setShowLorePopup] = useState(false);
+  // The nav bar belongs to the hideout itself, not to the arrival scene or the notice before it.
+  useEffect(() => {
+    if (!showArrival && !showNotice) return;
+    document.body.setAttribute('data-hide-dock', '1');
+    return () => document.body.removeAttribute('data-hide-dock');
+  }, [showArrival, showNotice]);
   const [crewCommand, setCrewCommand] = useState<{ seq: number; kind: 'help' | 'encourage'; line: string } | undefined>();
   const commandCrew = (kind: 'help' | 'encourage') => {
     noticeSeqRef.current += 1;
@@ -674,9 +680,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         </div>
       )}
       </> : null}
-      {meta.hideoutStickyHeadOutEnabled && (
-        <button type="button" onClick={() => onOpen('runs')} className="fixed inset-x-3 bottom-[max(0.75rem,var(--safe-bottom))] z-50 flex min-h-12 active:scale-[0.98] items-center justify-center gap-2 border border-primary bg-primary px-4 font-mono text-sm font-black uppercase tracking-widest text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,.45)] transition hover:bg-white sm:hidden" data-testid="button-open-runs-sticky">Head out <ArrowRight className="h-4 w-4" /></button>
-      )}
       <HideoutDirectionPanel
         hideoutRooms={hideoutRooms}
         travelRooms={travelRooms}
@@ -741,7 +744,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         </motion.div>
       </AnimatePresence>
 
-      <div className={`relative z-20 flex-1 flex flex-col p-6 ${meta.hideoutStickyHeadOutEnabled ? 'pb-24 sm:pb-6' : 'pb-6'}`}>
+      <div className={`relative z-20 flex-1 flex flex-col p-6 pb-32 sm:pb-6 sm:pl-24`}>
         {chromeLayout === 'new' ? (
     <div className="hub-dock mb-3 flex flex-col gap-2 border border-white/15 bg-black/90 p-3 shadow-xl backdrop-blur sm:p-4 lg:flex-row lg:items-center" data-testid="hub-control-dock">
       <div className="flex flex-wrap items-center gap-2">

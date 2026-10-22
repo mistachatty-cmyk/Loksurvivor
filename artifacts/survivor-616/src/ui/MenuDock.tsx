@@ -1,6 +1,8 @@
-import { Home, Map, Search, Settings, ShoppingBag, Users, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Home, Map, Search, Settings, ShoppingBag, Users, type LucideIcon } from 'lucide-react';
 
+import { useMeta } from '@/game/state/metaStore';
 import { useT, type MessageKey } from '@/lib/i18n';
+import { useSelectedMap } from '@/lib/selectedMap';
 
 export const OPEN_GO_TO_EVENT = 'survivor616:open-go-to';
 
@@ -23,11 +25,19 @@ const ITEMS: DockItem[] = [
 interface Props {
   screenName: string;
   onGo: (id: string) => void;
+  /** Launches the selected map, or opens the map list when none is picked. */
+  onHeadOut: () => void;
 }
 
 /** Always-there navigation for menu screens: bottom bar on phones, a slim rail on larger screens. */
-export function MenuDock({ screenName, onGo }: Props) {
+export function MenuDock({ screenName, onGo, onHeadOut }: Props) {
   const t = useT();
+  const { unlockedAreas, meta } = useMeta();
+  const selectedId = useSelectedMap();
+  const selectedName =
+    unlockedAreas.find((area) => area.id === selectedId)?.name ??
+    meta.customMaps.find((map) => map.id === selectedId)?.name ??
+    null;
   const itemClass = (active: boolean) =>
     `flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 px-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-[color,background-color,transform] duration-[var(--dur-fast)] active:scale-95 sm:min-h-12 sm:w-full sm:flex-none sm:py-2 ${
       active ? 'bg-primary/15 text-primary' : 'text-white/60 hover:bg-white/5 hover:text-white'
@@ -35,9 +45,23 @@ export function MenuDock({ screenName, onGo }: Props) {
   return (
     <nav
       aria-label={t('goto.dockLabel')}
-      className="fixed inset-x-0 bottom-0 z-[100] flex border-t border-white/15 bg-black/85 pb-[var(--safe-bottom)] pl-[var(--safe-left)] pr-[var(--safe-right)] backdrop-blur sm:inset-x-auto sm:inset-y-0 sm:left-0 sm:w-20 sm:flex-col sm:justify-center sm:border-r sm:border-t-0 sm:pb-0 sm:pr-0"
+      className="fixed inset-x-0 bottom-0 z-[100] flex flex-col border-t border-white/15 bg-black/90 pb-[var(--safe-bottom)] pl-[var(--safe-left)] pr-[var(--safe-right)] backdrop-blur sm:inset-x-auto sm:inset-y-0 sm:left-0 sm:w-20 sm:justify-center sm:border-r sm:border-t-0 sm:pb-0 sm:pr-0"
       data-testid="menu-dock"
     >
+      <button
+        type="button"
+        onClick={onHeadOut}
+        className="relative flex min-h-12 w-full flex-col items-center justify-center bg-primary px-2 text-primary-foreground transition active:scale-[0.99] hover:bg-white sm:min-h-14 sm:px-1"
+        data-testid="dock-head-out"
+      >
+        <span className="max-w-full truncate font-mono text-[8px] font-bold uppercase tracking-[0.3em] text-primary-foreground/45" data-testid="dock-head-out-quick">
+          {selectedName ? `${t('dock.quick')} · ${selectedName}` : t('dock.quick')}
+        </span>
+        <span className="flex items-center gap-1.5 font-mono text-sm font-black uppercase tracking-widest sm:text-[10px] sm:tracking-wider">
+          {t('dock.headOut')} <ArrowRight className="h-4 w-4 sm:h-3 sm:w-3" aria-hidden="true" />
+        </span>
+      </button>
+      <div className="flex sm:flex-col">
       {ITEMS.map(({ id, label, icon: Icon, screens }) => {
         const active = screens.includes(screenName);
         return (
@@ -51,6 +75,7 @@ export function MenuDock({ screenName, onGo }: Props) {
         <Search className="h-5 w-5" aria-hidden="true" />
         <span className="max-w-full truncate">{t('goto.search')}</span>
       </button>
+      </div>
     </nav>
   );
 }
