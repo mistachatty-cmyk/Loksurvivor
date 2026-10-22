@@ -8,18 +8,20 @@
  * so it costs nothing in the first-load bundle. Reads the same tracks and lock
  * state as the Soundtrack panel; it adds no audio files and no network calls.
  */
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import DiscCascadeCarousel from '@/components/ui/disc-cascade-carousel';
-import { albumTracks, discItemFor, startingDisc } from '@/game/audio/jukeboxDiscs';
+import { albumTracks, discItemFor, startingDisc, type DiscTrack } from '@/game/audio/jukeboxDiscs';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { watchDiscGuard } from '@/lib/discGuard';
+import { SealedDiscHint } from './SealedDiscHint';
 
 const SHELF_HEIGHT = '54dvh';
 
 export default function ArrivalDiscShelf({ lite }: { lite?: boolean }) {
   useEffect(() => watchDiscGuard(), []);
-  const { tracks, currentTrack, isPlaying, playTrack, togglePlay } = useMusicPlayer();
+  const { tracks, currentTrack, isPlaying, playTrack, togglePlay, soundtrackObjectiveCompletions } = useMusicPlayer();
+  const [hint, setHint] = useState<DiscTrack | null>(null);
   const discTracks = useMemo(() => albumTracks(tracks), [tracks]);
   const items = useMemo(() => discTracks.map(discItemFor), [discTracks]);
   // Fixed at mount: the carousel owns the position after that, and a changing
@@ -29,6 +31,7 @@ export default function ArrivalDiscShelf({ lite }: { lite?: boolean }) {
   if (items.length === 0) return null;
 
   return (
+    <>
     <DiscCascadeCarousel
       items={items}
       defaultIndex={first}
@@ -47,10 +50,21 @@ export default function ArrivalDiscShelf({ lite }: { lite?: boolean }) {
       ariaLabel="Soundtrack discs"
       onSelect={(_item, index) => {
         const track = discTracks[index];
-        if (!track || track.locked) return;
+        if (!track) return;
+        if (track.locked) {
+          setHint(track);
+          return;
+        }
+        setHint(null);
         if (currentTrack?.id === track.id && isPlaying) togglePlay();
         else playTrack(track.id);
       }}
     />
+    {hint ? (
+      <div className="absolute inset-x-0 top-[78%] z-50">
+        <SealedDiscHint track={hint} completed={soundtrackObjectiveCompletions} onClose={() => setHint(null)} />
+      </div>
+    ) : null}
+    </>
   );
 }

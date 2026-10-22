@@ -37,7 +37,7 @@ export type DiscReview = {
   stars?: number
 }
 
-export type DiscPattern = "sunburst" | "rings" | "halftone" | "horizon" | "stripes" | "eclipse" | "mosaic"
+export type DiscPattern = "sunburst" | "rings" | "halftone" | "horizon" | "stripes" | "eclipse" | "mosaic" | "blueprint"
 
 export type DiscCascadeItem = {
   /** The film's title: the big serif headline, and the disc print unless `label` says otherwise. */
@@ -319,6 +319,9 @@ const CSS =
   ".dcc-idle>img{position:absolute;inset:0;width:100%;height:100%;max-width:none;display:block;object-fit:cover}" +
   ".dcc-idle>svg,.dcc-hub{position:absolute;inset:0;width:100%;height:100%;max-width:none;display:block;overflow:visible}" +
   ".dcc-hub{pointer-events:none}" +
+  ".dcc-slide[data-blueprint] .dcc-disc{background:rgba(12,44,86,.2);box-shadow:inset 0 0 0 1.5px rgba(125,211,252,.75),0 0 18px rgba(56,189,248,.18)}" +
+  ".dcc-slide[data-blueprint] .dcc-edge,.dcc-slide[data-blueprint] .dcc-sheen{display:none}" +
+  ".dcc-slide[data-blueprint] .dcc-hub{opacity:.45}" +
   ".dcc-sheen{position:absolute;inset:0;border-radius:50%;pointer-events:none;mix-blend-mode:screen;opacity:var(--dcc-sheen);" +
   "background:conic-gradient(from calc(var(--dcc-glint,0deg) + var(--dcc-px,0) * 70deg)," +
   "transparent 0deg,rgba(255,255,255,.5) 16deg,transparent 38deg,transparent 140deg," +
@@ -416,7 +419,19 @@ function Art({ pattern, pal, seed, uid }: { pattern: DiscPattern; pal: [string, 
   const [bg, fg, ac] = pal
   const r = rng(seed * 9973 + 17)
   const out: React.ReactNode[] = [<rect key="bg" width="200" height="200" fill={bg} />]
-  if (pattern === "sunburst") {
+  if (pattern === "blueprint") {
+    // A see-through plan of a disc: thin lines only, no fill. `ac` is the line colour.
+    out.length = 0
+    for (let rr = 96, i = 0; rr > 30; rr -= 14, i++)
+      out.push(<circle key={"b" + i} cx="100" cy="100" r={rr} fill="none" stroke={ac} strokeWidth=".9" strokeDasharray={i % 2 ? "3 3" : undefined} opacity={i % 2 ? 0.7 : 0.9} />)
+    out.push(<line key="h" x1="4" y1="100" x2="196" y2="100" stroke={ac} strokeWidth=".6" opacity=".6" />, <line key="v" x1="100" y1="4" x2="100" y2="196" stroke={ac} strokeWidth=".6" opacity=".6" />)
+    for (let a = 0; a < 360; a += 15) {
+      const rad = (a * Math.PI) / 180
+      const long = a % 45 === 0
+      out.push(<line key={"t" + a} x1={(100 + 98 * Math.cos(rad)).toFixed(2)} y1={(100 + 98 * Math.sin(rad)).toFixed(2)} x2={(100 + (long ? 90 : 94) * Math.cos(rad)).toFixed(2)} y2={(100 + (long ? 90 : 94) * Math.sin(rad)).toFixed(2)} stroke={ac} strokeWidth={long ? 1 : 0.6} opacity=".8" />)
+    }
+    out.push(<circle key="hub" cx="100" cy="100" r="18" fill="none" stroke={ac} strokeWidth="1" />)
+  } else if (pattern === "sunburst") {
     const k = 28
     for (let i = 0; i < k; i += 2) out.push(<path key={"w" + i} d={wedge((i / k) * Math.PI * 2, ((i + 1) / k) * Math.PI * 2, 142)} fill={fg} />)
     out.push(<circle key="c" cx="100" cy="100" r="44" fill={ac} />)
@@ -1081,6 +1096,7 @@ export default function DiscCascadeCarousel({
               type="button"
               className="dcc-slide"
               data-active={isActive ? "" : undefined}
+              data-blueprint={item.pattern === "blueprint" ? "" : undefined}
               tabIndex={isActive ? 0 : -1}
               aria-roledescription="slide"
               aria-label={i + 1 + " of " + n + ": " + item.title}
