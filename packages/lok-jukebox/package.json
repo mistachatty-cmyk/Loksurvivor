@@ -1,0 +1,27 @@
+{
+  "name": "@lok/jukebox",
+  "version": "0.1.0",
+  "description": "Pure logic for the Lok Jukebox: the three theater levels, dampen-to-filter mapping, slow band grading and a track manifest check. No audio or DOM code, so every Lok app can share it.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.3"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

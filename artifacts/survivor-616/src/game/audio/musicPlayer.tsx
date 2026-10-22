@@ -21,6 +21,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
+import { TONE_RAMP_SECONDS, TRANSPARENT_TONE, type Tone } from '@lok/jukebox';
 import { MusicAnalyser } from './analysis';
 import { beatBus } from './beatBus';
 import { ConversionError, convertToMp3 } from './convert';
@@ -209,6 +210,12 @@ export interface MusicPlayerValue {
    * start a fresh context suspended otherwise.
    */
   ensureAudioContext: () => AudioContext | null;
+  /**
+   * Jukebox Room only: muffles / lifts the sound a little after the analyser,
+   * so beat detection and the room's color grade still see the true sound.
+   * Pass null to ramp back to transparent. Never called = graph unchanged.
+   */
+  setTheaterTone: (tone: Tone | null) => void;
 
   /* -------------------------- playlists -------------------------- */
   playlists: Playlist[];
@@ -479,6 +486,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const analysisRef = useRef<MusicAnalyser | null>(null);
+  const toneNodesRef = useRef<{ lowpass: BiquadFilterNode; shelf: BiquadFilterNode } | null>(null);
+  const pendingToneRef = useRef<Tone | null>(null);
 
   const [tracks, setTracks] = useState<Track[]>(() => {
     const locked = withSoundtrackLocks(BUNDLED_TRACKS, meta.soundtrackObjectiveCompletions);
@@ -623,6 +632,43 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     return audioContextRef.current;
   }, []);
 
+  /** Applies (or lazily builds) the theater tone filters after the analyser. */
+  const applyTone = useCallback((tone: Tone | null) => {
+    pendingToneRef.current = tone;
+    const context = audioContextRef.current;
+    const analyser = analyserRef.current;
+    if (!context || !analyser) return; // applied once the analyser exists
+    try {
+      if (!toneNodesRef.current) {
+        if (!tone) return; // nothing to undo
+        const lowpass = context.createBiquadFilter();
+        lowpass.type = 'lowpass';
+        lowpass.frequency.value = TRANSPARENT_TONE.lowpassHz;
+        lowpass.Q.value = 0.5;
+        const shelf = context.createBiquadFilter();
+        shelf.type = 'lowshelf';
+        shelf.frequency.value = 160;
+        shelf.gain.value = TRANSPARENT_TONE.bassDb;
+        analyser.disconnect(context.destination);
+        analyser.connect(lowpass);
+        lowpass.connect(shelf);
+        shelf.connect(context.destination);
+        toneNodesRef.current = { lowpass, shelf };
+      }
+      const nodes = toneNodesRef.current;
+      const target = tone ?? TRANSPARENT_TONE;
+      const now = context.currentTime;
+      const tc = TONE_RAMP_SECONDS / 3;
+      nodes.lowpass.frequency.cancelScheduledValues(now);
+      nodes.lowpass.frequency.setTargetAtTime(target.lowpassHz, now, tc);
+      nodes.shelf.gain.cancelScheduledValues(now);
+      nodes.shelf.gain.setTargetAtTime(target.bassDb, now, tc);
+    } catch {
+      // Tone is a nicety; playback must never depend on it.
+    }
+  }, []);
+  const setTheaterTone = useCallback((tone: Tone | null) => applyTone(tone), [applyTone]);
+
   const connectAnalyser = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -635,11 +681,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         sourceNodeRef.current = context.createMediaElementSource(audio);
         sourceNodeRef.current.connect(analyserRef.current);
         analyserRef.current.connect(context.destination);
+        if (pendingToneRef.current) applyTone(pendingToneRef.current);
       }
     } catch {
       // Playback still works if Web Audio analysis is unavailable.
     }
-  }, [ensureAudioContext]);
+  }, [ensureAudioContext, applyTone]);
 
   /** The id queue playback actually walks: the active playlist, filtered to
    * tracks that exist and have been unlocked, or every unlocked track when no
@@ -1536,6 +1583,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       soundtrackObjectiveCompletions: meta.soundtrackObjectiveCompletions,
       getAudioContext,
       ensureAudioContext,
+      setTheaterTone,
       playlists,
       activePlaylistId,
       activePlaylist,
@@ -1594,6 +1642,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       dismissError,
       getAudioContext,
       ensureAudioContext,
+      setTheaterTone,
       playTrackOnRepeat,
       playlists,
       activePlaylistId,
