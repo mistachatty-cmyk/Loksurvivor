@@ -46,7 +46,7 @@ import { AreaSelect } from '@/ui/AreaSelect';
 import { BestiaryPanel } from '@/ui/BestiaryPanel';
 import { PersonalLockerV3 } from '@/ui/PersonalLockerV3';
 import { CharacterSelect } from '@/ui/CharacterSelect';
-import { HubScreen, type HubPanel } from '@/ui/HubScreen';
+import { HubScreen, requestHideoutArrival, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
 import { LokShopScreen } from '@/ui/LokShopScreen';
 import { SupporterBar } from '@/ui/SupporterBar';
@@ -521,8 +521,9 @@ function Game() {
         <IntroScreen
           onBegin={() => {
             markOnboarded();
-            if (photosensitivityNoticeHidden()) enterAfterIntro();
-            else setScreen({ name: 'photosensitivity-notice' });
+            // The Outside-the-hideout scene always follows the intro; the photosensitivity notice comes right after it, just before the hideout.
+            requestHideoutArrival();
+            enterAfterIntro();
           }}
           onSignIn={() => {
             markOnboarded();
