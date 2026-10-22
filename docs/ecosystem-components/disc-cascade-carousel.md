@@ -16,7 +16,7 @@ A carousel of printed discs on a slanted line. Drag, flick, arrow keys, sideways
 - No `fontHref` (cost discipline: no new web fonts). Pass the game's own font stacks through `serif`, `sans`, `display` if needed.
 - No `src` images unless the owner asks. Use generated labels (`pattern`, `palette`, `label`).
 - No stock photo demo. The original demo used Unsplash photos; do not ship that.
-- Never name a prop, class, id or copy "signal" (house rule).
+- Follow the house naming rule in CLAUDE.md: the one banned word stays out of props, classes, ids and copy.
 - It respects `prefers-reduced-motion`. Keep it that way.
 
 ## Minimal usage (chrome off, discs only)
