@@ -9,6 +9,8 @@
   "settings.textSize.xlarge": "Très grand",
   "settings.arrivalDiscs.title": "Disques flottants à l'extérieur de la cachette",
   "settings.arrivalDiscs.body": "Affichez la bande sonore sous forme de disques tournant lentement au-dessus de la pluie sur l'écran d'arrivée. Appuyez sur le disque du milieu pour le lire. Désactivé par défaut ; la scène habituelle d’arrivée est inchangée.",
+  "hub.room.jukebox.label": "Salle de juke-box",
+  "hub.room.jukebox.description": "Disques et pièce sombre",
   "jukebox.title": "Salle de juke-box",
   "jukebox.pick": "Appuyez sur un disque",
   "jukebox.seek": "Rechercher",
