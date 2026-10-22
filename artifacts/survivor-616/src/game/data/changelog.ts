@@ -1749,6 +1749,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The hideout button bar (Back, Mission briefing, Looks, Lok chat, music) now sits right under the HIDEOUT headline.',
     ],
   },
+  {
+    version: '0.42.15',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T23:59:00Z',
+    kind: 'hotfix',
+    title: 'Warning First',
+    body: [
+      'The photosensitivity notice now comes straight after the title screen, before the Outside the hideout scene. It only shows once per visit.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

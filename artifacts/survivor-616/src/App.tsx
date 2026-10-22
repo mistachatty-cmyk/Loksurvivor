@@ -50,7 +50,7 @@ import { HubScreen, requestHideoutArrival, type HubPanel } from '@/ui/HubScreen'
 import { IntroScreen } from '@/ui/IntroScreen';
 import { LokShopScreen } from '@/ui/LokShopScreen';
 import { SupporterBar } from '@/ui/SupporterBar';
-import { PhotosensitivityNotice, photosensitivityNoticeHidden } from '@/ui/PhotosensitivityNotice';
+import { PhotosensitivityNotice, photosensitivityNoticeHidden, photosensitivityNoticeSeenThisSession } from '@/ui/PhotosensitivityNotice';
 import { MusicPanel } from '@/ui/MusicPanel';
 import { RunSummary } from '@/ui/RunSummary';
 import { RecoveryPanel } from '@/ui/RecoveryPanel';
@@ -523,7 +523,11 @@ function Game() {
             markOnboarded();
             // The Outside-the-hideout scene always follows the intro; the photosensitivity notice comes right after it, just before the hideout.
             requestHideoutArrival();
-            enterAfterIntro();
+            // A brand-new player meets their starter LokPet first, so the notice goes right here, straight after the title screen.
+            // Everyone else sees it in the hideout flow, with their own operator and LokPets faintly behind it.
+            const newPlayer = !meta.starterLokPetOnboardingComplete && meta.totalRuns === 0 && meta.savedLokPets.length === 0;
+            if (newPlayer && !photosensitivityNoticeHidden() && !photosensitivityNoticeSeenThisSession()) setScreen({ name: 'photosensitivity-notice' });
+            else enterAfterIntro();
           }}
           onSignIn={() => {
             markOnboarded();

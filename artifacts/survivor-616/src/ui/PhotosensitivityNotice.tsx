@@ -17,6 +17,12 @@ import { useT } from '@/lib/i18n';
 const HIDE_KEY = 'survivor616.photosensitivityNoticeHidden';
 const FADE_S = 0.45;
 
+let seenThisSession = false;
+/** True once the notice was shown and acknowledged during this page load, so it is never shown twice in a row. */
+export function photosensitivityNoticeSeenThisSession(): boolean {
+  return seenThisSession;
+}
+
 /** Whether the player asked not to see the notice again. Storage may be blocked, so this never throws. */
 export function photosensitivityNoticeHidden(): boolean {
   try {
@@ -48,6 +54,7 @@ export function PhotosensitivityNotice({ onContinue, backdrop }: { onContinue: (
 
   const proceed = () => {
     if (leaving) return;
+    seenThisSession = true;
     rememberHidden(dontShow);
     if (reduce) {
       onContinue();
