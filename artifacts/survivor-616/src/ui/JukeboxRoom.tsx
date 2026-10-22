@@ -22,7 +22,7 @@ import { SealedDiscHint } from './SealedDiscHint';
 import type { DiscTrack } from '@/game/audio/jukeboxDiscs';
 import { useTheaterLevel } from '@/lib/useTheaterLevel';
 import { readDiscPulse } from '@/lib/discPulse';
-import { readTheaterMix, writeTheaterMix } from '@/lib/jukeboxPrefs';
+import { readReactiveBg, reactiveBgGain, readTheaterMix, writeTheaterMix } from '@/lib/jukeboxPrefs';
 import { DiscPulse } from './DiscPulse';
 
 const FADE_MS = 900;
@@ -50,6 +50,7 @@ export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: Ju
   const discTracks = useMemo(() => albumTracks(tracks), [tracks]);
   const items = useMemo(() => discTracks.map(discItemFor), [discTracks]);
   const [pulseLevel] = useState(readDiscPulse);
+  const [bgGain] = useState(() => reactiveBgGain(readReactiveBg()));
   const current = useMemo(() => {
     const i = discTracks.findIndex((d) => d.id === currentTrack?.id);
     return i >= 0 ? i : startingDisc(discTracks, null);
@@ -75,11 +76,11 @@ export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: Ju
     const vig = vigRef.current;
     if (!glow || !vig) return;
     const paint = (g: { glow: number; vignette: number }) => {
-      glow.style.opacity = (0.12 + g.glow * 0.5).toFixed(3);
-      vig.style.opacity = g.vignette.toFixed(3);
+      glow.style.opacity = (0.12 + g.glow * 0.5 * bgGain).toFixed(3);
+      vig.style.opacity = (0.6 + (g.vignette - 0.6) * bgGain).toFixed(3);
     };
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    if (reduced) {
+    if (reduced || bgGain === 0) {
       paint(gradeFrom(IDLE_BANDS, 0.3));
       return;
     }
@@ -108,7 +109,7 @@ export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: Ju
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, []);
+  }, [bgGain]);
 
   // At Level 3 the first touch only wakes the room: swallow it in capture.
   const levelRef = useRef(level.level);

@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 161,
+      "version": "0.42.22",
+      "date": "2026-10-23",
+      "publishedAt": "2026-10-23T00:01:30Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Reactive Backgrounds & Random Play",
+      "body": [
+        "New Reactive background setting (Off, Soft or Full): the Jukebox Room and the arrival screen now glow and breathe with the music. Soft is gentler and lighter on phones.",
+        "The Jukebox & soundtracks settings now also hold Autoplay, Random order (shuffle, remembered between visits) and Repeat, so you can set up the music without opening the player."
+      ]
+    },
+    {
       "number": 160,
       "version": "0.42.21",
       "date": "2026-10-23",

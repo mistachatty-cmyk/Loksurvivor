@@ -9,6 +9,7 @@
  * like a dropped file; nothing routes through a server this app doesn't have.
  */
 
+import { readShuffle, writeShuffle } from '@/lib/jukeboxPrefs';
 import { DEFAULT_VOLUME, VOLUME_STORAGE_KEY, parseStoredVolume } from './volumeCurve';
 import {
   createContext,
@@ -515,7 +516,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       // Storage may be unavailable -- the level just will not persist.
     }
   }, [volume, muted]);
-  const [shuffle, setShuffle] = useState(false);
+  const [shuffle, setShuffle] = useState<boolean>(readShuffle);
   const [repeat, setRepeat] = useState<RepeatMode>('all');
   const [playbackRate, setPlaybackRateState] = useState(1.0);
   const [autoStart, setAutoStartState] = useState<boolean>(() => {
@@ -1528,7 +1529,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
-  const toggleShuffle = useCallback(() => setShuffle((s) => !s), []);
+  const toggleShuffle = useCallback(() => setShuffle((s) => { writeShuffle(!s); return !s; }), []);
   const cycleRepeat = useCallback(() => setRepeat((r) => (r === 'off' ? 'all' : r === 'all' ? 'one' : 'off')), []);
   const dismissError = useCallback(() => setError(null), []);
   const getAudioContext = useCallback(() => audioContextRef.current, []);
