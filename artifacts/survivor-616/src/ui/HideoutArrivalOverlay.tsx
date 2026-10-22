@@ -18,6 +18,7 @@ import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience
 import { weatherClass } from '@/game/data/hideout';
 import type { CharacterDef, HideoutSceneDef, SpritePalette } from '@/game/types';
 import { readArrivalDiscsEnabled } from '@/lib/arrivalDiscs';
+import { ErrorBoundary } from '@/components/error-boundary';
 import { RigPortrait } from './RigPortrait';
 
 // Opt-in floating CDs (Settings, or `?arrivalDiscs`). Lazy so the carousel is
@@ -104,9 +105,12 @@ export function HideoutArrivalOverlay({
           }`}
           data-testid="arrival-disc-shelf"
         >
-          <Suspense fallback={null}>
-            <ArrivalDiscShelf />
-          </Suspense>
+          {/* A failed disc chunk must never take the arrival screen down with it. */}
+          <ErrorBoundary FallbackComponent={() => null}>
+            <Suspense fallback={null}>
+              <ArrivalDiscShelf />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       ) : null}
 

@@ -1,0 +1,10 @@
+import { chromium } from '/opt/npm-tools/node_modules/playwright/index.mjs';
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const p = await b.newPage({ viewport: { width: 430, height: 930 } });
+p.on('console', m => { if (m.type()==='error') console.log('CONSOLE', m.text().slice(0,400)); });
+p.on('pageerror', e => console.log('PAGEERROR', e.message.slice(0,400), (e.stack||'').split('\n').slice(0,4).join(' | ')));
+await p.goto('http://localhost:3000/?jukebox', { waitUntil: 'networkidle' });
+await p.waitForTimeout(3000);
+console.log(await p.evaluate(() => document.body.innerText.slice(0,300)));
+await p.screenshot({ path: '/tmp/s1.png' });
+await b.close();

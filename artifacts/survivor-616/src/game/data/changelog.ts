@@ -1665,6 +1665,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The floating Lokifed discs now show on the Outside the hideout screen by default. Tap the middle disc to play it. If you want the plain rain scene back, turn it off in Settings.',
     ],
   },
+  {
+    version: '0.42.7',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T15:00:00Z',
+    kind: 'hotfix',
+    title: 'Smoother Updates',
+    body: [
+      'If the game was open while a new version arrived, some screens could show a "Something went wrong" page. The game now reloads itself once to pick up the new version, and the floating discs can no longer take the arrival screen down if they fail to load.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
