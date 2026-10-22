@@ -1741,7 +1741,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.42.14',
     date: '2026-10-22',
-    publishedAt: '2026-10-23T01:00:00Z',
+    publishedAt: '2026-10-22T23:58:00Z',
     kind: 'update',
     title: 'Smooth Way In',
     body: [
