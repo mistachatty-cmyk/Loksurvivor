@@ -17,6 +17,7 @@ import { albumTracks, discItemFor, startingDisc } from '@/game/audio/jukeboxDisc
 import { formatTime, useMusicPlayer } from '@/game/audio/musicPlayer';
 import { armDiscGuard, watchDiscGuard } from '@/lib/discGuard';
 import { useT } from '@/lib/i18n';
+import { setCrashScreen } from '@/lib/lokCrash';
 import { SealedDiscHint } from './SealedDiscHint';
 import type { DiscTrack } from '@/game/audio/jukeboxDiscs';
 import { useTheaterLevel } from '@/lib/useTheaterLevel';
@@ -192,6 +193,7 @@ export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
             onSelect={(_item, index) => {
               const track = discTracks[index];
               if (!track) return;
+              setCrashScreen(`jukebox-disc:${track.id}`);
               if (track.locked) {
                 setHint(track);
                 return;

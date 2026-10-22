@@ -14,6 +14,7 @@ import DiscCascadeCarousel from '@/components/ui/disc-cascade-carousel';
 import { albumTracks, discItemFor, startingDisc, type DiscTrack } from '@/game/audio/jukeboxDiscs';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { watchDiscGuard } from '@/lib/discGuard';
+import { setCrashScreen } from '@/lib/lokCrash';
 import { SealedDiscHint } from './SealedDiscHint';
 
 const SHELF_HEIGHT = '54dvh';
@@ -51,6 +52,7 @@ export default function ArrivalDiscShelf({ lite }: { lite?: boolean }) {
       onSelect={(_item, index) => {
         const track = discTracks[index];
         if (!track) return;
+        setCrashScreen(`disc:${track.id}`);
         if (track.locked) {
           setHint(track);
           return;
