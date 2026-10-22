@@ -301,10 +301,11 @@ export function HideoutPreview({
     const reduceMotion = prefersReducedMotionNow();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     let cssW = root.clientWidth;
-    const cssH = height;
+    let cssH = root.clientHeight || height;
 
     const resize = () => {
       cssW = root.clientWidth;
+      cssH = root.clientHeight || height;
       canvas.width = cssW * dpr;
       canvas.height = cssH * dpr;
     };
@@ -1195,7 +1196,7 @@ export function HideoutPreview({
     <div
       ref={rootRef}
       className={`relative w-full overflow-hidden ${className}`}
-      style={{ height }}
+      style={{ height: `min(${height}px, max(150px, 58vw))` }}
       data-testid="hideout-preview"
     >
       {/* The global stylesheet gives every aria-hidden element pointer-events: none, so the canvas

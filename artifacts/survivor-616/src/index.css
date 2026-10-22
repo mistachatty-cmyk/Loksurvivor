@@ -1157,3 +1157,9 @@ header, nav, [data-testid='roster-layout-toggle'] { opacity: calc(var(--ui-opaci
 @media (prefers-reduced-motion: reduce) { :root:not([data-motion='full']) .promo-slide { animation: none; } }
 /* A shop shows the inline supporter bar; don't also stack the bottom strip. */
 body:has(.supporter-bar--inline) .supporter-bar:not(.supporter-bar--inline) { display: none; }
+
+/* Phone: the hub control dock scrolls with the page and its buttons are tighter, so it stops eating the screen. */
+@media (max-width: 480px) {
+  .hub-dock { gap: 0.375rem; padding: 0.5rem; }
+  .hub-dock button { padding-inline: 0.5rem; letter-spacing: 0.06em; }
+}
