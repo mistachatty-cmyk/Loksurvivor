@@ -478,7 +478,10 @@ function Game() {
         return;
       }
       if (name && HISTORY_SCREENS.has(name)) setScreen({ name } as Screen);
-      else if (name === undefined) goHub();
+      else if (name === 'photosensitivity-notice' || name === 'starter-lokpet-encounter') {
+        // One-time screens are not places to return to: Back from the hideout lands on the title screen.
+        setScreen({ name: 'intro' });
+      } else if (name === undefined) goHub();
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
