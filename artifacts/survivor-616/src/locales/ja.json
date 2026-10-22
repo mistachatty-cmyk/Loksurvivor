@@ -20,6 +20,8 @@
   "jukebox.pause": "一時停止",
   "jukebox.close": "ジュークボックスルームを出る",
   "jukebox.theaterMix": "シアターミックス（画面が暗くなるとよりクリアなサウンド）",
+  "settings.crashReports.title": "クラッシュレポートを送信する",
+  "settings.crashReports.body": "ゲームがクラッシュした場合は、問題を修正できるよう、エラー テキスト、ゲームのバージョン、画面名、ブラウザの種類を送信してください。アカウントもデバイスIDも、あなたに関することも何もありません。追跡拒否に設定されているブラウザは決して送信しません。",
   "settings.audioLevel.volume": "ボリューム",
   "settings.audioLevel.sfxTitle": "ゲームプレイ SFX ボリューム",
   "settings.audioLevel.sfxDescription": "このデバイスで再生されるヒット音、ピックアップ音、メニュー音の音量。変更はすぐに適用されます。",

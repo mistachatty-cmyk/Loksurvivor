@@ -20,6 +20,8 @@
   "jukebox.pause": "Pausa",
   "jukebox.close": "Sal de la sala de la máquina de discos",
   "jukebox.theaterMix": "Mezcla de teatro (sonido más claro cuando la pantalla se oscurece)",
+  "settings.crashReports.title": "Enviar informes de fallos",
+  "settings.crashReports.body": "Si el juego falla, envía el texto del error, la versión del juego, el nombre de pantalla y el tipo de navegador para que se pueda solucionar. Sin cuenta, sin identificación de dispositivo, nada sobre ti. Los navegadores configurados en No rastrear nunca envían.",
   "settings.audioLevel.volume": "Volumen",
   "settings.audioLevel.sfxTitle": "Volumen SFX del juego",
   "settings.audioLevel.sfxDescription": "Qué tan fuertes se reproducen los golpes, las pastillas y los sonidos del menú en este dispositivo. Los cambios se aplican de inmediato.",

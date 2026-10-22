@@ -20,6 +20,8 @@
   "jukebox.pause": "Pause",
   "jukebox.close": "Verlassen Sie den Jukebox-Raum",
   "jukebox.theaterMix": "Theatermischung (klarerer Ton, wenn der Bildschirm dunkel wird)",
+  "settings.crashReports.title": "Absturzberichte senden",
+  "settings.crashReports.body": "Wenn das Spiel abstürzt, senden Sie den Fehlertext, die Spielversion, den Bildschirmnamen und den Browsertyp, damit das Problem behoben werden kann. Kein Konto, keine Geräte-ID, nichts über Sie. Browser, die auf „Nicht verfolgen“ eingestellt sind, senden niemals.",
   "settings.audioLevel.volume": "Lautstärke",
   "settings.audioLevel.sfxTitle": "Gameplay-SFX-Lautstärke",
   "settings.audioLevel.sfxDescription": "Wie laute Schläge, Tonabnehmer und Menütöne auf diesem Gerät abgespielt werden. Änderungen gelten sofort.",

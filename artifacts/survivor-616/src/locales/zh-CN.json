@@ -20,6 +20,8 @@
   "jukebox.pause": "暂停",
   "jukebox.close": "离开点唱机室",
   "jukebox.theaterMix": "剧院混音（屏幕变暗时声音更清晰）",
+  "settings.crashReports.title": "发送崩溃报告",
+  "settings.crashReports.body": "如果游戏崩溃，请发送错误文本、游戏版本、屏幕名称和浏览器类型，以便修复。没有帐户，没有设备 ID，没有任何关于您的信息。浏览器设置为“不跟踪”从不发送。",
   "settings.audioLevel.volume": "体积",
   "settings.audioLevel.sfxTitle": "游戏 SFX 音量",
   "settings.audioLevel.sfxDescription": "此设备上播放的敲击声、拾音器和菜单声音的音量大小。更改立即生效。",
