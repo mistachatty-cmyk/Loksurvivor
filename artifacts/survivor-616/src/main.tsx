@@ -10,11 +10,13 @@ import { applyTextSize } from '@/lib/textScale';
 import { MotionConfig } from 'framer-motion';
 import { applyMotionMode, getMotionMode, registerLiveFeedLoad } from '@/anim/motion';
 import { initLocalization } from '@/lib/i18n';
+import { lokCrash } from '@/lib/lokCrash';
 
 // After a deploy, an already-open or home-screen copy can ask for a code chunk
 // that no longer exists. Reload once to pick up the new build instead of
 // showing the error page. The session flag stops a reload loop.
 window.addEventListener('vite:preloadError', (event) => {
+  lokCrash.capture((event as Event & { payload?: unknown }).payload ?? 'preload error', 'chunk');
   try {
     if (window.sessionStorage.getItem('survivor616.chunk-reload') === '1') return;
     window.sessionStorage.setItem('survivor616.chunk-reload', '1');
@@ -91,9 +93,11 @@ applyScrollbarPrefs();
 registerLiveFeedLoad();
 
 function mount(): void {
+  lokCrash.install();
   createRoot(document.getElementById('root')!, {
     // Keeps caught errors off reportError(), which would raise the dev overlay.
     onCaughtError: (error, errorInfo) => {
+      lokCrash.capture(error, 'render');
       console.error(error, errorInfo.componentStack);
     },
   }).render(

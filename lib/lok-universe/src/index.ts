@@ -6,5 +6,7 @@ export * from "./render";
 export * from "./publish";
 export * from "./supporters";
 export * from "./wallet";
+export * from "./store";
 export * from "./playtime";
 export * from "./achievements";
+export * from "./crash";

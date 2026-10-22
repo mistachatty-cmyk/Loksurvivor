@@ -6,8 +6,9 @@
 
 import type { SupporterBarManifest } from "./supporters";
 import type { WalletStripManifest } from "./wallet";
+import type { StorefrontManifest } from "./store";
 
-export const SDK_VERSION = "1.2.0";
+export const SDK_VERSION = "1.4.0";
 /** Bump on a breaking change to the registry row / recipe shape. Stored in lok_cards.schema_version. */
 export const SCHEMA_VERSION = 1;
 
@@ -126,5 +127,7 @@ export interface PlatformManifest {
   supporterBar?: SupporterBarManifest;
   /** REQUIRED for any platform with a shop: every shop shows the LokToken balance or a sign-in offer. */
   walletStrip?: WalletStripManifest;
+  /** Shared visual shop frame; apps provide game-specific item cards and account actions. */
+  storefront?: StorefrontManifest;
   sdkVersion: string;
 }

@@ -52,6 +52,7 @@ import { MotionSetting, ShakeSetting } from './MotionToggle';
 import { ScrollbarSetting } from './ScrollbarSetting';
 import { TextSizeSetting } from './TextSizeSetting';
 import { ArrivalDiscsToggle } from './ArrivalDiscsToggle';
+import { CrashReportsToggle } from './CrashReportsToggle';
 import { FullscreenSetting } from './FullscreenSetting';
 import { ControlsSettings } from './ControlsSettings';
 import { EndgameSettings } from './EndgameSettings';
@@ -986,6 +987,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                 </div>
               </div>
               <ArrivalDiscsToggle />
+              <CrashReportsToggle />
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
