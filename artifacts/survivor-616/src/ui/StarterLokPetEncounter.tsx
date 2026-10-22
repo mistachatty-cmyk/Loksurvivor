@@ -62,7 +62,7 @@ function EnemyModel({ enemy, hp }: { enemy: EnemyDef; hp: number }) {
   );
 }
 
-export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () => void }) {
+export function StarterLokPetEncounter({ onEnterHideout, onStartTutorial }: { onEnterHideout: () => void; onStartTutorial?: () => void }) {
   const { completeStarterLokPetOnboarding, selectedCharacter, unlockedCharacters, meta } = useMeta();
   const [starterCharacter] = useState<CharacterDef>(() => (
     unlockedCharacters[Math.floor(Math.random() * unlockedCharacters.length)] ?? selectedCharacter
@@ -286,7 +286,14 @@ export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () 
               <span className="border border-white/15 px-3 py-2">2 free LokPacks</span>
               <span className="border border-white/15 px-3 py-2">40 Card Credits</span>
             </div>
-            <button type="button" onClick={onEnterHideout} className="mt-5 inline-flex min-h-14 items-center gap-2 bg-orange-400 px-7 py-4 text-xs font-black uppercase tracking-[.2em] text-black active:scale-[.98]" data-testid="button-enter-hideout-after-starter"><PackageOpen className="h-5 w-5" /> Enter hideout & open packs</button>
+            {onStartTutorial ? (
+              <div className="mt-5 flex flex-col gap-2">
+                <button type="button" onClick={onStartTutorial} className="inline-flex min-h-14 items-center justify-center gap-2 bg-cyan-300 px-7 py-4 text-xs font-black uppercase tracking-[.2em] text-black active:scale-[.98]" data-testid="button-start-tutorial"><Swords className="h-5 w-5" /> Learn the ropes on Monroe Strip</button>
+                <button type="button" onClick={onEnterHideout} className="min-h-11 px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55 hover:text-white" data-testid="button-enter-hideout-after-starter">Skip the tutorial · enter hideout &amp; open packs</button>
+              </div>
+            ) : (
+              <button type="button" onClick={onEnterHideout} className="mt-5 inline-flex min-h-14 items-center gap-2 bg-orange-400 px-7 py-4 text-xs font-black uppercase tracking-[.2em] text-black active:scale-[.98]" data-testid="button-enter-hideout-after-starter"><PackageOpen className="h-5 w-5" /> Enter hideout & open packs</button>
+            )}
           </motion.section>
         )}
       </div>

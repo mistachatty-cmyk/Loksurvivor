@@ -1904,6 +1904,20 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The new Clips tab lets you pick any part of the match you just played: the last half minute is kept in short pieces on your device, alongside your highlight moments. Pick one or several, then share or save them. Nothing is uploaded unless you share it.',
     ],
   },
+  {
+    version: '0.42.29',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T00:08:30Z',
+    kind: 'update',
+    title: 'Learn the Ropes',
+    body: [
+      'New players now get a guided first match right after their first fight with their starter LokPet: Monroe Strip, at high graphics quality, with coach cards for moving, your auto-firing weapon, XP gems, your LokPet, dashing, leveling up and surviving the block. Each card waits for you to actually do the thing, and you can skip the tutorial at any point.',
+      'Lok now drops by on dark stretches of a run, every so often and never more than three times a match, to suggest a light: Low-Light Optics from the Vendor, or a glowing weapon like the Phosphor Evoker Staff if you already own them.',
+      'In packed crowds, only a third of the enemies flash white when hit, so a big swarm no longer washes out into white blobs.',
+      'Holding a finger on the game no longer pops up the iPhone Copy and Translate bubble.',
+      'Fixed the Share button count and the tutorial step counter showing raw placeholders.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
