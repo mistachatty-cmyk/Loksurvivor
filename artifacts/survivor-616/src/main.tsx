@@ -11,6 +11,20 @@ import { MotionConfig } from 'framer-motion';
 import { applyMotionMode, getMotionMode, registerLiveFeedLoad } from '@/anim/motion';
 import { initLocalization } from '@/lib/i18n';
 
+// After a deploy, an already-open or home-screen copy can ask for a code chunk
+// that no longer exists. Reload once to pick up the new build instead of
+// showing the error page. The session flag stops a reload loop.
+window.addEventListener('vite:preloadError', (event) => {
+  try {
+    if (window.sessionStorage.getItem('survivor616.chunk-reload') === '1') return;
+    window.sessionStorage.setItem('survivor616.chunk-reload', '1');
+  } catch {
+    return;
+  }
+  event.preventDefault();
+  window.location.reload();
+});
+
 function describeUnknown(value: unknown): string {
   if (typeof value === 'string') return value;
   try {
