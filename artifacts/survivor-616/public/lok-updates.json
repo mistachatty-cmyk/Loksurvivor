@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 157,
+      "version": "0.42.18",
+      "date": "2026-10-22",
+      "publishedAt": "2026-10-22T23:59:55Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Looks Button Returns",
+      "body": [
+        "The Looks & LokPets button is back in the top right of every screen after the title, including the hideout, along with a new palette button beside it that switches to your next UI theme in one tap. On phones both are compact icons."
+      ]
+    },
+    {
       "number": 156,
       "version": "0.42.17",
       "date": "2026-10-22",
