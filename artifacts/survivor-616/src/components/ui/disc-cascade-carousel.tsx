@@ -128,6 +128,14 @@ export type DiscCascadeCarouselProps = {
   onSelect?: (item: DiscCascadeItem, index: number) => void
   ariaLabel?: string
   className?: string
+  /**
+   * Light mode for phones and low-memory devices: drops the edge, shadow and
+   * glint layers (three of the six graphics layers per disc) and mounts only
+   * the discs near the chosen one.
+   */
+  lite?: boolean
+  /** In lite mode, how many discs either side of the chosen one stay mounted. Default 3. */
+  renderRadius?: number
 }
 
 // #region motion
@@ -627,6 +635,8 @@ export default function DiscCascadeCarousel({
   onSelect,
   ariaLabel = "Film catalogue",
   className = "",
+  lite = false,
+  renderRadius = 3,
 }: DiscCascadeCarouselProps) {
   const n = items.length
   const start = Math.min(Math.max(Math.round(index ?? defaultIndex), 0), Math.max(n - 1, 0))
@@ -1060,6 +1070,8 @@ export default function DiscCascadeCarousel({
           const pal = item.palette ?? PALETTES[i % PALETTES.length]
           const ink = item.ink ?? (item.src ? "#ffffff" : inkFor(pal[0]))
           const id = uid + "d" + i
+          // Lite: far-away discs are empty shells (still positioned, so counts and focus order hold).
+          const mounted = !lite || Math.abs(offsetOf(i, active, n, loop)) <= renderRadius
           return (
             <button
               key={i}
@@ -1085,9 +1097,10 @@ export default function DiscCascadeCarousel({
                 } as React.CSSProperties
               }
             >
+              {mounted ? (
               <span className="dcc-tilt">
-                <span className="dcc-shade" />
-                <span className="dcc-edge" />
+                {lite ? null : <span className="dcc-shade" />}
+                {lite ? null : <span className="dcc-edge" />}
                 <span className="dcc-disc">
                   <span className="dcc-roll">
                     <span className="dcc-idle" style={{ fontFamily: display }}>
@@ -1111,9 +1124,10 @@ export default function DiscCascadeCarousel({
                     </span>
                   </span>
                   <Hub uid={id} />
-                  <span className="dcc-sheen" />
+                  {lite ? null : <span className="dcc-sheen" />}
                 </span>
               </span>
+              ) : null}
             </button>
           )
         })}

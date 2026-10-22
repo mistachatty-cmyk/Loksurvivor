@@ -18,6 +18,7 @@ import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience
 import { weatherClass } from '@/game/data/hideout';
 import type { CharacterDef, HideoutSceneDef, SpritePalette } from '@/game/types';
 import { readArrivalDiscsEnabled } from '@/lib/arrivalDiscs';
+import { armDiscGuard } from '@/lib/discGuard';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { RigPortrait } from './RigPortrait';
 
@@ -48,7 +49,9 @@ export function HideoutArrivalOverlay({
 }: HideoutArrivalOverlayProps) {
   const ambienceRef = useRef<AmbienceHandle | null>(null);
   const [entering, setEntering] = useState(false);
-  const [discsEnabled] = useState(readArrivalDiscsEnabled);
+  // The guard also decides lite mode: a phone, or a visit that last ended badly.
+  const [discSafety] = useState(() => (readArrivalDiscsEnabled() ? armDiscGuard() : { lite: true, off: false }));
+  const discsEnabled = readArrivalDiscsEnabled() && !discSafety.off;
 
   useEffect(() => {
     if (!ambienceEnabled) return;
@@ -108,7 +111,7 @@ export function HideoutArrivalOverlay({
           {/* A failed disc chunk must never take the arrival screen down with it. */}
           <ErrorBoundary FallbackComponent={() => null}>
             <Suspense fallback={null}>
-              <ArrivalDiscShelf />
+              <ArrivalDiscShelf lite={discSafety.lite} />
             </Suspense>
           </ErrorBoundary>
         </div>

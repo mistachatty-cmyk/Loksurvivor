@@ -27,3 +27,11 @@ Title + one sentence (under 20 words) whose words rise in one at a time + Contin
 - The disc carousel keeps all 12 discs mounted (hidden ones are `visibility: hidden`). If low-memory phones still struggle, render the art only for discs within about 3 positions of the chosen one (change it in the shared component, keep its tests).
 - The sheen layer uses `mix-blend-mode: screen` on every disc; `sheen={0.35}` is a cheap way to lighten it.
 - Verify audio and iOS behavior on a real iPhone: this sandbox has desktop Chromium only.
+
+## Second crash: arrival discs on iPhone (2026-10-22, 0.42.10)
+
+Swiping and playing the floating discs on the arrival screen killed Safari's tab (same "A problem repeatedly occurred" page). Cause: memory. Each disc is about six graphics layers (tilt, shadow, edge, disc mask, roll, glint with a blend mode) and all 12 stayed mounted, on top of the rain layer and the audio analyser.
+Fixes: the carousel has a `lite` prop (drops the shadow, edge and glint layers, mounts only discs within `renderRadius` = 3 of the chosen one: 7 of 12 mounted, and 3 fewer layers each). Phones (coarse pointer) always use it. `lib/discGuard.ts` leaves a marker while discs are on screen and checks it next load: one unclean exit forces lite, two in a row turn the discs off on that device; a stable minute resets it. Both the arrival shelf and the Jukebox Room use it.
+Audit (desktop Chromium, phone profile, 25 screens plus the Jukebox Room): no page errors, no horizontal overflow, JS heap 68-90 MB. Heaviest screens: Bestiary (3,500 DOM nodes, 72 running animations) and Card shop (1,950 nodes, 78 animations): candidates for list virtualization and pausing off-screen animation.
+Static scan: 31 files use backdrop blur (costly on iOS; avoid adding more over animated content), 8 use blend modes, every setInterval has a matching clear, and the only requestAnimationFrame without a cancel is the short one-shot rain fade in `HideoutArrivalOverlay`.
+Still unverified: real iPhone memory use. If it still crashes, send the "Copy error report" text; a hard tab kill leaves no report, but the guard will have switched the discs to lite or off.

@@ -8,15 +8,17 @@
  * so it costs nothing in the first-load bundle. Reads the same tracks and lock
  * state as the Soundtrack panel; it adds no audio files and no network calls.
  */
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import DiscCascadeCarousel from '@/components/ui/disc-cascade-carousel';
 import { albumTracks, discItemFor, startingDisc } from '@/game/audio/jukeboxDiscs';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
+import { watchDiscGuard } from '@/lib/discGuard';
 
 const SHELF_HEIGHT = '54dvh';
 
-export default function ArrivalDiscShelf() {
+export default function ArrivalDiscShelf({ lite }: { lite?: boolean }) {
+  useEffect(() => watchDiscGuard(), []);
   const { tracks, currentTrack, isPlaying, playTrack, togglePlay } = useMusicPlayer();
   const discTracks = useMemo(() => albumTracks(tracks), [tracks]);
   const items = useMemo(() => discTracks.map(discItemFor), [discTracks]);
@@ -31,6 +33,7 @@ export default function ArrivalDiscShelf() {
       items={items}
       defaultIndex={first}
       loop
+      lite={lite ?? true}
       height={SHELF_HEIGHT}
       discSize="clamp(150px, 46vw, 300px)"
       background="transparent"

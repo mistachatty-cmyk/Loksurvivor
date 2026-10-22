@@ -1698,6 +1698,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The photosensitivity warning is now a short title and one sentence with a gentle animation. Tap More info for the full guidance.',
     ],
   },
+  {
+    version: '0.42.10',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T19:00:00Z',
+    kind: 'hotfix',
+    title: 'Lighter Discs',
+    body: [
+      'The floating discs now use a lighter look on phones and keep fewer discs loaded at once, so scrolling and playing them no longer runs a phone out of memory. If the page ever closes unexpectedly while the discs are showing, the game switches them to the lightest mode, and turns them off if it happens twice in a row. You can still turn them back on in Settings.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
