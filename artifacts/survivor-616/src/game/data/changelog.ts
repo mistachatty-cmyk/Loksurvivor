@@ -1759,6 +1759,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The photosensitivity notice now comes straight after the title screen, before the Outside the hideout scene. It only shows once per visit.',
     ],
   },
+  {
+    version: '0.42.16',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T23:59:30Z',
+    kind: 'hotfix',
+    title: 'Back Home',
+    body: [
+      'Going back from the hideout (your phone back swipe or the browser Back button) now returns you to the title screen instead of getting stuck behind the one-time notice and starter screens.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
