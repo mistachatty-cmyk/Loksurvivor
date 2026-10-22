@@ -4,7 +4,7 @@ Status: **Phase 0 (recon) done. Nothing built yet.** Written so any agent (Claud
 Owner: Claude. Scope: docs only so far. Next: Phase 1.
 
 House rules that apply to this work (all verified in the repo):
-- Brand: always "Lok", never "Lock". The word "signal" is prohibited everywhere (copy, ids, comments, docs). Use beacon / pulse / relay / static / frequency.
+- Brand: always "Lok", never "Lock". One word is banned everywhere (see CLAUDE.md): copy, ids, comments, docs. Use beacon / pulse / relay / static / frequency.
 - Cost discipline (`docs/LOK_COST_DISCIPLINE.md`): procedural SVG/CSS art only, no new bitmaps/audio/web fonts, no new network calls, pause animation when hidden, reduced-motion respected. Do not pass `fontHref` to the carousel.
 - Soundtrack rule: only the bundled Lokifed album or the player's own files. Never invent artists or claim licensing.
 - Mid-run audio must never be altered (`.agents/memory/music-reactivity.md`).
