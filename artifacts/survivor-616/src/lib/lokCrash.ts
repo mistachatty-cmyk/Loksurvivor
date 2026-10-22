@@ -44,3 +44,53 @@ export const lokCrash = createCrashReporter({
 });
 
 export { formatReport };
+
+/**
+ * A page the browser kills (Safari "A problem repeatedly occurred") can never run
+ * code, so it cannot report itself. Instead a marker is left while the game is on
+ * screen and cleared whenever the page is hidden or closed normally. If the marker
+ * is still there on the next load, the last visit ended badly: record it, then the
+ * app shows a small "send a report" prompt.
+ */
+const ALIVE_KEY = 'survivor616.alive.v1';
+let recovered: ReturnType<typeof lokCrash.last> = null;
+
+export function startCrashWatch(): void {
+  try {
+    const raw = window.localStorage.getItem(ALIVE_KEY);
+    if (raw && document.visibilityState === 'visible') {
+      const prev = JSON.parse(raw) as { screen?: string; v?: string };
+      recovered = lokCrash.capture(
+        new Error(`Page closed unexpectedly on ${prev.screen || 'unknown screen'} (v${prev.v ?? '?'})`),
+        'error',
+      );
+    }
+    const mark = () => {
+      try {
+        window.localStorage.setItem(ALIVE_KEY, JSON.stringify({ screen: currentScreen, v: CURRENT_VERSION }));
+      } catch {
+        /* storage blocked */
+      }
+    };
+    const clear = () => {
+      try {
+        window.localStorage.removeItem(ALIVE_KEY);
+      } catch {
+        /* storage blocked */
+      }
+    };
+    mark();
+    window.setInterval(() => !document.hidden && mark(), 5000);
+    document.addEventListener('visibilitychange', () => (document.hidden ? clear() : mark()));
+    window.addEventListener('pagehide', clear);
+  } catch {
+    /* watching must never break the game */
+  }
+}
+
+/** The report for an unexpected close on the previous visit, if there was one (shown once). */
+export function takeRecoveredCrash() {
+  const r = recovered;
+  recovered = null;
+  return r;
+}

@@ -1718,6 +1718,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Discs you have not unlocked yet now look like see-through blueprints. Tap one and Lok tells you how many run objectives it takes to open it, and how many you have left.',
     ],
   },
+  {
+    version: '0.42.12',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T23:00:00Z',
+    kind: 'hotfix',
+    title: 'Crash Catcher',
+    body: [
+      'If the game closes unexpectedly, the next time you open it Lok shows a small card with an error code and a Copy report button. The report also notes which disc you last tapped, so crashes around the Jukebox are easier to track down.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

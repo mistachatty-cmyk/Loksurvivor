@@ -10,7 +10,7 @@ import { applyTextSize } from '@/lib/textScale';
 import { MotionConfig } from 'framer-motion';
 import { applyMotionMode, getMotionMode, registerLiveFeedLoad } from '@/anim/motion';
 import { initLocalization } from '@/lib/i18n';
-import { lokCrash } from '@/lib/lokCrash';
+import { lokCrash, startCrashWatch } from '@/lib/lokCrash';
 
 // After a deploy, an already-open or home-screen copy can ask for a code chunk
 // that no longer exists. Reload once to pick up the new build instead of
@@ -94,6 +94,7 @@ registerLiveFeedLoad();
 
 function mount(): void {
   lokCrash.install();
+startCrashWatch();
   createRoot(document.getElementById('root')!, {
     // Keeps caught errors off reportError(), which would raise the dev overlay.
     onCaughtError: (error, errorInfo) => {
