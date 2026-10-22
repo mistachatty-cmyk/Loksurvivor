@@ -1165,6 +1165,7 @@ body:has(.supporter-bar--inline) .supporter-bar:not(.supporter-bar--inline) { di
     scrollbar-width: none; scroll-snap-type: x proximity; overscroll-behavior-x: contain;
     -webkit-mask-image: linear-gradient(90deg, #000 90%, transparent); mask-image: linear-gradient(90deg, #000 90%, transparent);
   }
+  .hub-dock { padding-right: 6.25rem; }
   .hub-dock::-webkit-scrollbar { display: none; }
   .hub-dock > div { display: contents; }
   .hub-dock > div > * { flex: none; scroll-snap-align: start; }

@@ -747,9 +747,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       <div className="flex flex-wrap items-center gap-2">
         {onBack ? <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-white/40 hover:text-white" data-testid="button-hub-back-to-intro" aria-label="Back to title"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
         <button type="button" onClick={() => setShowLorePopup(true)} aria-haspopup="dialog" aria-expanded={showLorePopup} className="inline-flex min-h-10 items-center gap-2 border border-red-500/60 bg-red-950/40 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-red-100 hover:border-red-300" data-testid="button-hub-mission-briefing" title={t('hub.missionBriefingTitle')}><ShieldAlert className="h-4 w-4 text-red-400" />{t('hub.missionBriefing')}</button>
-        {(meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
-          <button type="button" onClick={onOpenRunSetup} className="inline-flex min-h-10 items-center gap-2 border border-cyan-200/45 bg-slate-950/70 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 hover:border-cyan-100" data-testid="button-open-run-setup" title={t('hub.looksLokpetsTitle')}><Sparkles className="h-4 w-4 text-cyan-200" />{t('common.looksLokpets')}</button>
-        )}
         {rescuedAllies.length > 0 ? <LokChatLauncher onOpen={() => setShowLokChat(true)} /> : null}
         <HideoutEndgameDock onOpen={onOpen} compact />
       </div>

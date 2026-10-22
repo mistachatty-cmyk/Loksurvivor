@@ -1780,6 +1780,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'If the game closes while the floating discs are showing, the discs now offer a "Discs paused" card you can tap to bring them back in the lightest mode. Playing a disc also quiets the rain sound, so only one thing is playing audio at a time.',
     ],
   },
+  {
+    version: '0.42.18',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T23:59:55Z',
+    kind: 'hotfix',
+    title: 'Looks Button Returns',
+    body: [
+      'The Looks & LokPets button is back in the top right of every screen after the title, including the hideout, along with a new palette button beside it that switches to your next UI theme in one tap. On phones both are compact icons.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
