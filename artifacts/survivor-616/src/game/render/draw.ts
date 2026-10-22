@@ -6,6 +6,7 @@
  * reads as pixel art without needing image atlases.
  */
 
+import { BLOCK_FX_LINGER_MS, blockMaterialOf, drawBlockMaterial } from './blockBreak';
 import { shakeScale } from '@/anim/motion';
 import { ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
 import { drawStyledPickup } from './pickupArtStyles';
@@ -2018,6 +2019,9 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'parking-meter': { top: '#4a4a52', side: '#28282e', trim: '#c9c9d2' },
   'attack-block': { top: '#3a1620', side: '#1e0b11', trim: '#ff5c5c' },
   'server-rack': { top: '#0e1b26', side: '#081119', trim: '#1fe6ff' },
+  // Glass and ice are drawn by render/blockBreak.ts; these only feed code that reads a flat colour.
+  'glass-block': { top: '#78d6ee', side: '#1d6d8a', trim: '#ebfcff' },
+  'ice-block': { top: '#eefbff', side: '#6cb4dc', trim: '#ffffff' },
   'tree-digital': { top: '#064e3b', side: '#022c22', trim: '#10b981' },
   'tree-fake': { top: '#083344', side: '#051b24', trim: '#06b6d4' },
   skyscraper: { top: '#1e293b', side: '#0f172a', trim: '#38bdf8' },
@@ -2042,7 +2046,49 @@ const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: st
   'fire-storm': { base: '#4a1206', rim: '#ff7a3d', glow: '#ffcf7a' },
   'acid-storm': { base: '#33430f', rim: '#b8ff5c', glow: '#e9ffb0' },
   frost: { base: '#274a56', rim: '#bfe9ff', glow: '#eaffff' },
+  ice: { base: '#7fc3e6', rim: '#eefbff', glow: '#ffffff' },
 };
+
+/** An icy patch: glossy pale floor, a moving sheen, hairline frost cracks and a few glints. */
+function drawIcePatch(ctx: CanvasRenderingContext2D, w: World, tile: World['fluids'][number], fadeAlpha: number) {
+  const { x, y, radius } = tile;
+  const ry = radius * 0.62;
+  ctx.save();
+  ctx.globalAlpha = 0.4 * fadeAlpha;
+  const g = ctx.createRadialGradient(x, y + 3, radius * 0.1, x, y + 4, radius);
+  g.addColorStop(0, 'rgba(225,248,255,0.95)');
+  g.addColorStop(0.65, 'rgba(140,204,236,0.8)');
+  g.addColorStop(1, 'rgba(110,180,220,0.1)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(x, y + 4, radius, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.3 * fadeAlpha;
+  ctx.strokeStyle = '#eefbff';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.ellipse(x, y + 4, radius * 0.94, ry * 0.94, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  // Hairline cracks and a sheen that drifts across.
+  ctx.beginPath();
+  for (let i = 0; i < 3; i += 1) {
+    const a = tile.uid * 1.7 + i * 2.1;
+    ctx.moveTo(x + Math.cos(a) * radius * 0.15, y + 4 + Math.sin(a) * ry * 0.15);
+    ctx.lineTo(x + Math.cos(a + 0.2) * radius * 0.55, y + 4 + Math.sin(a + 0.2) * ry * 0.55);
+    ctx.lineTo(x + Math.cos(a - 0.1) * radius * 0.8, y + 4 + Math.sin(a - 0.1) * ry * 0.8);
+  }
+  ctx.globalAlpha = 0.4 * fadeAlpha;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 0.9;
+  ctx.stroke();
+  const sweep = ((w.now / 2400 + tile.uid * 0.13) % 1) * 2 - 1;
+  ctx.globalAlpha = 0.28 * fadeAlpha;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.ellipse(x + sweep * radius * 0.5, y + 3, radius * 0.12, ry * 0.7, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
 
 function drawFluids(ctx: CanvasRenderingContext2D, w: World) {
   for (const tile of w.fluids) {
@@ -2050,6 +2096,10 @@ function drawFluids(ctx: CanvasRenderingContext2D, w: World) {
     // Hold near-full alpha, only fade during the final third of the tile's life.
     const remaining = (tile.expiresAt - w.now) / Math.max(1, tile.expiresAt - tile.spawnedAt);
     const fadeAlpha = clamp(remaining * 3, 0, 1);
+    if (tile.kind === 'ice') {
+      drawIcePatch(ctx, w, tile, fadeAlpha);
+      continue;
+    }
     ctx.save();
     ctx.globalAlpha = 0.55 * fadeAlpha;
     ctx.fillStyle = colors.base;
@@ -2164,6 +2214,7 @@ function drawObstacles(
   const obstacleList: Array<{
     x: number; y: number; w: number; h: number; kind: ObstacleDef['kind']; artAssetId?: string; damage?: number;
     breakable?: boolean; seed?: number; lastHitAt?: number; lastHitX?: number; lastHitY?: number; brokenAt?: number;
+    marks?: readonly number[]; sliding?: boolean;
   }> = [];
   const closedBuildings = w.endless?.buildingEntryStyle === 'seamless' && !w.endless.inDungeon
     ? w.endless.buildings.filter((building) =>
@@ -2175,7 +2226,7 @@ function drawObstacles(
       )
     : [];
   for (const o of w.breakables) {
-    if (o.broken && w.now - o.brokenAt > 760) continue;
+    if (o.broken && w.now - o.brokenAt > (blockMaterialOf(o.kind) ? BLOCK_FX_LINGER_MS : 760)) continue;
     if (o.x < viewBounds.left - margin || o.x > viewBounds.right + margin
       || o.y < viewBounds.top - margin || o.y > viewBounds.bottom + margin) continue;
     if (closedBuildings.some((building) =>
@@ -2187,6 +2238,7 @@ function drawObstacles(
       damage: o.broken ? 1 : Number.isFinite(o.maxHp) ? 1 - o.hp / o.maxHp : 0,
       breakable: o.breakable, seed: o.uid, lastHitAt: o.lastHitAt, lastHitX: o.lastHitX,
       lastHitY: o.lastHitY, brokenAt: o.broken ? o.brokenAt : undefined,
+      marks: o.hitMarks, sliding: o.kind === 'ice-block' && (o.vx * o.vx + o.vy * o.vy) > 46 * 46,
     });
   }
   for (const o of w.area.decorations ?? []) {
@@ -2202,6 +2254,17 @@ function drawObstacles(
         lastHitX: obstacle.lastHitX, lastHitY: obstacle.lastHitY, brokenAt: obstacle.brokenAt,
         motionEnabled: w.effectMotionEnabled,
         fragmentLimit: w.graphicsQuality === 'performance' ? 4 : w.graphicsQuality === 'balanced' ? 6 : 9,
+      });
+      continue;
+    }
+    const material = blockMaterialOf(obstacle.kind);
+    if (material) {
+      drawBlockMaterial(ctx, {
+        material, x: obstacle.x, y: obstacle.y, w: obstacle.w, h: obstacle.h, seed: obstacle.seed ?? 1,
+        damage: obstacle.damage ?? 0, marks: obstacle.marks, lastHitAt: obstacle.lastHitAt,
+        lastHitX: obstacle.lastHitX, lastHitY: obstacle.lastHitY, brokenAt: obstacle.brokenAt, now: w.now,
+        quality: w.graphicsQuality === 'performance' ? 'performance' : w.graphicsQuality === 'balanced' ? 'balanced' : 'high',
+        motionEnabled: w.effectMotionEnabled, sliding: obstacle.sliding,
       });
       continue;
     }

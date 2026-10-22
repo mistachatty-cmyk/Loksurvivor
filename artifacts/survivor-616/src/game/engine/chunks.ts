@@ -840,6 +840,8 @@ export function generateChunk(cx: number, cy: number, runSeed: number, themeId: 
       'data-pipe': [28, 120, 24, 150],
       'digi-arch': [58, 76, 92, 124],
       'pressure-door': [90, 132, 26, 40],
+      'glass-block': [50, 76, 40, 60],
+      'ice-block': [48, 66, 44, 60],
     };
     const [minW, maxW, minH, maxH] = sizes[kind];
     const w = minW + rng() * (maxW - minW);

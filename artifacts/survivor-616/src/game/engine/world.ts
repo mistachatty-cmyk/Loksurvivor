@@ -114,6 +114,7 @@ import {
   resolveCircleBox,
   type Aabb,
 } from './math';
+import { ICE_PROP_FRICTION, ICE_TRAIL_MIN_SPEED, slipVelocity } from './iceSlip';
 import {
   BUILDING_PREFABS,
   CHUNK_SIZE,
@@ -134,6 +135,9 @@ import {
 export type AnimState = 'idle' | 'walk' | 'attack' | 'hurt' | 'death';
 
 export interface Actor {
+  /** Carried velocity while sliding on ice (see engine/iceSlip.ts). Unset on solid ground. */
+  slipVx?: number;
+  slipVy?: number;
   uid: number;
   x: number;
   y: number;
@@ -653,6 +657,10 @@ export interface BreakableObstacle extends Aabb {
   lastHitX?: number;
   lastHitY?: number;
   lastDamage?: number;
+  /** Where recent hits landed (flattened x, y pairs, oldest first, capped): glass and ice grow their cracks from these. */
+  hitMarks?: number[];
+  /** Ice blocks: next time a sliding block may lay another patch of icy trail. */
+  nextTrailAt?: number;
   hp: number;
   maxHp: number;
   vx: number;
@@ -873,7 +881,7 @@ export interface ArtisteDrawState {
  * the status effect a standing enemy carries. `water` washes the latter
  * three away wherever it overlaps them, and off any enemy standing in it.
  */
-export type FluidKind = 'water' | 'oil' | 'burning-oil' | 'coolant' | 'runoff' | 'fire-storm' | 'acid-storm' | 'frost';
+export type FluidKind = 'water' | 'oil' | 'burning-oil' | 'coolant' | 'runoff' | 'fire-storm' | 'acid-storm' | 'frost' | 'ice';
 
 export interface FluidTile {
   uid: number;
@@ -951,10 +959,14 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'pressure-door': { variant: 'heavy-metal', hp: 300 },
   /** Page overlay: an element of a live web page. Immovable; callers pass a per-block hp. */
   'page-block': { variant: 'fixed-breakable', hp: 60 },
+  /** A pane of glass: fixed, cracks in stages, shatters. */
+  'glass-block': { variant: 'fixed-breakable', hp: 70 },
+  /** A block of ice: shoved across the floor it slides far and leaves a slick trail. */
+  'ice-block': { variant: 'medium-movable', hp: 150 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench', 'server-rack', 'tree-digital',
-  'data-pipe', 'digi-arch', 'pressure-door', 'page-block',
+  'data-pipe', 'digi-arch', 'pressure-door', 'page-block', 'glass-block', 'ice-block',
 ]);
 
 /** Small street-flavor breakables: bonus drops and rare-currency odds are scoped to just these four. */
@@ -975,6 +987,8 @@ const FLUID_LIFETIMES: Record<FluidKind, number> = {
   'fire-storm': 6000,
   'acid-storm': 7000,
   frost: 7000,
+  /** A sliding ice block's trail, or the slick left by a shattered one. Refreshed while blocks keep sliding over it. */
+  ice: 9000,
 };
 const FLUID_MAX_RADIUS: Record<FluidKind, number> = {
   water: 84,
@@ -985,6 +999,7 @@ const FLUID_MAX_RADIUS: Record<FluidKind, number> = {
   'fire-storm': 74,
   'acid-storm': 74,
   frost: 74,
+  ice: 40,
 };
 /** Immediate, position-based speed multiplier per fluid kind. Omitted kinds (runoff, fire-storm, acid-storm) don't change speed directly. */
 const FLUID_SPEED_MULTIPLIERS: Partial<Record<FluidKind, number>> = {
@@ -1009,6 +1024,10 @@ function propProfile(obstacle: Pick<ObstacleDef, 'kind' | 'propVariant' | 'hp'>)
   const breakable = entry?.hp !== undefined || (obstacle.kind === 'map-prop' && obstacle.hp !== undefined);
   if (variant === 'light-breakable') {
     return { variant, mass: 0.8, friction: 0.82, breakable, movable: true };
+  }
+  if (obstacle.kind === 'ice-block') {
+    // Heavy enough to plough through a crowd, slick enough to coast a long way.
+    return { variant, mass: 2.2, friction: ICE_PROP_FRICTION, breakable, movable: true };
   }
   if (variant === 'medium-movable') {
     return { variant, mass: 2.6, friction: 0.88, breakable, movable: true };
@@ -6831,6 +6850,13 @@ function damageBreakable(
     b.lastHitX = x;
     b.lastHitY = y;
     b.lastDamage = dealt;
+    if (b.kind === 'glass-block' || b.kind === 'ice-block') {
+      // Cracks grow from where the block was really hit.
+      const marks = b.hitMarks ?? (b.hitMarks = []);
+      marks.push(x, y);
+      if (marks.length > 12) marks.splice(0, marks.length - 12);
+      pushSfx(w, 'blockCrack');
+    }
     if (w.propHits.length >= PROP_HIT_CAP) w.propHits.shift();
     w.propHits.push({ uid: b.uid, x, y, radius, amount: dealt, intensity: impactIntensity, kill: b.hp <= 0, at: w.now });
     if (b.hp > 0) {
@@ -6839,14 +6865,35 @@ function damageBreakable(
     }
     b.broken = true;
     b.brokenAt = w.now;
-    pushSfx(w, 'obstacleBreak');
+    pushSfx(w, b.kind === 'glass-block' ? 'glassShatter' : b.kind === 'ice-block' ? 'iceShatter' : 'obstacleBreak');
     const count = b.kind === 'barrel' ? 16 : b.kind === 'neon-sign' ? 6 : 10;
-    spawnParticles(w, b.x, b.y, b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'barrel' ? '#f0760a' : '#c99055', count, 130);
+    if (b.kind === 'glass-block') {
+      spawnParticles(w, b.x, b.y, '#bff6ff', 16, 170);
+      spawnParticles(w, b.x, b.y, '#ffffff', 8, 120);
+    } else if (b.kind === 'ice-block') {
+      spawnParticles(w, b.x, b.y, '#d8f3ff', 14, 150);
+      spawnParticles(w, b.x, b.y, '#7dd3fc', 8, 100);
+    } else {
+      spawnParticles(w, b.x, b.y, b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'barrel' ? '#f0760a' : '#c99055', count, 130);
+    }
     if (b.kind === 'barrel') {
       forEachNearby(w, b.x, b.y, 100, (enemy) => {
         if (dist2(enemy.x, enemy.y, b.x, b.y) <= (80 + enemy.radius) ** 2) {
           damageEnemy(w, enemy, 18 * w.stats.power, 3, b.x, b.y);
         }
+      });
+    }
+    if (b.kind === 'glass-block') {
+      // Flying shards cut anything standing right at the pane.
+      forEachNearby(w, b.x, b.y, 80, (enemy) => {
+        if (dist2(enemy.x, enemy.y, b.x, b.y) <= (62 + enemy.radius) ** 2) damageEnemy(w, enemy, 8 * w.stats.power, 2, b.x, b.y);
+      });
+    }
+    if (b.kind === 'ice-block') {
+      // The block bursts into a slick puddle of ice shards.
+      spawnIceTrail(w, b.x, b.y, 0.9);
+      forEachNearby(w, b.x, b.y, 70, (enemy) => {
+        if (dist2(enemy.x, enemy.y, b.x, b.y) <= (54 + enemy.radius) ** 2) damageEnemy(w, enemy, 6 * w.stats.power, 2, b.x, b.y);
       });
     }
     if (b.kind === 'server-rack') {
@@ -6933,6 +6980,39 @@ function spawnFluidTile(w: World, x: number, y: number, kind: FluidKind, sourceU
     nextTickAt: w.now,
     sourceUid,
   });
+}
+
+/** The most icy patches alive at once; the oldest is refreshed rather than adding more. */
+const ICE_TILE_CAP = 36;
+
+/** Lays (or refreshes) a patch of icy ground. `scale` 1 is a full trail patch. */
+function spawnIceTrail(w: World, x: number, y: number, scale = 0.7) {
+  let count = 0;
+  for (const tile of w.fluids) {
+    if (tile.kind !== 'ice') continue;
+    count += 1;
+    if (dist2(x, y, tile.x, tile.y) < 15 * 15) {
+      tile.expiresAt = Math.max(tile.expiresAt, w.now + FLUID_LIFETIMES.ice);
+      tile.maxRadius = Math.max(tile.maxRadius, FLUID_MAX_RADIUS.ice * scale);
+      return;
+    }
+  }
+  if (count >= ICE_TILE_CAP) {
+    const oldest = w.fluids.find((tile) => tile.kind === 'ice');
+    if (oldest) oldest.expiresAt = w.now;
+  }
+  spawnFluidTile(w, x, y, 'ice');
+  const tile = w.fluids[w.fluids.length - 1]!;
+  tile.maxRadius = FLUID_MAX_RADIUS.ice * scale;
+  tile.radius = tile.maxRadius * 0.3;
+}
+
+/** Whether a point is on icy ground. Cheap when there is no ice (the common case). */
+function onIceAt(w: World, x: number, y: number): boolean {
+  for (const tile of w.fluids) {
+    if (tile.kind === 'ice' && dist2(x, y, tile.x, tile.y) <= tile.radius * tile.radius) return true;
+  }
+  return false;
 }
 
 function igniteFluidTile(w: World, tile: FluidTile) {
@@ -7580,7 +7660,16 @@ function updateBreakables(w: World, dt: number) {
       resolveMovingPropCollisions(w, b);
       resolvePropArenaWalls(w, b);
       damageEnemiesFromMovingProp(w, b, previousX, previousY);
-      const friction = b.chainActive ? Math.max(b.friction, PROP_CHAIN_FRICTION) : b.friction;
+      let friction = b.chainActive ? Math.max(b.friction, PROP_CHAIN_FRICTION) : b.friction;
+      if (w.fluids.length > 0 && friction < ICE_PROP_FRICTION && onIceAt(w, b.x, b.y)) friction = ICE_PROP_FRICTION;
+      if (b.kind === 'ice-block') {
+        const speedNow = Math.hypot(b.vx, b.vy);
+        if (speedNow >= ICE_TRAIL_MIN_SPEED && w.now >= (b.nextTrailAt ?? 0)) {
+          b.nextTrailAt = w.now + 70;
+          spawnIceTrail(w, b.x, b.y, 0.75);
+          if (w.rng() < 0.5) spawnParticles(w, b.x, b.y, '#d8f3ff', 1, 40);
+        }
+      }
       b.vx *= Math.pow(friction, dt * 60);
       b.vy *= Math.pow(friction, dt * 60);
       if (Math.hypot(b.vx, b.vy) < PROP_CHAIN_STOP_SPEED) {
@@ -7701,9 +7790,12 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
     p.vx = p.dashDirectionX * DASH_SPEED;
     p.vy = p.dashDirectionY * DASH_SPEED;
   } else {
-    p.vx = nx * speed;
-    p.vy = ny * speed;
+    // On ice the player keeps their momentum and only slowly turns toward where they steer.
+    const slip = slipVelocity(p, nx * speed, ny * speed, dt, w.fluids.length > 0 && onIceAt(w, p.x, p.y));
+    p.vx = slip.x;
+    p.vy = slip.y;
   }
+  if (dashing) { p.slipVx = undefined; p.slipVy = undefined; }
   const previousX = p.x;
   const previousY = p.y;
   p.x += p.vx * dt;
@@ -9269,8 +9361,14 @@ function updateEnemies(w: World, dt: number) {
       moveY /= l;
     }
 
-    enemy.x += moveX * speed * dt;
-    enemy.y += moveY * speed * dt;
+    if (w.fluids.length > 0 || enemy.slipVx !== undefined) {
+      const slip = slipVelocity(enemy, moveX * speed, moveY * speed, dt, onIceAt(w, enemy.x, enemy.y));
+      enemy.x += slip.x * dt;
+      enemy.y += slip.y * dt;
+    } else {
+      enemy.x += moveX * speed * dt;
+      enemy.y += moveY * speed * dt;
+    }
     applyKnockback(enemy, dt);
     for (const b of enemyMoveBreakables) {
       if (b.broken || w.now < b.nextEnemyImpactAt) continue;

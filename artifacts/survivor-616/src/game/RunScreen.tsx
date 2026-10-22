@@ -1311,6 +1311,11 @@ export function RunScreen({
     return () => cancelAnimationFrame(raf);
   }, [setPhaseBoth]);
 
+  // Dev builds expose the live world so visual checks can stage scenes (stripped from production builds).
+  useEffect(() => {
+    if (import.meta.env.DEV) (window as unknown as { __world?: World | null }).__world = worldRef.current;
+  }, []);
+
   // Safety net: if the closing screen is still up long after it should have handed over, offer a way out.
   const tr = useT();
   const [overStuck, setOverStuck] = useState(false);

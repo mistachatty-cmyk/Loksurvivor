@@ -1268,6 +1268,10 @@ export interface ObstacleDef {
      | 'digi-arch'
      /** Rapid pressure wing: reinforced emergency-pressure room seal. */
      | 'pressure-door'
+     /** A fixed, breakable pane of glass: cracks in stages under hits and shatters into shards. */
+     | 'glass-block'
+     /** A slick, heavy block of ice: slides far when shoved, leaves an icy trail that makes walkers slide, and shatters into frost. */
+     | 'ice-block'
      /** Page overlay only: a DOM element on a live web page, standing in as a fixed, breakable block. */
      | 'page-block' | 'map-prop';
   /** Detailed map-pack artwork shared by the editor and live renderer. */
