@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 145,
+      "version": "0.42.6",
+      "date": "2026-10-22",
+      "publishedAt": "2026-10-22T14:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Discs In The Rain",
+      "body": [
+        "The floating Lokifed discs now show on the Outside the hideout screen by default. Tap the middle disc to play it. If you want the plain rain scene back, turn it off in Settings."
+      ]
+    },
+    {
       "number": 144,
       "version": "0.42.5",
       "date": "2026-10-22",
