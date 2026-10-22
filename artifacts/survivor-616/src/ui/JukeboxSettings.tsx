@@ -5,7 +5,7 @@ import { useMusicPlayer, formatTime } from '@/game/audio/musicPlayer';
 import { useMeta } from '@/game/state/metaStore';
 import { DISC_PULSE_LEVELS, readDiscPulse, writeDiscPulse, type DiscPulseLevel } from '@/lib/discPulse';
 import { useT } from '@/lib/i18n';
-import { readTheaterMix, writeTheaterMix } from '@/lib/jukeboxPrefs';
+import { REACTIVE_BG_LEVELS, readReactiveBg, readTheaterMix, writeReactiveBg, writeTheaterMix, type ReactiveBgLevel } from '@/lib/jukeboxPrefs';
 import { ArrivalDiscsToggle } from './ArrivalDiscsToggle';
 
 const ON = 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100';
@@ -32,6 +32,7 @@ export function JukeboxSettings({ onOpenScreen }: { onOpenScreen?: (id: string) 
   const player = useMusicPlayer();
   const [pulse, setPulse] = useState<DiscPulseLevel>(readDiscPulse);
   const [mix, setMix] = useState(readTheaterMix);
+  const [bg, setBg] = useState<ReactiveBgLevel>(readReactiveBg);
   const roomOpen = unlockedRooms.some((room) => room.id === 'jukebox-room');
 
   return (
@@ -72,6 +73,37 @@ export function JukeboxSettings({ onOpenScreen }: { onOpenScreen?: (id: string) 
                 {t(`settings.jukebox.pulse.${level}` as never)}
               </button>
             ))}
+          </Row>
+
+          <Row title={t('settings.jukebox.bg')} body={t('settings.jukebox.bgBody')}>
+            {REACTIVE_BG_LEVELS.map((level) => (
+              <button
+                key={level} type="button" aria-pressed={bg === level}
+                onClick={() => { writeReactiveBg(level); setBg(level); }}
+                className={`border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${bg === level ? ON : OFF}`}
+                data-testid={`button-reactive-bg-${level}`}
+              >
+                {t(`settings.jukebox.pulse.${level}` as never)}
+              </button>
+            ))}
+          </Row>
+
+          <Row title={t('settings.jukebox.autoplay')} body={t('settings.jukebox.autoplayBody')}>
+            <button type="button" aria-pressed={player.autoStart} onClick={() => player.setAutoStart(!player.autoStart)} className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${player.autoStart ? ON : OFF}`} data-testid="button-jukebox-autoplay">
+              {player.autoStart ? 'On' : 'Off'}
+            </button>
+          </Row>
+
+          <Row title={t('settings.jukebox.shuffle')} body={t('settings.jukebox.shuffleBody')}>
+            <button type="button" aria-pressed={player.shuffle} onClick={player.toggleShuffle} className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${player.shuffle ? ON : OFF}`} data-testid="button-jukebox-shuffle">
+              {player.shuffle ? 'On' : 'Off'}
+            </button>
+          </Row>
+
+          <Row title={t('settings.jukebox.repeat')} body={t('settings.jukebox.repeatBody')}>
+            <button type="button" onClick={player.cycleRepeat} className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${player.repeat === 'off' ? OFF : ON}`} data-testid="button-jukebox-repeat">
+              {t(`settings.jukebox.repeat.${player.repeat}` as never)}
+            </button>
           </Row>
 
           <Row title={t('settings.jukebox.theater')} body={t('settings.jukebox.theaterBody')}>

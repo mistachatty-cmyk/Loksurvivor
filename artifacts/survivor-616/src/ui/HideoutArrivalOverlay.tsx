@@ -18,6 +18,8 @@ import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience
 import { weatherClass } from '@/game/data/hideout';
 import type { CharacterDef, HideoutSceneDef, SpritePalette } from '@/game/types';
 import { readArrivalDiscsEnabled } from '@/lib/arrivalDiscs';
+import { readReactiveBg } from '@/lib/jukeboxPrefs';
+import { ReactiveBackdrop } from './ReactiveBackdrop';
 import { armDiscGuard, resetDiscGuard } from '@/lib/discGuard';
 import { useT } from '@/lib/i18n';
 import { optionalImport } from '@/lib/optionalChunk';
@@ -58,6 +60,7 @@ export function HideoutArrivalOverlay({
   // After two bad visits the discs stay off, but the player can try them again (in the lightest mode) from here.
   const [retryDiscs, setRetryDiscs] = useState(false);
   const wantsDiscs = readArrivalDiscsEnabled();
+  const [bgLevel] = useState(readReactiveBg);
   const discsEnabled = wantsDiscs && (!discSafety.off || retryDiscs);
   const discsPaused = wantsDiscs && discSafety.off && !retryDiscs;
 
@@ -112,6 +115,7 @@ export function HideoutArrivalOverlay({
         <div className="hideout-sky-glow" />
         <div className="hideout-weather-particles" />
       </div>
+      {discsEnabled ? <ReactiveBackdrop level={bgLevel} color={scene.homeAccent} /> : null}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/80" aria-hidden="true" />
 
       {discsEnabled ? (

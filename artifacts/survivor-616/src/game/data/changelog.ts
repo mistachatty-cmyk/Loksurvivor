@@ -1822,6 +1822,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Jukebox Room has Music library and Music settings buttons in its top left. A tab left open across an update now recovers with one reload more reliably.',
     ],
   },
+  {
+    version: '0.42.22',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T00:01:30Z',
+    kind: 'update',
+    title: 'Reactive Backgrounds & Random Play',
+    body: [
+      'New Reactive background setting (Off, Soft or Full): the Jukebox Room and the arrival screen now glow and breathe with the music. Soft is gentler and lighter on phones.',
+      'The Jukebox & soundtracks settings now also hold Autoplay, Random order (shuffle, remembered between visits) and Repeat, so you can set up the music without opening the player.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
