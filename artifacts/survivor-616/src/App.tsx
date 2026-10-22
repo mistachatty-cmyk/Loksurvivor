@@ -83,6 +83,7 @@ import { SETTINGS_FOCUS_KEY } from '@/lib/jukeboxPrefs';
 import { CrashRecoveryPrompt } from '@/ui/CrashRecoveryPrompt';
 import { MenuDock } from '@/ui/MenuDock';
 import { readSelectedMap } from '@/lib/selectedMap';
+import { readTutorialDone, writeTutorialDone } from '@/lib/tutorial';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
 import { RunSetupScreen } from '@/ui/RunSetupScreen';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
@@ -143,7 +144,7 @@ type Screen =
   | { name: 'arena-join'; initialCode?: string }
   | { name: 'arena'; area: AreaDef; seats: ArenaSeat[]; net?: ArenaNetRole }
   | { name: 'run-setup'; areaId?: string; challengeIds?: string[]; episodeId?: string; missionId?: string; destination: 'run' | 'hub' }
-  | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string; missionId?: string }
+  | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string; missionId?: string; tutorial?: boolean }
   | { name: 'summary'; result: RunResult };
 
 /** A choice event waiting on the player (from a trigger, a prop or the "something is happening" chip). */
@@ -213,7 +214,7 @@ function initialScreen(): Screen {
     const params = new URLSearchParams(window.location.search);
     const requested = params.get('screen');
     const areaId = params.get('area');
-    if (requested === 'run' && areaId) return { name: 'run', areaId };
+    if (requested === 'run' && areaId) return { name: 'run', areaId, ...(params.get('tutorial') === '1' ? { tutorial: true } : {}) };
     if (requested === 'summary' && params.get('fixture') === 'lokpet-archive') {
       return { name: 'summary', result: createLokPetArchiveFixtureResult() };
     }
@@ -586,9 +587,19 @@ function Game() {
       return (
         <StarterLokPetEncounter
           onEnterHideout={() => {
+            writeTutorialDone();
             enterHideout();
             setScreen({ name: 'card-shop' });
           }}
+          onStartTutorial={
+            readTutorialDone()
+              ? undefined
+              : () => {
+                  // First real match: Monroe Strip with guided cards, at high quality.
+                  enterHideout();
+                  setScreen({ name: 'run', areaId: 'monroe-strip', challengeIds: [], tutorial: true });
+                }
+          }
         />
       );
 
@@ -827,8 +838,16 @@ function Game() {
               startingWeaponLevel={startingWeaponLevel(meta)}
               utilityRewardMultiplier={rewardCredMultiplier(meta)}
               physicsObjectClicksEnabled={meta.physicsObjectClicksEnabled}
-              onAbort={goHub}
-              onFinish={handleFinish}
+              tutorial={screen.tutorial}
+              onTutorialDone={writeTutorialDone}
+              onAbort={() => {
+                if (screen.tutorial) writeTutorialDone();
+                goHub();
+              }}
+              onFinish={(result) => {
+                if (screen.tutorial) writeTutorialDone();
+                handleFinish(result);
+              }}
             />
           </Suspense>
         );

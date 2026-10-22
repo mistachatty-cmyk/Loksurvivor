@@ -35,6 +35,8 @@ import { getFirstNightChapter } from '@/game/data/firstNight';
 import { getBuildingEntryStyle } from '@/game/state/buildingEntrySetting';
 import { nextRescueAllyId } from '@/game/data/progression';
 import { createRunHighlightRecorder } from '@/game/data/runHighlights';
+import { RunTutorial } from '@/ui/RunTutorial';
+import { LokLightHint } from '@/ui/LokLightHint';
 import { createClipRecorder } from '@/game/media/clipRecorder';
 import { beaconsOf, customMapToArea, objectiveMarkersOf, spawnPointsOf } from '@/game/data/customMaps';
 import { CUSTOM_MAP_ASSETS_BY_ID } from '@/game/data/customMaps';
@@ -152,6 +154,9 @@ export interface RunScreenProps {
   areaOverride?: AreaDef;
   /** Sector Command: plays this mission on its authored map. */
   missionId?: string;
+  /** First-match tutorial: guided cards over the fight, at high graphics quality. */
+  tutorial?: boolean;
+  onTutorialDone?: () => void;
   onAbort: () => void;
   onFinish: (result: RunResult) => void;
 }
@@ -227,6 +232,8 @@ export function RunScreen({
   episodeId,
   areaOverride,
   missionId,
+  tutorial = false,
+  onTutorialDone,
   onAbort,
   onFinish,
 }: RunScreenProps) {
@@ -238,6 +245,11 @@ export function RunScreen({
   const music = useMusicPlayer();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [tutorialOver, setTutorialOver] = useState(false);
+  const endTutorial = useCallback(() => {
+    setTutorialOver(true);
+    onTutorialDone?.();
+  }, [onTutorialDone]);
   const worldRef = useRef<World | null>(null);
   const highlightRecorderRef = useRef(createRunHighlightRecorder());
   const clipRecorderRef = useRef(createClipRecorder(() => canvasRef.current));
@@ -459,7 +471,7 @@ export function RunScreen({
           };
         }),
         modifiers: meta.runModifiers,
-        graphicsQuality: meta.graphicsQuality,
+        graphicsQuality: tutorial ? 'high' : meta.graphicsQuality,
         dropStyle: getDropStyle(meta.activeDropPackId),
         riderSaddle: meta.lokShopPerks.includes('rider-saddle'),
         damageNumberStyle: meta.damageNumberStyle,
@@ -1514,6 +1526,8 @@ export function RunScreen({
       className="relative h-dvh w-full overflow-hidden bg-black select-none"
       style={{
         transform: chaosTransform || undefined,
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
         filter: meta.paletteInvertEnabled ? 'invert(1)' : undefined,
         animation: hud?.wheelSpin?.colorFluctuation ? 'hordespin-hue 2.2s linear infinite' : undefined,
       }}
@@ -1524,6 +1538,8 @@ export function RunScreen({
       <canvas ref={canvasRef} onWheel={handleCanvasWheel} className="absolute inset-0 h-full w-full" />
 
       {/* Fires on level change only, never on mount -- loading a run mid-level stays quiet. The one full-screen effect in the game. */}
+      <LokLightHint worldRef={worldRef} />
+      {tutorial && !tutorialOver ? <RunTutorial worldRef={worldRef} onDone={endTutorial} /> : null}
       <LevelUpFlash level={hud?.level ?? 1} />
       <LevelUpAnnouncement level={hud?.level ?? 1} />
 

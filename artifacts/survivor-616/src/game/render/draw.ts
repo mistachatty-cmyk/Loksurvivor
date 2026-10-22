@@ -1497,6 +1497,11 @@ const TIME_OF_DAY_STOPS: Array<[number, [number, number, number, number]]> = [
   [1, [10, 14, 40, 0.16]],
 ];
 
+/** How dark the time-of-day tint is right now, 0 (full day) to about 0.4 (deep night). */
+export function timeOfDayDarkness(phase: number): number {
+  return Number(timeOfDayTint(phase).split(',')[3]?.replace(')', '') ?? 0) || 0;
+}
+
 function timeOfDayTint(phase: number): string {
   const clamped = clamp(phase, 0, 1);
   let a = TIME_OF_DAY_STOPS[0]!;
@@ -6231,7 +6236,8 @@ function drawActors(
       SPRITE_SCALE * sizeClassScale(enemy.def) * (enemy.radius / enemy.baseRadius) * (1 - fallProgress * 0.72) * musicVisual(w, enemy.def.react, 'scale'),
       {
         direction: studioDirection(enemy.vx, enemy.vy, enemy.facing),
-        flash: w.now < enemy.hitFlashUntil,
+        // In a packed crowd every enemy flashing white at once blots the screen out, so only a third of them flash.
+        flash: w.now < enemy.hitFlashUntil && (w.enemies.length < 45 || enemy.uid % 3 === 0),
         outline: outlineEnemies || enemy.def.family === 'Boss' || enemy.def.sizeClass === 'giant',
         dissolve,
         tint: stoned
