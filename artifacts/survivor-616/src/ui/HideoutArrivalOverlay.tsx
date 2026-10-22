@@ -11,13 +11,18 @@
  * effect stays off for as long as this overlay is mounted (see its
  * `showArrival` guard) so the two never run at once.
  */
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
 import { weatherClass } from '@/game/data/hideout';
 import type { CharacterDef, HideoutSceneDef, SpritePalette } from '@/game/types';
+import { readArrivalDiscsEnabled } from '@/lib/arrivalDiscs';
 import { RigPortrait } from './RigPortrait';
+
+// Opt-in floating CDs (Settings, or `?arrivalDiscs`). Lazy so the carousel is
+// never part of the first-load bundle for anyone who has it off.
+const ArrivalDiscShelf = lazy(() => import('./ArrivalDiscShelf'));
 
 export interface HideoutArrivalOverlayProps {
   character: CharacterDef;
@@ -42,6 +47,7 @@ export function HideoutArrivalOverlay({
 }: HideoutArrivalOverlayProps) {
   const ambienceRef = useRef<AmbienceHandle | null>(null);
   const [entering, setEntering] = useState(false);
+  const [discsEnabled] = useState(readArrivalDiscsEnabled);
 
   useEffect(() => {
     if (!ambienceEnabled) return;
@@ -90,6 +96,19 @@ export function HideoutArrivalOverlay({
         <div className="hideout-weather-particles" />
       </div>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/80" aria-hidden="true" />
+
+      {discsEnabled ? (
+        <div
+          className={`absolute inset-x-0 top-[5dvh] z-[5] h-[54dvh] transition-opacity duration-500 ${
+            entering ? 'opacity-0' : 'opacity-100'
+          }`}
+          data-testid="arrival-disc-shelf"
+        >
+          <Suspense fallback={null}>
+            <ArrivalDiscShelf />
+          </Suspense>
+        </div>
+      ) : null}
 
       <motion.div
         initial={{ opacity: 0, y: 12 }}

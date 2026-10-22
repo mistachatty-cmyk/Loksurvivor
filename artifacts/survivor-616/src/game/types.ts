@@ -1338,7 +1338,7 @@ export interface AreaDef {
   hostileEntries?: Array<{ x: number; y: number }>;
   /** Placed supplies and interactive set pieces. */
   mapPickups?: Array<{ id: string; kind: string; x: number; y: number; value?: number }>;
-  mapInteractables?: Array<{ id: string; kind: 'relay' | 'root-anchor' | 'cache' | 'plate' | 'coil'; x: number; y: number; w: number; h: number }>;
+  mapInteractables?: Array<{ id: string; kind: 'relay' | 'root-anchor' | 'cache' | 'plate' | 'coil' | 'arcade-box'; x: number; y: number; w: number; h: number }>;
   mapFeature?: 'fractured-616' | 'glassroot-shrine';
   /** Overhead conditions; defaults to 'clear' when omitted. */
   sky?: AreaSky;
@@ -1469,7 +1469,7 @@ export interface CustomMapAsset {
   /** Map pack props use one physics kind and choose artwork by this id. */
   artAssetId?: string;
   pickupKind?: string;
-  interactableKind?: 'relay' | 'root-anchor' | 'cache' | 'plate' | 'coil';
+  interactableKind?: 'relay' | 'root-anchor' | 'cache' | 'plate' | 'coil' | 'arcade-box';
   defaultMode?: CustomMapPlacement['mode'];
 }
 
@@ -1645,7 +1645,7 @@ export interface DirectorRunState {
 
 /** A one-shot meta-progression announcement, drained and shown by the hub on return. See `MetaState.pendingNotifications`. */
 /** A hideout panel a room tile or prop can open. */
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'locker' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'grpd-armory' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher' | 'frog-ranch' | 'lok-shop';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'locker' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'grpd-armory' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher' | 'frog-ranch' | 'lok-shop' | 'jukebox';
 
 /** Today's hideout payouts (local day), see `engine/hideoutRewards.ts`. */
 export interface HideoutLedger {
@@ -2076,7 +2076,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'director-terminal' | 'lok-shop'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'director-terminal' | 'lok-shop' | 'jukebox'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';

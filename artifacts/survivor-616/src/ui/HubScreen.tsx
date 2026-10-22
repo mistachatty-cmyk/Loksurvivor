@@ -112,6 +112,7 @@ const PANEL_CONFIG: Record<HubPanel, { icon: any; testId: string }> = {
   workshop: { icon: Hammer, testId: 'button-open-workshop' },
   'card-shop': { icon: CreditCard, testId: 'button-open-card-shop' },
   'weapon-bans': { icon: Clapperboard, testId: 'button-open-weapon-bans' },
+  jukebox: { icon: Disc3, testId: 'button-open-jukebox' },
   'grpd-armory': { icon: ShieldCheck, testId: 'button-open-grpd-armory' },
   settings: { icon: Settings2, testId: 'button-open-settings' },
   'palette-store': { icon: Palette, testId: 'button-open-palette-store' },

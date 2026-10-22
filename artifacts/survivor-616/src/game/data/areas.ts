@@ -353,6 +353,8 @@ export const AREAS: AreaDef[] = [
     threat: 'severe',
     rescueAllyId: 'otis',
     discoveryId: 'arcade-high-score',
+    // The Arcade Box. With the High Score it opens the Jukebox Room.
+    mapInteractables: [{ id: 'arcade-box', kind: 'arcade-box', x: -200, y: 110, w: 48, h: 48 }],
     unlock: { kind: 'clearArea', areaId: 'old-market' },
     waves: [
       { fromSec: 0, toSec: 45, enemyId: 'pixel-wraith', ratePerSec: 1.3, burst: 2 },

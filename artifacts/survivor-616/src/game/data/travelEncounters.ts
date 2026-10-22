@@ -40,6 +40,7 @@ export const TRAVEL_ENCOUNTER_TRIGGERS: TravelEncounterTrigger[] = [
   { id: 'storefront-entry', source: 'hub-room', roomId: 'the-storefront', chance: 0.25, label: 'Someone by the Neon Sleeve wants a piece of your deck.' },
   { id: 'studio-28-entry', source: 'hub-room', roomId: 'studio-28', chance: 0.25, label: 'A figure under the Studio 28 marquee steps out of the box-office glow, looking for a scrap.' },
   { id: 'grpd-entry', source: 'hub-room', roomId: 'grpd-station', chance: 0.25, label: 'A Division St. K9 patrol unit approaches for a sudden field duel.' },
+  { id: 'jukebox-room-entry', source: 'hub-room', roomId: 'jukebox-room', chance: 0.25, label: 'Someone is leaning on the Arcade jukebox, not ready to give up the next song.' },
   { id: 'vault-entry', source: 'hub-room', roomId: 'grpd-vault', chance: 0.25, label: 'Something loose in the evidence corridor catches your scent on the way to the Vault.' },
   { id: 'shelter-entry', source: 'hub-room', roomId: 'rapid-shelter', chance: 0.25, label: 'A stray Data-Gob blocks the pressure door on the way into Rapid Shelter.' },
   { id: 'head-out', source: 'run-launch', chance: 0.25, label: 'Something crosses your path on the way out into the city.' },

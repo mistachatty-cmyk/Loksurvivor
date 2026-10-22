@@ -272,6 +272,9 @@ importers:
       '@lok/auto-l10n':
         specifier: workspace:*
         version: link:../../packages/auto-l10n
+      '@lok/jukebox':
+        specifier: workspace:*
+        version: link:../../packages/lok-jukebox
       '@lok/recap':
         specifier: workspace:*
         version: link:../../packages/recap
@@ -540,6 +543,8 @@ importers:
       '@vitalets/google-translate-api':
         specifier: ^9.2.1
         version: 9.2.1
+
+  packages/lok-jukebox: {}
 
   packages/recap:
     dependencies:
