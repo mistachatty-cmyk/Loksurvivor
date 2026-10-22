@@ -1,5 +1,9 @@
 {
   "goto.dockLabel": "메인 메뉴",
+  "dock.headOut": "밖으로 나가세요",
+  "dock.quick": "빠른",
+  "areas.selected": "선택됨",
+  "areas.tapAgain": "재생하려면 다시 탭하세요.",
   "goto.search": "검색",
   "settings.textSize.title": "텍스트 크기",
   "settings.textSize.body": "메뉴 텍스트를 더 크게 또는 더 작게 만듭니다. 전화, TV 또는 방 건너편의 아케이드 화면에서 유용합니다.",

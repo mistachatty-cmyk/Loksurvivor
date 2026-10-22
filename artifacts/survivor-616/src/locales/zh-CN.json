@@ -1,5 +1,9 @@
 {
   "goto.dockLabel": "主菜单",
+  "dock.headOut": "出发",
+  "dock.quick": "快的",
+  "areas.selected": "已选择",
+  "areas.tapAgain": "再次点击即可播放",
   "goto.search": "搜索",
   "settings.textSize.title": "文字大小",
   "settings.textSize.body": "使菜单文本变大或变小。对房间内的电话、电视或街机屏幕很有帮助。",

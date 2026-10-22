@@ -1,5 +1,9 @@
 {
   "goto.dockLabel": "メインメニュー",
+  "dock.headOut": "出かけましょう",
+  "dock.quick": "クイック",
+  "areas.selected": "選択済み",
+  "areas.tapAgain": "もう一度タップして再生します",
   "goto.search": "検索",
   "settings.textSize.title": "文字サイズ",
   "settings.textSize.body": "メニューのテキストを大きくまたは小さくします。部屋の反対側の電話、テレビ、またはアーケード画面で役立ちます。",
