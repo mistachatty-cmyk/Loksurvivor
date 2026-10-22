@@ -1728,6 +1728,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'If the game closes unexpectedly, the next time you open it Lok shows a small card with an error code and a Copy report button. The report also notes which disc you last tapped, so crashes around the Jukebox are easier to track down.',
     ],
   },
+  {
+    version: '0.42.13',
+    date: '2026-10-22',
+    publishedAt: '2026-10-22T23:50:00Z',
+    kind: 'hotfix',
+    title: 'Roomier Hideout',
+    body: [
+      'The hideout walk scene now fills the full width of a phone screen and scales its height with the screen instead of looking squished. The control buttons at the top are tighter and scroll with the page on phones, so they stop covering the screen.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
