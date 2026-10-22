@@ -15,6 +15,7 @@ import DiscCascadeCarousel from '@/components/ui/disc-cascade-carousel';
 import { beatBus } from '@/game/audio/beatBus';
 import { albumTracks, discItemFor, startingDisc } from '@/game/audio/jukeboxDiscs';
 import { formatTime, useMusicPlayer } from '@/game/audio/musicPlayer';
+import { armDiscGuard, watchDiscGuard } from '@/lib/discGuard';
 import { useT } from '@/lib/i18n';
 import { useTheaterLevel } from '@/lib/useTheaterLevel';
 
@@ -39,6 +40,8 @@ export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
   const { tracks, currentTrack, isPlaying, playTrack, togglePlay, next, previous, seek, progressSec, durationSec, setTheaterTone } = music;
   const [theaterMix, setTheaterMix] = useState(readMix);
   const { level, wake } = useTheaterLevel({ paused: !isPlaying, theaterMix });
+  const [safety] = useState(armDiscGuard);
+  useEffect(() => watchDiscGuard(), []);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const glowRef = useRef<HTMLDivElement | null>(null);
   const vigRef = useRef<HTMLDivElement | null>(null);
@@ -171,6 +174,7 @@ export default function JukeboxRoom({ onClose }: JukeboxRoomProps) {
             items={items}
             index={current}
             loop
+            lite={safety.lite}
             height="58dvh"
             discSize="clamp(170px, 50vw, 340px)"
             background="transparent"

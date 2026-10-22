@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { readArrivalDiscsSetting, writeArrivalDiscsSetting } from '@/lib/arrivalDiscs';
+import { resetDiscGuard } from '@/lib/discGuard';
 import { useT } from '@/lib/i18n';
 
 /** Settings row for the opt-in floating-CD shelf on the arrival screen. */
@@ -19,6 +20,7 @@ export function ArrivalDiscsToggle() {
           type="button"
           onClick={() => {
             writeArrivalDiscsSetting(!on);
+            if (!on) resetDiscGuard();
             setOn(!on);
           }}
           aria-pressed={on}
