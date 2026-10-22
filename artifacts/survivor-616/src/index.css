@@ -1227,3 +1227,82 @@ body:has(.supporter-bar--inline) .supporter-bar:not(.supporter-bar--inline) { di
 
 /* Hidden while the hideout arrival scene or the photosensitivity notice is up. */
 body[data-hide-dock] [data-testid='menu-dock'] { display: none; }
+
+/* Cheat-code Easter eggs: transform/opacity only, one fixed layer, never wraps game UI. */
+.cheatfx { position: fixed; inset: 0; z-index: 400; pointer-events: none; overflow: hidden; }
+.cheatfx-piece { position: absolute; top: -24px; border-radius: 1px; opacity: 0; animation: cheatfx-fall 2.6s cubic-bezier(.3,.6,.5,1) forwards; }
+@keyframes cheatfx-fall {
+  0% { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate3d(var(--cf-drift, 0px), 105dvh, 0) rotate(540deg); }
+}
+.cheatfx-disco {
+  position: absolute; inset: 0; opacity: 0;
+  background: conic-gradient(from 0deg at 50% 40%, rgba(34,211,238,.35), rgba(232,121,249,.35), rgba(250,204,21,.3), rgba(34,197,94,.3), rgba(34,211,238,.35));
+  animation: cheatfx-disco 1.4s ease-in-out 5 both;
+}
+.cheatfx-disco[data-reduced] { animation: none; opacity: .18; }
+@keyframes cheatfx-disco {
+  0%, 100% { opacity: 0; transform: rotate(0deg) scale(1.4); }
+  50% { opacity: .75; transform: rotate(40deg) scale(1.4); }
+}
+.cheatfx-616 {
+  position: absolute; left: 50%; top: 42%; font-weight: 900; font-size: min(34vw, 220px); letter-spacing: .05em; color: #fff;
+  text-shadow: 0 0 30px rgba(34,211,238,.9), 0 0 70px rgba(232,121,249,.7); opacity: 0;
+  animation: cheatfx-616 2.4s ease-out forwards;
+}
+@keyframes cheatfx-616 {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.6); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -60%) scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce) { .cheatfx-piece, .cheatfx-616 { animation-duration: .01s; } }
+
+/* Notification toast: a thin bar that drains while the toast waits, so the timing is visible. */
+.toast-timer { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; transform-origin: left; background: hsl(var(--primary) / .75); animation: toast-drain linear forwards; }
+@keyframes toast-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* Menu refresh: one shared lift for every ScreenLayout page (soft glow, rounded glass panels, bouncy cards). */
+.menu-fresh-glow {
+  position: absolute; inset: 0 0 auto 0; height: 340px; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(60% 100% at 18% 0%, hsl(var(--primary) / .20), transparent 70%),
+    radial-gradient(50% 90% at 90% 0%, hsl(var(--accent, var(--primary)) / .12), transparent 70%);
+}
+.menu-fresh-title { position: relative; letter-spacing: -.01em; }
+.menu-fresh-title::after {
+  content: ''; display: block; width: 3.5rem; height: 3px; margin-top: .6rem; border-radius: 3px;
+  background: linear-gradient(90deg, hsl(var(--primary)), transparent);
+  transform-origin: left; animation: menu-fresh-underline .6s cubic-bezier(.34, 1.56, .64, 1) both;
+}
+@keyframes menu-fresh-underline { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.menu-fresh main :is(section, article, aside)[class~="border-border"] {
+  border-radius: 14px;
+  background-image: linear-gradient(160deg, hsl(var(--primary) / .07), transparent 45%);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .05), 0 14px 32px -22px rgba(0, 0, 0, .85);
+  transition: transform .32s cubic-bezier(.34, 1.56, .64, 1), border-color .18s ease, box-shadow .18s ease;
+}
+@media (hover: hover) {
+  .menu-fresh main article[class~="border-border"]:hover { transform: translateY(-3px) scale(1.01); border-color: hsl(var(--primary) / .55); }
+}
+.menu-fresh main article[class~="border-border"]:active { transform: scale(.985); }
+.menu-fresh main :is(section, article, aside)[class~="border-border"] button[class*="border"] {
+  border-radius: 8px;
+  transition: transform .28s cubic-bezier(.34, 1.56, .64, 1), background-color .15s ease, border-color .15s ease;
+}
+.menu-fresh main :is(section, article, aside)[class~="border-border"] button[class*="border"]:active:not(:disabled) { transform: scale(.94); }
+/* Cards pop in one after another. */
+.menu-fresh main article[class~="border-border"] { animation: menu-fresh-pop .45s cubic-bezier(.34, 1.56, .64, 1) both; }
+.menu-fresh main article[class~="border-border"]:nth-child(2) { animation-delay: .04s; }
+.menu-fresh main article[class~="border-border"]:nth-child(3) { animation-delay: .08s; }
+.menu-fresh main article[class~="border-border"]:nth-child(4) { animation-delay: .12s; }
+.menu-fresh main article[class~="border-border"]:nth-child(n+5) { animation-delay: .16s; }
+@keyframes menu-fresh-pop { from { opacity: 0; transform: translateY(10px) scale(.94); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .menu-fresh main article[class~="border-border"], .menu-fresh-title::after { animation: none; }
+}
+
+/* Sound Booth preview bars. */
+.sbooth-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 16px; }
+.sbooth-bars i { width: 3px; height: 100%; border-radius: 2px; background: hsl(var(--sb-hue, 200) 85% 62%); transform-origin: bottom; animation: sbooth-eq .5s ease-in-out infinite alternate; }
+@keyframes sbooth-eq { from { transform: scaleY(.25); } to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .sbooth-bars i { animation: none; transform: scaleY(.7); } }

@@ -1918,6 +1918,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Fixed the Share button count and the tutorial step counter showing raw placeholders.',
     ],
   },
+  {
+    version: '0.42.30',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T00:20:00Z',
+    kind: 'update',
+    title: 'Cheat Bar and Bouncy Menus',
+    body: [
+      'Fixed the "Block cleared" screen freezing at the end of a match: the hand-off to the results could be postponed forever while the app was busy, and any hiccup while saving the result could strand you there. It now always hands over, and a Back to hideout button appears if it ever does not.',
+      'Notifications now drop in at the top of the screen, under the notch, with a springy bounce and a draining timer. Only three show at once, each one keeps its own timer, and anything that expires or is tapped away is filed in the Mailbox.',
+      'Menus got a quick refresh: a soft glow behind each page title, rounded glassy panels, cards that pop in one after another and bounce when you press them, and a livelier Sound Booth with a colour strip per pack and dancing bars while a pack previews.',
+      'A hidden Cheat bar now exists for testers. Dev Mode stays locked until the secret phrase is typed into LOK Chat. After that the Cheat bar (in LOK Chat and Settings) can grant any resource, open or relock every unlock, and play a few Easter eggs, which anyone can also trigger by typing confetti, disco, 616 or konami in LOK Chat.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
