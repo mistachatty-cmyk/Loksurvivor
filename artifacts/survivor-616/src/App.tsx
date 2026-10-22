@@ -80,7 +80,6 @@ import { getFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
 import { GoToPalette } from '@/ui/GoToPalette';
 import { setCrashScreen } from '@/lib/lokCrash';
 import { CrashRecoveryPrompt } from '@/ui/CrashRecoveryPrompt';
-import { ThemeCycleButton } from '@/ui/ThemeCycleButton';
 import { MenuDock } from '@/ui/MenuDock';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
 import { RunSetupScreen } from '@/ui/RunSetupScreen';
@@ -831,7 +830,6 @@ function Game() {
             className="fixed right-[max(0.75rem,var(--safe-right))] top-[max(0.75rem,var(--safe-top))] z-[110] flex items-center gap-1.5"
             data-testid="global-looks-cluster"
           >
-            <ThemeCycleButton />
             <button type="button" onClick={openLooks} aria-label="Looks & LokPets" className="inline-flex min-h-11 min-w-11 active:scale-95 items-center justify-center gap-2 border border-cyan-200/35 bg-slate-950/85 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-xl backdrop-blur transition hover:border-cyan-100" data-testid="button-global-looks-lokpets"><Sparkles className="h-4 w-4 text-cyan-200" /><span className="hidden sm:inline">Looks & LokPets</span></button>
           </div>
         )}

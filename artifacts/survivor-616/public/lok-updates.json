@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 158,
+      "version": "0.42.19",
+      "date": "2026-10-22",
+      "publishedAt": "2026-10-22T23:59:58Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Quick Look Switch",
+      "body": [
+        "The quick look switch is back in the bottom left of the title screen: tap the dice to roll to the next look. The extra palette button beside Looks & LokPets was removed."
+      ]
+    },
+    {
       "number": 157,
       "version": "0.42.18",
       "date": "2026-10-22",
