@@ -1995,6 +1995,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Prefer the old look? Settings has New UI and Classic corners. Classic keeps the separate corner buttons and the level-up panels exactly as they were.',
     ],
   },
+  {
+    version: '0.42.36',
+    date: '2026-10-23',
+    publishedAt: '2026-10-23T11:30:00Z',
+    kind: 'update',
+    title: 'Locked-down build',
+    body: [
+      'Behind-the-scenes hardening. Nothing about how the game plays changed.',
+      'The secret phrases that unlock Dev Mode and the cheat bar are no longer stored as readable words in the game files. They are checked by a one-way scramble instead, so searching the shipped files turns up nothing.',
+      'The build now publishes no source maps and strips every comment, and a new check fails the build if either ever comes back.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
