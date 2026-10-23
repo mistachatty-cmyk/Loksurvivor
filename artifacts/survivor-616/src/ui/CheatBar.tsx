@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { Terminal } from 'lucide-react';
 
-import { CHEAT_CODES, primaryPhrase, type CheatGroup } from '@/game/data/cheatCodes';
+import { CHEAT_CODES, type CheatGroup } from '@/game/data/cheatCodes';
 import { useT } from '@/lib/i18n';
 import { useCheats } from './useCheats';
 
@@ -17,17 +17,17 @@ const GROUPS: { id: CheatGroup; labelKey: 'cheat.group.resources' | 'cheat.group
 
 export function CheatBar({ compact = false }: { compact?: boolean }) {
   const t = useT();
-  const { run, devAccess } = useCheats();
+  const { run, runCode, devAccess } = useCheats();
   const [draft, setDraft] = useState('');
   const [note, setNote] = useState('');
 
   if (!devAccess) return null;
 
-  const submit = (text: string) => {
-    const outcome = run(text);
+  const show = (outcome: { handled: boolean; message: string }) => {
     setNote(outcome.handled ? outcome.message : t('cheat.unknown'));
     if (outcome.handled) setDraft('');
   };
+  const submit = (text: string) => show(run(text));
 
   return (
     <div className="border border-cyan-300/30 bg-black/40 p-3" data-testid="cheat-bar">
@@ -61,11 +61,11 @@ export function CheatBar({ compact = false }: { compact?: boolean }) {
                   <button
                     key={code.id}
                     type="button"
-                    onClick={() => submit(primaryPhrase(code))}
+                    onClick={() => show(runCode(code))}
                     data-testid={`cheat-chip-${code.id}`}
                     className="border border-white/15 bg-white/5 px-2 py-1 font-mono text-[11px] text-white/85 hover:border-cyan-200/60"
                   >
-                    {primaryPhrase(code)}
+                    {code.id}
                   </button>
                 ))}
               </div>

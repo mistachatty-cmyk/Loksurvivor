@@ -31,10 +31,14 @@ export default defineConfig(async () => ({
     },
     dedupe: ['react', 'react-dom'],
   },
+  // Strip every comment (licence banners included) and debugger statement from the shipped code.
+  esbuild: { legalComments: 'none' as const, drop: ['debugger' as const] },
   root: path.resolve(import.meta.dirname),
   build: {
     outDir: path.resolve(import.meta.dirname, 'dist/public'),
     emptyOutDir: true,
+    // Private build: never publish source maps, so the shipped files stay minified and unreadable.
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks: {

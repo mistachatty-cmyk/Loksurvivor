@@ -29,10 +29,8 @@ export function useCheats() {
   const { meta, unlockDevModeAccess, cheatGrant, setDevModeAllUnlocks } = useMeta();
   const devAccess = meta.devModeAccessUnlocked;
 
-  const run = useCallback((text: string): CheatOutcome => {
-    const resolved = resolveCheat(text, devAccess);
-    if (resolved.status !== 'ready') return { handled: false, message: '' };
-    const { effect } = resolved.code;
+  const execute = useCallback((code: CheatCodeDef): CheatOutcome => {
+    const { effect } = code;
     switch (effect.kind) {
       case 'devAccess':
         unlockDevModeAccess();
@@ -51,7 +49,17 @@ export function useCheats() {
     }
   }, [devAccess, unlockDevModeAccess, cheatGrant, setDevModeAllUnlocks, t]);
 
-  return { run, devAccess };
+  const run = useCallback((text: string): CheatOutcome => {
+    const resolved = resolveCheat(text, devAccess);
+    return resolved.status === 'ready' ? execute(resolved.code) : { handled: false, message: '' };
+  }, [devAccess, execute]);
+
+  /** Runs a code straight from its Cheat bar chip (the phrase itself is not stored in the build). */
+  const runCode = useCallback((code: CheatCodeDef): CheatOutcome => (
+    code.requiresDevAccess && !devAccess ? { handled: false, message: '' } : execute(code)
+  ), [devAccess, execute]);
+
+  return { run, runCode, devAccess };
 }
 
 export type { CheatCodeDef };

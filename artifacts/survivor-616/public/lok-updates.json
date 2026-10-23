@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 175,
+      "version": "0.42.36",
+      "date": "2026-10-23",
+      "publishedAt": "2026-10-23T11:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Locked-down build",
+      "body": [
+        "Behind-the-scenes hardening. Nothing about how the game plays changed.",
+        "The secret phrases that unlock Dev Mode and the cheat bar are no longer stored as readable words in the game files. They are checked by a one-way scramble instead, so searching the shipped files turns up nothing.",
+        "The build now publishes no source maps and strips every comment, and a new check fails the build if either ever comes back."
+      ]
+    },
+    {
       "number": 174,
       "version": "0.42.35",
       "date": "2026-10-23",
