@@ -1212,7 +1212,7 @@
   "settings.power.storage.media": "Seus arquivos",
   "settings.power.storage.total": "Este jogo, total",
   "settings.power.storage.none": "Nenhum",
-  "settings.power.storage.unknown": "Não relatado",
+  "settings.power.storage.unknown": "Desconhecido",
   "settings.power.persist": "Proteja meu save",
   "settings.power.persist.on": "Salvar está protegido",
   "settings.power.persist.done": "Feito. Seu navegador manterá esse salvamento quando o espaço acabar.",
@@ -1220,5 +1220,11 @@
   "settings.power.refresh": "Atualizar",
   "settings.power.persistBody": "A proteção pede ao navegador para não limpar os dados deste jogo se o dispositivo ficar com pouco espaço. Alguns navegadores decidem por conta própria.",
   "settings.power.network": "O que este jogo envia",
-  "settings.power.networkBody": "Apenas três coisas saem do seu dispositivo: relatórios de falhas (se ativado), o registro do tempo de reprodução (se ativado) e o link da música que você mesmo cola quando pede para reproduzir uma. Sem anúncios, sem rastreadores, sem uploads em segundo plano e nada é executado depois que você fecha o jogo."
+  "settings.power.networkBody": "Apenas três coisas saem do seu dispositivo: relatórios de falhas (se ativado), o registro do tempo de reprodução (se ativado) e o link da música que você mesmo cola quando pede para reproduzir uma. Sem anúncios, sem rastreadores, sem uploads em segundo plano e nada é executado depois que você fecha o jogo.",
+  "saveGuard.title": "Abra em duas guias",
+  "saveGuard.body": "Outra guia acabou de ser salva. Para proteger seu progresso, esta guia pausou o salvamento. Carregue o salvamento mais recente ou mantenha o que esta guia contém.",
+  "saveGuard.load": "Carregar o salvamento mais recente",
+  "saveGuard.keep": "Mantenha esta guia",
+  "settings.power.tabGuard": "Proteja meu save entre guias",
+  "settings.power.tabGuardBody": "Se o jogo estiver aberto em duas guias, a guia mais antiga pausa o salvamento e pergunta qual progresso manter, para que uma guia nunca apague o que a outra ganhou. Off permite que todas as guias sejam salvas livremente."
 }
