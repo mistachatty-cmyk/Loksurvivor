@@ -149,7 +149,7 @@ type Screen =
   | { name: 'arena-join'; initialCode?: string }
   | { name: 'arena'; area: AreaDef; seats: ArenaSeat[]; net?: ArenaNetRole }
   | { name: 'run-setup'; areaId?: string; challengeIds?: string[]; episodeId?: string; missionId?: string; destination: 'run' | 'hub' }
-  | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string; missionId?: string; tutorial?: boolean }
+  | { name: 'run'; areaId: string; challengeIds?: string[]; seed?: number; episodeId?: string; missionId?: string; tutorial?: boolean }
   | { name: 'summary'; result: RunResult };
 
 /** A choice event waiting on the player (from a trigger, a prop or the "something is happening" chip). */
@@ -736,8 +736,8 @@ function Game() {
       return (
         <AreaSelect
           onBack={goHub}
-          onLaunch={(areaId, challengeIds) =>
-            attemptTravelEncounter('run-launch', undefined, () => prepareRun({ areaId, challengeIds }))
+          onLaunch={(areaId, challengeIds, seed) =>
+            attemptTravelEncounter('run-launch', undefined, () => prepareRun({ areaId, challengeIds, seed }))
           }
         />
       );
@@ -853,12 +853,13 @@ function Game() {
         return (
           <Suspense fallback={<div className="grid min-h-dvh place-items-center bg-black font-mono text-xs uppercase tracking-[0.25em] text-blue-200">Loading block…</div>}>
             <RunScreen
-              key={`${screen.areaId}-${selectedCharacter.id}-${screen.episodeId ?? 'standard'}-${(screen.challengeIds ?? []).join('-')}`}
+              key={`${screen.areaId}-${selectedCharacter.id}-${screen.episodeId ?? 'standard'}-${(screen.challengeIds ?? []).join('-')}-${screen.seed ?? 'own'}`}
               areaId={screen.areaId}
               areaOverride={customMap ? customMapToArea(customMap) : undefined}
               missionId={screen.missionId}
               characterId={selectedCharacter.id}
               challengeIds={screen.challengeIds}
+              seed={screen.seed}
               episodeId={screen.episodeId}
               startingWeaponLevel={startingWeaponLevel(meta)}
               utilityRewardMultiplier={rewardCredMultiplier(meta)}

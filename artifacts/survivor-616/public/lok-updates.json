@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 184,
+      "version": "0.42.45",
+      "date": "2026-10-24",
+      "publishedAt": "2026-10-24T19:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Challenge codes",
+      "body": [
+        "After a run, tap Copy challenge code and send it to a friend by text, chat or on paper. On the Where tonight screen, a Challenge code box takes a code and starts that same block on that same night: same map, same waves, same loot rolls. Compare how far each of you got.",
+        "A code is just the map and the night, with a check character to catch typos. It is not stored or uploaded anywhere, and it only works for blocks you have unlocked."
+      ]
+    },
+    {
       "number": 183,
       "version": "0.42.44",
       "date": "2026-10-24",

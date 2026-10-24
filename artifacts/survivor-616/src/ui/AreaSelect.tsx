@@ -10,6 +10,7 @@ import { getFirstNightChapter } from '@/game/data/firstNight';
 import { areaCategory, type AreaCategory } from '@/game/data/areaCategories';
 import { ScreenLayout } from './ScreenLayout';
 import { FirstNightBoard } from './FirstNightBoard';
+import { ChallengeCodeBox } from './ChallengeCodeBox';
 import { motion } from 'framer-motion';
 import { MapPin, Lock, Clock, AlertTriangle, CheckCircle2, Infinity, Skull, PencilRuler, Copy, Maximize2, Compass, Layers, Sparkles, Eye } from 'lucide-react';
 import { useState } from 'react';
@@ -19,7 +20,7 @@ import { useSelectedMap, writeSelectedMap } from '@/lib/selectedMap';
 
 export interface AreaSelectProps {
   onBack: () => void;
-  onLaunch: (areaId: string, challengeIds: string[]) => void;
+  onLaunch: (areaId: string, challengeIds: string[], seed?: number) => void;
 }
 
 const THREAT_COLORS = {
@@ -112,6 +113,8 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
       <div className="mb-6">
         <FirstNightBoard />
       </div>
+
+      <ChallengeCodeBox onLaunch={(areaId, seed) => onLaunch(areaId, selectedChallengeIds, seed)} />
 
       {recommendedArea ? (
         <section className="mb-6 flex flex-col gap-3 border border-cyan-200/30 bg-cyan-950/20 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="section-recommended-map">
