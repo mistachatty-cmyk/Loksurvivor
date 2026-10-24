@@ -42,6 +42,18 @@ test('stun skips the attacker\'s move and clears itself', () => {
 });
 
 test('empower scales with the afflicting move\'s own value, not a flat multiplier', () => {
+  // Crits and damage variance draw from Math.random; pin it so a lucky roll on the weaker hit
+  // (or a crit on the stronger one) cannot flip the comparison.
+  const originalRandom = Math.random;
+  Math.random = () => 0.999;
+  try {
+    assertEmpowerScales();
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+function assertEmpowerScales() {
   const low = freshBattle();
   pinMoves(low.playerTeam[0]);
   pinMoves(low.enemyTeam[0]);
@@ -61,7 +73,7 @@ test('empower scales with the afflicting move\'s own value, not a flat multiplie
   const highDamage = highHpBefore - highResult.enemyTeam[0].hp;
 
   assert.ok(highDamage > lowDamage, `an 80-value empower (${highDamage}) should hit harder than a 10-value one (${lowDamage})`);
-});
+}
 
 test('a leech status effect drains the afflicted pet and heals its source at end of turn', () => {
   const state = freshBattle();
