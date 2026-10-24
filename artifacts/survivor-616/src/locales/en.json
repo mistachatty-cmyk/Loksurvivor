@@ -1220,7 +1220,7 @@
   "settings.power.refresh": "Refresh",
   "settings.power.persistBody": "Protecting asks the browser not to clear this game's data if the device runs low on space. Some browsers decide on their own.",
   "settings.power.network": "What this game sends",
-  "settings.power.networkBody": "Only four things ever leave your device: crash reports (if on), the play-time tally (if on), the daily message file (if on, a plain read of one public file), and the music link you paste yourself when you ask to play one. No ads, no trackers, no background uploads, and nothing runs after you close the game.",
+  "settings.power.networkBody": "Only four things ever leave your device: crash details (automatically if on, or when you press Send to LOK Services), the play-time tally (if on), the daily message file (if on, a plain read of one public file), and the music link you paste yourself when you ask to play one. No ads, no trackers, no background uploads, and nothing runs after you close the game.",
   "saveGuard.title": "Open in two tabs",
   "saveGuard.body": "Another tab just saved. To protect your progress this tab has paused saving. Load the newest save, or keep what this tab has.",
   "saveGuard.load": "Load newest save",
@@ -1237,5 +1237,12 @@
   "challenge.badArea": "This game does not have that block.",
   "challenge.locked": "You have not unlocked that block yet.",
   "challenge.copy": "Copy challenge code",
-  "challenge.copied": "Code copied"
+  "challenge.copied": "Code copied",
+  "crash.send": "Send to LOK Services",
+  "crash.send.sending": "Sending…",
+  "crash.send.sent": "Sent. Thank you.",
+  "crash.send.failed": "Could not send. Check your connection and try again.",
+  "crash.send.unavailable": "Sending is not set up in this copy of the game.",
+  "settings.power.sendCrash": "Send my last crash details",
+  "settings.power.sendCrashBody": "The game kept details of the last crash on this device. This sends that short, scrubbed text to LOK Services once, whatever the switch above says. It has no account, no device id and no page content."
 }

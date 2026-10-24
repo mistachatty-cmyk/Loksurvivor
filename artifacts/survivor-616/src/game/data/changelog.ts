@@ -2110,6 +2110,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'A code is just the map and the night, with a check character to catch typos. It is not stored or uploaded anywhere, and it only works for blocks you have unlocked.',
     ],
   },
+  {
+    version: '0.42.46',
+    date: '2026-10-24',
+    publishedAt: '2026-10-24T19:50:00Z',
+    kind: 'update',
+    title: 'Send to LOK Services',
+    body: [
+      'If the game ever crashes, you can now press Send to LOK Services right on the crash screen, on the prompt after the game closed on you, or in Settings, Power, storage and data. It sends the same short, scrubbed details as Copy, once, and tells you whether it got through.',
+      'It works even if automatic crash sending is off or your browser asks not to be tracked, because you pressed it. No account, no device id and no page content go with it.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

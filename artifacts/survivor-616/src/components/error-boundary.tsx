@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { formatReport, lokCrash } from '@/lib/lokCrash';
+import { SendCrashButton } from '@/ui/SendCrashButton';
 import {
   Component,
   type ComponentType,
@@ -77,6 +78,11 @@ function DefaultFallback({ error, resetError }: ErrorFallbackProps) {
           >
             {copied ? 'Copied' : 'Copy error report'}
           </button>
+        ) : null}
+        {report ? (
+          <div className="mt-2">
+            <SendCrashButton className="rounded border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100" />
+          </div>
         ) : null}
         <button
           type="button"

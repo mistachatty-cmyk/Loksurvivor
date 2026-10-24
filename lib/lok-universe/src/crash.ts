@@ -57,6 +57,13 @@ export interface CrashReporter {
   install(): () => void;
   /** The most recent report kept on this device, if any. */
   last(): CrashReport | null;
+  /**
+   * The person chose to send this report (a "Send to LOK" button). That is explicit consent, so it
+   * works even when automatic sending is off, blocked by Do Not Track, or over the session limit.
+   * Resolves "sent", "failed" (network or server refused) or "unavailable" (no server configured).
+   * Defaults to the latest report kept on the device.
+   */
+  submit(report?: CrashReport | null): Promise<"sent" | "failed" | "unavailable">;
 }
 
 export const CRASH_STORAGE_KEY = "lok.crash.last.v1";
@@ -148,6 +155,23 @@ export function createCrashReporter(options: CrashReporterOptions): CrashReporte
     }
   };
 
+  const post = (report: CrashReport): Promise<Response> =>
+    fetch(`${options.supabaseUrl}/rest/v1/rpc/lok_crash_report_add`, {
+      method: "POST",
+      keepalive: true,
+      headers: { apikey: options.publishableKey as string, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        p_app_key: report.appKey,
+        p_app_version: report.appVersion,
+        p_kind: report.kind,
+        p_screen: report.screen,
+        p_fingerprint: report.fingerprint,
+        p_message: report.message,
+        p_stack: report.stack,
+        p_env: report.env,
+      }),
+    });
+
   const send = (report: CrashReport) => {
     if (!options.supabaseUrl || !options.publishableKey) return;
     if (options.enabled && !options.enabled()) return;
@@ -156,23 +180,18 @@ export function createCrashReporter(options: CrashReporterOptions): CrashReporte
     sentFingerprints.add(report.fingerprint);
     sentCount += 1;
     try {
-      void fetch(`${options.supabaseUrl}/rest/v1/rpc/lok_crash_report_add`, {
-        method: "POST",
-        keepalive: true,
-        headers: { apikey: options.publishableKey, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          p_app_key: report.appKey,
-          p_app_version: report.appVersion,
-          p_kind: report.kind,
-          p_screen: report.screen,
-          p_fingerprint: report.fingerprint,
-          p_message: report.message,
-          p_stack: report.stack,
-          p_env: report.env,
-        }),
-      }).catch(() => undefined);
+      void post(report).catch(() => undefined);
     } catch {
       /* reporting must never throw */
+    }
+  };
+
+  const readLast = (): CrashReport | null => {
+    try {
+      const raw = window.localStorage.getItem(CRASH_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as CrashReport) : null;
+    } catch {
+      return null;
     }
   };
 
@@ -206,12 +225,15 @@ export function createCrashReporter(options: CrashReporterOptions): CrashReporte
 
   return {
     capture,
-    last() {
+    last: readLast,
+    async submit(report) {
+      const target = report ?? readLast();
+      if (!target || !options.supabaseUrl || !options.publishableKey) return "unavailable";
       try {
-        const raw = window.localStorage.getItem(CRASH_STORAGE_KEY);
-        return raw ? (JSON.parse(raw) as CrashReport) : null;
+        const response = await post(target);
+        return response.ok ? "sent" : "failed";
       } catch {
-        return null;
+        return "failed";
       }
     },
     install() {
