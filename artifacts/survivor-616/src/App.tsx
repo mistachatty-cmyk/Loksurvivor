@@ -41,34 +41,11 @@ import {
 import type { AreaDef, RunResult, VendorItemCategory } from '@/game/types';
 import type { ArenaSeat } from '@/game/arena/arenaWorld';
 import type { ArenaNetRole } from '@/game/arena/arenaNet';
-import { ArchivePanel } from '@/ui/ArchivePanel';
-import { DirectorTerminalPanel } from '@/ui/DirectorTerminalPanel';
-import { AreaSelect } from '@/ui/AreaSelect';
-import { BestiaryPanel } from '@/ui/BestiaryPanel';
-import { PersonalLockerV3 } from '@/ui/PersonalLockerV3';
-import { CharacterSelect } from '@/ui/CharacterSelect';
 import { HubScreen, requestHideoutArrival, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
-import { LokShopScreen } from '@/ui/LokShopScreen';
 import { SupporterBar } from '@/ui/SupporterBar';
 import { PhotosensitivityNotice, photosensitivityNoticeHidden, photosensitivityNoticeSeenThisSession } from '@/ui/PhotosensitivityNotice';
-import { MusicPanel } from '@/ui/MusicPanel';
-import { RunSummary } from '@/ui/RunSummary';
-import { RecoveryPanel } from '@/ui/RecoveryPanel';
-import { VendorPanel } from '@/ui/VendorPanel';
-import { WorkshopPanel } from '@/ui/WorkshopPanel';
-import { SettingsPanel } from '@/ui/SettingsPanel';
-import { PaletteGalleryPanel } from '@/ui/PaletteGalleryPanel';
-import { SoundBoothPanel } from '@/ui/SoundBoothPanel';
-import { AccountPanel } from '@/ui/AccountPanel';
-import { FeedbackPanel } from '@/ui/FeedbackPanel';
-import { CardShopPanel } from '@/ui/CardShopPanel';
-import { WeaponBansScreen } from '@/ui/WeaponBansScreen';
-import { GrpdArmoryScreen } from '@/ui/GrpdArmoryScreen';
 import { grpdArmoryLocation } from '@/game/data/grpdArmory';
-import { ThreatMatrixScreen } from '@/ui/ThreatMatrixScreen';
-import { LokPetBattleScreen } from '@/ui/LokPetBattleScreen';
-import { DustMiteRancherPanel } from '@/ui/DustMiteRancherPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { FocusWidgetMount } from '@/ui/FocusWidgetMount';
 import { TravelEncounterOverlay } from '@/ui/TravelEncounterOverlay';
@@ -80,6 +57,7 @@ import { eventsLeftToday } from '@/game/engine/hideoutRewards';
 import { getFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
 import { GoToPalette } from '@/ui/GoToPalette';
 import { setCrashScreen } from '@/lib/lokCrash';
+import { prefetchWhenIdle } from '@/lib/idlePrefetch';
 import { SETTINGS_FOCUS_KEY } from '@/lib/jukeboxPrefs';
 import { CrashRecoveryPrompt } from '@/ui/CrashRecoveryPrompt';
 import { MenuDock } from '@/ui/MenuDock';
@@ -88,15 +66,38 @@ import { LokChatHost } from '@/ui/LokChatHost';
 import { readSelectedMap } from '@/lib/selectedMap';
 import { readTutorialDone, writeTutorialDone } from '@/lib/tutorial';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
-import { RunSetupScreen } from '@/ui/RunSetupScreen';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { customMapToArea } from '@/game/data/customMaps';
-import { MapBuilder } from '@/ui/MapBuilder';
-import { SectorCommandScreen } from '@/ui/SectorCommandScreen';
-import { ArenaSetupScreen } from '@/ui/ArenaSetupScreen';
-import { ArenaJoinScreen } from '@/ui/ArenaJoinScreen';
-import { ArenaScreen } from '@/game/ArenaScreen';
+const ArchivePanel = lazy(() => import('@/ui/ArchivePanel').then((m) => ({ default: m.ArchivePanel })));
+const DirectorTerminalPanel = lazy(() => import('@/ui/DirectorTerminalPanel').then((m) => ({ default: m.DirectorTerminalPanel })));
+const BestiaryPanel = lazy(() => import('@/ui/BestiaryPanel').then((m) => ({ default: m.BestiaryPanel })));
+const PersonalLockerV3 = lazy(() => import('@/ui/PersonalLockerV3').then((m) => ({ default: m.PersonalLockerV3 })));
+const CharacterSelect = lazy(() => import('@/ui/CharacterSelect').then((m) => ({ default: m.CharacterSelect })));
+const LokShopScreen = lazy(() => import('@/ui/LokShopScreen').then((m) => ({ default: m.LokShopScreen })));
+const MusicPanel = lazy(() => import('@/ui/MusicPanel').then((m) => ({ default: m.MusicPanel })));
+const RunSummary = lazy(() => import('@/ui/RunSummary').then((m) => ({ default: m.RunSummary })));
+const RecoveryPanel = lazy(() => import('@/ui/RecoveryPanel').then((m) => ({ default: m.RecoveryPanel })));
+const VendorPanel = lazy(() => import('@/ui/VendorPanel').then((m) => ({ default: m.VendorPanel })));
+const WorkshopPanel = lazy(() => import('@/ui/WorkshopPanel').then((m) => ({ default: m.WorkshopPanel })));
+const SettingsPanel = lazy(() => import('@/ui/SettingsPanel').then((m) => ({ default: m.SettingsPanel })));
+const PaletteGalleryPanel = lazy(() => import('@/ui/PaletteGalleryPanel').then((m) => ({ default: m.PaletteGalleryPanel })));
+const SoundBoothPanel = lazy(() => import('@/ui/SoundBoothPanel').then((m) => ({ default: m.SoundBoothPanel })));
+const AccountPanel = lazy(() => import('@/ui/AccountPanel').then((m) => ({ default: m.AccountPanel })));
+const FeedbackPanel = lazy(() => import('@/ui/FeedbackPanel').then((m) => ({ default: m.FeedbackPanel })));
+const CardShopPanel = lazy(() => import('@/ui/CardShopPanel').then((m) => ({ default: m.CardShopPanel })));
+const WeaponBansScreen = lazy(() => import('@/ui/WeaponBansScreen').then((m) => ({ default: m.WeaponBansScreen })));
+const GrpdArmoryScreen = lazy(() => import('@/ui/GrpdArmoryScreen').then((m) => ({ default: m.GrpdArmoryScreen })));
+const ThreatMatrixScreen = lazy(() => import('@/ui/ThreatMatrixScreen').then((m) => ({ default: m.ThreatMatrixScreen })));
+const LokPetBattleScreen = lazy(() => import('@/ui/LokPetBattleScreen').then((m) => ({ default: m.LokPetBattleScreen })));
+const DustMiteRancherPanel = lazy(() => import('@/ui/DustMiteRancherPanel').then((m) => ({ default: m.DustMiteRancherPanel })));
+const MapBuilder = lazy(() => import('@/ui/MapBuilder').then((m) => ({ default: m.MapBuilder })));
+const SectorCommandScreen = lazy(() => import('@/ui/SectorCommandScreen').then((m) => ({ default: m.SectorCommandScreen })));
+const ArenaSetupScreen = lazy(() => import('@/ui/ArenaSetupScreen').then((m) => ({ default: m.ArenaSetupScreen })));
+const ArenaJoinScreen = lazy(() => import('@/ui/ArenaJoinScreen').then((m) => ({ default: m.ArenaJoinScreen })));
+const ArenaScreen = lazy(() => import('@/game/ArenaScreen').then((m) => ({ default: m.ArenaScreen })));
+const RunSetupScreen = lazy(() => import('@/ui/RunSetupScreen').then((m) => ({ default: m.RunSetupScreen })));
+const AreaSelect = lazy(() => import('@/ui/AreaSelect').then((m) => ({ default: m.AreaSelect })));
 const JukeboxRoom = lazy(() => import('@/ui/JukeboxRoom'));
 const StudioScreen = lazy(() => import('@/ui/StudioScreen').then(m => ({ default: m.StudioScreen })));
 const RunScreen = lazy(() => import('@/game/RunScreen').then(m => ({ default: m.RunScreen })));
@@ -258,6 +259,20 @@ function Game() {
   const { meta, markOnboarded, selectedCharacter, completeRun, completeSectorMission, enterHideout, unlockedAreas, unlockedRooms } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen());
   useEffect(() => setCrashScreen(screen.name), [screen.name]);
+  // On the hub, quietly load the screens most likely to be opened next (skipped while saving power).
+  const onHub = screen.name === 'hub';
+  useEffect(() => {
+    if (!onHub) return undefined;
+    return prefetchWhenIdle([
+      () => import('@/ui/SettingsPanel'),
+      () => import('@/ui/CharacterSelect'),
+      () => import('@/ui/RunSetupScreen'),
+      () => import('@/ui/CardShopPanel'),
+      () => import('@/ui/MusicPanel'),
+      () => import('@/ui/VendorPanel'),
+      () => import('@/game/RunScreen'),
+    ]);
+  }, [onHub]);
   const chromeLayout = useUiChromeLayout();
   const looksReturnRef = useRef<Screen | null>(null);
   const screenRef = useRef<Screen>(screen);
@@ -899,7 +914,7 @@ function Game() {
         swipeEnabled={!DOCK_HIDDEN_SCREENS.includes(screen.name) && !choiceEvent && !travelEncounter}
         onSwipe={goToScreen}
       >
-        {renderScreen()}
+        <Suspense fallback={<div className="min-h-dvh bg-background" aria-busy="true" />}>{renderScreen()}</Suspense>
       </ScreenSlide>
       <CrashRecoveryPrompt />
       <LokChatHost />
