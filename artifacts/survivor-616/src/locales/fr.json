@@ -1220,7 +1220,7 @@
   "settings.power.refresh": "Actualiser",
   "settings.power.persistBody": "La protection demande au navigateur de ne pas effacer les données de ce jeu si l'appareil manque d'espace. Certains navigateurs décident eux-mêmes.",
   "settings.power.network": "Ce que ce jeu envoie",
-  "settings.power.networkBody": "Seules quatre choses quittent votre appareil : les rapports d'erreur (si activés), le décompte de la durée de lecture (si activé), le fichier de messages quotidiens (si activé, une simple lecture d'un fichier public) et le lien musical que vous collez lorsque vous demandez d'en lire un. Aucune publicité, aucun tracker, aucun téléchargement en arrière-plan et rien ne s'exécute après la fermeture du jeu.",
+  "settings.power.networkBody": "Seules quatre choses quittent votre appareil : les détails du crash (automatiquement si activé, ou lorsque vous appuyez sur Envoyer aux services LOK), le décompte de la durée de lecture (si activé), le fichier de messages quotidiens (si activé, une simple lecture d'un fichier public) et le lien musical que vous collez vous-même lorsque vous demandez d'en lire un. Aucune publicité, aucun tracker, aucun téléchargement en arrière-plan et rien ne s'exécute après la fermeture du jeu.",
   "saveGuard.title": "Ouvrir dans deux onglets",
   "saveGuard.body": "Un autre onglet vient d'être enregistré. Pour protéger votre progression, cet onglet a suspendu la sauvegarde. Chargez la sauvegarde la plus récente ou conservez ce que contient cet onglet.",
   "saveGuard.load": "Charger la sauvegarde la plus récente",
@@ -1237,5 +1237,12 @@
   "challenge.badArea": "Ce jeu n'a pas ce bloc.",
   "challenge.locked": "Vous n'avez pas encore déverrouillé ce bloc.",
   "challenge.copy": "Copier le code de défi",
-  "challenge.copied": "Code copié"
+  "challenge.copied": "Code copié",
+  "crash.send": "Envoyer à LOK Services",
+  "crash.send.sending": "Envoi…",
+  "crash.send.sent": "Envoyé. Merci.",
+  "crash.send.failed": "Impossible d'envoyer. Vérifiez votre connexion et réessayez.",
+  "crash.send.unavailable": "L'envoi n'est pas configuré dans cette copie du jeu.",
+  "settings.power.sendCrash": "Envoyer les détails de mon dernier crash",
+  "settings.power.sendCrashBody": "Le jeu a conservé les détails du dernier crash sur cet appareil. Cela envoie ce texte court et épuré aux services LOK une fois, quoi que dise le commutateur ci-dessus. Il n'a aucun compte, aucun identifiant d'appareil et aucun contenu de page."
 }

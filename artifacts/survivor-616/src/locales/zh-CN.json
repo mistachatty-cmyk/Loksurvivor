@@ -1220,7 +1220,7 @@
   "settings.power.refresh": "刷新",
   "settings.power.persistBody": "如果设备空间不足，保护会要求浏览器不要清除该游戏的数据。有些浏览器自行决定。",
   "settings.power.network": "这个游戏发送什么",
-  "settings.power.networkBody": "只有四件事会离开你的设备：崩溃报告（如果打开）、播放时间计数（如果打开）、每日消息文件（如果打开，则为一个公共文件的普通读取）以及当你要求播放音乐时你自己粘贴的音乐链接。没有广告，没有跟踪器，没有后台上传，关闭游戏后也不会运行任何内容。",
+  "settings.power.networkBody": "只有四件事会离开您的设备：崩溃详细信息（如果打开，则自动，或者当您按“发送到 LOK 服务”时）、播放时间计数（如果打开）、每日消息文件（如果打开，则简单读取一个公共文件）以及当您要求播放音乐时您自己粘贴的音乐链接。没有广告，没有跟踪器，没有后台上传，关闭游戏后也不会运行任何内容。",
   "saveGuard.title": "在两个选项卡中打开",
   "saveGuard.body": "刚刚保存了另一个选项卡。为了保护您的进度，此选项卡已暂停保存。加载最新的保存，或保留此选项卡的内容。",
   "saveGuard.load": "加载最新保存",
@@ -1237,5 +1237,12 @@
   "challenge.badArea": "这个游戏没有那个方块。",
   "challenge.locked": "您还没有解锁该块。",
   "challenge.copy": "复制挑战码",
-  "challenge.copied": "复制代码"
+  "challenge.copied": "复制代码",
+  "crash.send": "发送至 LOK 服务",
+  "crash.send.sending": "正在发送...",
+  "crash.send.sent": "发送。谢谢。",
+  "crash.send.failed": "无法发送。检查您的连接并重试。",
+  "crash.send.unavailable": "此游戏副本中未设置发送功能。",
+  "settings.power.sendCrash": "发送我上次崩溃的详细信息",
+  "settings.power.sendCrashBody": "游戏保留了该设备上上次崩溃的详细信息。无论上面的开关说什么，这都会将经过清理的简短文本发送到 LOK 服务一次。它没有帐户，没有设备 ID，也没有页面内容。"
 }
