@@ -2033,6 +2033,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Behind the scenes: crash reports now name the screen the game was really on when it closed (they used to say a question mark), and every update is now typechecked, built and tested automatically before it can land.',
     ],
   },
+  {
+    version: '0.42.39',
+    date: '2026-10-24',
+    publishedAt: '2026-10-24T15:00:00Z',
+    kind: 'update',
+    title: 'Power, storage and data',
+    body: [
+      'New Settings section, Power, storage and data. A battery saver (Off, Auto or On) trims the biggest power costs: run frame rate, the music-reactive glow and disc effects, the Jukebox Room screen lock and the drifting background animations. Auto switches on at 20 percent battery when not charging, or when your browser Data Saver is on. The fight and your rewards never change.',
+      'You can pick the saver frame rate (30, 45 or 60), turn the lock-screen music controls off, and stop the play-time tally. Crash reports moved here too.',
+      'A storage meter shows how big your save and your own music files are and how much space this game uses in total, with a Protect my save button that asks the browser to keep your data when the device runs low on space. A plain note lists the only three things the game ever sends: crash reports, the play-time tally and music links you paste yourself.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

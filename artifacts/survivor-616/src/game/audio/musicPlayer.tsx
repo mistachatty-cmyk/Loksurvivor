@@ -11,6 +11,7 @@
 
 import { readShuffle, writeShuffle } from '@/lib/jukeboxPrefs';
 import { positionStateFor, sessionMetaFor, skipTarget } from '@/lib/mediaSessionMeta';
+import { mediaControlsPref } from '@/lib/powerSaver';
 import { DEFAULT_VOLUME, VOLUME_STORAGE_KEY, parseStoredVolume } from './volumeCurve';
 import {
   createContext,
@@ -1500,8 +1501,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Lock screen, earbuds and car controls. Metadata and handlers only: the sound itself is never touched.
+  // Settings > Power, storage and data can switch them off.
+  const mediaControls = mediaControlsPref.use();
   useEffect(() => {
-    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    if (!mediaControls || typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     const session = navigator.mediaSession;
     const actions: [MediaSessionAction, MediaSessionActionHandler][] = [
       ['play', () => { if (audioRef.current?.paused) togglePlay(); }],
@@ -1528,10 +1531,19 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         }
       }
     };
-  }, [togglePlay, next, previous, seek]);
+  }, [mediaControls, togglePlay, next, previous, seek]);
 
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    if (!mediaControls) {
+      try {
+        navigator.mediaSession.metadata = null;
+        navigator.mediaSession.playbackState = 'none';
+      } catch {
+        /* nothing to clear */
+      }
+      return;
+    }
     try {
       navigator.mediaSession.metadata = currentTrack
         ? new MediaMetadata(sessionMetaFor(currentTrack, import.meta.env.BASE_URL))
@@ -1539,20 +1551,20 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     } catch {
       /* lock-screen details are a nicety */
     }
-  }, [currentTrack]);
+  }, [mediaControls, currentTrack]);
 
   useEffect(() => {
-    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    if (!mediaControls || typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     try {
       navigator.mediaSession.playbackState = currentTrack ? (isPlaying ? 'playing' : 'paused') : 'none';
     } catch {
       /* lock-screen details are a nicety */
     }
-  }, [currentTrack, isPlaying]);
+  }, [mediaControls, currentTrack, isPlaying]);
 
   const wholeSecond = Math.floor(progressSec);
   useEffect(() => {
-    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    if (!mediaControls || typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     const state = positionStateFor(durationSec, wholeSecond, playbackRate);
     if (!state) return;
     try {
@@ -1560,7 +1572,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     } catch {
       /* lock-screen details are a nicety */
     }
-  }, [wholeSecond, durationSec, playbackRate]);
+  }, [mediaControls, wholeSecond, durationSec, playbackRate]);
 
   const setVolume = useCallback((value: number) => {
     const clamped = Math.max(0, Math.min(1, value));

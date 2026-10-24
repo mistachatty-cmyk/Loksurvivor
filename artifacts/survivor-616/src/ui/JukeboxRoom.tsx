@@ -19,6 +19,7 @@ import { useT } from '@/lib/i18n';
 import { useTheaterLevel } from '@/lib/useTheaterLevel';
 import { readDiscPulse } from '@/lib/discPulse';
 import { formatCountdown, nextSleepStep } from '@/lib/sleepTimer';
+import { useSavingPower } from '@/lib/powerSaver';
 import { useWakeLock } from '@/lib/useWakeLock';
 import { readDiscGestures, readKeepAwake, readReactiveBg, reactiveBgGain, readTheaterMix, writeTheaterMix } from '@/lib/jukeboxPrefs';
 import { DiscShelves, type DiscShelvesHandle } from './DiscShelves';
@@ -40,7 +41,8 @@ export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: Ju
   const [gestures] = useState(readDiscGestures);
   const shelvesRef = useRef<DiscShelvesHandle | null>(null);
   const [keepAwake] = useState(readKeepAwake);
-  useWakeLock(keepAwake && isPlaying);
+  const saving = useSavingPower();
+  useWakeLock(keepAwake && !saving && isPlaying);
 
   // Sleep timer: pauses the music when it runs out. It lives only while the room is open.
   const [sleepMin, setSleepMin] = useState(0);
@@ -78,7 +80,9 @@ export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: Ju
 
   const shelves = useMemo(() => buildShelves(tracks as ShelfTrack[]), [tracks]);
   const palette = useMemo(() => paletteOf(shelves, currentTrack?.id), [shelves, currentTrack?.id]);
-  const [bgGain] = useState(() => reactiveBgGain(readReactiveBg()));
+  const [storedGain] = useState(() => reactiveBgGain(readReactiveBg()));
+  // Battery saver rests the music-reactive glow.
+  const bgGain = saving ? 0 : storedGain;
 
   useEffect(() => {
     writeTheaterMix(theaterMix);

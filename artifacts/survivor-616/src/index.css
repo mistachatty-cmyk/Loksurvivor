@@ -1399,3 +1399,16 @@ html { overflow-x: clip; }
   .game-bar-xp-ready::after, .game-bar-card-ready::after { animation: none; display: none; }
   .game-bar-burst { display: none; }
 }
+
+/* Battery saver (Settings > Power, storage and data): rest the purely decorative, always-running
+   animations. Nothing here changes what the game does; it only stops things from moving for show. */
+html[data-power-save] [data-ui-theme]::before,
+html[data-power-save] .hideout-cloud,
+html[data-power-save] .hideout-flier,
+html[data-power-save] .hideout-weather-particles,
+html[data-power-save] .hub-cred-pulse {
+  animation: none !important;
+}
+html[data-power-save] .hideout-weather-heat .hideout-weather-particles {
+  filter: none;
+}

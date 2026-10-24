@@ -12,6 +12,7 @@ import { applyMotionMode, getMotionMode, registerLiveFeedLoad } from '@/anim/mot
 import { initLocalization } from '@/lib/i18n';
 import { getCrashScreen, lokCrash, startCrashWatch } from '@/lib/lokCrash';
 import { optionalChunkLoading } from '@/lib/optionalChunk';
+import { startPowerWatch } from '@/lib/powerSaver';
 
 // After a deploy, an already-open or home-screen copy can ask for a code chunk
 // that no longer exists. Reload once to pick up the new build instead of
@@ -116,7 +117,8 @@ registerLiveFeedLoad();
 
 function mount(): void {
   lokCrash.install();
-startCrashWatch();
+  startCrashWatch();
+  startPowerWatch();
   createRoot(document.getElementById('root')!, {
     // Keeps caught errors off reportError(), which would raise the dev overlay.
     onCaughtError: (error, errorInfo) => {
