@@ -14,19 +14,27 @@ import type { LokPetPalette, LokPetSilhouette, SpritePalette, SpriteRig } from '
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RARITY_STYLE } from './LockDeckCollection';
 import { RigPortrait } from './RigPortrait';
+import { useNearViewport } from '@/lib/useNearViewport';
 
 /** Pixel-grid recipes are drawn by the shared SDK renderer, so every platform draws them identically. */
 function SdkCanvasArt({ art, size, motion }: { art: CardArtRecipe; size: number; motion?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const near = useNearViewport(ref);
   useEffect(() => {
     const canvas = ref.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
+    if (!canvas) return;
+    if (!near) {
+      canvas.width = 1;
+      canvas.height = 1;
+      return;
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     canvas.width = size;
     canvas.height = size;
     ctx.clearRect(0, 0, size, size);
     drawCardArt(ctx, art, 0, 0, size);
-  }, [art, size]);
+  }, [art, size, near]);
   const bob = motion === 'sleep' ? 'none' : 'registry-art-bob 1.6s ease-in-out infinite';
   return <canvas ref={ref} aria-hidden="true" style={{ width: size, height: size, imageRendering: 'pixelated', animation: bob }} />;
 }

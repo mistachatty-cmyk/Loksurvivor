@@ -20,3 +20,6 @@ Spec and handoff log: `docs/jukebox-spec.md`. Shared logic: `packages/lok-jukebo
 - `src/lib/powerSaver.ts`: one saver (Off/Auto/On; Auto = battery <=20% not charging, or Data Saver). Read it via `useSavingPower()` / `isSavingPower()`; never add a second "low power" flag. It caps run frame rate (`effectiveFrameRate`), gates music-reactive glow, disc pulse, wake lock, and sets `<html data-power-save>` (CSS freezes ambient animations). Simulation and rewards are never touched.
 - `src/lib/devicePref.ts` `createPref` is the pattern for new per-device switches. `storageUsage.ts` is read-only (no bulk delete: user files are referenced by playlists and Studio).
 - Settings home for all of it: `PowerSettings.tsx` (id `settings-power`). Anything new that costs power or network gets a toggle there.
+
+## Offscreen canvases (0.42.41)
+- `useNearViewport` (src/lib/useNearViewport.ts) gates canvas drawing/animation by IntersectionObserver and frees backing stores offscreen. RigPortrait and SdkCanvasArt use it. Card shop binder went from 77 live 284px canvases (6.2 MP) to ~10 (0.8 MP). Use it for any new long grid of canvases.
