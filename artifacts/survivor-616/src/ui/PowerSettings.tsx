@@ -2,6 +2,7 @@ import { BatteryCharging } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useT } from '@/lib/i18n';
+import { dailyFeedPref } from '@/lib/dailyFeed';
 import { tabGuardPref } from '@/lib/saveGuard';
 import { mediaControlsPref, playtimeSharingPref, SAVER_CAPS, saverCapPref, saverModePref, usePowerStatus, type SaverMode } from '@/lib/powerSaver';
 import { formatBytes, readStorageReport, requestPersistentStorage, type StorageReport } from '@/lib/storageUsage';
@@ -54,6 +55,7 @@ export function PowerSettings() {
   const controls = mediaControlsPref.use();
   const playtime = playtimeSharingPref.use();
   const tabGuard = tabGuardPref.use();
+  const dailyFeed = dailyFeedPref.use();
   const status = usePowerStatus();
   const { report, refresh } = useStorageReport();
   const [persistMessage, setPersistMessage] = useState<string | null>(null);
@@ -106,6 +108,7 @@ export function PowerSettings() {
 
       <SwitchRow title={t('settings.power.controls')} body={t('settings.power.controlsBody')} on={controls} onChange={(next) => mediaControlsPref.set(next)} testId="button-power-media-controls" />
       <SwitchRow title={t('settings.power.playtime')} body={t('settings.power.playtimeBody')} on={playtime} onChange={(next) => playtimeSharingPref.set(next)} testId="button-power-playtime" />
+      <SwitchRow title={t('settings.power.daily')} body={t('settings.power.dailyBody')} on={dailyFeed} onChange={(next) => dailyFeedPref.set(next)} testId="button-power-daily-feed" />
       <SwitchRow title={t('settings.power.tabGuard')} body={t('settings.power.tabGuardBody')} on={tabGuard} onChange={(next) => tabGuardPref.set(next)} testId="button-power-tab-guard" />
       <CrashReportsToggle />
 

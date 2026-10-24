@@ -26,3 +26,6 @@ Spec and handoff log: `docs/jukebox-spec.md`. Shared logic: `packages/lok-jukebo
 
 ## Two-tab save guard (0.42.43)
 - `src/lib/saveGuard.ts`: a foreign `storage` write only flags the tab; the prompt (`SaveGuardBanner`) appears when this tab next tries to save (`saveMeta` -> `requestWrite()`). Prompting on the foreign write itself was noisy (opening a second tab always rewrites the save). Pref `tabGuardPref` (Power settings).
+
+## Daily message (0.42.44)
+- `public/lok-daily.json` (hand-edited, max 5 notes, dated windows, validated by `parseDailyFeed` and a test) is read by `lib/dailyFeed.ts` at most once per UTC day, shown once per note id as a hideout strip line. Blocked by pref, saver/Data Saver, offline. To announce something: add a note with `from`/`until`; no redeploy logic needed beyond shipping the file. Keep the network note in Settings (`settings.power.networkBody`) in step with any new network read.
