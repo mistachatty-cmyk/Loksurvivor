@@ -23,3 +23,6 @@ Spec and handoff log: `docs/jukebox-spec.md`. Shared logic: `packages/lok-jukebo
 
 ## Offscreen canvases (0.42.41)
 - `useNearViewport` (src/lib/useNearViewport.ts) gates canvas drawing/animation by IntersectionObserver and frees backing stores offscreen. RigPortrait and SdkCanvasArt use it. Card shop binder went from 77 live 284px canvases (6.2 MP) to ~10 (0.8 MP). Use it for any new long grid of canvases.
+
+## Two-tab save guard (0.42.43)
+- `src/lib/saveGuard.ts`: a foreign `storage` write only flags the tab; the prompt (`SaveGuardBanner`) appears when this tab next tries to save (`saveMeta` -> `requestWrite()`). Prompting on the foreign write itself was noisy (opening a second tab always rewrites the save). Pref `tabGuardPref` (Power settings).

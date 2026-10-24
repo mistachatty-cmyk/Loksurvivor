@@ -6,6 +6,7 @@
  * mirrored into localStorage so a refresh does not wipe the hideout.
  */
 
+import { saveGuard } from '@/lib/saveGuard';
 import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
 import {
   createContext,
@@ -1759,6 +1760,8 @@ export function serializeMeta(meta: MetaState): string {
 }
 
 function saveMeta(meta: MetaState) {
+  // Another tab changed the save: wait for the player to choose which copy to keep.
+  if (!saveGuard.requestWrite()) return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(meta));
   } catch (error) {
@@ -4856,6 +4859,15 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveMeta(state.meta);
   }, [state.meta]);
+
+  // Another tab wrote the save: stop overwriting it until the player picks a copy (see SaveGuardBanner).
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === STORAGE_KEY && event.newValue !== null) saveGuard.noteForeignWrite();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // End-game unlocks are earned once and kept. Record anything newly qualified and announce it once.
   useEffect(() => {
