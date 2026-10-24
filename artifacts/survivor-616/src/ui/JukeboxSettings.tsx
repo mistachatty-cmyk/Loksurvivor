@@ -5,7 +5,7 @@ import { useMusicPlayer, formatTime } from '@/game/audio/musicPlayer';
 import { useMeta } from '@/game/state/metaStore';
 import { DISC_FX_KEYS, DISC_PULSE_LEVELS, readDiscFx, readDiscPulse, writeDiscFx, writeDiscPulse, type DiscFx, type DiscPulseLevel } from '@/lib/discPulse';
 import { useT } from '@/lib/i18n';
-import { REACTIVE_BG_LEVELS, readReactiveBg, readTheaterMix, writeReactiveBg, writeTheaterMix, type ReactiveBgLevel } from '@/lib/jukeboxPrefs';
+import { REACTIVE_BG_LEVELS, readDiscGestures, readReactiveBg, readShelves, readTheaterMix, writeDiscGestures, writeReactiveBg, writeShelves, writeTheaterMix, type ReactiveBgLevel } from '@/lib/jukeboxPrefs';
 import { ArrivalDiscsToggle } from './ArrivalDiscsToggle';
 
 const ON = 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100';
@@ -34,6 +34,8 @@ export function JukeboxSettings({ onOpenScreen }: { onOpenScreen?: (id: string) 
   const [mix, setMix] = useState(readTheaterMix);
   const [fx, setFx] = useState<DiscFx>(readDiscFx);
   const [bg, setBg] = useState<ReactiveBgLevel>(readReactiveBg);
+  const [shelves, setShelves] = useState(readShelves);
+  const [gestures, setGestures] = useState(readDiscGestures);
   const roomOpen = unlockedRooms.some((room) => room.id === 'jukebox-room');
 
   return (
@@ -62,6 +64,18 @@ export function JukeboxSettings({ onOpenScreen }: { onOpenScreen?: (id: string) 
           </Row>
 
           <ArrivalDiscsToggle />
+
+          <Row title={t('settings.jukebox.shelves')} body={t('settings.jukebox.shelvesBody')}>
+            <button type="button" aria-pressed={shelves} onClick={() => { writeShelves(!shelves); setShelves(!shelves); }} className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${shelves ? ON : OFF}`} data-testid="button-jukebox-shelves">
+              {shelves ? 'On' : 'Off'}
+            </button>
+          </Row>
+
+          <Row title={t('settings.jukebox.gestures')} body={t('settings.jukebox.gesturesBody')}>
+            <button type="button" aria-pressed={gestures} onClick={() => { writeDiscGestures(!gestures); setGestures(!gestures); }} className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${gestures ? ON : OFF}`} data-testid="button-jukebox-gestures">
+              {gestures ? 'On' : 'Off'}
+            </button>
+          </Row>
 
           <Row title={t('settings.jukebox.pulse')} body={t('settings.jukebox.pulseBody')}>
             {DISC_PULSE_LEVELS.map((level) => (

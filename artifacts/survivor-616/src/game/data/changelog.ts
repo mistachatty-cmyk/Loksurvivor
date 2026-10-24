@@ -2007,6 +2007,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The build now publishes no source maps and strips every comment, and a new check fails the build if either ever comes back.',
     ],
   },
+  {
+    version: '0.42.37',
+    date: '2026-10-24',
+    publishedAt: '2026-10-24T12:00:00Z',
+    kind: 'update',
+    title: 'Jukebox shelves, spin and pull-out',
+    body: [
+      'The Jukebox Room and the arrival-screen discs now keep one shelf per album. Swipe up or down (or use the arrows and dots on the side) and the next shelf slides in, so New Fits and every album after it are one swipe away instead of all squeezed on one row. The room opens on the shelf that is playing and remembers the one you left.',
+      'Spin any disc by hand without changing the song: switch on Spin in the Jukebox Room, then drag around the disc and let go. It coasts to a stop like a record.',
+      'Pull a song out: drag the centered disc up (or press the pull-out button) and the disc lifts out to a full screen of just that song, spinning with the music. Spin it, scrub it, repeat it, then swipe down to put it back.',
+      'Settings, Jukebox and soundtracks has two new switches: Stacked shelves, and Spin and pull out. Turn either off to get the old single tap-only row back. New Fits songs now get their own discs.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

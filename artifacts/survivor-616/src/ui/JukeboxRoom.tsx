@@ -8,22 +8,18 @@
  * The first touch at Level 3 only wakes the room; it never presses a button.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Library, Pause, Play, Settings2, SkipBack, SkipForward, X } from 'lucide-react';
+import { ArrowUpFromLine, Library, Pause, Play, RotateCw, Settings2, SkipBack, SkipForward, X } from 'lucide-react';
 import { dampenToTone, gradeFrom, groupBands, IDLE_BANDS, smoothBands, type GroupedBands } from '@lok/jukebox';
 
-import DiscCascadeCarousel from '@/components/ui/disc-cascade-carousel';
 import { beatBus } from '@/game/audio/beatBus';
-import { albumTracks, discItemFor, startingDisc } from '@/game/audio/jukeboxDiscs';
+import { buildShelves, paletteOf, type ShelfTrack } from '@/game/audio/jukeboxShelves';
 import { formatTime, useMusicPlayer } from '@/game/audio/musicPlayer';
 import { armDiscGuard, watchDiscGuard } from '@/lib/discGuard';
 import { useT } from '@/lib/i18n';
-import { setCrashScreen } from '@/lib/lokCrash';
-import { SealedDiscHint } from './SealedDiscHint';
-import type { DiscTrack } from '@/game/audio/jukeboxDiscs';
 import { useTheaterLevel } from '@/lib/useTheaterLevel';
 import { readDiscPulse } from '@/lib/discPulse';
-import { readReactiveBg, reactiveBgGain, readTheaterMix, writeTheaterMix } from '@/lib/jukeboxPrefs';
-import { DiscPulse } from './DiscPulse';
+import { readDiscGestures, readReactiveBg, reactiveBgGain, readTheaterMix, writeTheaterMix } from '@/lib/jukeboxPrefs';
+import { DiscShelves, type DiscShelvesHandle } from './DiscShelves';
 
 const FADE_MS = 900;
 
@@ -37,8 +33,10 @@ export interface JukeboxRoomProps {
 export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: JukeboxRoomProps) {
   const t = useT();
   const music = useMusicPlayer();
-  const { tracks, currentTrack, isPlaying, playTrack, togglePlay, next, previous, seek, progressSec, durationSec, setTheaterTone, soundtrackObjectiveCompletions } = music;
-  const [hint, setHint] = useState<DiscTrack | null>(null);
+  const { tracks, currentTrack, isPlaying, togglePlay, next, previous, seek, progressSec, durationSec, setTheaterTone } = music;
+  const [spinMode, setSpinMode] = useState(false);
+  const [gestures] = useState(readDiscGestures);
+  const shelvesRef = useRef<DiscShelvesHandle | null>(null);
   const [theaterMix, setTheaterMix] = useState(readTheaterMix);
   const { level, wake } = useTheaterLevel({ paused: !isPlaying, theaterMix });
   const [safety] = useState(armDiscGuard);
@@ -47,15 +45,9 @@ export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: Ju
   const glowRef = useRef<HTMLDivElement | null>(null);
   const vigRef = useRef<HTMLDivElement | null>(null);
 
-  const discTracks = useMemo(() => albumTracks(tracks), [tracks]);
-  const items = useMemo(() => discTracks.map(discItemFor), [discTracks]);
-  const [pulseLevel] = useState(readDiscPulse);
+  const shelves = useMemo(() => buildShelves(tracks as ShelfTrack[]), [tracks]);
+  const palette = useMemo(() => paletteOf(shelves, currentTrack?.id), [shelves, currentTrack?.id]);
   const [bgGain] = useState(() => reactiveBgGain(readReactiveBg()));
-  const current = useMemo(() => {
-    const i = discTracks.findIndex((d) => d.id === currentTrack?.id);
-    return i >= 0 ? i : startingDisc(discTracks, null);
-  }, [discTracks, currentTrack?.id]);
-  const palette = items[current]?.palette ?? ['#0a0a0f', '#888', '#c8a24a'];
 
   useEffect(() => {
     writeTheaterMix(theaterMix);
@@ -168,57 +160,21 @@ export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: Ju
       />
 
       <div className="absolute inset-x-0 top-[14dvh] h-[58dvh]">
-        {items.length > 0 ? (
-          <DiscPulse
-            color={items[current]?.palette?.[1] ?? '#7dd3fc'}
-            active={isPlaying}
-            level={pulseLevel}
-            discSize="clamp(170px, 50vw, 340px)"
-          />
-        ) : null}
-        {items.length > 0 ? (
-          <DiscCascadeCarousel
-            items={items}
-            index={current}
-            loop
-            lite={safety.lite}
-            height="58dvh"
-            discSize="clamp(170px, 50vw, 340px)"
-            background="transparent"
-            frame={false}
-            details={false}
-            reviews={false}
-            controls={false}
-            hint=""
-            indexLabel=""
-            brand=""
-            ariaLabel={t('jukebox.title')}
-            onSelect={(_item, index) => {
-              const track = discTracks[index];
-              if (!track) return;
-              setCrashScreen(`jukebox-disc:${track.id}`);
-              if (track.locked) {
-                setHint(track);
-                return;
-              }
-              setHint(null);
-              if (currentTrack?.id === track.id) togglePlay();
-              else playTrack(track.id);
-            }}
-          />
-        ) : null}
+        <DiscShelves
+          ref={shelvesRef}
+          lite={safety.lite}
+          discSize="clamp(170px, 50vw, 340px)"
+          ariaLabel={t('jukebox.title')}
+          crashPrefix="jukebox-disc"
+          spinMode={spinMode}
+        />
       </div>
-
-      {hint ? (
-        <div className="absolute inset-x-0 top-[calc(14dvh+58dvh)] z-50 px-4">
-          <SealedDiscHint track={hint} completed={soundtrackObjectiveCompletions} onClose={() => setHint(null)} />
-        </div>
-      ) : null}
 
       <div className="absolute inset-x-0 bottom-0 flex flex-col gap-3 bg-gradient-to-t from-black/80 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10" style={uiStyle}>
         <p className="truncate text-center font-mono text-xs uppercase tracking-[0.25em] text-white/70">
           {currentTrack?.title ?? t('jukebox.pick')}
         </p>
+        {spinMode ? <p className="text-center font-mono text-[10px] uppercase tracking-[0.16em] text-white/45">{t('disc.spin.hint')}</p> : null}
         <div className="flex items-center gap-3">
           <span className="w-10 text-right font-mono text-[10px] text-white/50">{formatTime(progressSec)}</span>
           <input
@@ -232,12 +188,37 @@ export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: Ju
           />
           <span className="w-10 font-mono text-[10px] text-white/50">{formatTime(durationSec)}</span>
         </div>
-        <div className="flex items-center justify-center gap-6">
+        <div className="flex items-center justify-center gap-4">
+          {gestures ? (
+            <button
+              type="button"
+              onClick={() => setSpinMode((on) => !on)}
+              aria-pressed={spinMode}
+              aria-label={spinMode ? t('disc.spin.off') : t('disc.spin.on')}
+              title={spinMode ? t('disc.spin.off') : t('disc.spin.on')}
+              className={`rounded-full p-2 ${spinMode ? 'bg-white/20 text-white' : 'text-white/70'}`}
+              data-testid="button-disc-spin"
+            >
+              <RotateCw size={20} />
+            </button>
+          ) : null}
           <button type="button" onClick={previous} aria-label={t('jukebox.prev')} className="p-2 text-white/80"><SkipBack size={22} /></button>
           <button type="button" onClick={togglePlay} aria-label={isPlaying ? t('jukebox.pause') : t('jukebox.play')} className="rounded-full border border-white/40 p-3">
             {isPlaying ? <Pause size={24} /> : <Play size={24} />}
           </button>
           <button type="button" onClick={next} aria-label={t('jukebox.next')} className="p-2 text-white/80"><SkipForward size={22} /></button>
+          {gestures ? (
+            <button
+              type="button"
+              onClick={() => shelvesRef.current?.pullOut()}
+              aria-label={t('disc.pull.button')}
+              title={t('disc.pull.hint')}
+              className="rounded-full p-2 text-white/70"
+              data-testid="button-disc-pullout"
+            >
+              <ArrowUpFromLine size={20} />
+            </button>
+          ) : null}
         </div>
         <label className="flex items-center justify-center gap-2 font-mono text-[10px] uppercase tracking-widest text-white/50">
           <input type="checkbox" checked={theaterMix} onChange={(e) => setTheaterMix(e.target.checked)} />
