@@ -311,7 +311,8 @@ const CSS =
   ".dcc-disc{overflow:hidden;background:#cfd2d6;" +
   "box-shadow:inset 0 0 0 1px rgba(255,255,255,.28),inset 0 0 0 2px rgba(0,0,0,.08)}" +
   ".dcc-roll,.dcc-idle{position:absolute;inset:0;border-radius:50%}" +
-  ".dcc-roll{transform:rotate(var(--dcc-roll,0deg))}" +
+  // --dcc-user-spin is a hand-spin set by the Jukebox on the chosen disc only; it adds to the roll.
+  ".dcc-roll{transform:rotate(calc(var(--dcc-roll,0deg) + var(--dcc-user-spin,0deg)))}" +
   ".dcc-root[data-spin] .dcc-idle{animation:dcc-spin var(--dcc-spin) linear infinite;animation-play-state:paused}" +
   ".dcc-root[data-spin] .dcc-slide[data-active] .dcc-idle{animation-play-state:running}" +
   ".dcc-root[data-dragging] .dcc-slide .dcc-idle{animation-play-state:paused}" +

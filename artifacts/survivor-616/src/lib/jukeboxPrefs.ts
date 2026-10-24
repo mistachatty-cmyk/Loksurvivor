@@ -64,3 +64,63 @@ export function writeShuffle(on: boolean): void {
     /* the choice just will not persist */
   }
 }
+
+/**
+ * Stacked shelves: one row of discs per album or playlist, swiped up and down. Off puts every disc
+ * back on a single row. On by default.
+ */
+const SHELVES_KEY = 'survivor616.jukebox.shelves.v1';
+
+export function readShelves(): boolean {
+  try {
+    return window.localStorage.getItem(SHELVES_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+export function writeShelves(on: boolean): void {
+  try {
+    window.localStorage.setItem(SHELVES_KEY, on ? '1' : '0');
+  } catch {
+    /* the choice just will not persist */
+  }
+}
+
+/** Hands-on disc gestures: spin a disc, and pull the song out to a full screen. On by default. */
+const GESTURES_KEY = 'survivor616.jukebox.disc-gestures.v1';
+
+export function readDiscGestures(): boolean {
+  try {
+    return window.localStorage.getItem(GESTURES_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+export function writeDiscGestures(on: boolean): void {
+  try {
+    window.localStorage.setItem(GESTURES_KEY, on ? '1' : '0');
+  } catch {
+    /* the choice just will not persist */
+  }
+}
+
+/** The shelf the player last looked at, so the room reopens where they left it. */
+const LAST_SHELF_KEY = 'survivor616.jukebox.last-shelf.v1';
+
+export function readLastShelf(): string | null {
+  try {
+    return window.localStorage.getItem(LAST_SHELF_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function writeLastShelf(id: string): void {
+  try {
+    window.localStorage.setItem(LAST_SHELF_KEY, id);
+  } catch {
+    /* the choice just will not persist */
+  }
+}
