@@ -1183,5 +1183,10 @@
   "settings.jukebox.shelves": "Étagères empilées",
   "settings.jukebox.shelvesBody": "Une rangée de disques par album, la suivante glissant lorsque vous faites glisser votre doigt vers le haut ou vers le bas. Off remet chaque disque sur une seule rangée.",
   "settings.jukebox.gestures": "Tournez et retirez-vous",
-  "settings.jukebox.gesturesBody": "Faites tourner un disque avec votre doigt sans changer la chanson et faites glisser le disque centré vers le haut pour afficher sa chanson en plein écran. Désactivé maintient les disques en mode tap uniquement."
+  "settings.jukebox.gesturesBody": "Faites tourner un disque avec votre doigt sans changer la chanson et faites glisser le disque centré vers le haut pour afficher sa chanson en plein écran. Désactivé maintient les disques en mode tap uniquement.",
+  "jukebox.shuffle": "Mélanger",
+  "jukebox.sleep": "Minuterie de mise en veille : appuyez pour mettre la musique en pause après 15, 30, 60 ou 90 minutes",
+  "jukebox.sleep.left": "Minuterie de mise en veille : la musique se met en pause dans {{time}}",
+  "settings.jukebox.awake": "Gardez l'écran allumé dans la salle Jukebox",
+  "settings.jukebox.awakeBody": "Pendant que la musique joue dans la salle Jukebox, votre écran reste éveillé, vous pouvez donc regarder une chanson entière. Il consomme un peu plus de batterie. Désactivé permet à l'écran de dormir comme d'habitude."
 }
