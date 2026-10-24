@@ -1212,7 +1212,7 @@
   "settings.power.storage.media": "Tus archivos",
   "settings.power.storage.total": "Este juego, total.",
   "settings.power.storage.none": "Ninguno",
-  "settings.power.storage.unknown": "No reportado",
+  "settings.power.storage.unknown": "Desconocido",
   "settings.power.persist": "proteger mi guardado",
   "settings.power.persist.on": "Guardar está protegido",
   "settings.power.persist.done": "Hecho. Su navegador guardará esto cuando se agote el espacio.",
@@ -1220,5 +1220,11 @@
   "settings.power.refresh": "Actualizar",
   "settings.power.persistBody": "La protección le pide al navegador que no borre los datos de este juego si el dispositivo se queda sin espacio. Algunos navegadores deciden por sí solos.",
   "settings.power.network": "Lo que envía este juego",
-  "settings.power.networkBody": "Solo tres cosas salen de tu dispositivo: informes de fallos (si están activados), el recuento del tiempo de reproducción (si está activado) y el enlace de música que pegas cuando pides reproducir una. Sin anuncios, sin rastreadores, sin cargas en segundo plano y nada se ejecuta después de cerrar el juego."
+  "settings.power.networkBody": "Solo tres cosas salen de tu dispositivo: informes de fallos (si están activados), el recuento del tiempo de reproducción (si está activado) y el enlace de música que pegas cuando pides reproducir una. Sin anuncios, sin rastreadores, sin cargas en segundo plano y nada se ejecuta después de cerrar el juego.",
+  "saveGuard.title": "Abrir en dos pestañas",
+  "saveGuard.body": "Se acaba de guardar otra pestaña. Para proteger su progreso, esta pestaña ha pausado el guardado. Cargue el guardado más reciente o conserve lo que tiene esta pestaña.",
+  "saveGuard.load": "Cargar el guardado más reciente",
+  "saveGuard.keep": "Mantener esta pestaña",
+  "settings.power.tabGuard": "Proteger mi guardado entre pestañas",
+  "settings.power.tabGuardBody": "Si el juego está abierto en dos pestañas, la pestaña anterior detiene el guardado y pregunta qué progreso conservar, por lo que una pestaña nunca borra lo que ganó la otra. Desactivado permite que cada pestaña se guarde libremente."
 }

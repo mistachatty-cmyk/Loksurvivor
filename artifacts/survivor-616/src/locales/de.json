@@ -1212,7 +1212,7 @@
   "settings.power.storage.media": "Ihre Dateien",
   "settings.power.storage.total": "Dieses Spiel, total",
   "settings.power.storage.none": "Keine",
-  "settings.power.storage.unknown": "Nicht gemeldet",
+  "settings.power.storage.unknown": "Unbekannt",
   "settings.power.persist": "Beschütze meine Rettung",
   "settings.power.persist.on": "Speichern ist geschützt",
   "settings.power.persist.done": "Fertig. Ihr Browser speichert dies, wenn der Speicherplatz knapp wird.",
@@ -1220,5 +1220,11 @@
   "settings.power.refresh": "Aktualisieren",
   "settings.power.persistBody": "Der Schutz fordert den Browser auf, die Daten dieses Spiels nicht zu löschen, wenn auf dem Gerät nicht mehr genügend Speicherplatz vorhanden ist. Manche Browser entscheiden selbst.",
   "settings.power.network": "Was dieses Spiel sendet",
-  "settings.power.networkBody": "Nur drei Dinge verlassen jemals Ihr Gerät: Absturzberichte (falls aktiviert), die Spielzeitzählung (falls aktiviert) und der Musiklink, den Sie selbst einfügen, wenn Sie zum Abspielen auffordern. Keine Werbung, keine Tracker, keine Hintergrund-Uploads und nach dem Schließen des Spiels wird nichts mehr ausgeführt."
+  "settings.power.networkBody": "Nur drei Dinge verlassen jemals Ihr Gerät: Absturzberichte (falls aktiviert), die Spielzeitzählung (falls aktiviert) und der Musiklink, den Sie selbst einfügen, wenn Sie zum Abspielen auffordern. Keine Werbung, keine Tracker, keine Hintergrund-Uploads und nach dem Schließen des Spiels wird nichts mehr ausgeführt.",
+  "saveGuard.title": "In zwei Tabs öffnen",
+  "saveGuard.body": "Ein weiterer Tab wurde gerade gespeichert. Um Ihren Fortschritt zu schützen, wurde die Speicherung auf dieser Registerkarte angehalten. Laden Sie den neuesten Speicherstand oder behalten Sie den Inhalt dieser Registerkarte bei.",
+  "saveGuard.load": "Neuesten Speicherstand laden",
+  "saveGuard.keep": "Behalten Sie diese Registerkarte",
+  "settings.power.tabGuard": "Schützen Sie meine Speicherung über mehrere Registerkarten hinweg",
+  "settings.power.tabGuardBody": "Wenn das Spiel in zwei Tabs geöffnet ist, pausiert der ältere Tab das Speichern und fragt, welcher Fortschritt beibehalten werden soll, sodass ein Tab nie die verdienten Verdienste des anderen Tabs löscht. Aus lässt jede Registerkarte frei speichern."
 }

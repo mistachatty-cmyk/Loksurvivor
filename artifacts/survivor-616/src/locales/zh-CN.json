@@ -1212,7 +1212,7 @@
   "settings.power.storage.media": "你的文件",
   "settings.power.storage.total": "本场比赛，总计",
   "settings.power.storage.none": "没有任何",
-  "settings.power.storage.unknown": "未报道",
+  "settings.power.storage.unknown": "未知",
   "settings.power.persist": "保护我的保存",
   "settings.power.persist.on": "保存受到保护",
   "settings.power.persist.done": "完毕。当空间不足时，您的浏览器将保留此保存。",
@@ -1220,5 +1220,11 @@
   "settings.power.refresh": "刷新",
   "settings.power.persistBody": "如果设备空间不足，保护会要求浏览器不要清除该游戏的数据。有些浏览器自行决定。",
   "settings.power.network": "这个游戏发送什么",
-  "settings.power.networkBody": "只有三件事会离开你的设备：崩溃报告（如果打开）、播放时间计数（如果打开）以及当你要求播放音乐时你自己粘贴的音乐链接。没有广告，没有跟踪器，没有后台上传，关闭游戏后也不会运行任何内容。"
+  "settings.power.networkBody": "只有三件事会离开你的设备：崩溃报告（如果打开）、播放时间计数（如果打开）以及当你要求播放音乐时你自己粘贴的音乐链接。没有广告，没有跟踪器，没有后台上传，关闭游戏后也不会运行任何内容。",
+  "saveGuard.title": "在两个选项卡中打开",
+  "saveGuard.body": "刚刚保存了另一个选项卡。为了保护您的进度，此选项卡已暂停保存。加载最新的保存，或保留此选项卡的内容。",
+  "saveGuard.load": "加载最新保存",
+  "saveGuard.keep": "保留此选项卡",
+  "settings.power.tabGuard": "跨标签保护我的保存",
+  "settings.power.tabGuardBody": "如果游戏在两个选项卡中打开，旧选项卡会暂停保存并询问保留哪个进度，因此一个选项卡永远不会擦除另一个选项卡获得的内容。关闭可以让每个选项卡自由保存。"
 }

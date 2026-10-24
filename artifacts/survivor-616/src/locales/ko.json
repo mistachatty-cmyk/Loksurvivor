@@ -1212,7 +1212,7 @@
   "settings.power.storage.media": "귀하의 파일",
   "settings.power.storage.total": "이 게임은 총",
   "settings.power.storage.none": "없음",
-  "settings.power.storage.unknown": "보고되지 않음",
+  "settings.power.storage.unknown": "알 수 없음",
   "settings.power.persist": "내 저장을 보호하세요",
   "settings.power.persist.on": "저장이 보호됩니다",
   "settings.power.persist.done": "완료. 공간이 부족해지면 브라우저에서 이 저장 공간을 유지합니다.",
@@ -1220,5 +1220,11 @@
   "settings.power.refresh": "새로고침",
   "settings.power.persistBody": "보호는 장치의 공간이 부족한 경우 이 게임의 데이터를 지우지 않도록 브라우저에 요청합니다. 일부 브라우저는 스스로 결정합니다.",
   "settings.power.network": "이 게임이 보내는 것",
-  "settings.power.networkBody": "기기에 남아 있는 정보는 충돌 보고서(켜져 있는 경우), 재생 시간 기록(켜져 있는 경우), 재생을 요청할 때 직접 붙여넣는 음악 링크입니다. 광고도 없고, 추적기도 없고, 백그라운드 업로드도 없고, 게임을 닫은 후에는 아무것도 실행되지 않습니다."
+  "settings.power.networkBody": "기기에 남아 있는 정보는 충돌 보고서(켜져 있는 경우), 재생 시간 기록(켜져 있는 경우), 재생을 요청할 때 직접 붙여넣는 음악 링크입니다. 광고도 없고, 추적기도 없고, 백그라운드 업로드도 없고, 게임을 닫은 후에는 아무것도 실행되지 않습니다.",
+  "saveGuard.title": "두 개의 탭에서 열기",
+  "saveGuard.body": "방금 다른 탭이 저장되었습니다. 진행 상황을 보호하기 위해 이 탭에서는 저장이 일시 중지되었습니다. 최신 저장 파일을 로드하거나 이 탭에 있는 내용을 유지하세요.",
+  "saveGuard.load": "최신 저장 로드",
+  "saveGuard.keep": "이 탭을 유지하세요",
+  "settings.power.tabGuard": "여러 탭에서 내 저장 내용을 보호하세요",
+  "settings.power.tabGuardBody": "게임이 두 개의 탭에 열려 있는 경우 이전 탭은 저장을 일시 중지하고 어떤 진행 상황을 유지할 것인지 묻기 때문에 한 탭이 다른 탭에서 획득한 내용을 절대 지우지 않습니다. 끄면 모든 탭을 자유롭게 저장할 수 있습니다."
 }
