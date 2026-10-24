@@ -152,6 +152,8 @@ export interface RunScreenProps {
   areaId: string;
   characterId: string;
   challengeIds?: string[];
+  /** A shared challenge code's seed. Without one the run picks its own. */
+  seed?: number;
   startingWeaponLevel?: number;
   utilityRewardMultiplier?: number;
   physicsObjectClicksEnabled?: boolean;
@@ -232,6 +234,7 @@ export function RunScreen({
   areaId,
   characterId,
   challengeIds = [],
+  seed: seedProp,
   startingWeaponLevel: startingWeaponLevelProp,
   utilityRewardMultiplier: utilityRewardMultiplierProp,
   physicsObjectClicksEnabled = true,
@@ -443,7 +446,7 @@ export function RunScreen({
       area,
       character,
       effectiveStats(character, meta),
-      undefined,
+      seedProp,
       challenges,
       initialWeaponLevel,
       physicsObjectClicksEnabled,
@@ -1358,6 +1361,7 @@ export function RunScreen({
         console.error('claiming reel prizes failed', error);
       }
       const result = buildResult(world, finalRewardMultiplier);
+      result.seed = world.rngSeed;
       try {
         const highlights = highlightRecorderRef.current.getHighlights();
         // Clip saving is a nicety: a stalled IndexedDB write (Safari) or a throw must never strand the

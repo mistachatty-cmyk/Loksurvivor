@@ -2835,6 +2835,8 @@ export interface ThreatCalibrations {
 
 export interface RunResult {
   areaId: string;
+  /** The run's seed: waves, objectives and loot rolls follow it, so it can be shared as a challenge code. */
+  seed?: number;
   characterId: string;
   cleared: boolean;
   /** Present for a failed run; distinguishes lethal environmental deaths. */

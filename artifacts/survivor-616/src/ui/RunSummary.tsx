@@ -19,6 +19,8 @@ import { WeaponIcon } from './WeaponIcon';
 import { AccountNudge } from './AccountNudge';
 import { AnimatedNumber } from './AnimatedNumber';
 import { runShareText } from '@/lib/sharePlatforms';
+import { encodeChallenge } from '@/lib/challengeCode';
+import { AREAS_BY_ID } from '@/game/data/areas';
 import { useT } from '@/lib/i18n';
 import { formatClock } from '@lok/recap';
 import { PetGrowthRecap } from './PetGrowthRecap';
@@ -94,6 +96,9 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
   const { session, user } = useAuth();
   const [showAfterAction, setShowAfterAction] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+  // Only built-in maps can be shared: a custom map or mission lives on this device.
+  const challengeCode = result.seed !== undefined && !result.missionId && AREAS_BY_ID[result.areaId] ? encodeChallenge(result.areaId, result.seed) : null;
   const t = useT();
   const [clipUrlsByAssetId, setClipUrlsByAssetId] = useState<Record<string, string>>({});
 
@@ -966,6 +971,19 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
             >
               {t('summary.runItBack')}
             </button>
+            {challengeCode ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(challengeCode).then(() => setCodeCopied(true)).catch(() => undefined);
+                }}
+                className="inline-flex flex-1 items-center justify-center gap-2 border border-border bg-card py-4 text-sm font-black uppercase tracking-widest text-white transition-colors hover:border-primary"
+                data-testid="button-copy-challenge-code"
+                title={challengeCode}
+              >
+                {codeCopied ? t('challenge.copied') : t('challenge.copy')}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setShareOpen(true)}

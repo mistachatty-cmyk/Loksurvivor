@@ -29,3 +29,6 @@ Spec and handoff log: `docs/jukebox-spec.md`. Shared logic: `packages/lok-jukebo
 
 ## Daily message (0.42.44)
 - `public/lok-daily.json` (hand-edited, max 5 notes, dated windows, validated by `parseDailyFeed` and a test) is read by `lib/dailyFeed.ts` at most once per UTC day, shown once per note id as a hideout strip line. Blocked by pref, saver/Data Saver, offline. To announce something: add a note with `from`/`until`; no redeploy logic needed beyond shipping the file. Keep the network note in Settings (`settings.power.networkBody`) in step with any new network read.
+
+## Challenge codes (0.42.45)
+- `lib/challengeCode.ts`: `616.<area lowercased>.<seed base36>.<check>`; decoder matches ids case-insensitively (an area id `bubbleWash` exists), requires the map to be unlocked. `RunResult.seed` comes from `world.rngSeed`; `RunScreen` takes a `seed` prop, `Screen` run carries it. Same seed = same waves/objectives/loot rolls, not identical play. Only built-in `AREAS` get a copy button (custom maps/missions are device-local).

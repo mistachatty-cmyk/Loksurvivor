@@ -2099,6 +2099,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Settings, Power, storage and data has a Daily message switch to turn it off. The note there about what the game sends now lists it.',
     ],
   },
+  {
+    version: '0.42.45',
+    date: '2026-10-24',
+    publishedAt: '2026-10-24T19:30:00Z',
+    kind: 'update',
+    title: 'Challenge codes',
+    body: [
+      'After a run, tap Copy challenge code and send it to a friend by text, chat or on paper. On the Where tonight screen, a Challenge code box takes a code and starts that same block on that same night: same map, same waves, same loot rolls. Compare how far each of you got.',
+      'A code is just the map and the night, with a check character to catch typos. It is not stored or uploaded anywhere, and it only works for blocks you have unlocked.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

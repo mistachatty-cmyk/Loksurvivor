@@ -1228,5 +1228,14 @@
   "settings.power.tabGuard": "Protect my save across tabs",
   "settings.power.tabGuardBody": "If the game is open in two tabs, the older tab pauses saving and asks which progress to keep, so one tab never wipes what the other earned. Off lets every tab save freely.",
   "settings.power.daily": "Daily message",
-  "settings.power.dailyBody": "Once a day the game reads one small file from its own site and may show a short line from the 616 on your hideout strip. It carries nothing about you. It never loads while the battery saver or Data Saver is on. Off stops it."
+  "settings.power.dailyBody": "Once a day the game reads one small file from its own site and may show a short line from the 616 on your hideout strip. It carries nothing about you. It never loads while the battery saver or Data Saver is on. Off stops it.",
+  "challenge.title": "Challenge code",
+  "challenge.body": "Got a code from a friend? Enter it to play their block on their night: same map, same waves, same loot rolls. Then compare how far each of you got.",
+  "challenge.play": "Play",
+  "challenge.badFormat": "That does not look like a challenge code. It reads like 616.block.0000.0",
+  "challenge.badCheck": "That code has a typo. Check each character.",
+  "challenge.badArea": "This game does not have that block.",
+  "challenge.locked": "You have not unlocked that block yet.",
+  "challenge.copy": "Copy challenge code",
+  "challenge.copied": "Code copied"
 }
