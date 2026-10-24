@@ -2033,6 +2033,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Behind the scenes: crash reports now name the screen the game was really on when it closed (they used to say a question mark), and every update is now typechecked, built and tested automatically before it can land.',
     ],
   },
+  {
+    version: '0.42.39',
+    date: '2026-10-24',
+    publishedAt: '2026-10-24T19:00:00Z',
+    kind: 'hotfix',
+    title: 'Pull-out stability on iPhone',
+    body: [
+      'Fixed the Jukebox Room closing on its own on some iPhones when a song was pulled out. While a song is pulled out, the shelf of discs behind it now rests instead of being drawn, and the light show on a phone stays gentle. Putting the disc back returns you to the same shelf and disc.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

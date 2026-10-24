@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 178,
+      "version": "0.42.39",
+      "date": "2026-10-24",
+      "publishedAt": "2026-10-24T19:00:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Pull-out stability on iPhone",
+      "body": [
+        "Fixed the Jukebox Room closing on its own on some iPhones when a song was pulled out. While a song is pulled out, the shelf of discs behind it now rests instead of being drawn, and the light show on a phone stays gentle. Putting the disc back returns you to the same shelf and disc."
+      ]
+    },
+    {
       "number": 177,
       "version": "0.42.38",
       "date": "2026-10-24",

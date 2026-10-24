@@ -138,7 +138,7 @@ export function DiscPullOut({ trackId, item, lite, onClose }: DiscPullOutProps) 
       </div>
 
       <div ref={stageRef} className="relative z-10 mx-auto mt-2 h-[50dvh] w-full max-w-xl flex-none">
-        <DiscPulse color={palette[1]} active={playingThis} playing={isPlaying} level={pulseLevel} discSize={DISC_SIZE} />
+        <DiscPulse color={palette[1]} active={playingThis} playing={isPlaying} level={lite && pulseLevel !== 'off' ? 'soft' : pulseLevel} discSize={DISC_SIZE} />
         <DiscCascadeCarousel
           items={[item]}
           height="100%"

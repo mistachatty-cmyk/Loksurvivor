@@ -439,7 +439,14 @@ export const DiscShelves = forwardRef<DiscShelvesHandle, DiscShelvesProps>(funct
         </>
       ) : null}
 
-      <div key={shelf.id} className="shelf-row absolute inset-0" data-enter={enter}>
+      {/* While a song is pulled out the shelf beneath is not drawn at all (display:none frees its
+          3D layers); two full 3D scenes at once is what ran phones out of memory. State is kept. */}
+      <div
+        key={shelf.id}
+        className="shelf-row absolute inset-0"
+        data-enter={enter}
+        style={pulledEntry ? { display: 'none' } : undefined}
+      >
         <ShelfRow
           entries={shelf.entries}
           currentId={currentTrack?.id}
@@ -453,7 +460,7 @@ export const DiscShelves = forwardRef<DiscShelvesHandle, DiscShelvesProps>(funct
         />
       </div>
 
-      {gestures && spinMode ? (
+      {gestures && spinMode && !pulledEntry ? (
         <DiscSpinSurface containerRef={wrapRef} discSize={discSize} label={t('disc.spin.surface')} onTap={() => select(centerIdx)} />
       ) : null}
 
