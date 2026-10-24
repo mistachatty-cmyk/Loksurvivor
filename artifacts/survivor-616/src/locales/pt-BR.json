@@ -1220,11 +1220,13 @@
   "settings.power.refresh": "Atualizar",
   "settings.power.persistBody": "A proteção pede ao navegador para não limpar os dados deste jogo se o dispositivo ficar com pouco espaço. Alguns navegadores decidem por conta própria.",
   "settings.power.network": "O que este jogo envia",
-  "settings.power.networkBody": "Apenas três coisas saem do seu dispositivo: relatórios de falhas (se ativado), o registro do tempo de reprodução (se ativado) e o link da música que você mesmo cola quando pede para reproduzir uma. Sem anúncios, sem rastreadores, sem uploads em segundo plano e nada é executado depois que você fecha o jogo.",
+  "settings.power.networkBody": "Apenas quatro coisas saem do seu dispositivo: relatórios de falhas (se ativado), o registro do tempo de reprodução (se ativado), o arquivo de mensagens diárias (se ativado, uma leitura simples de um arquivo público) e o link da música que você cola quando pede para reproduzir um. Sem anúncios, sem rastreadores, sem uploads em segundo plano e nada é executado depois que você fecha o jogo.",
   "saveGuard.title": "Abra em duas guias",
   "saveGuard.body": "Outra guia acabou de ser salva. Para proteger seu progresso, esta guia pausou o salvamento. Carregue o salvamento mais recente ou mantenha o que esta guia contém.",
   "saveGuard.load": "Carregar o salvamento mais recente",
   "saveGuard.keep": "Mantenha esta guia",
   "settings.power.tabGuard": "Proteja meu save entre guias",
-  "settings.power.tabGuardBody": "Se o jogo estiver aberto em duas guias, a guia mais antiga pausa o salvamento e pergunta qual progresso manter, para que uma guia nunca apague o que a outra ganhou. Off permite que todas as guias sejam salvas livremente."
+  "settings.power.tabGuardBody": "Se o jogo estiver aberto em duas guias, a guia mais antiga pausa o salvamento e pergunta qual progresso manter, para que uma guia nunca apague o que a outra ganhou. Off permite que todas as guias sejam salvas livremente.",
+  "settings.power.daily": "Mensagem diária",
+  "settings.power.dailyBody": "Uma vez por dia, o jogo lê um pequeno arquivo de seu próprio site e pode mostrar uma pequena linha do 616 na sua faixa de esconderijo. Não carrega nada sobre você. Ele nunca carrega enquanto a economia de bateria ou a economia de dados estão ativadas. Desligado interrompe."
 }
