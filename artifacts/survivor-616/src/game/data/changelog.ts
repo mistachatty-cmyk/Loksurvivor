@@ -2020,6 +2020,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Settings, Jukebox and soundtracks has two new switches: Stacked shelves, and Spin and pull out. Turn either off to get the old single tap-only row back. New Fits songs now get their own discs.',
     ],
   },
+  {
+    version: '0.42.38',
+    date: '2026-10-24',
+    publishedAt: '2026-10-24T14:40:00Z',
+    kind: 'update',
+    title: 'Better listening and viewing',
+    body: [
+      'Your soundtrack now shows up on the lock screen, in earbud controls and on car displays: title, album and the 616 icon, with play, pause, next, previous and a scrubbable playhead.',
+      'The Jukebox Room keeps your screen awake while music plays, so you can watch a whole song with the discs and the glow. Settings, Jukebox and soundtracks has a switch if you would rather let the screen sleep. A pulled-out song does the same.',
+      'New in the Jukebox Room: shuffle and repeat buttons, and a sleep timer that pauses the music after 15, 30, 60 or 90 minutes. On a keyboard, Space plays and pauses, N and P skip, S shuffles, R cycles repeat and F pulls the song out.',
+      'Behind the scenes: crash reports now name the screen the game was really on when it closed (they used to say a question mark), and every update is now typechecked, built and tested automatically before it can land.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

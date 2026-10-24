@@ -5,7 +5,7 @@ import { useMusicPlayer, formatTime } from '@/game/audio/musicPlayer';
 import { useMeta } from '@/game/state/metaStore';
 import { DISC_FX_KEYS, DISC_PULSE_LEVELS, readDiscFx, readDiscPulse, writeDiscFx, writeDiscPulse, type DiscFx, type DiscPulseLevel } from '@/lib/discPulse';
 import { useT } from '@/lib/i18n';
-import { REACTIVE_BG_LEVELS, readDiscGestures, readReactiveBg, readShelves, readTheaterMix, writeDiscGestures, writeReactiveBg, writeShelves, writeTheaterMix, type ReactiveBgLevel } from '@/lib/jukeboxPrefs';
+import { REACTIVE_BG_LEVELS, readDiscGestures, readKeepAwake, readReactiveBg, readShelves, readTheaterMix, writeDiscGestures, writeKeepAwake, writeReactiveBg, writeShelves, writeTheaterMix, type ReactiveBgLevel } from '@/lib/jukeboxPrefs';
 import { ArrivalDiscsToggle } from './ArrivalDiscsToggle';
 
 const ON = 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100';
@@ -36,6 +36,7 @@ export function JukeboxSettings({ onOpenScreen }: { onOpenScreen?: (id: string) 
   const [bg, setBg] = useState<ReactiveBgLevel>(readReactiveBg);
   const [shelves, setShelves] = useState(readShelves);
   const [gestures, setGestures] = useState(readDiscGestures);
+  const [awake, setAwake] = useState(readKeepAwake);
   const roomOpen = unlockedRooms.some((room) => room.id === 'jukebox-room');
 
   return (
@@ -68,6 +69,12 @@ export function JukeboxSettings({ onOpenScreen }: { onOpenScreen?: (id: string) 
           <Row title={t('settings.jukebox.shelves')} body={t('settings.jukebox.shelvesBody')}>
             <button type="button" aria-pressed={shelves} onClick={() => { writeShelves(!shelves); setShelves(!shelves); }} className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${shelves ? ON : OFF}`} data-testid="button-jukebox-shelves">
               {shelves ? 'On' : 'Off'}
+            </button>
+          </Row>
+
+          <Row title={t('settings.jukebox.awake')} body={t('settings.jukebox.awakeBody')}>
+            <button type="button" aria-pressed={awake} onClick={() => { writeKeepAwake(!awake); setAwake(!awake); }} className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${awake ? ON : OFF}`} data-testid="button-jukebox-awake">
+              {awake ? 'On' : 'Off'}
             </button>
           </Row>
 

@@ -64,10 +64,18 @@ export function startCrashWatch(): void {
     const raw = window.localStorage.getItem(ALIVE_KEY);
     if (raw && document.visibilityState === 'visible') {
       const prev = JSON.parse(raw) as { screen?: string; v?: string };
-      recovered = lokCrash.capture(
-        new Error(`Page closed unexpectedly on ${prev.screen || 'unknown screen'} (v${prev.v ?? '?'})`),
-        'error',
-      );
+      // The report is filed now, on the new visit, so name the screen the LAST visit died on.
+      // Without this every such report said "screen: ?" and we had to guess where it happened.
+      const nowOn = currentScreen;
+      if (prev.screen) currentScreen = prev.screen;
+      try {
+        recovered = lokCrash.capture(
+          new Error(`Page closed unexpectedly on ${prev.screen || 'unknown screen'} (v${prev.v ?? '?'})`),
+          'error',
+        );
+      } finally {
+        currentScreen = nowOn;
+      }
     }
     const mark = () => {
       try {
