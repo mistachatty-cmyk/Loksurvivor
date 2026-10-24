@@ -32,3 +32,6 @@ Spec and handoff log: `docs/jukebox-spec.md`. Shared logic: `packages/lok-jukebo
 
 ## Challenge codes (0.42.45)
 - `lib/challengeCode.ts`: `616.<area lowercased>.<seed base36>.<check>`; decoder matches ids case-insensitively (an area id `bubbleWash` exists), requires the map to be unlocked. `RunResult.seed` comes from `world.rngSeed`; `RunScreen` takes a `seed` prop, `Screen` run carries it. Same seed = same waves/objectives/loot rolls, not identical play. Only built-in `AREAS` get a copy button (custom maps/missions are device-local).
+
+## Hub sync state (2026-10-24, game 0.42.45)
+- Lore, achievements catalog, LokDex catalog and LokDex art were all stale in `mistachatty-cmyk/gsixhub` and were regenerated and merged (gsixhub PR #50). Its default branch is `claude/gsix-hub-rebuild-0pqf59`, it has no CLAUDE.md, and the session needs `add_repo` (push access) plus one shallow clone. Re-run the four exporters (see CLAUDE.md) after any lore/card/achievement change.
