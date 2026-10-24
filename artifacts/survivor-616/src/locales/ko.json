@@ -1183,5 +1183,10 @@
   "settings.jukebox.shelves": "쌓인 선반",
   "settings.jukebox.shelvesBody": "앨범당 한 줄의 디스크가 있으며 위나 아래로 스와이프하면 다음 디스크가 들어옵니다. 꺼짐은 모든 디스크를 다시 단일 행에 넣습니다.",
   "settings.jukebox.gestures": "돌려서 빼내세요",
-  "settings.jukebox.gesturesBody": "노래를 변경하지 않고 손가락으로 디스크를 회전시키고 중앙에 있는 디스크를 위로 끌어 노래를 전체 화면으로 끌어옵니다. 끄면 디스크를 탭 전용으로 유지합니다."
+  "settings.jukebox.gesturesBody": "노래를 변경하지 않고 손가락으로 디스크를 회전시키고 중앙에 있는 디스크를 위로 끌어 노래를 전체 화면으로 끌어옵니다. 끄면 디스크를 탭 전용으로 유지합니다.",
+  "jukebox.shuffle": "셔플",
+  "jukebox.sleep": "취침 타이머: 탭하여 15분, 30분, 60분 또는 90분 후에 음악을 일시중지합니다.",
+  "jukebox.sleep.left": "수면 타이머: {{time}}에서 음악이 일시 중지됩니다.",
+  "settings.jukebox.awake": "주크박스 룸에서 화면을 켜두세요",
+  "settings.jukebox.awakeBody": "주크박스 룸에서 음악이 재생되는 동안 화면은 계속 켜져 있으므로 전체 노래를 볼 수 있습니다. 배터리를 조금 더 소모합니다. 끄면 화면이 평소처럼 절전 모드로 전환됩니다."
 }

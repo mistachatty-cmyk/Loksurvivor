@@ -1183,5 +1183,10 @@
   "settings.jukebox.shelves": "堆叠式货架",
   "settings.jukebox.shelvesBody": "每张专辑有一排光盘，当您向上或向下滑动时，下一张会滑入。关闭将每个光盘放回单行。",
   "settings.jukebox.gestures": "旋转并拉出",
-  "settings.jukebox.gesturesBody": "用手指旋转光盘而不改变歌曲，然后向上拖动居中的光盘将其歌曲拉出全屏。关闭使光盘仅可点击。"
+  "settings.jukebox.gesturesBody": "用手指旋转光盘而不改变歌曲，然后向上拖动居中的光盘将其歌曲拉出全屏。关闭使光盘仅可点击。",
+  "jukebox.shuffle": "随机播放",
+  "jukebox.sleep": "睡眠定时器：点击可在 15、30、60 或 90 分钟后暂停音乐",
+  "jukebox.sleep.left": "睡眠定时器：音乐在 {{time}} 暂停",
+  "settings.jukebox.awake": "保持点唱机室的屏幕打开",
+  "settings.jukebox.awakeBody": "当点唱机室中播放音乐时，您的屏幕会保持唤醒状态，因此您可以观看整首歌曲。它使用更多的电池。关闭可让屏幕照常休眠。"
 }

@@ -1183,5 +1183,10 @@
   "settings.jukebox.shelves": "Prateleiras empilhadas",
   "settings.jukebox.shelvesBody": "Uma linha de discos por álbum, com o próximo deslizando para cima ou para baixo. Off coloca todos os discos de volta em uma única linha.",
   "settings.jukebox.gestures": "Gire e retire",
-  "settings.jukebox.gesturesBody": "Gire um disco com o dedo sem alterar a música e arraste o disco centralizado para cima para exibir a música em tela inteira. Desligado mantém os discos somente tocando."
+  "settings.jukebox.gesturesBody": "Gire um disco com o dedo sem alterar a música e arraste o disco centralizado para cima para exibir a música em tela inteira. Desligado mantém os discos somente tocando.",
+  "jukebox.shuffle": "Embaralhar",
+  "jukebox.sleep": "Temporizador: toque para pausar a música após 15, 30, 60 ou 90 minutos",
+  "jukebox.sleep.left": "Temporizador: a música pausa em {{time}}",
+  "settings.jukebox.awake": "Mantenha a tela ligada na Jukebox Room",
+  "settings.jukebox.awakeBody": "Enquanto a música toca na Jukebox Room, sua tela permanece ativa, para que você possa assistir a uma música inteira. Ele usa um pouco mais de bateria. Desligado permite que a tela durma normalmente."
 }

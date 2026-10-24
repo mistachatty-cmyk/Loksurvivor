@@ -1183,5 +1183,10 @@
   "settings.jukebox.shelves": "Estantes apilados",
   "settings.jukebox.shelvesBody": "Una fila de discos por álbum, y la siguiente se desliza hacia adentro al deslizar el dedo hacia arriba o hacia abajo. Off coloca cada disco nuevamente en una sola fila.",
   "settings.jukebox.gestures": "Gira y saca",
-  "settings.jukebox.gesturesBody": "Gire un disco con el dedo sin cambiar la canción y arrastre el disco centrado hacia arriba para mostrar su canción en pantalla completa. Apagado mantiene los discos solo pulsados."
+  "settings.jukebox.gesturesBody": "Gire un disco con el dedo sin cambiar la canción y arrastre el disco centrado hacia arriba para mostrar su canción en pantalla completa. Apagado mantiene los discos solo pulsados.",
+  "jukebox.shuffle": "barajar",
+  "jukebox.sleep": "Temporizador de apagado: toque para pausar la música después de 15, 30, 60 o 90 minutos.",
+  "jukebox.sleep.left": "Temporizador de apagado: la música se detiene en {{time}}",
+  "settings.jukebox.awake": "Mantenga la pantalla encendida en la sala Jukebox",
+  "settings.jukebox.awakeBody": "Mientras suena música en la sala Jukebox, tu pantalla permanece activa para que puedas ver una canción completa. Utiliza un poco más de batería. Apagado permite que la pantalla duerma como de costumbre."
 }

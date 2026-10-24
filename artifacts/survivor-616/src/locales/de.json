@@ -1183,5 +1183,10 @@
   "settings.jukebox.shelves": "Gestapelte Regale",
   "settings.jukebox.shelvesBody": "Eine Reihe von Discs pro Album, wobei die nächste hineingeschoben wird, wenn Sie nach oben oder unten wischen. Aus setzt jede Scheibe wieder in eine einzelne Reihe.",
   "settings.jukebox.gestures": "Drehen und herausziehen",
-  "settings.jukebox.gesturesBody": "Drehen Sie eine Disc mit Ihrem Finger, ohne das Lied zu ändern, und ziehen Sie die mittlere Disc nach oben, um das Lied im Vollbildmodus anzuzeigen. Aus schaltet die Discs nur durch Antippen ab."
+  "settings.jukebox.gesturesBody": "Drehen Sie eine Disc mit Ihrem Finger, ohne das Lied zu ändern, und ziehen Sie die mittlere Disc nach oben, um das Lied im Vollbildmodus anzuzeigen. Aus schaltet die Discs nur durch Antippen ab.",
+  "jukebox.shuffle": "Mischen",
+  "jukebox.sleep": "Sleep-Timer: Tippen Sie, um die Musik nach 15, 30, 60 oder 90 Minuten anzuhalten",
+  "jukebox.sleep.left": "Sleep-Timer: Musik pausiert in {{time}}",
+  "settings.jukebox.awake": "Lassen Sie den Bildschirm im Jukebox-Raum eingeschaltet",
+  "settings.jukebox.awakeBody": "Während im Jukebox-Raum Musik abgespielt wird, bleibt Ihr Bildschirm wach, sodass Sie einen ganzen Song ansehen können. Es verbraucht etwas mehr Batterie. Bei „Aus“ wird der Bildschirm wie gewohnt in den Ruhezustand versetzt."
 }
