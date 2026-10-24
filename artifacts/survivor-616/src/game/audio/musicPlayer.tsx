@@ -10,6 +10,7 @@
  */
 
 import { readShuffle, writeShuffle } from '@/lib/jukeboxPrefs';
+import { positionStateFor, sessionMetaFor, skipTarget } from '@/lib/mediaSessionMeta';
 import { DEFAULT_VOLUME, VOLUME_STORAGE_KEY, parseStoredVolume } from './volumeCurve';
 import {
   createContext,
@@ -1497,6 +1498,69 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     audio.currentTime = Math.max(0, Math.min(seconds, audio.duration));
     setProgressSec(audio.currentTime);
   }, []);
+
+  // Lock screen, earbuds and car controls. Metadata and handlers only: the sound itself is never touched.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    const session = navigator.mediaSession;
+    const actions: [MediaSessionAction, MediaSessionActionHandler][] = [
+      ['play', () => { if (audioRef.current?.paused) togglePlay(); }],
+      ['pause', () => { if (audioRef.current && !audioRef.current.paused) togglePlay(); }],
+      ['previoustrack', () => previous()],
+      ['nexttrack', () => next()],
+      ['seekto', (details) => { if (typeof details.seekTime === 'number') seek(details.seekTime); }],
+      ['seekbackward', (details) => seek(skipTarget(audioRef.current?.currentTime ?? 0, details.seekOffset ?? 10, -1))],
+      ['seekforward', (details) => seek(skipTarget(audioRef.current?.currentTime ?? 0, details.seekOffset ?? 10, 1))],
+    ];
+    for (const [action, handler] of actions) {
+      try {
+        session.setActionHandler(action, handler);
+      } catch {
+        /* this browser does not offer that action */
+      }
+    }
+    return () => {
+      for (const [action] of actions) {
+        try {
+          session.setActionHandler(action, null);
+        } catch {
+          /* nothing to undo */
+        }
+      }
+    };
+  }, [togglePlay, next, previous, seek]);
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    try {
+      navigator.mediaSession.metadata = currentTrack
+        ? new MediaMetadata(sessionMetaFor(currentTrack, import.meta.env.BASE_URL))
+        : null;
+    } catch {
+      /* lock-screen details are a nicety */
+    }
+  }, [currentTrack]);
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    try {
+      navigator.mediaSession.playbackState = currentTrack ? (isPlaying ? 'playing' : 'paused') : 'none';
+    } catch {
+      /* lock-screen details are a nicety */
+    }
+  }, [currentTrack, isPlaying]);
+
+  const wholeSecond = Math.floor(progressSec);
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    const state = positionStateFor(durationSec, wholeSecond, playbackRate);
+    if (!state) return;
+    try {
+      navigator.mediaSession.setPositionState(state);
+    } catch {
+      /* lock-screen details are a nicety */
+    }
+  }, [wholeSecond, durationSec, playbackRate]);
 
   const setVolume = useCallback((value: number) => {
     const clamped = Math.max(0, Math.min(1, value));

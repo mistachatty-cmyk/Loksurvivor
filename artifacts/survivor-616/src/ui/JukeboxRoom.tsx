@@ -8,7 +8,7 @@
  * The first touch at Level 3 only wakes the room; it never presses a button.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpFromLine, Library, Pause, Play, RotateCw, Settings2, SkipBack, SkipForward, X } from 'lucide-react';
+import { ArrowUpFromLine, Library, Moon, Pause, Play, Repeat, Repeat1, RotateCw, Settings2, Shuffle, SkipBack, SkipForward, X } from 'lucide-react';
 import { dampenToTone, gradeFrom, groupBands, IDLE_BANDS, smoothBands, type GroupedBands } from '@lok/jukebox';
 
 import { beatBus } from '@/game/audio/beatBus';
@@ -18,7 +18,9 @@ import { armDiscGuard, watchDiscGuard } from '@/lib/discGuard';
 import { useT } from '@/lib/i18n';
 import { useTheaterLevel } from '@/lib/useTheaterLevel';
 import { readDiscPulse } from '@/lib/discPulse';
-import { readDiscGestures, readReactiveBg, reactiveBgGain, readTheaterMix, writeTheaterMix } from '@/lib/jukeboxPrefs';
+import { formatCountdown, nextSleepStep } from '@/lib/sleepTimer';
+import { useWakeLock } from '@/lib/useWakeLock';
+import { readDiscGestures, readKeepAwake, readReactiveBg, reactiveBgGain, readTheaterMix, writeTheaterMix } from '@/lib/jukeboxPrefs';
 import { DiscShelves, type DiscShelvesHandle } from './DiscShelves';
 
 const FADE_MS = 900;
@@ -33,10 +35,39 @@ export interface JukeboxRoomProps {
 export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: JukeboxRoomProps) {
   const t = useT();
   const music = useMusicPlayer();
-  const { tracks, currentTrack, isPlaying, togglePlay, next, previous, seek, progressSec, durationSec, setTheaterTone } = music;
+  const { tracks, currentTrack, isPlaying, togglePlay, next, previous, seek, progressSec, durationSec, setTheaterTone, shuffle, toggleShuffle, repeat, cycleRepeat } = music;
   const [spinMode, setSpinMode] = useState(false);
   const [gestures] = useState(readDiscGestures);
   const shelvesRef = useRef<DiscShelvesHandle | null>(null);
+  const [keepAwake] = useState(readKeepAwake);
+  useWakeLock(keepAwake && isPlaying);
+
+  // Sleep timer: pauses the music when it runs out. It lives only while the room is open.
+  const [sleepMin, setSleepMin] = useState(0);
+  const [sleepLeftMs, setSleepLeftMs] = useState(0);
+  const playingRef = useRef(isPlaying);
+  playingRef.current = isPlaying;
+  const toggleRef = useRef(togglePlay);
+  toggleRef.current = togglePlay;
+  useEffect(() => {
+    if (sleepMin <= 0) {
+      setSleepLeftMs(0);
+      return;
+    }
+    const endsAt = Date.now() + sleepMin * 60_000;
+    setSleepLeftMs(sleepMin * 60_000);
+    const timer = window.setInterval(() => {
+      const left = endsAt - Date.now();
+      if (left <= 0) {
+        window.clearInterval(timer);
+        if (playingRef.current) toggleRef.current();
+        setSleepMin(0);
+        return;
+      }
+      setSleepLeftMs(left);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [sleepMin]);
   const [theaterMix, setTheaterMix] = useState(readTheaterMix);
   const { level, wake } = useTheaterLevel({ paused: !isPlaying, theaterMix });
   const [safety] = useState(armDiscGuard);
@@ -102,6 +133,31 @@ export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: Ju
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [bgGain]);
+
+  // Keyboard: space play/pause, N next, P previous, S shuffle, R repeat, F pull the song out.
+  const keysRef = useRef({ togglePlay, next, previous, toggleShuffle, cycleRepeat });
+  keysRef.current = { togglePlay, next, previous, toggleShuffle, cycleRepeat };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      // Typing fields keep their keys, the pull-out view has its own, and Space on a focused button presses it.
+      if (el?.closest('input, textarea, select, [role="dialog"], [contenteditable="true"]')) return;
+      const key = e.key.toLowerCase();
+      if (key === ' ' && el?.closest('button, [role="button"]')) return;
+      const k = keysRef.current;
+      if (key === ' ') k.togglePlay();
+      else if (key === 'n') k.next();
+      else if (key === 'p') k.previous();
+      else if (key === 's') k.toggleShuffle();
+      else if (key === 'r') k.cycleRepeat();
+      else if (key === 'f') shelvesRef.current?.pullOut();
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // At Level 3 the first touch only wakes the room: swallow it in capture.
   const levelRef = useRef(level.level);
@@ -219,6 +275,42 @@ export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: Ju
               <ArrowUpFromLine size={20} />
             </button>
           ) : null}
+        </div>
+        <div className="flex items-center justify-center gap-5">
+          <button
+            type="button"
+            onClick={toggleShuffle}
+            aria-pressed={shuffle}
+            aria-label={t('jukebox.shuffle')}
+            title={t('jukebox.shuffle')}
+            className={`rounded-full p-2 ${shuffle ? 'bg-white/20 text-white' : 'text-white/60'}`}
+            data-testid="button-jukebox-shuffle"
+          >
+            <Shuffle size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={cycleRepeat}
+            aria-label={t(repeat === 'one' ? 'disc.pull.repeat.one' : repeat === 'all' ? 'disc.pull.repeat.all' : 'disc.pull.repeat.off')}
+            title={t(repeat === 'one' ? 'disc.pull.repeat.one' : repeat === 'all' ? 'disc.pull.repeat.all' : 'disc.pull.repeat.off')}
+            aria-pressed={repeat !== 'off'}
+            className={`rounded-full p-2 ${repeat !== 'off' ? 'bg-white/20 text-white' : 'text-white/60'}`}
+            data-testid="button-jukebox-repeat"
+          >
+            {repeat === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSleepMin((m) => nextSleepStep(m))}
+            aria-pressed={sleepMin > 0}
+            aria-label={sleepMin > 0 ? t('jukebox.sleep.left', { time: formatCountdown(sleepLeftMs) }) : t('jukebox.sleep')}
+            title={t('jukebox.sleep')}
+            className={`flex items-center gap-1.5 rounded-full p-2 ${sleepMin > 0 ? 'bg-white/20 text-white' : 'text-white/60'}`}
+            data-testid="button-jukebox-sleep"
+          >
+            <Moon size={18} />
+            {sleepMin > 0 ? <span className="font-mono text-[10px] tracking-wider">{formatCountdown(sleepLeftMs)}</span> : null}
+          </button>
         </div>
         <label className="flex items-center justify-center gap-2 font-mono text-[10px] uppercase tracking-widest text-white/50">
           <input type="checkbox" checked={theaterMix} onChange={(e) => setTheaterMix(e.target.checked)} />

@@ -1183,5 +1183,10 @@
   "settings.jukebox.shelves": "Stacked shelves",
   "settings.jukebox.shelvesBody": "One row of discs per album, with the next one sliding in when you swipe up or down. Off puts every disc back on a single row.",
   "settings.jukebox.gestures": "Spin and pull out",
-  "settings.jukebox.gesturesBody": "Spin a disc with your finger without changing the song, and drag the centered disc up to pull its song out to a full screen. Off keeps the discs tap-only."
+  "settings.jukebox.gesturesBody": "Spin a disc with your finger without changing the song, and drag the centered disc up to pull its song out to a full screen. Off keeps the discs tap-only.",
+  "jukebox.shuffle": "Shuffle",
+  "jukebox.sleep": "Sleep timer: tap to pause the music after 15, 30, 60 or 90 minutes",
+  "jukebox.sleep.left": "Sleep timer: music pauses in {{time}}",
+  "settings.jukebox.awake": "Keep the screen on in the Jukebox Room",
+  "settings.jukebox.awakeBody": "While music plays in the Jukebox Room your screen stays awake, so you can watch a whole song. It uses a little more battery. Off lets the screen sleep as usual."
 }

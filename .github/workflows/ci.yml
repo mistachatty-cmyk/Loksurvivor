@@ -1,0 +1,50 @@
+name: CI
+
+# Typecheck, build and run every test for the game on each pull request and each push to main.
+# The build runs before the tests on purpose: src/buildPrivacy.test.ts inspects the finished
+# build (no source maps, no readable dev phrase, no debug hooks) and skips itself without one.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  game:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: artifacts/survivor-616
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        env:
+          PORT: '3000'
+          BASE_PATH: /
+        run: pnpm exec vite build --config vite.config.ts
+
+      - name: Tests
+        run: pnpm test

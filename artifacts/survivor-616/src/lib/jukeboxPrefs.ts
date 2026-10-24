@@ -124,3 +124,22 @@ export function writeLastShelf(id: string): void {
     /* the choice just will not persist */
   }
 }
+
+/** Keep the screen awake while the Jukebox Room plays music. On by default; it costs a little battery. */
+const AWAKE_KEY = 'survivor616.jukebox.keep-awake.v1';
+
+export function readKeepAwake(): boolean {
+  try {
+    return window.localStorage.getItem(AWAKE_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+export function writeKeepAwake(on: boolean): void {
+  try {
+    window.localStorage.setItem(AWAKE_KEY, on ? '1' : '0');
+  } catch {
+    /* the choice just will not persist */
+  }
+}
