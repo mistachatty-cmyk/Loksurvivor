@@ -8,6 +8,8 @@ import { useEffect, useRef } from 'react';
 import { drawRig } from '@/game/render/sprite';
 import type { AnimName, SpritePalette, SpriteRig } from '@/game/types';
 import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
+import { useNearViewport } from '@/lib/useNearViewport';
+import { useSavingPower } from '@/lib/powerSaver';
 
 export interface RigPortraitProps {
   rig: SpriteRig;
@@ -36,10 +38,18 @@ export function RigPortrait({
   pixelScale,
 }: RigPortraitProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const near = useNearViewport(canvasRef);
+  const saving = useSavingPower();
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    if (!near) {
+      // Off screen: give the canvas memory back until it scrolls into view again.
+      canvas.width = 1;
+      canvas.height = 1;
+      return;
+    }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -54,7 +64,7 @@ export function RigPortrait({
     let raf = 0;
 
     const reduceMotion = prefersReducedMotionNow();
-    const shouldAnimate = animated && !reduceMotion;
+    const shouldAnimate = animated && !reduceMotion && !saving;
     const frame = (time: number) => {
       if (shouldAnimate) raf = requestAnimationFrame(frame);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -77,7 +87,7 @@ export function RigPortrait({
     if (shouldAnimate) raf = requestAnimationFrame(frame);
     else frame(start);
     return () => cancelAnimationFrame(raf);
-  }, [rig, palette, anim, size, animated, pixelScale]);
+  }, [rig, palette, anim, size, animated, pixelScale, near, saving]);
 
   return (
     <canvas

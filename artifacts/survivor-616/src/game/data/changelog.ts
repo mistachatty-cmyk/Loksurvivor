@@ -2056,6 +2056,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'While you sit on the hub, the game quietly loads the screens you are most likely to open next, so they still open instantly. It skips this while the battery saver or your browser Data Saver is on.',
     ],
   },
+  {
+    version: '0.42.41',
+    date: '2026-10-24',
+    publishedAt: '2026-10-24T16:10:00Z',
+    kind: 'hotfix',
+    title: 'Card shop crash fix',
+    body: [
+      'The Card Shop binder page could make some phones run out of memory and reload, because it drew more than 70 animated card portraits at once. Portraits now draw and animate only while they are on screen (or just about to be) and hand their memory back when you scroll past, so at most about ten are alive at a time.',
+      'The same saving applies to every menu that shows character portraits, and portraits hold still while the battery saver is on.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
