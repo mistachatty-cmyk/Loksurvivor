@@ -66,6 +66,7 @@ import { useT, useLocale } from '@/lib/i18n';
 import { grpdArmoryLocation, grpdAvailableSeals } from '@/game/data/grpdArmory';
 import { travelLeadPet } from '@/game/data/travelEncounters';
 import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
+import { loadDailyNote } from '@/lib/dailyFeed';
 import { PhotosensitivityNotice, photosensitivityNoticeHidden, photosensitivityNoticeSeenThisSession } from './PhotosensitivityNotice';
 import { HideoutDirectionPanel } from './HideoutDirectionPanel';
 import { HideoutEndgameDock } from './HideoutEndgameDock';
@@ -239,6 +240,20 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     noticeSeqRef.current += 1;
     setStripNotice({ seq: noticeSeqRef.current, title, line, anchor });
   };
+  // Once a day at most: today's note from lok-daily.json, as a line on the strip (see lib/dailyFeed).
+  useEffect(() => {
+    let live = true;
+    const timer = window.setTimeout(() => {
+      void loadDailyNote().then((note) => {
+        if (live && note) showStripNotice(note.title, note.line);
+      });
+    }, 4000);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [crewSay, setCrewSay] = useState<{ seq: number; propId: string; line: string } | undefined>(undefined);
   // One line from a crew member's own voice. Used when you talk to them and when two of them chat.
   const crewLineFor = (allyId: string): string | undefined => {

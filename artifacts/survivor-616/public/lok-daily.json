@@ -1,0 +1,12 @@
+{
+  "schema": "survivor616.daily.v1",
+  "notes": [
+    {
+      "id": "2026-10-24-battery-saver",
+      "from": "2026-10-24",
+      "until": "2026-11-14",
+      "title": "From the 616",
+      "line": "New in Settings: a battery saver, a storage meter and a Protect my save button. Look for Power, storage and data."
+    }
+  ]
+}

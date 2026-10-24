@@ -2088,6 +2088,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Settings, Power, storage and data has a switch, Protect my save across tabs. It is on by default.',
     ],
   },
+  {
+    version: '0.42.44',
+    date: '2026-10-24',
+    publishedAt: '2026-10-24T18:50:00Z',
+    kind: 'update',
+    title: 'Daily message',
+    body: [
+      'The hideout strip can now carry a short line from the 616 about what is new, once per note. It comes from one small public file on the game\'s own site: nothing about you is sent, it is read at most once a day, and it never loads while the battery saver or Data Saver is on or you are offline.',
+      'Settings, Power, storage and data has a Daily message switch to turn it off. The note there about what the game sends now lists it.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
