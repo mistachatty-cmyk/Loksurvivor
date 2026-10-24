@@ -11,7 +11,7 @@ description: Why the Jukebox Room crashed iPhone Safari, why the app now has a f
   3. Swiping a disc called `playTrack` for every disc passed (a new audio load each time).
   Rules now: the grade writes `opacity` straight onto two small layers via refs, about 12 times a second, paused when the tab is hidden. Never put a filter or a per-frame variable write on an ancestor of the disc carousel. Swiping only browses; tapping the middle disc plays it.
 - **A stale cached build** (home-screen app open across a deploy) can ask for a code chunk that no longer exists. `main.tsx` now reloads once on `vite:preloadError`, and the arrival disc shelf sits in its own error boundary.
-- **The real error text is hidden in production**, so a crash on a phone could not be diagnosed. Crash reports (shared SDK `crash.ts`, `src/lib/lokCrash.ts`) now keep the latest report on the device (error code + Copy report on the crash page) and send it only if the server migration in Lok-EcoSystsem `docs/LOK_CRASH_REPORTS.md` has been applied.
+- **The real error text is hidden in production**, so a crash on a phone could not be diagnosed. Crash reports (shared SDK `crash.ts`, `src/lib/lokCrash.ts`) now keep the latest report on the device (error code + Copy report on the crash page) and send it to the shared LokServices Supabase project (migration `lok_crash_reports` APPLIED 2026-10-24, see Lok-EcoSystsem `docs/LOK_CRASH_REPORTS.md`; reads happen from the Supabase dashboard; one test row `zz-migration-check` may remain).
 
 ## Sizing (dynamic UI scale)
 
