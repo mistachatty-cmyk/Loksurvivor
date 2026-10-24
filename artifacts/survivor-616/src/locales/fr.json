@@ -1212,7 +1212,7 @@
   "settings.power.storage.media": "Vos fichiers",
   "settings.power.storage.total": "Ce jeu, total",
   "settings.power.storage.none": "Aucun",
-  "settings.power.storage.unknown": "Non signalé",
+  "settings.power.storage.unknown": "Inconnu",
   "settings.power.persist": "Protéger ma sauvegarde",
   "settings.power.persist.on": "La sauvegarde est protégée",
   "settings.power.persist.done": "Terminé. Votre navigateur conservera cette sauvegarde lorsque l'espace sera faible.",

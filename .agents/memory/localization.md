@@ -24,3 +24,5 @@ Free, automatic translation. The reusable part is the package `packages/auto-l10
 - `auto-l10n scan --src artifacts/survivor-616/src` estimated about 1,078 hard-coded strings in 76 files before this work (heuristic; it cannot see strings built in `data/*.ts`). The first slice converted the title screen, `ScreenLayout`'s Back button (so "Back" is localized on every screen), Hub room labels and descriptions, the Settings header, pager and Travel fight style, and the Language picker (70 keys).
 - Not covered at all: data-driven names and lore (characters, enemies, areas, lore chronicles, weapons). Plan: keys like `character.<id>.name`, with the record keeping its English as the fallback. Also not covered: text drawn on the canvas, the Remotion recap package, and right-to-left layout (`directionOf()` exists; the game only sets `<html lang>`).
 - Convert screens one at a time: add keys, replace the text with `t()`, run `pnpm typecheck`.
+
+- Gotcha (0.42.43): avoid English like "reported"/"notified" in new strings: auto-translate renders them as French "signalé", which trips the banned-word test (i18n.test.ts). Prefer "Unknown", "Sent".

@@ -2077,6 +2077,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Live Game Bar takes less room when your phone is held sideways: the upgrade cards lay out in a single row with the icon beside the name, and the power-up button is a little smaller, so more of the fight stays visible.',
     ],
   },
+  {
+    version: '0.42.43',
+    date: '2026-10-24',
+    publishedAt: '2026-10-24T18:10:00Z',
+    kind: 'update',
+    title: 'Two tabs, one save',
+    body: [
+      'If the game is open in two tabs, one tab can no longer quietly wipe what the other earned. When the older tab is about to save over newer progress, it pauses and asks whether to load the newest save or keep its own.',
+      'Settings, Power, storage and data has a switch, Protect my save across tabs. It is on by default.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

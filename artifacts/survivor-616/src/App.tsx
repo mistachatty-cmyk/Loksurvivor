@@ -60,6 +60,7 @@ import { setCrashScreen } from '@/lib/lokCrash';
 import { prefetchWhenIdle } from '@/lib/idlePrefetch';
 import { SETTINGS_FOCUS_KEY } from '@/lib/jukeboxPrefs';
 import { CrashRecoveryPrompt } from '@/ui/CrashRecoveryPrompt';
+import { SaveGuardBanner } from '@/ui/SaveGuardBanner';
 import { MenuDock } from '@/ui/MenuDock';
 import { ScreenSlide } from '@/ui/ScreenSlide';
 import { LokChatHost } from '@/ui/LokChatHost';
@@ -917,6 +918,7 @@ function Game() {
         <Suspense fallback={<div className="min-h-dvh bg-background" aria-busy="true" />}>{renderScreen()}</Suspense>
       </ScreenSlide>
       <CrashRecoveryPrompt />
+      <SaveGuardBanner />
       <LokChatHost />
       {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && screen.name !== 'photosensitivity-notice' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena'].includes(screen.name) ? 'default' : 'menu'} />}
       <GoToPalette

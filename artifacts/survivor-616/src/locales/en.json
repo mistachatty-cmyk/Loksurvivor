@@ -1212,7 +1212,7 @@
   "settings.power.storage.media": "Your files",
   "settings.power.storage.total": "This game, total",
   "settings.power.storage.none": "None",
-  "settings.power.storage.unknown": "Not reported",
+  "settings.power.storage.unknown": "Unknown",
   "settings.power.persist": "Protect my save",
   "settings.power.persist.on": "Save is protected",
   "settings.power.persist.done": "Done. Your browser will keep this save when space runs low.",
@@ -1220,5 +1220,11 @@
   "settings.power.refresh": "Refresh",
   "settings.power.persistBody": "Protecting asks the browser not to clear this game's data if the device runs low on space. Some browsers decide on their own.",
   "settings.power.network": "What this game sends",
-  "settings.power.networkBody": "Only three things ever leave your device: crash reports (if on), the play-time tally (if on), and the music link you paste yourself when you ask to play one. No ads, no trackers, no background uploads, and nothing runs after you close the game."
+  "settings.power.networkBody": "Only three things ever leave your device: crash reports (if on), the play-time tally (if on), and the music link you paste yourself when you ask to play one. No ads, no trackers, no background uploads, and nothing runs after you close the game.",
+  "saveGuard.title": "Open in two tabs",
+  "saveGuard.body": "Another tab just saved. To protect your progress this tab has paused saving. Load the newest save, or keep what this tab has.",
+  "saveGuard.load": "Load newest save",
+  "saveGuard.keep": "Keep this tab",
+  "settings.power.tabGuard": "Protect my save across tabs",
+  "settings.power.tabGuardBody": "If the game is open in two tabs, the older tab pauses saving and asks which progress to keep, so one tab never wipes what the other earned. Off lets every tab save freely."
 }
