@@ -25,6 +25,7 @@ import {
 import { consumeArcadeReturn, rememberArcadeReturn } from '@/lib/arcadeReturn';
 import { lokClient } from '@/lib/lokClient';
 import { startLokPlaytime } from '@/lib/lokPlaytime';
+import { playtimeSharingPref } from '@/lib/powerSaver';
 import { LOKDEX_APP_KEY, type LokDexSnapshot } from '@/lib/lokDexSnapshot';
 import { MUSIC_APP_KEY } from '@/lib/lokMusicProgress';
 
@@ -88,7 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Saves how long this account plays to the GSix account (shown on gsix.online).
   // It does nothing while the game is framed by the GSix site -- the site counts that time itself.
-  useEffect(() => startLokPlaytime(), []);
+  // The player can switch this off in Settings > Power, storage and data.
+  const sharePlaytime = playtimeSharingPref.use();
+  useEffect(() => (sharePlaytime ? startLokPlaytime() : undefined), [sharePlaytime]);
 
   const doSignInWithEmail = useCallback(async (email: string, password: string) => {
     if (!lokClient) return { error: 'Auth is not configured yet.' };

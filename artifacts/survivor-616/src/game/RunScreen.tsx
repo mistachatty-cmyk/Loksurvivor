@@ -118,6 +118,7 @@ import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
 import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 import { useT } from '@/lib/i18n';
+import { effectiveFrameRate, saverCapPref, useSavingPower } from '@/lib/powerSaver';
 
 /**
  * Screen point -> world point, using the same camera math `renderWorld` uses.
@@ -211,7 +212,8 @@ const STORM_CLOUD_OPTIONS: Array<{ mode: StormCloudMode; label: string; color: s
 const FIXED_STEP = 1 / 60;
 /** Most catch-up steps allowed in one frame before time is dropped. */
 const MAX_SUBSTEPS = 6;
-const FRAME_INTERVAL_MS: Record<60 | 120, number> = { 60: 1000 / 60, 120: 1000 / 120 };
+/** Render pacing targets. 30 and 45 only ever come from the battery saver's cap. */
+const frameIntervalMs = (rate: number): number => 1000 / rate;
 
 function formatClock(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
@@ -358,12 +360,15 @@ export function RunScreen({
   levelUpPausesRef.current = meta.levelUpPresentation === 'pause-focus' && !meta.liveModeEnabled;
   const presentationRef = useRef(meta);
   presentationRef.current = meta;
+  // Battery saver: holds the render rate to its cap and rests the music-reactive glow.
+  const saving = useSavingPower();
+  const saverCap = saverCapPref.use();
   const musicReactiveRef = useRef(meta.musicReactiveEnabled);
-  musicReactiveRef.current = meta.musicReactiveEnabled;
+  musicReactiveRef.current = meta.musicReactiveEnabled && !saving;
   // Kept in a ref so changing pacing in Settings applies to the next drawn
   // frame without rebuilding the world or restarting a run.
-  const frameRateModeRef = useRef<60 | 120>(meta.frameRateMode);
-  frameRateModeRef.current = meta.frameRateMode;
+  const frameRateModeRef = useRef<number>(meta.frameRateMode);
+  frameRateModeRef.current = effectiveFrameRate(meta.frameRateMode, saving, Number(saverCap));
 
   // Tilt steering. The hook is inert unless the setting is on, and the ref is
   // read straight from the loop so orientation events never re-render.
@@ -913,7 +918,7 @@ export function RunScreen({
     let accumulator = 0;
     let lastRenderAt = -Infinity;
     let nextRenderAt = 0;
-    let scheduledRate: 60 | 120 = frameRateModeRef.current;
+    let scheduledRate: number = frameRateModeRef.current;
     let backingScale = 1;
     let performanceWindowAt = last;
     let renderSamples = 0;
@@ -1142,7 +1147,7 @@ export function RunScreen({
       renderTargetViewRef.current = commanderTargetView;
 
       const requestedRate = frameRateModeRef.current;
-      const targetFrameMs = FRAME_INTERVAL_MS[requestedRate];
+      const targetFrameMs = frameIntervalMs(requestedRate);
       const sinceLastRender = time - lastRenderAt;
       if (requestedRate !== scheduledRate) {
         scheduledRate = requestedRate;

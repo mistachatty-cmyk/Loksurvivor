@@ -54,7 +54,7 @@ import { ScrollbarSetting } from './ScrollbarSetting';
 import { TextSizeSetting } from './TextSizeSetting';
 import { JukeboxSettings } from './JukeboxSettings';
 import { SETTINGS_FOCUS_KEY } from '@/lib/jukeboxPrefs';
-import { CrashReportsToggle } from './CrashReportsToggle';
+import { PowerSettings } from './PowerSettings';
 import { FullscreenSetting } from './FullscreenSetting';
 import { ControlsSettings } from './ControlsSettings';
 import { EndgameSettings } from './EndgameSettings';
@@ -87,6 +87,7 @@ export interface SettingsPanelProps {
 const SETTINGS_DESTINATIONS = [
   { id: 'settings-language', label: 'Language', terms: 'translation device' },
   { id: 'settings-display', label: 'Display and performance', terms: 'graphics frame rate fog zoom fullscreen' },
+  { id: 'settings-power', label: 'Power, storage and data', terms: 'battery saver power frame rate storage space data network crash playtime lock screen' },
   { id: 'settings-ui-layout', label: 'UI layout', terms: 'new dock classic corners music mission briefing looks companion' },
   { id: 'settings-audio', label: 'Audio and atmosphere', terms: 'music sound effects ambience weather' },
   { id: 'settings-jukebox', label: 'Jukebox and soundtracks', terms: 'music disc pulse theater volume soundtrack jukebox room library' },
@@ -758,6 +759,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets, onOpenScreen }: S
             </div>
           </div>
         </section>
+        <PowerSettings />
 
         <FullscreenSetting />
 
@@ -1004,7 +1006,6 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets, onOpenScreen }: S
                   </button>
                 </div>
               </div>
-              <CrashReportsToggle />
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>

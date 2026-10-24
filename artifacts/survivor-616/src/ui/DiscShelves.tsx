@@ -20,6 +20,7 @@ import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { readDiscPulse, type DiscPulseLevel } from '@/lib/discPulse';
 import { readDiscGestures, readLastShelf, readShelves, writeLastShelf } from '@/lib/jukeboxPrefs';
 import { useT } from '@/lib/i18n';
+import { useSavingPower } from '@/lib/powerSaver';
 import { setCrashScreen } from '@/lib/lokCrash';
 import { DiscPullOut } from './DiscPullOut';
 import { DiscPulse } from './DiscPulse';
@@ -146,7 +147,10 @@ export const DiscShelves = forwardRef<DiscShelvesHandle, DiscShelvesProps>(funct
   const { tracks, currentTrack, isPlaying, playTrack, togglePlay, soundtrackObjectiveCompletions } = useMusicPlayer();
   const [shelvesOn] = useState(readShelves);
   const [gestures] = useState(readDiscGestures);
-  const [pulseLevel] = useState(readDiscPulse);
+  const saving = useSavingPower();
+  const [storedPulse] = useState(readDiscPulse);
+  // Battery saver: lighter discs and no beat-pulse layers.
+  const pulseLevel: DiscPulseLevel = saving ? 'off' : storedPulse;
   const [hint, setHint] = useState<DiscTrack | null>(null);
   const [pulled, setPulled] = useState<string | null>(null);
   const [centerIdx, setCenterIdx] = useState(0);
@@ -445,7 +449,7 @@ export const DiscShelves = forwardRef<DiscShelvesHandle, DiscShelvesProps>(funct
           currentId={currentTrack?.id}
           isPlaying={isPlaying}
           pulseLevel={pulseLevel}
-          lite={lite}
+          lite={lite || saving}
           discSize={discSize}
           ariaLabel={ariaLabel}
           onSelect={select}
@@ -467,7 +471,7 @@ export const DiscShelves = forwardRef<DiscShelvesHandle, DiscShelvesProps>(funct
         <DiscPullOut
           trackId={pulledEntry.track.id}
           item={shelfDiscItem(pulledEntry.track, pulledEntry.position, pulledEntry.shelfTitle)}
-          lite={lite}
+          lite={lite || saving}
           onClose={() => setPulled(null)}
         />
       ) : null}

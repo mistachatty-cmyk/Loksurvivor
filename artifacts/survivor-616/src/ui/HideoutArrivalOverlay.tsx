@@ -20,6 +20,7 @@ import type { CharacterDef, HideoutSceneDef, SpritePalette } from '@/game/types'
 import { readArrivalDiscsEnabled, writeArrivalDiscsSetting } from '@/lib/arrivalDiscs';
 import { readReactiveBg } from '@/lib/jukeboxPrefs';
 import { ReactiveBackdrop } from './ReactiveBackdrop';
+import { useSavingPower } from '@/lib/powerSaver';
 import { armDiscGuard, resetDiscGuard } from '@/lib/discGuard';
 import { useT } from '@/lib/i18n';
 import { optionalImport } from '@/lib/optionalChunk';
@@ -105,7 +106,10 @@ export function HideoutArrivalOverlay({
   // After two bad visits the discs stay off, but the player can try them again (in the lightest mode) from here.
   const [retryDiscs, setRetryDiscs] = useState(false);
   const wantsDiscs = readArrivalDiscsEnabled();
-  const [bgLevel] = useState(readReactiveBg);
+  const saving = useSavingPower();
+  const [storedBgLevel] = useState(readReactiveBg);
+  // Battery saver rests the music-reactive backdrop.
+  const bgLevel = saving ? 'off' : storedBgLevel;
   const discsEnabled = wantsDiscs && (!discSafety.off || retryDiscs);
   const discsPaused = wantsDiscs && discSafety.off && !retryDiscs;
 

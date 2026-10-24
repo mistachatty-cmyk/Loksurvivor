@@ -15,6 +15,7 @@ import DiscCascadeCarousel, { type DiscCascadeItem } from '@/components/ui/disc-
 import { formatTime, useMusicPlayer } from '@/game/audio/musicPlayer';
 import { readDiscPulse } from '@/lib/discPulse';
 import { readKeepAwake } from '@/lib/jukeboxPrefs';
+import { useSavingPower } from '@/lib/powerSaver';
 import { useWakeLock } from '@/lib/useWakeLock';
 import { useT } from '@/lib/i18n';
 import { setCrashScreen } from '@/lib/lokCrash';
@@ -46,7 +47,9 @@ export function DiscPullOut({ trackId, item, lite, onClose }: DiscPullOutProps) 
   const t = useT();
   const { currentTrack, isPlaying, togglePlay, seek, progressSec, durationSec, repeat, cycleRepeat } = useMusicPlayer();
   const [leaving, setLeaving] = useState(false);
-  const [pulseLevel] = useState(readDiscPulse);
+  const saving = useSavingPower();
+  const [storedPulse] = useState(readDiscPulse);
+  const pulseLevel = saving ? 'off' : storedPulse;
   const stageRef = useRef<HTMLDivElement | null>(null);
   const swipe = useRef<{ id: number; y0: number } | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
@@ -56,7 +59,7 @@ export function DiscPullOut({ trackId, item, lite, onClose }: DiscPullOutProps) 
   // The song is only "pulled out" while it is the one playing; otherwise the disc just sits there.
   const playingThis = currentTrack?.id === trackId && isPlaying;
   const [keepAwake] = useState(readKeepAwake);
-  useWakeLock(keepAwake && playingThis);
+  useWakeLock(keepAwake && !saving && playingThis);
 
   useEffect(() => {
     setCrashScreen(`jukebox-pullout:${trackId}`);
