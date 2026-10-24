@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 181,
+      "version": "0.42.42",
+      "date": "2026-10-24",
+      "publishedAt": "2026-10-24T16:40:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Tidier bar on a sideways phone",
+      "body": [
+        "The Live Game Bar takes less room when your phone is held sideways: the upgrade cards lay out in a single row with the icon beside the name, and the power-up button is a little smaller, so more of the fight stays visible."
+      ]
+    },
+    {
       "number": 180,
       "version": "0.42.41",
       "date": "2026-10-24",

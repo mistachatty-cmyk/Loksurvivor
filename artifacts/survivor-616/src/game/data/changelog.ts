@@ -2067,6 +2067,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The same saving applies to every menu that shows character portraits, and portraits hold still while the battery saver is on.',
     ],
   },
+  {
+    version: '0.42.42',
+    date: '2026-10-24',
+    publishedAt: '2026-10-24T16:40:00Z',
+    kind: 'update',
+    title: 'Tidier bar on a sideways phone',
+    body: [
+      'The Live Game Bar takes less room when your phone is held sideways: the upgrade cards lay out in a single row with the icon beside the name, and the power-up button is a little smaller, so more of the fight stays visible.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

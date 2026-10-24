@@ -77,7 +77,7 @@ function SkillCard({ upgrade, ready, icon, onPick }: { upgrade: UpgradeDef; read
       onClick={onPick}
       disabled={!ready}
       title={upgrade.description}
-      className={`game-bar-card relative flex h-[50px] min-w-0 flex-col items-start justify-center gap-0.5 overflow-hidden border px-1.5 text-left transition-[opacity,transform,box-shadow,border-color] duration-300 ${
+      className={`game-bar-card relative flex h-[50px] min-w-0 flex-col items-start justify-center gap-0.5 overflow-hidden border px-1.5 [@media(max-height:430px)]:h-[34px] [@media(max-height:430px)]:flex-row [@media(max-height:430px)]:items-center [@media(max-height:430px)]:gap-1 text-left transition-[opacity,transform,box-shadow,border-color] duration-300 ${
         ready
           ? 'game-bar-card-ready border-primary/80 bg-primary/10 opacity-100 active:scale-95'
           : 'cursor-default border-white/15 bg-white/[0.04] opacity-50'
@@ -86,9 +86,9 @@ function SkillCard({ upgrade, ready, icon, onPick }: { upgrade: UpgradeDef; read
       data-testid={`button-upgrade-${upgrade.id}`}
       data-ready={ready ? 'true' : 'false'}
     >
-      <span className="flex w-full items-center gap-1">
+      <span className="flex w-full items-center gap-1 [@media(max-height:430px)]:w-auto">
         <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[11px] text-primary">{icon ?? KIND_MARK[upgrade.cardKind ?? 'upgrade']}</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[7px] uppercase tracking-wider text-white/45">{upgrade.cardKind ?? 'upgrade'}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[7px] uppercase tracking-wider text-white/45 [@media(max-height:430px)]:hidden">{upgrade.cardKind ?? 'upgrade'}</span>
       </span>
       <span className="line-clamp-2 w-full text-[9px] font-black uppercase leading-[1.05] tracking-wide text-white">{upgrade.name}</span>
     </button>
@@ -109,7 +109,7 @@ function RoundAction({ action, size, ready }: { action: GameBarAction; size: 'lg
       aria-label={action.ariaLabel}
       className={
         size === 'lg'
-          ? `relative h-[52px] w-[52px] shrink-0 rounded-full border-2 px-0.5 font-mono text-[8px] font-bold uppercase leading-tight tracking-wider text-white disabled:opacity-55 ${ready ? 'game-bar-power-ready border-white/60' : 'border-white/25'}`
+          ? `relative h-[52px] w-[52px] shrink-0 rounded-full [@media(max-height:430px)]:h-[44px] [@media(max-height:430px)]:w-[44px] border-2 px-0.5 font-mono text-[8px] font-bold uppercase leading-tight tracking-wider text-white disabled:opacity-55 ${ready ? 'game-bar-power-ready border-white/60' : 'border-white/25'}`
           : `h-6 w-full min-w-0 truncate border px-1 font-mono text-[8px] font-bold uppercase leading-none tracking-wider text-white disabled:opacity-55 ${ready ? 'border-white/50' : 'border-white/20'}`
       }
       style={style}
@@ -187,7 +187,7 @@ export function RunGameBar(props: RunGameBarProps) {
         <div className="mt-1 flex items-stretch gap-1.5">
           <div className="grid min-w-0 flex-1 grid-cols-3 gap-1" data-testid="game-bar-cards">
             {shown.length === 0 ? (
-              <p className="col-span-3 flex h-[50px] items-center justify-center font-mono text-[8px] uppercase tracking-wider text-white/35">{t('run.bar.noneLeft')}</p>
+              <p className="col-span-3 flex h-[50px] [@media(max-height:430px)]:h-[34px] items-center justify-center font-mono text-[8px] uppercase tracking-wider text-white/35">{t('run.bar.noneLeft')}</p>
             ) : (
               shown.slice(0, 3).map((upgrade) => (
                 <SkillCard key={upgrade.id} upgrade={upgrade} ready={ready} icon={renderIcon(upgrade)} onPick={() => take(upgrade)} />
