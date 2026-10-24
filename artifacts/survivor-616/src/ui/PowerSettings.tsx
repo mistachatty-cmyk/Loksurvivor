@@ -8,6 +8,8 @@ import { mediaControlsPref, playtimeSharingPref, SAVER_CAPS, saverCapPref, saver
 import { formatBytes, readStorageReport, requestPersistentStorage, type StorageReport } from '@/lib/storageUsage';
 
 import { CrashReportsToggle } from './CrashReportsToggle';
+import { SendCrashButton } from './SendCrashButton';
+import { lokCrash } from '@/lib/lokCrash';
 
 const ON = 'border-cyan-300/60 bg-cyan-400/15 text-cyan-100';
 const OFF = 'border-border bg-background text-muted-foreground hover:border-cyan-300/60 hover:text-white';
@@ -111,6 +113,11 @@ export function PowerSettings() {
       <SwitchRow title={t('settings.power.daily')} body={t('settings.power.dailyBody')} on={dailyFeed} onChange={(next) => dailyFeedPref.set(next)} testId="button-power-daily-feed" />
       <SwitchRow title={t('settings.power.tabGuard')} body={t('settings.power.tabGuardBody')} on={tabGuard} onChange={(next) => tabGuardPref.set(next)} testId="button-power-tab-guard" />
       <CrashReportsToggle />
+      {lokCrash.last() ? (
+        <Row title={t('settings.power.sendCrash')} body={t('settings.power.sendCrashBody')}>
+          <SendCrashButton className={`${CHIP} ${OFF}`} testId="button-power-send-crash" />
+        </Row>
+      ) : null}
 
       <div className="mt-3 border border-border/70 bg-background/50 p-4" data-testid="panel-storage-usage">
         <h3 className="text-sm font-black uppercase tracking-wide text-white">{t('settings.power.storage')}</h3>

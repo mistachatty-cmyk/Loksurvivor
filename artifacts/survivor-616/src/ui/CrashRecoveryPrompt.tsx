@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { formatReport, takeRecoveredCrash } from '@/lib/lokCrash';
 import { useT } from '@/lib/i18n';
+import { SendCrashButton } from './SendCrashButton';
 
 /** Shown once after the browser closed the game unexpectedly on the last visit. */
 export function CrashRecoveryPrompt() {
@@ -29,6 +30,7 @@ export function CrashRecoveryPrompt() {
         >
           {copied ? t('crash.recovered.copied') : t('crash.recovered.copy')}
         </button>
+        <SendCrashButton className="text-sky-300 hover:text-white" testId="button-send-recovered-crash" />
         <button type="button" className="text-sky-300 hover:text-white" onClick={() => setOpen(false)}>
           {t('crash.recovered.close')}
         </button>

@@ -8,7 +8,7 @@ import type { SupporterBarManifest } from "./supporters";
 import type { WalletStripManifest } from "./wallet";
 import type { StorefrontManifest } from "./store";
 
-export const SDK_VERSION = "1.4.0";
+export const SDK_VERSION = "1.5.0";
 /** Bump on a breaking change to the registry row / recipe shape. Stored in lok_cards.schema_version. */
 export const SCHEMA_VERSION = 1;
 
