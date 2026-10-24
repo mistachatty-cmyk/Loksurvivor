@@ -1228,5 +1228,14 @@
   "settings.power.tabGuard": "Schützen Sie meine Speicherung über mehrere Registerkarten hinweg",
   "settings.power.tabGuardBody": "Wenn das Spiel in zwei Tabs geöffnet ist, pausiert der ältere Tab das Speichern und fragt, welcher Fortschritt beibehalten werden soll, sodass ein Tab nie die verdienten Verdienste des anderen Tabs löscht. Aus lässt jede Registerkarte frei speichern.",
   "settings.power.daily": "Tägliche Nachricht",
-  "settings.power.dailyBody": "Einmal am Tag liest das Spiel eine kleine Datei von seiner eigenen Website und zeigt möglicherweise eine kurze Zeile von 616 auf Ihrem Versteckstreifen an. Es trägt nichts über dich. Es wird nie geladen, während der Energiesparmodus oder der Datensparmodus aktiviert ist. Aus stoppt es."
+  "settings.power.dailyBody": "Einmal am Tag liest das Spiel eine kleine Datei von seiner eigenen Website und zeigt möglicherweise eine kurze Zeile von 616 auf Ihrem Versteckstreifen an. Es trägt nichts über dich. Es wird nie geladen, während der Energiesparmodus oder der Datensparmodus aktiviert ist. Aus stoppt es.",
+  "challenge.title": "Challenge-Code",
+  "challenge.body": "Hast du einen Code von einem Freund bekommen? Betreten Sie es, um ihren Block in ihrer Nacht zu spielen: dieselbe Karte, dieselben Wellen, dieselben Beutewürfe. Vergleichen Sie dann, wie weit jeder von Ihnen gekommen ist.",
+  "challenge.play": "Spielen",
+  "challenge.badFormat": "Das sieht nicht nach einem Challenge-Code aus. Es liest sich wie 616.block.0000.0",
+  "challenge.badCheck": "Dieser Code hat einen Tippfehler. Überprüfen Sie jedes Zeichen.",
+  "challenge.badArea": "Dieses Spiel hat diesen Block nicht.",
+  "challenge.locked": "Sie haben diesen Block noch nicht entsperrt.",
+  "challenge.copy": "Herausforderungscode kopieren",
+  "challenge.copied": "Code kopiert"
 }

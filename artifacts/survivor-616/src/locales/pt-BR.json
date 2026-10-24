@@ -1228,5 +1228,14 @@
   "settings.power.tabGuard": "Proteja meu save entre guias",
   "settings.power.tabGuardBody": "Se o jogo estiver aberto em duas guias, a guia mais antiga pausa o salvamento e pergunta qual progresso manter, para que uma guia nunca apague o que a outra ganhou. Off permite que todas as guias sejam salvas livremente.",
   "settings.power.daily": "Mensagem diária",
-  "settings.power.dailyBody": "Uma vez por dia, o jogo lê um pequeno arquivo de seu próprio site e pode mostrar uma pequena linha do 616 na sua faixa de esconderijo. Não carrega nada sobre você. Ele nunca carrega enquanto a economia de bateria ou a economia de dados estão ativadas. Desligado interrompe."
+  "settings.power.dailyBody": "Uma vez por dia, o jogo lê um pequeno arquivo de seu próprio site e pode mostrar uma pequena linha do 616 na sua faixa de esconderijo. Não carrega nada sobre você. Ele nunca carrega enquanto a economia de bateria ou a economia de dados estão ativadas. Desligado interrompe.",
+  "challenge.title": "Código de desafio",
+  "challenge.body": "Recebeu um código de um amigo? Entre nele para jogar o bloco deles na noite deles: mesmo mapa, mesmas ondas, mesmos saques. Em seguida, compare o quão longe cada um de vocês chegou.",
+  "challenge.play": "Jogar",
+  "challenge.badFormat": "Isso não parece um código de desafio. Lê-se como 616.block.0000.0",
+  "challenge.badCheck": "Esse código contém um erro de digitação. Verifique cada personagem.",
+  "challenge.badArea": "Este jogo não possui esse bloco.",
+  "challenge.locked": "Você ainda não desbloqueou esse bloco.",
+  "challenge.copy": "Copiar código de desafio",
+  "challenge.copied": "Código copiado"
 }

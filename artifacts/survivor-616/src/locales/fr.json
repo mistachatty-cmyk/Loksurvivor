@@ -1228,5 +1228,14 @@
   "settings.power.tabGuard": "Protéger ma sauvegarde dans tous les onglets",
   "settings.power.tabGuardBody": "Si le jeu est ouvert dans deux onglets, l'ancien onglet interrompt la sauvegarde et demande quelle progression conserver, de sorte qu'un onglet n'efface jamais ce que l'autre a gagné. Désactivé permet à chaque onglet d'être enregistré librement.",
   "settings.power.daily": "Message quotidien",
-  "settings.power.dailyBody": "Une fois par jour, le jeu lit un petit fichier de son propre site et peut afficher une courte ligne du 616 sur votre cachette. Cela ne porte rien sur vous. Il ne se charge jamais lorsque l'économiseur de batterie ou l'économiseur de données est activé. Off l'arrête."
+  "settings.power.dailyBody": "Une fois par jour, le jeu lit un petit fichier de son propre site et peut afficher une courte ligne du 616 sur votre cachette. Cela ne porte rien sur vous. Il ne se charge jamais lorsque l'économiseur de batterie ou l'économiseur de données est activé. Off l'arrête.",
+  "challenge.title": "Code de défi",
+  "challenge.body": "Vous avez un code d'un ami ? Entrez-y pour jouer leur bloc pendant leur nuit : même carte, mêmes vagues, mêmes jets de butin. Comparez ensuite le chemin parcouru par chacun de vous.",
+  "challenge.play": "Jouer",
+  "challenge.badFormat": "Cela ne ressemble pas à un code de défi. Cela ressemble à 616.block.0000.0",
+  "challenge.badCheck": "Ce code contient une faute de frappe. Vérifiez chaque personnage.",
+  "challenge.badArea": "Ce jeu n'a pas ce bloc.",
+  "challenge.locked": "Vous n'avez pas encore déverrouillé ce bloc.",
+  "challenge.copy": "Copier le code de défi",
+  "challenge.copied": "Code copié"
 }

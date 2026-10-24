@@ -1228,5 +1228,14 @@
   "settings.power.tabGuard": "跨标签保护我的保存",
   "settings.power.tabGuardBody": "如果游戏在两个选项卡中打开，旧选项卡会暂停保存并询问保留哪个进度，因此一个选项卡永远不会擦除另一个选项卡获得的内容。关闭可以让每个选项卡自由保存。",
   "settings.power.daily": "每日留言",
-  "settings.power.dailyBody": "游戏每天一次从自己的站点读取一个小文件，并且可能会在您的藏身处地带显示 616 中的一小行内容。它与你无关。当电池保护程序或数据保护程序打开时，它永远不会加载。关闭停止它。"
+  "settings.power.dailyBody": "游戏每天一次从自己的站点读取一个小文件，并且可能会在您的藏身处地带显示 616 中的一小行内容。它与你无关。当电池保护程序或数据保护程序打开时，它永远不会加载。关闭停止它。",
+  "challenge.title": "挑战码",
+  "challenge.body": "有朋友给的代码吗？输入它在晚上玩他们的街区：相同的地图，相同的波浪，相同的战利品卷。然后比较你们每个人走了多远。",
+  "challenge.play": "玩",
+  "challenge.badFormat": "这看起来不像是挑战代码。它读起来像 616.block.0000.0",
+  "challenge.badCheck": "该代码有一个拼写错误。检查每个字符。",
+  "challenge.badArea": "这个游戏没有那个方块。",
+  "challenge.locked": "您还没有解锁该块。",
+  "challenge.copy": "复制挑战码",
+  "challenge.copied": "复制代码"
 }

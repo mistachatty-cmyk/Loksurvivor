@@ -1228,5 +1228,14 @@
   "settings.power.tabGuard": "Proteger mi guardado entre pestañas",
   "settings.power.tabGuardBody": "Si el juego está abierto en dos pestañas, la pestaña anterior detiene el guardado y pregunta qué progreso conservar, por lo que una pestaña nunca borra lo que ganó la otra. Desactivado permite que cada pestaña se guarde libremente.",
   "settings.power.daily": "Mensaje diario",
-  "settings.power.dailyBody": "Una vez al día, el juego lee un pequeño archivo de su propio sitio y puede mostrar una línea corta del 616 en tu zona de escondite. No lleva nada sobre ti. Nunca se carga mientras el ahorro de batería o el ahorro de datos están activados. Off lo detiene."
+  "settings.power.dailyBody": "Una vez al día, el juego lee un pequeño archivo de su propio sitio y puede mostrar una línea corta del 616 en tu zona de escondite. No lleva nada sobre ti. Nunca se carga mientras el ahorro de batería o el ahorro de datos están activados. Off lo detiene.",
+  "challenge.title": "Código de desafío",
+  "challenge.body": "¿Recibiste un código de un amigo? Ingresa para jugar su bloque en su noche: el mismo mapa, las mismas olas, las mismas tiradas de botín. Luego compare hasta dónde llegó cada uno de ustedes.",
+  "challenge.play": "Jugar",
+  "challenge.badFormat": "Eso no parece un código de desafío. Se lee como 616.block.0000.0",
+  "challenge.badCheck": "Ese código tiene un error tipográfico. Revisa cada personaje.",
+  "challenge.badArea": "Este juego no tiene ese bloque.",
+  "challenge.locked": "Aún no has desbloqueado ese bloque.",
+  "challenge.copy": "Copiar código de desafío",
+  "challenge.copied": "Código copiado"
 }
