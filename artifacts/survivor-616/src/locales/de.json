@@ -1220,7 +1220,7 @@
   "settings.power.refresh": "Aktualisieren",
   "settings.power.persistBody": "Der Schutz fordert den Browser auf, die Daten dieses Spiels nicht zu löschen, wenn auf dem Gerät nicht mehr genügend Speicherplatz vorhanden ist. Manche Browser entscheiden selbst.",
   "settings.power.network": "Was dieses Spiel sendet",
-  "settings.power.networkBody": "Nur vier Dinge verlassen jemals Ihr Gerät: Absturzberichte (falls aktiviert), die Wiedergabezeitliste (falls aktiviert), die tägliche Nachrichtendatei (falls aktiviert, eine einfache Lesung einer öffentlichen Datei) und der Musiklink, den Sie selbst einfügen, wenn Sie zum Abspielen einer Datei auffordern. Keine Werbung, keine Tracker, keine Hintergrund-Uploads und nach dem Schließen des Spiels wird nichts mehr ausgeführt.",
+  "settings.power.networkBody": "Nur vier Dinge verlassen jemals Ihr Gerät: Absturzdetails (automatisch, wenn aktiviert oder wenn Sie auf „An LOK-Dienste senden“ klicken), die Wiedergabezeitliste (falls aktiviert), die tägliche Nachrichtendatei (falls aktiviert, eine einfache Lesung einer öffentlichen Datei) und der Musiklink, den Sie selbst einfügen, wenn Sie um die Wiedergabe einer Datei bitten. Keine Werbung, keine Tracker, keine Hintergrund-Uploads und nach dem Schließen des Spiels wird nichts mehr ausgeführt.",
   "saveGuard.title": "In zwei Tabs öffnen",
   "saveGuard.body": "Ein weiterer Tab wurde gerade gespeichert. Um Ihren Fortschritt zu schützen, wurde die Speicherung auf dieser Registerkarte angehalten. Laden Sie den neuesten Speicherstand oder behalten Sie den Inhalt dieser Registerkarte bei.",
   "saveGuard.load": "Neuesten Speicherstand laden",
@@ -1237,5 +1237,12 @@
   "challenge.badArea": "Dieses Spiel hat diesen Block nicht.",
   "challenge.locked": "Sie haben diesen Block noch nicht entsperrt.",
   "challenge.copy": "Herausforderungscode kopieren",
-  "challenge.copied": "Code kopiert"
+  "challenge.copied": "Code kopiert",
+  "crash.send": "An LOK Services senden",
+  "crash.send.sending": "Senden…",
+  "crash.send.sent": "Gesendet. Danke schön.",
+  "crash.send.failed": "Konnte nicht gesendet werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+  "crash.send.unavailable": "Das Senden ist in dieser Kopie des Spiels nicht eingerichtet.",
+  "settings.power.sendCrash": "Senden Sie meine letzten Absturzdaten",
+  "settings.power.sendCrashBody": "Das Spiel hat Details zum letzten Absturz auf diesem Gerät gespeichert. Dadurch wird dieser kurze, gesäuberte Text einmal an LOK Services gesendet, unabhängig davon, was der Schalter oben sagt. Es hat kein Konto, keine Geräte-ID und keinen Seiteninhalt."
 }
