@@ -2045,6 +2045,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'A storage meter shows how big your save and your own music files are and how much space this game uses in total, with a Protect my save button that asks the browser to keep your data when the device runs low on space. A plain note lists the only three things the game ever sends: crash reports, the play-time tally and music links you paste yourself.',
     ],
   },
+  {
+    version: '0.42.40',
+    date: '2026-10-24',
+    publishedAt: '2026-10-24T15:40:00Z',
+    kind: 'update',
+    title: 'Faster first load',
+    body: [
+      'The game opens faster. The first download is about 40 percent smaller because rarely opened screens, like Settings, the shops, the Archive, the Bestiary and the map builder, now load only when you open them.',
+      'While you sit on the hub, the game quietly loads the screens you are most likely to open next, so they still open instantly. It skips this while the battery saver or your browser Data Saver is on.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
