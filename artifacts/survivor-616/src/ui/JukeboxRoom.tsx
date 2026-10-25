@@ -7,6 +7,7 @@
  * Level 3 with the UI gone and the mix fully open until the screen is touched.
  * The first touch at Level 3 only wakes the room; it never presses a button.
  */
+import { FavoriteButton } from './FavoriteButton';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpFromLine, Library, Moon, Pause, Play, Repeat, Repeat1, RotateCw, Settings2, Shuffle, SkipBack, SkipForward, X } from 'lucide-react';
 import { dampenToTone, gradeFrom, groupBands, IDLE_BANDS, smoothBands, type GroupedBands } from '@lok/jukebox';
@@ -292,6 +293,7 @@ export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: Ju
           >
             <Shuffle size={18} />
           </button>
+          <FavoriteButton trackId={currentTrack?.id} size={18} className="" testId="button-jukebox-favorite" />
           <button
             type="button"
             onClick={cycleRepeat}
