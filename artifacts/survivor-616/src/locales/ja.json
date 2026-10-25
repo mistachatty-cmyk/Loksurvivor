@@ -1287,5 +1287,13 @@
   "inv.runFoundSealed": "封印されてアイテムで待機中。いつでも好きなときに開いてください。",
   "inv.runFoundOpened": "すでにあなたのコレクションにオープンされています。",
   "inv.cardsInPack": "{{n}}カード",
-  "inv.cardInPack": "カード1枚"
+  "inv.cardInPack": "カード1枚",
+  "modifier.glassCannon": "グラスキャノン",
+  "modifier.glassCannonBody": "攻撃力が 60% 高くなり、最大 HP の半分が残ります。一つの間違いは高くつく。",
+  "modifier.paperHorde": "紙の大群",
+  "modifier.paperHordeBody": "敵の数が約 60% 増加し、それぞれの HP が約半分になります。ポップスがたくさん。",
+  "modifier.jackpot": "ジャックポットストリート",
+  "modifier.jackpotBody": "HPが4分の1多い敵に対して、XPはさらに半分になります。",
+  "modifier.frenzy": "狂乱",
+  "modifier.frenzyBody": "あなたは 30% 早く攻撃し、敵は 15% 早く走ります。"
 }

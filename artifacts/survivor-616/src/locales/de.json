@@ -1287,5 +1287,13 @@
   "inv.runFoundSealed": "Versiegelt und in Einzelteilen wartend. Öffnen Sie sie, wann immer Sie möchten.",
   "inv.runFoundOpened": "Bereits in Ihrer Sammlung geöffnet.",
   "inv.cardsInPack": "{{n}}-Karten",
-  "inv.cardInPack": "1 Karte"
+  "inv.cardInPack": "1 Karte",
+  "modifier.glassCannon": "Glaskanone",
+  "modifier.glassCannonBody": "Du schlägst 60 % härter und trägst die Hälfte der maximalen HP. Ein Fehler ist teuer.",
+  "modifier.paperHorde": "Papierhorde",
+  "modifier.paperHordeBody": "Ungefähr 60 % mehr Feinde, jeder mit etwa der Hälfte der HP. Viele Pops.",
+  "modifier.jackpot": "Jackpot-Straßen",
+  "modifier.jackpotBody": "Nochmals halb so viel XP, gegen Feinde mit einem Viertel mehr HP.",
+  "modifier.frenzy": "Raserei",
+  "modifier.frenzyBody": "Sie greifen 30 % schneller an und Feinde rennen 15 % schneller."
 }

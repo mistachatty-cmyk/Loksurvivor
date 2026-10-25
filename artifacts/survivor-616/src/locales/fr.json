@@ -1287,5 +1287,13 @@
   "inv.runFoundSealed": "Scellé et en attente dans les articles. Ouvrez-les quand vous le souhaitez.",
   "inv.runFoundOpened": "Déjà ouvert dans votre collection.",
   "inv.cardsInPack": "Cartes {{n}}",
-  "inv.cardInPack": "1 carte"
+  "inv.cardInPack": "1 carte",
+  "modifier.glassCannon": "Canon en verre",
+  "modifier.glassCannonBody": "Vous frappez 60 % plus fort et portez la moitié des PV maximum. Une erreur coûte cher.",
+  "modifier.paperHorde": "Horde de papier",
+  "modifier.paperHordeBody": "Environ 60 % d'ennemis en plus, chacun avec environ la moitié des PV. Beaucoup de pop.",
+  "modifier.jackpot": "Rues des jackpots",
+  "modifier.jackpotBody": "Encore moitié moins d'XP, contre des ennemis avec un quart de PV en plus.",
+  "modifier.frenzy": "Frénésie",
+  "modifier.frenzyBody": "Vous attaquez 30 % plus vite et les ennemis courent 15 % plus vite."
 }

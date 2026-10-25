@@ -1287,5 +1287,13 @@
   "inv.runFoundSealed": "Selado e aguardando em Itens. Abra-os sempre que quiser.",
   "inv.runFoundOpened": "Já aberto em sua coleção.",
   "inv.cardsInPack": "Cartões {{n}}",
-  "inv.cardInPack": "1 cartão"
+  "inv.cardInPack": "1 cartão",
+  "modifier.glassCannon": "Canhão de vidro",
+  "modifier.glassCannonBody": "Você acerta 60% mais forte e carrega metade do HP máximo. Um erro custa caro.",
+  "modifier.paperHorde": "Horda de papel",
+  "modifier.paperHordeBody": "Cerca de 60% mais inimigos, cada um com cerca de metade do HP. Muitos pops.",
+  "modifier.jackpot": "Ruas do jackpot",
+  "modifier.jackpotBody": "Metade novamente de XP, contra inimigos com um quarto a mais de HP.",
+  "modifier.frenzy": "Frenesi",
+  "modifier.frenzyBody": "Você ataca 30% mais rápido e os inimigos correm 15% mais rápido."
 }

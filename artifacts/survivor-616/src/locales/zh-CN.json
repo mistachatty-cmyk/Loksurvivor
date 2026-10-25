@@ -1287,5 +1287,13 @@
   "inv.runFoundSealed": "密封并在物品中等待。您可以随时打开它们。",
   "inv.runFoundOpened": "已经打开到您的收藏中。",
   "inv.cardsInPack": "{{n}}卡",
-  "inv.cardInPack": "1 张卡"
+  "inv.cardInPack": "1 张卡",
+  "modifier.glassCannon": "玻璃大炮",
+  "modifier.glassCannonBody": "你的攻击力增加了 60%，并且拥有最大 HP 的一半。一个错误的代价就是昂贵的。",
+  "modifier.paperHorde": "纸部落",
+  "modifier.paperHordeBody": "敌人数量增加约 60%，每个敌人的生命值大约一半。很多流行音乐。",
+  "modifier.jackpot": "大奖街道",
+  "modifier.jackpotBody": "对抗生命值增加四分之一的敌人时，经验值又增加一半。",
+  "modifier.frenzy": "疯狂",
+  "modifier.frenzyBody": "你的攻击速度提高 30%，敌人的奔跑速度提高 15%。"
 }

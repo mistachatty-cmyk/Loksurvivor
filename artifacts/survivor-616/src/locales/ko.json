@@ -1287,5 +1287,13 @@
   "inv.runFoundSealed": "봉인되어 아이템을 기다리고 있습니다. 원할 때 언제든지 열어보세요.",
   "inv.runFoundOpened": "이미 컬렉션이 열렸습니다.",
   "inv.cardsInPack": "{{n}} 카드",
-  "inv.cardInPack": "카드 1장"
+  "inv.cardInPack": "카드 1장",
+  "modifier.glassCannon": "유리 대포",
+  "modifier.glassCannonBody": "60% 더 세게 공격하고 최대 HP의 절반을 휴대합니다. 한 번의 실수는 비용이 많이 듭니다.",
+  "modifier.paperHorde": "종이 호드",
+  "modifier.paperHordeBody": "약 60% 더 많은 적들이 있으며 각각의 HP는 대략 절반입니다. 많은 팝.",
+  "modifier.jackpot": "잭팟 거리",
+  "modifier.jackpotBody": "HP가 4분의 1 더 많은 적에 대해 XP가 절반으로 늘어납니다.",
+  "modifier.frenzy": "프렌지",
+  "modifier.frenzyBody": "공격 속도가 30% 더 빨라지고 적의 달리기 속도가 15% 더 빨라집니다."
 }

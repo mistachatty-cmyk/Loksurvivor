@@ -1287,5 +1287,13 @@
   "inv.runFoundSealed": "Sellado y esperando en Artículos. Ábrelos cuando quieras.",
   "inv.runFoundOpened": "Ya abierto en tu colección.",
   "inv.cardsInPack": "Tarjetas {{n}}",
-  "inv.cardInPack": "1 tarjeta"
+  "inv.cardInPack": "1 tarjeta",
+  "modifier.glassCannon": "Cañón de cristal",
+  "modifier.glassCannonBody": "Golpeas un 60% más fuerte y tienes la mitad del HP máximo. Un error cuesta caro.",
+  "modifier.paperHorde": "Horda de papel",
+  "modifier.paperHordeBody": "Aproximadamente un 60% más de enemigos, cada uno con aproximadamente la mitad de HP. Muchos estallidos.",
+  "modifier.jackpot": "Calles con premios mayores",
+  "modifier.jackpotBody": "La mitad de XP, contra enemigos con un cuarto más de HP.",
+  "modifier.frenzy": "frenesí",
+  "modifier.frenzyBody": "Atacas un 30% más rápido y los enemigos corren un 15% más rápido."
 }
