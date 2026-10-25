@@ -1466,5 +1466,16 @@
   "crewrun.promptLater": "Dismiss",
   "crewrun.start": "Start a crew run",
   "crewrun.startBody": "Open a run your crew can drop into. Everyone plays on their own device.",
-  "crewrun.needAccount": "Sign in to start a crew run."
+  "crewrun.needAccount": "Sign in to start a crew run.",
+  "social.chat.mute": "Mute",
+  "social.chat.unmute": "Unmute",
+  "climb.height": "{{n}} m",
+  "climb.best": "Best {{n}} m",
+  "climb.fell": "Fell at {{n}} m. Again!",
+  "climb.hint": "Tap or press space to leap between the walls. Dodge the signs and vents.",
+  "climb.loaded": "Loaded! You reached {{n}} m",
+  "settings.power.climbLoader": "Wall-climb loading game",
+  "settings.power.climbLoaderBody": "While something loads, play a wall-jump climb between two skyscrapers with your operator and LokPet. Off shows the quiet street walk instead.",
+  "loading.title": "Loading",
+  "loading.status": "Hang on while the game gets ready. Climb while you wait."
 }

@@ -1,0 +1,8 @@
+{
+  "presence": true,
+  "chat": true,
+  "listen": true,
+  "crewRuns": true,
+  "chatPerMinute": 20,
+  "runTickHz": 4
+}

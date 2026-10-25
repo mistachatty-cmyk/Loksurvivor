@@ -13,6 +13,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { lokClient } from '@/lib/lokClient';
 import { friendsPref } from '@/lib/powerSaver';
 import { crewmateIds } from '@/lib/social/crewRules';
+import { createBudget, loadNetConfig, useNetConfig } from '@/lib/social/netConfig';
 import { friendCodeFromSearch } from '@/lib/social/friendCode';
 import { avatarFor, displayNameFor } from '@/lib/social/identity';
 import { useAuth } from './authStore';
@@ -26,6 +27,8 @@ export type Doing = 'menu' | 'run' | 'theater';
 export interface CrewBus {
   /** True while the crew's channel is open (a crew with at least two players, and friends switched on). */
   up: boolean;
+  /** Keeps the channel open while something needs it (the overlay, a run, listening). Returns the way to let go. */
+  hold: () => () => void;
   send: (event: string, payload: Record<string, unknown>) => void;
   /** Listens for one kind of message; returns the way to stop. */
   on: (event: string, handler: (payload: Record<string, unknown>) => void) => () => void;
@@ -90,19 +93,31 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   const [tab, setTab] = useState<CrewTab>('crew');
   const [prefillCode, setPrefillCode] = useState<string | null>(null);
 
+  const net = useNetConfig();
+  useEffect(() => { void loadNetConfig(); }, []);
   const [busUp, setBusUp] = useState(false);
+  const [holds, setHolds] = useState(0);
+  const [awake, setAwake] = useState(true);
+  const busBudget = useRef(createBudget(8, 16));
   const busChannelRef = useRef<ReturnType<typeof openCrewChannel> | null>(null);
+  const hold = useCallback(() => {
+    setHolds((n) => n + 1);
+    let released = false;
+    return () => { if (!released) { released = true; setHolds((n) => Math.max(0, n - 1)); } };
+  }, []);
   const busHandlers = useRef(new Map<string, Set<(payload: Record<string, unknown>) => void>>());
   const bus = useMemo<CrewBus>(() => ({
     up: busUp,
-    send: (event, payload) => busChannelRef.current?.send(event, payload),
+    hold,
+    // Every message passes a small allowance, so a bug or a flood can never spend the shared message budget.
+    send: (event, payload) => { if (busBudget.current.take(Date.now())) busChannelRef.current?.send(event, payload); },
     on: (event, handler) => {
       const set = busHandlers.current.get(event) ?? new Set();
       set.add(handler);
       busHandlers.current.set(event, set);
       return () => { set.delete(handler); };
     },
-  }), [busUp]);
+  }), [busUp, hold]);
 
   const doingRef = useRef<Doing>('menu');
   const roomRef = useRef<string | null>(null);
@@ -146,7 +161,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
 
   // Presence: connect while the page is visible, let go after it has been hidden a minute.
   useEffect(() => {
-    if (!active || !lokClient || !userId || setupNeeded) return;
+    if (!active || !lokClient || !userId || setupNeeded || !net.presence) return;
     let hiddenTimer: ReturnType<typeof setTimeout> | null = null;
     const connect = () => {
       if (presenceRef.current) return;
@@ -176,20 +191,35 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       if (hiddenTimer) clearTimeout(hiddenTimer);
       disconnect();
     };
-  }, [active, userId, setupNeeded, refresh]);
+  }, [active, userId, setupNeeded, refresh, net.presence]);
 
   // The crew's shared channel: open only while there is someone to talk to.
   const crewId = crew.crew?.id ?? null;
   const hasCompany = active && crew.members.length >= 2;
+  // The channel costs a connection, so it opens only when there is someone to talk to: a crewmate is online, or
+  // this player is looking at the crew, in a crew run or listening. A hidden page lets go after a minute.
+  const othersOnline = crew.members.some((m) => m.userId !== userId && Boolean(online[m.userId]));
+  const wantBus = hasCompany && awake && (othersOnline || holds > 0);
   useEffect(() => {
-    if (!lokClient || !crewId || !hasCompany) { busChannelRef.current = null; setBusUp(false); return; }
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onVisibility = () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      if (document.visibilityState === 'hidden') timer = setTimeout(() => setAwake(false), HIDDEN_GRACE_MS);
+      else setAwake(true);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { document.removeEventListener('visibilitychange', onVisibility); if (timer) clearTimeout(timer); };
+  }, []);
+  useEffect(() => {
+    if (!lokClient || !crewId || !wantBus) { busChannelRef.current = null; setBusUp(false); return; }
     const channel = openCrewChannel(lokClient, crewId, (event, payload) => {
       busHandlers.current.get(event)?.forEach((handler) => handler(payload));
     });
     busChannelRef.current = channel;
     setBusUp(true);
     return () => { channel.leave(); busChannelRef.current = null; setBusUp(false); };
-  }, [crewId, hasCompany]);
+  }, [crewId, wantBus]);
 
   const setDoing = useCallback((doing: Doing, room?: string | null) => {
     doingRef.current = doing;

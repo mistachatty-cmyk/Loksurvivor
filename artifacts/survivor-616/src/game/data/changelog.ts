@@ -2208,6 +2208,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Crew runs are for fun: joined players are helpers that move and strike nearby enemies, and if the host falls the run ends for everyone.',
     ],
   },
+  {
+    version: '0.42.54',
+    date: '2026-10-25',
+    publishedAt: '2026-10-25T21:00:00Z',
+    kind: 'update',
+    title: 'Wall-climb loading game and a lighter crew connection',
+    body: [
+      'Loading screens now have a game: two skyscrapers, a night sky with the moon and stars, and you leap from wall to wall while sliding down to see how high you can climb before the game loads. It uses your own operator and your LokPet, dodges signs and vents, and keeps your best height. Settings has a switch to use the street walk instead.',
+      'Crew connections are lighter. The crew channel only opens when a crewmate is actually online or you have the Crew overlay, a run or a listening session open, and it closes after a minute in a hidden tab. Sends are rate-limited, crew runs send fewer updates and go quiet when nothing changes, and chat has a per-minute limit.',
+      'You can now mute a crewmate in the Crew overlay. Their chat lines stop showing for you.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

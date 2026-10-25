@@ -18,3 +18,10 @@ Full write-up: `docs/LOK_FRIENDS.md`. Decisions worth keeping:
 - Message budget: Realtime free tier limits messages per second for the whole project. Host ticks ~7/s only while guests exist; guests send input on change plus a 1.5s heartbeat. Keep it that way.
 - Playwright can mock the Realtime socket with `page.routeWebSocket` (reply `phx_reply` ok to every message, push `presence_state` for the prompt). Broadcast sends are binary frames and are not visible to the mock.
 - Playlists sync under `auth_saves` key `survivor616.playlists`; the edit stamp lives in localStorage `survivor616.playlists.v1.stamp`.
+
+## Net budget and loading game (0.42.54)
+
+- Crew channel is need-based (`wantBus`, `bus.hold()`); all sends go through token buckets; remote dial `public/lok-net.json` (`netConfig.ts`). Any new realtime feature must hold the bus while active and respect `useNetConfig()` flags. Details in docs/LOK_FRIENDS.md.
+- Host crew-run ticks default to 4 Hz and skip unchanged ticks; do not raise without checking the message budget.
+- Loading game: `lib/climbGame.ts` (pure, tested) + `ui/ClimbLoader.tsx` (canvas, uses equipped operator look and starter/selected LokPet). `ui/LoadingGame.tsx` picks climb vs walk by `climbLoaderPref`; App's Suspense fallback shows `DelayedLoadingGame` for run screens. Saved test pet must be injected into a real meta object (a bare seed gets reset by the store).
+- Avoid the word "signal" even for AbortController; use Promise.race timeouts.

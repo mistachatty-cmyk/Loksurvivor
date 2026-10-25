@@ -24,16 +24,15 @@ import {
   crewRunLength, expireSeats, heardFrom, seatJoiner, seatLeaves, stickToMove, type HeldSeat, type RunSeat,
 } from '@/lib/social/crewRun';
 import { EmoteBar } from '@/ui/CrewChat';
-import { WalkingLoader } from '@/ui/WalkingLoader';
+import { LoadingGame } from '@/ui/LoadingGame';
 import { openCrewOverlay, useSocial } from '@/state/socialStore';
+import { getNetConfig } from '@/lib/social/netConfig';
 import type { AreaDef, CharacterDef } from '@/game/types';
 
 const FIXED_STEP = 1 / 60;
 const MAX_SUBSTEPS = 6;
-/** The host broadcasts about 7 times a second: plenty for held inputs, kind to the shared message budget. */
-const TICK_EVERY_STEPS = 8;
-const INPUT_HEARTBEAT_MS = 1500;
-const INPUT_MIN_GAP_MS = 100;
+/** The host broadcasts a few times a second (the dial `runTickHz`, 4 by default): held inputs need no more, and the shared message budget is small. */
+const INPUT_HEARTBEAT_MS = 2000;
 const JOIN_RETRY_MS = 2500;
 const JOIN_GIVE_UP_MS = 15000;
 const STICK_RADIUS = 54;
@@ -214,6 +213,10 @@ export function CrewRunScreen({ role, crewId, characterId, areaId, onExit }: Cre
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, crewId, areaId, characterId]);
 
+  // A crew run keeps the crew's chat channel open for emotes.
+  const { hold } = social.bus;
+  useEffect(() => hold(), [hold]);
+
   // Leaving the host screen stops advertising the room.
   useEffect(() => () => { social.setDoing('menu'); }, [social.setDoing]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -249,6 +252,11 @@ export function CrewRunScreen({ role, crewId, characterId, areaId, onExit }: Cre
     let steps = 0;
     let sentAt = 0;
     let lastSent: ArenaMove = still;
+    let lastTickInputs = '';
+    let lastTickAt = 0;
+    const hz = getNetConfig().runTickHz;
+    const tickEverySteps = Math.max(1, Math.round(60 / hz));
+    const inputMinGapMs = Math.round(1000 / hz);
     let view: Viewport = { width: 1, height: 1, dpr: 1 };
 
     const resize = (): Viewport => {
@@ -277,7 +285,7 @@ export function CrewRunScreen({ role, crewId, characterId, areaId, onExit }: Cre
       if (time - sizeAt > 250) { sizeAt = time; view = resize(); }
       const mine = myMove();
 
-      if (role === 'guest' && (time - sentAt > INPUT_HEARTBEAT_MS || (time - sentAt > INPUT_MIN_GAP_MS && !same(mine, lastSent)))) {
+      if (role === 'guest' && (time - sentAt > INPUT_HEARTBEAT_MS || (time - sentAt > inputMinGapMs && !same(mine, lastSent)))) {
         sentAt = time; lastSent = mine;
         guestRoom.current?.sendInput(mySeatRef.current, mine);
       }
@@ -294,10 +302,15 @@ export function CrewRunScreen({ role, crewId, characterId, areaId, onExit }: Cre
           if (world.outcome !== 'running') break;
           if (role === 'host' && world.guests.length > 0) {
             steps += 1;
-            if (steps >= TICK_EVERY_STEPS) {
+            if (steps >= tickEverySteps) {
               steps = 0;
               const inputs: Record<string, ArenaMove> = { host: hostMove };
               for (const guest of world.guests) inputs[guest.id] = inputsRef.current[guest.id] ?? still;
+              // Idle rooms are quiet: send only when someone's movement changed, plus a once-a-second beat for the clock and scores.
+              const fingerprint = JSON.stringify(inputs);
+              if (fingerprint === lastTickInputs && time - lastTickAt < 1000) continue;
+              lastTickInputs = fingerprint;
+              lastTickAt = time;
               hostRoom.current?.sendTick({ inputs, time: world.time, kills: world.kills, guestKills: world.guestKills, outcome: world.outcome });
             }
           }
@@ -368,7 +381,7 @@ export function CrewRunScreen({ role, crewId, characterId, areaId, onExit }: Cre
 
   if (phase === 'connecting' || phase === 'ready') {
     return (
-      <WalkingLoader
+      <LoadingGame
         character={character}
         title={t(role === 'host' ? 'crewrun.openingTitle' : 'crewrun.joiningTitle')}
         status={phase === 'ready' ? t('crewrun.readyStatus') : t(status === 'disconnected' ? 'crewrun.statusOffline' : role === 'host' ? 'crewrun.statusOpening' : 'crewrun.statusKnocking')}
