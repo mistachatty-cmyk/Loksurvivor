@@ -1244,5 +1244,19 @@
   "crash.send.failed": "No se pudo enviar. Comprueba tu conexión y vuelve a intentarlo.",
   "crash.send.unavailable": "El envío no está configurado en esta copia del juego.",
   "settings.power.sendCrash": "Enviar los detalles de mi último accidente",
-  "settings.power.sendCrashBody": "El juego mantuvo detalles del último fallo en este dispositivo. Esto envía ese texto corto y borrado a LOK Services una vez, independientemente de lo que diga el interruptor de arriba. No tiene cuenta, ni identificación de dispositivo ni contenido de página."
+  "settings.power.sendCrashBody": "El juego mantuvo detalles del último fallo en este dispositivo. Esto envía ese texto corto y borrado a LOK Services una vez, independientemente de lo que diga el interruptor de arriba. No tiene cuenta, ni identificación de dispositivo ni contenido de página.",
+  "disc.shelf.favorites": "Favoritos",
+  "disc.shelf.recent": "Jugado recientemente",
+  "listening.favorite": "Añadir a favoritos",
+  "listening.unfavorite": "Eliminar de favoritos",
+  "listening.playedOnce": "Jugado una vez · {{time}}",
+  "listening.played": "Jugado {{n}} veces · {{time}}",
+  "settings.jukebox.favShelf": "Estante de favoritos",
+  "settings.jukebox.favShelfBody": "Las canciones que te gustan en la sala Jukebox se reúnen en su propio estante en la parte delantera.",
+  "settings.jukebox.recentShelf": "Estante reproducido recientemente",
+  "settings.jukebox.recentShelfBody": "Tus últimas canciones, las más nuevas primero, en un estante al frente de la sala.",
+  "settings.jukebox.history": "Recuerda lo que escucho",
+  "settings.jukebox.historyBody": "Cuenta las reproducciones y el tiempo de escucha solo en este dispositivo, por lo que los estantes y los conteos de reproducción pueden funcionar. No se envía nada a ninguna parte.",
+  "settings.jukebox.historyStats": "{{plays}} reproduce · {{time}} escuchó en este dispositivo. No se envía nada a ninguna parte.",
+  "settings.jukebox.historyClear": "Borrar historial"
 }

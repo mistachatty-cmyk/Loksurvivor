@@ -1244,5 +1244,19 @@
   "crash.send.failed": "无法发送。检查您的连接并重试。",
   "crash.send.unavailable": "此游戏副本中未设置发送功能。",
   "settings.power.sendCrash": "发送我上次崩溃的详细信息",
-  "settings.power.sendCrashBody": "游戏保留了该设备上上次崩溃的详细信息。无论上面的开关说什么，这都会将经过清理的简短文本发送到 LOK 服务一次。它没有帐户，没有设备 ID，也没有页面内容。"
+  "settings.power.sendCrashBody": "游戏保留了该设备上上次崩溃的详细信息。无论上面的开关说什么，这都会将经过清理的简短文本发送到 LOK 服务一次。它没有帐户，没有设备 ID，也没有页面内容。",
+  "disc.shelf.favorites": "收藏夹",
+  "disc.shelf.recent": "最近玩过",
+  "listening.favorite": "添加到收藏夹",
+  "listening.unfavorite": "从收藏夹中删除",
+  "listening.playedOnce": "玩过一次·{{time}}",
+  "listening.played": "玩过 {{n}} 次 · {{time}}",
+  "settings.jukebox.favShelf": "收藏夹架",
+  "settings.jukebox.favShelfBody": "您在点唱机室喜欢的歌曲都集中在前面的独立架子上。",
+  "settings.jukebox.recentShelf": "最近玩的架子",
+  "settings.jukebox.recentShelfBody": "您最新的歌曲（最新的在前）放在房间前面的架子上。",
+  "settings.jukebox.history": "记住我听的内容",
+  "settings.jukebox.historyBody": "仅计算此设备上的播放和收听时间，因此搁架和播放计数可以工作。没有任何东西被发送到任何地方。",
+  "settings.jukebox.historyStats": "{{plays}} 播放 · {{time}} 在此设备上收听。没有任何东西被发送到任何地方。",
+  "settings.jukebox.historyClear": "清除历史记录"
 }

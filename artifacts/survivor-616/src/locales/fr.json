@@ -1244,5 +1244,19 @@
   "crash.send.failed": "Impossible d'envoyer. Vérifiez votre connexion et réessayez.",
   "crash.send.unavailable": "L'envoi n'est pas configuré dans cette copie du jeu.",
   "settings.power.sendCrash": "Envoyer les détails de mon dernier crash",
-  "settings.power.sendCrashBody": "Le jeu a conservé les détails du dernier crash sur cet appareil. Cela envoie ce texte court et épuré aux services LOK une fois, quoi que dise le commutateur ci-dessus. Il n'a pas de compte, pas d'identifiant d'appareil et pas de contenu de page."
+  "settings.power.sendCrashBody": "Le jeu a conservé les détails du dernier crash sur cet appareil. Cela envoie ce texte court et épuré aux services LOK une fois, quoi que dise le commutateur ci-dessus. Il n'a pas de compte, pas d'identifiant d'appareil et pas de contenu de page.",
+  "disc.shelf.favorites": "Favoris",
+  "disc.shelf.recent": "Joué récemment",
+  "listening.favorite": "Ajouter aux favoris",
+  "listening.unfavorite": "Supprimer des favoris",
+  "listening.playedOnce": "Joué une fois · {{time}}",
+  "listening.played": "Joué à {{n}} fois · {{time}}",
+  "settings.jukebox.favShelf": "Étagère des favoris",
+  "settings.jukebox.favShelfBody": "Les chansons que vous aimez dans la salle Jukebox sont rassemblées sur leur propre étagère à l'avant.",
+  "settings.jukebox.recentShelf": "Étagère récemment jouée",
+  "settings.jukebox.recentShelfBody": "Vos dernières chansons, les plus récentes en premier, sur une étagère à l'avant de la pièce.",
+  "settings.jukebox.history": "Rappelez-vous ce que j'écoute",
+  "settings.jukebox.historyBody": "Compte les écoutes et le temps d'écoute sur cet appareil uniquement, afin que les étagères et le nombre de lectures puissent fonctionner. Rien n'est envoyé nulle part.",
+  "settings.jukebox.historyStats": "{{plays}} joue · {{time}} écouté sur cet appareil. Rien n'est envoyé nulle part.",
+  "settings.jukebox.historyClear": "Effacer l'historique"
 }

@@ -1244,5 +1244,19 @@
   "crash.send.failed": "送信できませんでした。接続を確認して、もう一度試してください。",
   "crash.send.unavailable": "このゲームでは送信が設定されていません。",
   "settings.power.sendCrash": "前回のクラッシュの詳細を送信する",
-  "settings.power.sendCrashBody": "ゲームには、このデバイスでの最後のクラッシュの詳細が保存されていました。これにより、上のスイッチの内容に関係なく、その短いスクラブされたテキストが LOK サービスに 1 回送信されます。アカウント、デバイス ID、ページ コンテンツはありません。"
+  "settings.power.sendCrashBody": "ゲームには、このデバイスでの最後のクラッシュの詳細が保存されていました。これにより、上のスイッチの内容に関係なく、その短いスクラブされたテキストが LOK サービスに 1 回送信されます。アカウント、デバイス ID、ページ コンテンツはありません。",
+  "disc.shelf.favorites": "お気に入り",
+  "disc.shelf.recent": "最近プレイした",
+  "listening.favorite": "お気に入りに追加",
+  "listening.unfavorite": "お気に入りから削除",
+  "listening.playedOnce": "一度プレイしました · {{time}}",
+  "listening.played": "{{n}} 回プレイしました · {{time}}",
+  "settings.jukebox.favShelf": "お気に入り棚",
+  "settings.jukebox.favShelfBody": "ジュークボックス ルームで心に留めた曲は、正面の専用の棚に集まります。",
+  "settings.jukebox.recentShelf": "最近プレイした棚",
+  "settings.jukebox.recentShelfBody": "あなたの最新の曲が、部屋の前の棚に新しいものから順に並べられています。",
+  "settings.jukebox.history": "私が聞いていることを覚えておいてください",
+  "settings.jukebox.historyBody": "このデバイスでのみ再生と視聴時間をカウントするため、シェルフと再生カウントは機能します。どこにも何も送信されません。",
+  "settings.jukebox.historyStats": "{{plays}} はこのデバイスで再生し、{{time}} は聞きます。どこにも何も送信されません。",
+  "settings.jukebox.historyClear": "履歴をクリアする"
 }
