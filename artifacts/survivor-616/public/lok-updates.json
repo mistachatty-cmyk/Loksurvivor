@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 193,
+      "version": "0.42.54",
+      "date": "2026-10-25",
+      "publishedAt": "2026-10-25T21:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Mute and sound meter from the GSix arcade",
+      "body": [
+        "When you play Survivor 616 inside the GSix arcade, the game bar can now mute and unmute the game, and a small meter next to it bounces with the sound so you can see at a glance whether the game is making noise.",
+        "Pick sound or muted before the game loads, and the choice is remembered on your device. Nothing changes when you play Survivor 616 on its own page."
+      ]
+    },
+    {
       "number": 192,
       "version": "0.42.53",
       "date": "2026-10-25",
