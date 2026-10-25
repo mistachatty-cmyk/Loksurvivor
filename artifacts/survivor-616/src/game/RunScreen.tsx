@@ -118,6 +118,7 @@ import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
 import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 import { useT } from '@/lib/i18n';
+import { openCrewOverlay } from '@/state/socialStore';
 import { effectiveFrameRate, saverCapPref, useSavingPower } from '@/lib/powerSaver';
 
 /**
@@ -2729,6 +2730,16 @@ export function RunScreen({
             >
               Settings
             </button>
+            {!liveDashboardOpen ? (
+              <button
+                type="button"
+                onClick={() => openCrewOverlay()}
+                className="w-full rounded-sm border border-emerald-200/40 bg-emerald-300/10 px-4 py-3 font-bold uppercase tracking-widest text-emerald-100"
+                data-testid="button-pause-crew"
+              >
+                {tr('social.button')}
+              </button>
+            ) : null}
             {!liveDashboardOpen ? (
               <button
                 type="button"

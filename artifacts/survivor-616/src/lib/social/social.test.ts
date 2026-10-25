@@ -98,3 +98,80 @@ test('the host announces a new song, play or pause and a seek, but not the ordin
   assert.equal(hostChanged(base, { ...base, trackId: 'b', positionSec: 0 }), true);
   assert.equal(hostChanged(base, { ...base, positionSec: 60 }), true);
 });
+
+import { cleanChat, createChatLimiter, MAX_CHAT_LENGTH, parseCrewChat } from './crewChat';
+
+test('chat lines are cleaned and capped', () => {
+  assert.equal(cleanChat('  hi \n\n there\t!  '), 'hi there !');
+  assert.equal(cleanChat('x'.repeat(500)).length, MAX_CHAT_LENGTH);
+  assert.equal(cleanChat('   '), '');
+});
+
+test('incoming chat accepts only valid lines and known emotes', () => {
+  assert.deepEqual(parseCrewChat({ kind: 'chat', text: ' gg ' }), { kind: 'chat', text: 'gg' });
+  assert.deepEqual(parseCrewChat({ kind: 'emote', emote: 'wave' }), { kind: 'emote', emote: 'wave' });
+  assert.equal(parseCrewChat({ kind: 'emote', emote: 'rm -rf' }), null);
+  assert.equal(parseCrewChat({ kind: 'chat', text: 5 }), null);
+  assert.equal(parseCrewChat({ kind: 'chat', text: '   ' }), null);
+  assert.equal(parseCrewChat({}), null);
+});
+
+test('the chat limiter allows a short burst, then waits for the window to pass', () => {
+  const limiter = createChatLimiter(3, 1000);
+  assert.ok(limiter.allow(0) && limiter.allow(10) && limiter.allow(20));
+  assert.ok(!limiter.allow(30));
+  assert.ok(limiter.allow(1100));
+});
+
+import { crewRunLength, expireSeats, freeSeatId, heardFrom, openCrewRun, seatJoiner, seatLeaves, SEAT_TIMEOUT_MS, stickToMove, type HeldSeat } from './crewRun';
+
+const joiner = (userId: string) => ({ userId, name: userId, characterId: 'c' });
+
+test('guests take the first free seat, a retry keeps the same seat, and a fifth player is turned away', () => {
+  let seats: HeldSeat[] = [];
+  for (const id of ['a', 'b', 'c']) {
+    const result = seatJoiner(seats, joiner(id), 0);
+    assert.notEqual(result, 'full');
+    if (result !== 'full') seats = result.seats;
+  }
+  assert.deepEqual(seats.map((s) => s.id), ['p2', 'p3', 'p4']);
+  const retry = seatJoiner(seats, joiner('b'), 5);
+  assert.ok(retry !== 'full' && retry.seatId === 'p3' && retry.seats.length === 3);
+  assert.equal(seatJoiner(seats, joiner('d'), 0), 'full');
+});
+
+test('a seat that leaves is reused by the next player', () => {
+  const first = seatJoiner([], joiner('a'), 0);
+  const second = first === 'full' ? first : seatJoiner(first.seats, joiner('b'), 0);
+  assert.ok(first !== 'full' && second !== 'full');
+  if (first === 'full' || second === 'full') return;
+  const after = seatLeaves(second.seats, 'p2');
+  assert.equal(freeSeatId(after.map((s) => s.id)), 'p2');
+});
+
+test('quiet seats drop out and talking keeps a seat alive', () => {
+  const seats: HeldSeat[] = [{ id: 'p2', userId: 'a', name: 'a', characterId: 'c', lastHeardAt: 0 }, { id: 'p3', userId: 'b', name: 'b', characterId: 'c', lastHeardAt: 0 }];
+  const alive = heardFrom(seats, 'p3', SEAT_TIMEOUT_MS);
+  const { seats: kept, dropped } = expireSeats(alive, SEAT_TIMEOUT_MS + 1);
+  assert.deepEqual(kept.map((s) => s.id), ['p3']);
+  assert.deepEqual(dropped.map((s) => s.id), ['p2']);
+});
+
+test('a crew run is offered only for a crewmate who is hosting this crew\'s room', () => {
+  const crew: LokCrewState = { crew: { id: 'crew-1', leaderId: 'me', game: 'survivor616' }, members: [member('me'), member('ada'), member('bo')], invites: [] };
+  assert.equal(openCrewRun(crew, {}, 'me'), null);
+  assert.equal(openCrewRun(crew, { ada: { game: 'survivor616', doing: 'run' } }, 'me'), null);
+  assert.equal(openCrewRun(crew, { ada: { game: 'survivor616', doing: 'run', room: 'other' } }, 'me'), null);
+  assert.equal(openCrewRun(crew, { me: { game: 'survivor616', doing: 'run', room: 'crew-1' } }, 'me'), null);
+  assert.equal(openCrewRun(crew, { bo: { game: 'survivor616', doing: 'run', room: 'crew-1' } }, 'me')?.userId, 'bo');
+});
+
+test('run length is capped and the touch stick has a dead zone', () => {
+  assert.equal(crewRunLength({ endless: true, durationSec: 0 }), 300);
+  assert.equal(crewRunLength({ durationSec: 900 }), 420);
+  assert.equal(crewRunLength({ durationSec: 180 }), 180);
+  assert.deepEqual(stickToMove(2, 1), { moveX: 0, moveY: 0 });
+  const full = stickToMove(200, 0);
+  assert.equal(full.moveX, 1);
+  assert.ok(Math.abs(stickToMove(27, 0).moveX - 0.5) < 1e-9);
+});

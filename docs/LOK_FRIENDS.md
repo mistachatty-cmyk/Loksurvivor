@@ -19,6 +19,15 @@ One system for every Lok game. A player signs in once (Discord, GitHub, Google, 
 - The live connection opens only when signed in, only while "Friends and crew" is on in Settings > Power, storage and data, and closes after the page has been hidden for a minute.
 - Listening together sends a song id, a play/pause flag and a position, never audio. Only soundtrack songs (the same in every game) can be shared. The crew channel is named after the crew's random id, which only crew members ever receive.
 
+## Crew chat, emotes and crew runs (0.42.53)
+
+- **One shared crew channel.** `socialStore` opens `lok-crew-<crewId>` once, only while the crew has two or more players, and exposes it as `social.bus` (`send`, `on`, `up`). Listening together and chat both ride it; never open a second channel with the same name.
+- **Chat and emotes** (`src/lib/social/crewChat.ts`, `state/crewChat.tsx`, `ui/CrewChat.tsx`): lines up to 120 characters, four per eight seconds, checked again on receipt, kept in memory only. Emotes are a fixed list. Crewmates' lines show as small pop-ups over any screen, including runs. Settings > Power has a "Crew chat" switch.
+- **Crew runs** (drop in / drop out): a crewmate opens an open room from the Crew overlay. While hosting, presence carries `doing: 'run'` plus `room: <crewId>`; other crew members see the "your crew is in a run" prompt (`ui/CrewRunSetup.tsx`) and can drop in. The room is a Realtime broadcast channel `crewrun:<crewId>` (`game/arena/crewRunNet.ts`), same relay idea as the arena: the host relays move inputs, the shared clock and kill counts at about 7 messages a second, and every device runs its own simulation from a shared seed. A late joiner copies the host's clock so the waves line up.
+- **What a crew run is not.** Joined players are the arena's lightweight helpers (they move and strike nearby enemies, no levelling), only the host can be knocked out, and if the host leaves the run ends for everyone. Enemy swarms can drift a little between screens. Scores are unranked and pay nothing.
+- **Walking loading screen** (`ui/WalkingLoader.tsx`): shown while the room connects. A canvas street the player's own operator walks along; chips, bounce pads and pigeons are for play only and nothing is saved.
+- **Playlists on the account** (`lib/playlistSync.ts`, `ui/PlaylistCloudSync.tsx`): custom playlists are stored under their own key in the player's `auth_saves` row (`survivor616.playlists`). Only names, order and bundled songs are saved. Newest edit wins; a device that has never synced merges instead. Settings > Power has a switch.
+
 ## Switching it on (dashboard steps, once)
 
 1. Supabase > Authentication > Providers: enable Discord and GitHub (each needs a client id and secret from its developer portal; the callback is `https://<project>.supabase.co/auth/v1/callback`). Google and Apple are already used by the game.
@@ -30,4 +39,4 @@ Until step 3 the overlay says friends are almost ready instead of failing.
 
 ## Free-tier note
 
-Realtime free tier allows 200 concurrent connections. Each signed-in player with the page open uses one for presence (plus one while in a crew with company). That is plenty for now; the connection-closing rules above exist to keep it that way.
+Realtime free tier allows 200 concurrent connections. Each signed-in player with the page open uses one for presence (plus one while in a crew with company, plus one in a crew run). The free tier also limits messages per second across the whole project, which is why crew runs send about 7 ticks a second and guests only send input when it changes. That is plenty for now; the connection-closing rules above exist to keep it that way.

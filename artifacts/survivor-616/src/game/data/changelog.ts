@@ -2194,6 +2194,20 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Character Select screen lists each weapon path, so you can see what the next level will do.',
     ],
   },
+  {
+    version: '0.42.53',
+    date: '2026-10-25',
+    publishedAt: '2026-10-25T20:00:00Z',
+    kind: 'update',
+    title: 'Crew runs, crew chat and playlists that follow you',
+    body: [
+      'Crew runs let your crew drop in and out of a run together. Start one from the Crew overlay, pick an operator and an area, and your crewmates see a prompt that their crew is in a run. They can drop in at any time and drop out again; the run keeps going. Up to four players, each on their own device, with touch controls on phones.',
+      'While a run connects you get a loading screen you can play with: walk your operator along a quiet street, hop on bounce pads, scare the pigeons and pick up chips.',
+      'Crew chat and emotes are in the Crew overlay and as small pop-ups during runs. The pause menu now has a Crew button too. Settings has a Crew chat switch.',
+      'Custom playlists now follow you across devices when you are signed in. Only names, order and songs that ship with the game are saved; songs from your own files stay on the device that has them. Settings has a switch.',
+      'Crew runs are for fun: joined players are helpers that move and strike nearby enemies, and if the host falls the run ends for everyone.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

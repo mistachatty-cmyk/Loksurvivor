@@ -2228,6 +2228,16 @@ export function addGuestPlayer(
   return guest;
 }
 
+/**
+ * Crew runs: a player dropped out. Their kill count stays on the scoreboard; nothing else of theirs is left in
+ * the world. Safe to call for an id that is not there.
+ */
+export function removeGuestPlayer(w: World, id: string): boolean {
+  const before = w.guests.length;
+  w.guests = w.guests.filter((guest) => guest.id !== id);
+  return w.guests.length !== before;
+}
+
 function uid(w: World): number {
   w.nextUid += 1;
   return w.nextUid;

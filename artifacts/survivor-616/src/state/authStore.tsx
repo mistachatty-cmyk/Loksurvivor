@@ -52,6 +52,9 @@ interface AuthContextValue {
   /** Cloud save (auth_saves), namespaced under SOURCE. null user/lokClient => no-ops. */
   loadCloudSave: () => Promise<CloudSaveResult | null>;
   saveCloudSave: (data: unknown) => Promise<{ error: string | null }>;
+  /** Small extra cloud documents (playlists) under their own key in the same row. */
+  loadCloudDoc: (source: string) => Promise<CloudSaveResult | null>;
+  saveCloudDoc: (source: string, data: unknown) => Promise<{ error: string | null }>;
   /** Publishes the compact LokDex snapshot the GSix hub reads (lokdex_collections). */
   saveLokDex: (snapshot: LokDexSnapshot) => Promise<{ error: string | null }>;
   /** Publishes soundtrack objective progress so the GSix site's player can open the same songs. */
@@ -170,6 +173,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [session],
   );
 
+  const doLoadCloudDoc = useCallback(
+    async (source: string) => {
+      if (!lokClient || !session) return null;
+      return loadCloudSave(lokClient, session.user.id, source);
+    },
+    [session],
+  );
+
+  const doSaveCloudDoc = useCallback(
+    async (source: string, data: unknown) => {
+      if (!lokClient || !session) return { error: 'Not signed in.' };
+      return saveCloudSave(lokClient, session.user.id, source, data);
+    },
+    [session],
+  );
+
   const doSaveMusicProgress = useCallback(
     async (objectives: number) => {
       if (!lokClient || !session) return { error: 'Not signed in.' };
@@ -202,6 +221,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     submitFeedback: doSubmitFeedback,
     loadCloudSave: doLoadCloudSave,
     saveCloudSave: doSaveCloudSave,
+    loadCloudDoc: doLoadCloudDoc,
+    saveCloudDoc: doSaveCloudDoc,
     saveLokDex: doSaveLokDex,
     saveMusicProgress: doSaveMusicProgress,
   };

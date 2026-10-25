@@ -13,6 +13,7 @@ import { readShuffle, writeShuffle } from '@/lib/jukeboxPrefs';
 import { useEq, type EqSettings } from '@/lib/musicEq';
 import { positionStateFor, sessionMetaFor, skipTarget } from '@/lib/mediaSessionMeta';
 import { mediaControlsPref } from '@/lib/powerSaver';
+import { playlistFingerprint, syncablePlaylists } from '@/lib/playlistSync';
 import { DEFAULT_VOLUME, VOLUME_STORAGE_KEY, parseStoredVolume } from './volumeCurve';
 import {
   createContext,
@@ -244,6 +245,10 @@ export interface MusicPlayerValue {
   /** Replaces a playlist's track order wholesale -- built for a drag-reorder
    * UI that already has the full new order on hand, rather than one move at a time. */
   reorderPlaylistTracks: (playlistId: string, trackIds: string[]) => void;
+  /** When the custom playlists last changed on this device (ms; 0 = never edited). Used by cloud sync. */
+  playlistsEditedAt: number;
+  /** Replaces the custom playlists with a synced set; `editedAt` is stamped so it is not re-uploaded. */
+  importPlaylists: (next: Array<{ id: string; name: string; trackIds: string[] }>, editedAt: number) => void;
 }
 
 const MusicContext = createContext<MusicPlayerValue | null>(null);
@@ -304,6 +309,20 @@ const NEW_FITS_TRACKS: Track[] = (
 
 /** Every built-in song, Lokifed first so the title-screen default stays Data Spark. */
 const BUNDLED_TRACKS: Track[] = [...LOKIFED_TRACKS, ...NEW_FITS_TRACKS];
+/** Ids of the songs that ship with the game: the only ones a synced playlist may hold. */
+export const BUNDLED_TRACK_IDS: ReadonlySet<string> = new Set(BUNDLED_TRACKS.map((track) => track.id));
+const PLAYLIST_STAMP_KEY = 'survivor616.playlists.v1.stamp';
+
+function readPlaylistStamp(): { fingerprint: string; editedAt: number } | null {
+  try {
+    const raw = typeof window === 'undefined' ? null : window.localStorage.getItem(PLAYLIST_STAMP_KEY);
+    const parsed = raw ? (JSON.parse(raw) as { fingerprint?: unknown; editedAt?: unknown }) : null;
+    if (parsed && typeof parsed.fingerprint === 'string' && typeof parsed.editedAt === 'number') {
+      return { fingerprint: parsed.fingerprint, editedAt: parsed.editedAt };
+    }
+  } catch { /* an unreadable stamp just means "never edited" */ }
+  return null;
+}
 
 const BUNDLED_ALBUMS: SoundtrackAlbum[] = [
   {
@@ -1044,6 +1063,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
   }, [albumCredits]);
 
+  const [playlistsEditedAt, setPlaylistsEditedAt] = useState<number>(() => readPlaylistStamp()?.editedAt ?? 0);
+  const pendingImportAtRef = useRef<number | null>(null);
+
   // Persist playlists (metadata + order only -- see Playlist management below
   // for why local-file entries don't survive a reload).
   useEffect(() => {
@@ -1054,6 +1076,16 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         activePlaylistId: BUNDLED_ALBUM_PLAYLISTS.some((album) => album.id === activePlaylistId) ? null : activePlaylistId,
       };
       window.localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(payload));
+      // Remember when the synced part last changed, so cloud sync can tell which side is newer.
+      const synced = syncablePlaylists(playlists, BUNDLED_TRACK_IDS);
+      const fingerprint = playlistFingerprint(synced);
+      const stamp = readPlaylistStamp();
+      if (!stamp || stamp.fingerprint !== fingerprint) {
+        const at = pendingImportAtRef.current ?? (stamp || synced.length > 0 ? Date.now() : 0);
+        pendingImportAtRef.current = null;
+        window.localStorage.setItem(PLAYLIST_STAMP_KEY, JSON.stringify({ fingerprint, editedAt: at }));
+        setPlaylistsEditedAt(at);
+      }
     } catch {
       // Storage may be unavailable (private browsing, quota) -- playlists just won't persist.
     }
@@ -1159,6 +1191,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
   const reorderPlaylistTracks = useCallback((playlistId: string, trackIds: string[]) => {
     setPlaylists((prev) => prev.map((p) => (p.id === playlistId && !p.builtIn ? { ...p, trackIds } : p)));
+  }, []);
+
+  const importPlaylists = useCallback((next: Array<{ id: string; name: string; trackIds: string[] }>, editedAt: number) => {
+    pendingImportAtRef.current = editedAt;
+    setPlaylists((prev) => [
+      ...prev.filter((playlist) => playlist.builtIn),
+      ...next.map((playlist) => ({ id: playlist.id, name: playlist.name, trackIds: playlist.trackIds })),
+    ]);
+    setActivePlaylistIdState((current) => (current && next.some((playlist) => playlist.id === current) ? current : current && BUNDLED_ALBUM_PLAYLISTS.some((a) => a.id === current) ? current : null));
   }, []);
 
   /* --------------------------------------------------------------- */
@@ -1831,6 +1872,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       addToPlaylist,
       removeFromPlaylist,
       reorderPlaylistTracks,
+      playlistsEditedAt,
+      importPlaylists,
     }),
     [
       tracks,
@@ -1891,6 +1934,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       addToPlaylist,
       removeFromPlaylist,
       reorderPlaylistTracks,
+      playlistsEditedAt,
+      importPlaylists,
     ],
   );
 

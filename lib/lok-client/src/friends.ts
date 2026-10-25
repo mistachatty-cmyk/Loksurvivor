@@ -174,6 +174,8 @@ export interface LokPresence {
   game: string;
   /** `menu`, `run` or `theater`: shown next to the name. */
   doing: string;
+  /** Set while the player hosts an open crew run: the room a crewmate can drop into. */
+  room?: string;
 }
 
 /**
@@ -191,7 +193,10 @@ export function joinPresence(
     const out: Record<string, LokPresence> = {};
     for (const [key, metas] of Object.entries(raw)) {
       const latest = metas[metas.length - 1];
-      if (latest) out[key] = { game: String(latest.game ?? ""), doing: String(latest.doing ?? "menu") };
+      if (latest) {
+        out[key] = { game: String(latest.game ?? ""), doing: String(latest.doing ?? "menu") };
+        if (typeof latest.room === "string" && latest.room) out[key]!.room = latest.room.slice(0, 80);
+      }
     }
     onSync(out);
   });

@@ -34,6 +34,10 @@ export const mediaControlsPref = createPref<boolean>('survivor616.audio.media-co
 export const playtimeSharingPref = createPref<boolean>('survivor616.net.playtime.v1', true);
 /** Friends, crews and online status. Only does anything while signed in; off closes the live connection. */
 export const friendsPref = createPref<boolean>('survivor616.net.friends.v1', true);
+/** Keeping custom playlists on the account so they follow the player to other devices. */
+export const playlistSyncPref = createPref<boolean>('survivor616.net.playlistSync.v1', true);
+/** Showing crew chat lines and emotes from crewmates. */
+export const crewChatPref = createPref<boolean>('survivor616.net.crewChat.v1', true);
 
 export function savingReason(mode: SaverMode, facts: PowerFacts): SaverReason | null {
   if (mode === 'off') return null;
