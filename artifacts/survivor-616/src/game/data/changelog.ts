@@ -2145,6 +2145,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Pausing a song and coming back, especially after switching apps, could replay the same few seconds over and over. The soundtrack now stops cleanly when your phone interrupts the sound, then clears the stuck bit and picks up where you left off. The pack opening screen also sits above everything now, so its Close button is always tappable.',
     ],
   },
+  {
+    version: '0.42.49',
+    date: '2026-10-25',
+    publishedAt: '2026-10-25T14:10:00Z',
+    kind: 'update',
+    title: 'Two new operators and four new run modifiers',
+    body: [
+      'Spoke Queen is fast and circles herself with three spinning bicycle wheels that clip anything close. Her ultimate, Critical Mass, is the whole ride arriving at once: faster legs, harder wheels and a shove that clears the lane.',
+      'Jackhammer Jean is slow, heavy and loud. Her quakes roll out through the pavement and open potholes under the crowd, and Road Closed is a wide slam while she stands her ground. Both are in the roster now.',
+      'Four new run modifiers on the Roster page. Glass Cannon hits 60% harder with half the max HP. Paper Horde sends about 60% more enemies with roughly half the HP each. Jackpot Streets gives half again as much XP against tougher enemies. Frenzy attacks 30% faster, and enemies run 15% faster.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -344,3 +344,58 @@ test('HORDE_SPIN_TIERS are well-formed', () => {
   const rare = HORDE_SPIN_TIERS.filter((tier) => tier.rare);
   assert.ok(rare.some((tier) => tier.id === '5x5') && rare.some((tier) => tier.id === '666'), '5x5 and 666 must be the rare tiers');
 });
+
+function makeWorld(modifiers: Record<string, boolean>, wave: WaveDef = immediateWave, seed = 1) {
+  const character = CHARACTERS[0]!;
+  return createWorld(areaWithWave(wave), character, character.stats, seed, [], 1, true, null, { modifiers });
+}
+
+test('glassCannonMode hits harder and halves max hp', () => {
+  const base = makeWorld({});
+  const glass = makeWorld({ glassCannonMode: true });
+  assert.ok(glass.stats.power > base.stats.power * 1.55);
+  assert.equal(glass.player.maxHp, Math.round(base.player.maxHp * 0.5));
+  assert.equal(glass.player.hp, glass.player.maxHp);
+});
+
+test('frenzyMode speeds up weapons and enemies and stacks with speedMode', () => {
+  const base = makeWorld({});
+  const frenzy = makeWorld({ frenzyMode: true });
+  assert.ok(frenzy.stats.haste > base.stats.haste * 1.25);
+  for (const world of [base, frenzy, makeWorld({ frenzyMode: true, speedMode: true })]) stepWorld(world, 1 / 30, neutralInput);
+  const speedOf = (w: ReturnType<typeof makeWorld>) => w.enemies[0]!.speed;
+  const fast = makeWorld({ frenzyMode: true, speedMode: true });
+  stepWorld(fast, 1 / 30, neutralInput);
+  assert.ok(speedOf(frenzy) > speedOf(base) * 1.1);
+  assert.ok(speedOf(fast) > speedOf(frenzy) * 1.2);
+});
+
+test('paperHordeMode brings more, softer enemies', () => {
+  const slow: WaveDef = { fromSec: 0, toSec: 300, enemyId: 'nightcrawler', ratePerSec: 1, burst: 1 };
+  const base = makeWorld({}, slow);
+  const paper = makeWorld({ paperHordeMode: true }, slow);
+  for (const world of [base, paper]) {
+    world.player.invulnUntil = Number.POSITIVE_INFINITY;
+    world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < 61; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  }
+  assert.ok(paper.enemies.length > base.enemies.length, 'more spawns');
+  assert.ok(paper.enemies[0]!.maxHp < base.enemies[0]!.maxHp * 0.7, 'each one is softer');
+});
+
+test('jackpotMode multiplies XP and toughens enemies', () => {
+  const base = makeWorld({});
+  const jackpot = makeWorld({ jackpotMode: true });
+  assert.equal(jackpot.xpMult, base.xpMult * 1.5);
+  stepWorld(base, 1 / 30, neutralInput);
+  stepWorld(jackpot, 1 / 30, neutralInput);
+  assert.ok(jackpot.enemies[0]!.maxHp > base.enemies[0]!.maxHp * 1.2);
+});
+
+test('the four new modifiers survive save normalization and ignore lookalikes', () => {
+  const keys = ['glassCannonMode', 'paperHordeMode', 'jackpotMode', 'frenzyMode'] as const;
+  const saved = normalizeMeta({ version: 15, runModifiers: Object.fromEntries(keys.map((key) => [key, true])) }).runModifiers;
+  for (const key of keys) assert.equal(saved[key], true);
+  const junk = normalizeMeta({ version: 15, runModifiers: Object.fromEntries(keys.map((key) => [key, 'yes'])) }).runModifiers;
+  for (const key of keys) assert.equal(junk[key], undefined);
+});

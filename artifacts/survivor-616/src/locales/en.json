@@ -1287,5 +1287,13 @@
   "inv.runFoundSealed": "Sealed and waiting in Items. Open them whenever you like.",
   "inv.runFoundOpened": "Already opened into your collection.",
   "inv.cardsInPack": "{{n}} cards",
-  "inv.cardInPack": "1 card"
+  "inv.cardInPack": "1 card",
+  "modifier.glassCannon": "Glass Cannon",
+  "modifier.glassCannonBody": "You hit 60% harder and carry half the max HP. One mistake is expensive.",
+  "modifier.paperHorde": "Paper Horde",
+  "modifier.paperHordeBody": "About 60% more enemies, each with roughly half the HP. A lot of pops.",
+  "modifier.jackpot": "Jackpot Streets",
+  "modifier.jackpotBody": "Half again as much XP, against enemies with a quarter more HP.",
+  "modifier.frenzy": "Frenzy",
+  "modifier.frenzyBody": "You attack 30% faster and enemies run 15% faster."
 }

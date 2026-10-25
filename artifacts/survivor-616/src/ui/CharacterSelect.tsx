@@ -2,6 +2,7 @@
  * Roster / character picker. Owned by the design pass -- keep the export
  * name and props stable.
  */
+import { useT, type MessageKey } from '@/lib/i18n';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { BookOpen, HeartPulse, LockKeyhole, Maximize2, Zap } from 'lucide-react';
 
@@ -560,7 +561,7 @@ function LockedCharacterTile({ character, meta }: { character: CharacterDef; met
   );
 }
 
-const RUN_MODIFIER_OPTIONS: Array<{ key: keyof RunModifiers; name: string; description: string }> = [
+const RUN_MODIFIER_OPTIONS: Array<{ key: keyof RunModifiers; name: string; description: string; nameKey?: MessageKey; descKey?: MessageKey }> = [
   { key: 'doubleMode', name: '2x Mode', description: 'Doubled spawn rate and a flat hp bump on any run. Stacks with everything else here.' },
   { key: 'quadSpawnMode', name: '4x Spawns', description: 'Optional fourfold wave pressure. If 2x Mode is also on, 4x wins for spawns while its hp bump remains.' },
   { key: 'unleashedMode', name: 'Unleashed 1000', description: 'Up to 1,000 live enemies with optimized 8x pressure. Overrides other spawn-rate toggles, but keeps their hp effects.' },
@@ -574,9 +575,14 @@ const RUN_MODIFIER_OPTIONS: Array<{ key: keyof RunModifiers; name: string; descr
   // Only shown once meta.directorModeUnlocked -- see RunModifiersChecklist below.
   { key: 'directorModeEnabled', name: 'Director Mode', description: 'Raises the odds the Director crashes the run with its crew, once eligible.' },
   { key: 'bionicCluckProtocol', name: 'Bionic Cluck Protocol', description: 'Digital Russel mutiny: Hostile bots transmute into friendly clucking Chicken-Bots that lay restorative & explosive eggs.' },
+  { key: 'glassCannonMode', name: '', description: '', nameKey: 'modifier.glassCannon', descKey: 'modifier.glassCannonBody' },
+  { key: 'paperHordeMode', name: '', description: '', nameKey: 'modifier.paperHorde', descKey: 'modifier.paperHordeBody' },
+  { key: 'jackpotMode', name: '', description: '', nameKey: 'modifier.jackpot', descKey: 'modifier.jackpotBody' },
+  { key: 'frenzyMode', name: '', description: '', nameKey: 'modifier.frenzy', descKey: 'modifier.frenzyBody' },
 ];
 
 function RunModifiersChecklist({ modifiers, directorModeUnlocked, onToggle }: { modifiers: RunModifiers; directorModeUnlocked: boolean; onToggle: (key: keyof RunModifiers) => void }) {
+  const t = useT();
   const options = RUN_MODIFIER_OPTIONS.filter((option) => option.key !== 'directorModeEnabled' || directorModeUnlocked);
   return (
     <section className="border border-primary/30 bg-card p-4" data-testid="section-run-modifiers">
@@ -605,8 +611,8 @@ function RunModifiersChecklist({ modifiers, directorModeUnlocked, onToggle }: { 
                 &#10003;
               </span>
               <span className="min-w-0">
-                <span className="block text-[11px] font-bold uppercase tracking-wide text-white">{option.name}</span>
-                <span className="block text-[10px] leading-snug text-muted-foreground">{option.description}</span>
+                <span className="block text-[11px] font-bold uppercase tracking-wide text-white">{option.nameKey ? t(option.nameKey) : option.name}</span>
+                <span className="block text-[10px] leading-snug text-muted-foreground">{option.descKey ? t(option.descKey) : option.description}</span>
               </span>
             </button>
           );

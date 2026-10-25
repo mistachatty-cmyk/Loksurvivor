@@ -114,3 +114,8 @@ when the `active` phase's timer elapses, guarded by `wheelSpin.rewardGranted`
 pure screen-space decoration keyed off `hud.wheelSpin.colorFluctuation` and
 never touches the simulation, per the ambiance-contract convention in
 `sky-ambiance.md`.
+
+## Frenzy, Glass Cannon, Paper Horde, Jackpot Streets (0.42.49)
+- Stat swaps (`glassCannonMode` power x1.6 / maxHp x0.5, `frenzyMode` haste x1.3) are applied once in `createWorld` right after `const modifiers`, before the player and `w.stats` are built. Enemy HP/spawn go through `modifierHpMult`/`modifierSpawnMult`; enemy speed through the new `modifierEnemySpeed` (Speed Mode and Frenzy stack). `jackpotMode` multiplies `xpMult` at world creation.
+- Their checklist text lives in en.json (`modifier.*`), read through `nameKey`/`descKey` in `CharacterSelect`. The older entries still use hard-coded English.
+- Spoke Queen / Jackhammer Jean live in `data/creatorPair.ts` (appended after the forge five); their canvas touches are `render/creatorPairVfx.ts`.

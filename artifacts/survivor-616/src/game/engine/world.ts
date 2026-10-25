@@ -1688,6 +1688,9 @@ export function createWorld(
   if (takenQuirks.has('oversized')) stats = { ...stats, maxHp: Math.round(stats.maxHp * 1.4) };
   if (takenQuirks.has('shrunken')) stats = { ...stats, maxHp: Math.max(1, Math.round(stats.maxHp * 0.75)) };
   const modifiers = setup.modifiers ?? {};
+  // Opt-in stat swaps. Applied once, before the player and `w.stats` are built from `stats`.
+  if (modifiers.glassCannonMode) stats = { ...stats, power: stats.power * 1.6, maxHp: Math.max(1, Math.round(stats.maxHp * 0.5)) };
+  if (modifiers.frenzyMode) stats = { ...stats, haste: stats.haste * 1.3 };
   // `invertedMap` mirrors the area's authored obstacle layout left-to-right;
   // area coordinates are centered at (0,0) (bounds are half-extents), so
   // flipping is just negating x. All three of obstacles/breakables/potholes
@@ -1874,7 +1877,7 @@ export function createWorld(
     onBeatHits: 0,
     level: 1,
     xp: 0,
-    xpMult: Math.max(0, setup.xpMult ?? 1),
+    xpMult: Math.max(0, (setup.xpMult ?? 1) * (modifiers.jackpotMode ? 1.5 : 1)),
     xpToNext: xpForLevel(1),
     pendingLevelUps: 0,
     rerollsRemaining: LEVEL_UP_REROLLS_PER_RUN,
@@ -2352,7 +2355,14 @@ function modifierHpMult(w: World): number {
   let mult = 1;
   if (w.modifiers.doubleMode) mult *= 1.5;
   if (w.modifiers.scalerMode) mult *= Math.min(3, 1 + (w.level - 1) * 0.06);
+  if (w.modifiers.jackpotMode) mult *= 1.25;
+  if (w.modifiers.paperHordeMode) mult *= 0.55;
   return mult;
+}
+
+/** Enemy movement multiplier from run modifiers (Speed Mode and Frenzy stack). */
+function modifierEnemySpeed(w: World): number {
+  return (w.modifiers.speedMode ? 1.25 : 1) * (w.modifiers.frenzyMode ? 1.15 : 1);
 }
 
 /** Flat spawn-rate multiplier from run modifiers. See `modifierHpMult` for the endless-cap caveat. */
@@ -2360,7 +2370,7 @@ function modifierSpawnMult(w: World): number {
   if (w.modifiers.millionHordeMode) return 16;
   if (w.modifiers.unleashedMode) return 8;
   if (w.modifiers.quadSpawnMode) return 4;
-  return w.modifiers.doubleMode ? 2 : 1;
+  return (w.modifiers.doubleMode ? 2 : 1) * (w.modifiers.paperHordeMode ? 1.6 : 1);
 }
 
 function selectedDirector(w: World): (typeof DIRECTORS)[number] | undefined {
@@ -2527,7 +2537,7 @@ const HORDE_PROMOTIONS_PER_STEP = 48;
 function feedHorde(w: World, def: EnemyDef, hpMult: number, perTick: number, at?: { x: number; y: number }): number {
   const field = w.hordeField;
   if (!field) return 0;
-  const speed = def.speed * (w.modifiers.speedMode ? 1.25 : 1);
+  const speed = def.speed * modifierEnemySpeed(w);
   const kind = field.registerKind(def, hpMult, speed);
   const view = w.hordeView;
   let cx: number;
@@ -2697,7 +2707,7 @@ function spawnEnemy(
   const affixes: Array<'armored' | 'overclocked' | 'incendiary' | 'vampiric' | 'magnetic'> = ['armored', 'overclocked', 'incendiary', 'vampiric', 'magnetic'];
   const affix = isVeteran ? affixes[Math.floor(w.rng() * affixes.length)] : undefined;
   const hp = isVeteran ? Math.round(baseHp * (affix === 'armored' ? 2.0 : 1.6)) : baseHp;
-  const finalSpeed = isVeteran ? def.speed * (w.modifiers.speedMode ? 1.25 : 1) * (affix === 'overclocked' ? 1.35 : 1.12) : def.speed * (w.modifiers.speedMode ? 1.25 : 1);
+  const finalSpeed = isVeteran ? def.speed * modifierEnemySpeed(w) * (affix === 'overclocked' ? 1.35 : 1.12) : def.speed * modifierEnemySpeed(w);
   const finalDamage = isVeteran ? Math.round(def.damage * 1.3) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyDamageMultiplier, 1) : def.damage * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyDamageMultiplier, 1);
   const finalXp = isVeteran ? Math.round(def.xp * 2.5) : def.xp;
 
