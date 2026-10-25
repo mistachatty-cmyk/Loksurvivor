@@ -135,7 +135,7 @@ function LokBalanceSection() {
 }
 
 function LoginForm() {
-  const { available, signInWithEmail, signUpWithEmail, signInWithGoogle, signInWithApple, user, signOut } = useAuth();
+  const { available, signInWithEmail, signUpWithEmail, signInWithGoogle, signInWithApple, signInWithDiscord, signInWithGitHub, user, signOut } = useAuth();
   const syncStatus = useCloudSyncStatus();
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   const [email, setEmail] = useState('');
@@ -174,10 +174,12 @@ function LoginForm() {
     });
   };
 
-  const handleOAuth = async (provider: 'google' | 'apple') => {
-    const { error } = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
+  const handleOAuth = async (provider: 'google' | 'apple' | 'discord' | 'github') => {
+    const label = { google: 'Google', apple: 'Apple', discord: 'Discord', github: 'GitHub' }[provider];
+    const run = { google: signInWithGoogle, apple: signInWithApple, discord: signInWithDiscord, github: signInWithGitHub }[provider];
+    const { error } = await run();
     if (error) {
-      toast({ title: `${provider === 'google' ? 'Google' : 'Apple'} sign-in unavailable`, description: error, variant: 'destructive' });
+      toast({ title: `${label} sign-in unavailable`, description: error, variant: 'destructive' });
     }
   };
 
@@ -232,6 +234,12 @@ function LoginForm() {
         </Button>
         <Button variant="outline" onClick={() => void handleOAuth('apple')} data-testid="button-sign-in-apple">
           Continue with Apple
+        </Button>
+        <Button variant="outline" onClick={() => void handleOAuth('discord')} data-testid="button-sign-in-discord">
+          Continue with Discord
+        </Button>
+        <Button variant="outline" onClick={() => void handleOAuth('github')} data-testid="button-sign-in-github">
+          Continue with GitHub
         </Button>
       </div>
       {!available && <p className="text-xs text-destructive">Login isn't configured in this environment yet.</p>}

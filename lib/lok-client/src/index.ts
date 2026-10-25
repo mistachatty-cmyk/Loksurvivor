@@ -8,3 +8,4 @@ export * from "./cards";
 export * from "./lokdex";
 export * from "./music";
 export * from "./supporters";
+export * from "./friends";

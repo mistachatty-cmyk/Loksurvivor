@@ -16,7 +16,7 @@ export async function signInWithEmail(
   return client.auth.signInWithPassword({ email, password });
 }
 
-type OAuthProvider = "google" | "apple";
+export type OAuthProvider = "google" | "apple" | "discord" | "github";
 
 /**
  * Providers (Google especially) refuse to render their sign-in page inside an
@@ -70,6 +70,22 @@ export function signInWithApple(
   hooks?: { onFramed?: () => void },
 ) {
   return signInWithProvider(client, "apple", redirectTo, hooks);
+}
+
+export function signInWithDiscord(
+  client: SupabaseClient,
+  redirectTo?: string,
+  hooks?: { onFramed?: () => void },
+) {
+  return signInWithProvider(client, "discord", redirectTo, hooks);
+}
+
+export function signInWithGitHub(
+  client: SupabaseClient,
+  redirectTo?: string,
+  hooks?: { onFramed?: () => void },
+) {
+  return signInWithProvider(client, "github", redirectTo, hooks);
 }
 
 export async function signOut(client: SupabaseClient) {

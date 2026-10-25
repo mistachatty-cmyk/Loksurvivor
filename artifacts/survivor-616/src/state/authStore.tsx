@@ -8,7 +8,9 @@ import {
   saveLokDexSnapshot,
   saveMusicProgress,
   signInWithApple,
+  signInWithDiscord,
   signInWithEmail,
+  signInWithGitHub,
   signInWithGoogle,
   signOut as signOutClient,
   signUpWithEmail,
@@ -42,6 +44,8 @@ interface AuthContextValue {
   signUpWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
   signInWithApple: () => Promise<{ error: string | null }>;
+  signInWithDiscord: () => Promise<{ error: string | null }>;
+  signInWithGitHub: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   joinWaitlist: (input: Omit<JoinWaitlistInput, 'source'>) => Promise<{ error: string | null }>;
   submitFeedback: (input: Omit<SubmitFeedbackInput, 'source' | 'userId'>) => Promise<{ error: string | null }>;
@@ -117,6 +121,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }, []);
 
+  const doSignInWithDiscord = useCallback(async () => {
+    if (!lokClient) return { error: 'Auth is not configured yet.' };
+    const { error } = await signInWithDiscord(lokClient, undefined, { onFramed: rememberArcadeReturn });
+    return { error: error?.message ?? null };
+  }, []);
+
+  const doSignInWithGitHub = useCallback(async () => {
+    if (!lokClient) return { error: 'Auth is not configured yet.' };
+    const { error } = await signInWithGitHub(lokClient, undefined, { onFramed: rememberArcadeReturn });
+    return { error: error?.message ?? null };
+  }, []);
+
   const doSignOut = useCallback(async () => {
     if (!lokClient) return;
     await signOutClient(lokClient);
@@ -179,6 +195,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUpWithEmail: doSignUpWithEmail,
     signInWithGoogle: doSignInWithGoogle,
     signInWithApple: doSignInWithApple,
+    signInWithDiscord: doSignInWithDiscord,
+    signInWithGitHub: doSignInWithGitHub,
     signOut: doSignOut,
     joinWaitlist: doJoinWaitlist,
     submitFeedback: doSubmitFeedback,

@@ -32,6 +32,8 @@ export const saverCapPref = createPref<string>('survivor616.power.saver-fps.v1',
 export const mediaControlsPref = createPref<boolean>('survivor616.audio.media-controls.v1', true);
 /** Counting active play time toward the player's GSix account (or the anonymous tally). */
 export const playtimeSharingPref = createPref<boolean>('survivor616.net.playtime.v1', true);
+/** Friends, crews and online status. Only does anything while signed in; off closes the live connection. */
+export const friendsPref = createPref<boolean>('survivor616.net.friends.v1', true);
 
 export function savingReason(mode: SaverMode, facts: PowerFacts): SaverReason | null {
   if (mode === 'off') return null;
