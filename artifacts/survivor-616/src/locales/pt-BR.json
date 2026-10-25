@@ -1244,5 +1244,19 @@
   "crash.send.failed": "Não foi possível enviar. Verifique sua conexão e tente novamente.",
   "crash.send.unavailable": "O envio não está configurado nesta cópia do jogo.",
   "settings.power.sendCrash": "Enviar detalhes do meu último acidente",
-  "settings.power.sendCrashBody": "O jogo manteve detalhes do último travamento neste aparelho. Isso envia esse texto curto e limpo para os Serviços LOK uma vez, independentemente do que a opção acima indicar. Não possui conta, id de dispositivo e conteúdo de página."
+  "settings.power.sendCrashBody": "O jogo manteve detalhes do último travamento neste aparelho. Isso envia esse texto curto e limpo para os Serviços LOK uma vez, independentemente do que a opção acima indicar. Não possui conta, id de dispositivo e conteúdo de página.",
+  "disc.shelf.favorites": "Favoritos",
+  "disc.shelf.recent": "Jogado recentemente",
+  "listening.favorite": "Adicionar aos Favoritos",
+  "listening.unfavorite": "Remover dos Favoritos",
+  "listening.playedOnce": "Jogado uma vez · {{time}}",
+  "listening.played": "Jogado {{n}} vezes · {{time}}",
+  "settings.jukebox.favShelf": "Estante de favoritos",
+  "settings.jukebox.favShelfBody": "As músicas que você mais gosta na Jukebox Room ficam reunidas em sua própria prateleira na frente.",
+  "settings.jukebox.recentShelf": "Prateleira jogada recentemente",
+  "settings.jukebox.recentShelfBody": "Suas músicas mais recentes, as mais recentes primeiro, em uma prateleira na frente da sala.",
+  "settings.jukebox.history": "Lembre-se do que eu ouço",
+  "settings.jukebox.historyBody": "Conta as reproduções e o tempo de audição apenas neste dispositivo, para que as prateleiras e as contagens de reproduções possam funcionar. Nada é enviado para lugar nenhum.",
+  "settings.jukebox.historyStats": "{{plays}} reproduz · {{time}} ouvido neste dispositivo. Nada é enviado para lugar nenhum.",
+  "settings.jukebox.historyClear": "Limpar histórico"
 }

@@ -1244,5 +1244,19 @@
   "crash.send.failed": "Konnte nicht gesendet werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
   "crash.send.unavailable": "Das Senden ist in dieser Kopie des Spiels nicht eingerichtet.",
   "settings.power.sendCrash": "Senden Sie meine letzten Absturzdaten",
-  "settings.power.sendCrashBody": "Das Spiel hat Details zum letzten Absturz auf diesem Gerät gespeichert. Dadurch wird dieser kurze, gesäuberte Text einmal an LOK Services gesendet, unabhängig davon, was der Schalter oben sagt. Es hat kein Konto, keine Geräte-ID und keinen Seiteninhalt."
+  "settings.power.sendCrashBody": "Das Spiel hat Details zum letzten Absturz auf diesem Gerät gespeichert. Dadurch wird dieser kurze, gesäuberte Text einmal an LOK Services gesendet, unabhängig davon, was der Schalter oben sagt. Es hat kein Konto, keine Geräte-ID und keinen Seiteninhalt.",
+  "disc.shelf.favorites": "Favoriten",
+  "disc.shelf.recent": "Kürzlich gespielt",
+  "listening.favorite": "Zu Favoriten hinzufügen",
+  "listening.unfavorite": "Aus Favoriten entfernen",
+  "listening.playedOnce": "Einmal gespielt · {{time}}",
+  "listening.played": "{{n}} mal gespielt · {{time}}",
+  "settings.jukebox.favShelf": "Favoriten-Regal",
+  "settings.jukebox.favShelfBody": "Die Lieder, die Sie im Jukebox-Raum lieben, finden Sie auf einem eigenen Regal an der Vorderseite.",
+  "settings.jukebox.recentShelf": "Kürzlich gespieltes Regal",
+  "settings.jukebox.recentShelfBody": "Ihre neuesten Songs, die neuesten zuerst, auf einem Regal vorne im Raum.",
+  "settings.jukebox.history": "Denken Sie daran, was ich höre",
+  "settings.jukebox.historyBody": "Zählt Wiedergaben und Hörzeit nur auf diesem Gerät, sodass die Regale und Wiedergabezählungen funktionieren können. Es wird nichts irgendwo hingeschickt.",
+  "settings.jukebox.historyStats": "{{plays}} spielt · {{time}} hat auf diesem Gerät gehört. Es wird nichts irgendwo hingeschickt.",
+  "settings.jukebox.historyClear": "Klare Geschichte"
 }
