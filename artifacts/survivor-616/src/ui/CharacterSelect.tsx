@@ -423,6 +423,13 @@ function CharacterDetail({
             <span className="text-[10px] font-bold uppercase tracking-widest text-white">{character.weapon.name}</span>
           </div>
           <p className="text-xs text-muted-foreground">{character.weapon.description}</p>
+          {character.weapon.milestones?.length ? (
+            <ol className="mt-2 space-y-1 border-l border-white/15 pl-2" data-testid="weapon-path">
+              {character.weapon.milestones.map((m) => (
+                <li key={m.level} className="text-[11px] leading-snug text-white/70"><span className="font-mono font-bold text-primary">Lv {m.level}</span> <span className="font-bold text-white">{m.name}</span> · {m.description}</li>
+              ))}
+            </ol>
+          ) : null}
         </div>
         <div>
           <div className="mb-1 flex items-center gap-2">

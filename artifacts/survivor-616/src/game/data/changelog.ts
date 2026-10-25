@@ -2182,6 +2182,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Settings, under Power, storage and data, has a Friends and crew switch that closes the live connection, and the overlay has Show me as online. Friends need one setup step on the shared Lok database before they switch on; until then the overlay says they are almost ready.',
     ],
   },
+  {
+    version: '0.42.52',
+    date: '2026-10-25',
+    publishedAt: '2026-10-25T18:00:00Z',
+    kind: 'update',
+    title: 'Spoke Queen and Jackhammer Jean grow with their weapons',
+    body: [
+      'Spoke Queen and Jackhammer Jean no longer just hit harder as their signature weapons level up. At levels 2, 4, 6 and 8 each weapon gains a new behavior, and a pop-up tells you when it arrives.',
+      'The wheels can surge in a faster, wider orbit, burst when they hit, and finish as a full Mass Ride. The quake can echo, aftershock, slam a ring on every third swing and leave potholes behind.',
+      'The Character Select screen lists each weapon path, so you can see what the next level will do.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

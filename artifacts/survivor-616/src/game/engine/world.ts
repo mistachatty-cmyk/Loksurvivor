@@ -22,6 +22,7 @@ import { EVOLUTIONS, EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { PASSIVES, PASSIVES_BY_ID } from '@/game/data/passives';
 import { UPGRADES, ALLIES_BY_ID } from '@/game/data/progression';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
+import { claimMilestones, everyNth, milestoneEffects, surgeActive } from '@/game/engine/milestones';
 import { grpdOfferWeight, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
 import { rollPrize } from '@/game/data/prizes';
 import { LOKPET_ELEMENT_COLORS, getLokPetEvolutionStage, rollLokPet } from '@/game/data/lokPets';
@@ -5598,6 +5599,36 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
           statusEffectId: weapon.statusEffectId,
         });
       }
+      const path = milestoneEffects(weapon, runWeapon.level);
+      if (path.echo) {
+        for (let i = 0; i < count; i += 1) {
+          const delay = path.echo.delayMs + i * 120;
+          w.effects.push({
+            uid: uid(w), kind: 'wave', weaponId: weapon.id, x: p.x, y: p.y, radius: reach * (0.55 + i * 0.22) * path.echo.radiusMult,
+            angle, spread: 0.46, bornAt: w.now + delay, expiresAt: w.now + 330 + delay, color: weapon.color ?? palette.accent,
+            damage: damage * path.echo.damageMult, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
+            statusEffectId: weapon.statusEffectId,
+          });
+        }
+      }
+      runWeapon.casts = (runWeapon.casts ?? 0) + 1;
+      if (path.every && everyNth(path.every, runWeapon.casts)) {
+        const { slam, potholes } = path.every;
+        if (slam) {
+          const slamRadius = slam.radius * areaMult(w);
+          novaDamage(w, p.x, p.y, slamRadius, damage * slam.damageMult, 4, slam.statusEffectId, weapon.id);
+          damageBreakable(w, p.x, p.y, slamRadius, damage * slam.damageMult, 4, p.x, p.y, 'ground-shock');
+          w.effects.push({ uid: uid(w), kind: 'ring', weaponId: weapon.id, x: p.x, y: p.y, radius: slamRadius, angle: 0, spread: 0,
+            bornAt: w.now, expiresAt: w.now + 320, color: weapon.color ?? palette.accent, damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false });
+          w.shake = Math.max(w.shake, 6);
+        }
+        if (potholes) {
+          const hx = target ? target.x : p.x + Math.cos(angle) * reach * 0.6;
+          const hy = target ? target.y : p.y + Math.sin(angle) * reach * 0.6;
+          activatePotholes(w, hx, hy, potholes.radius * areaMult(w), 'ground-shock');
+          activatePotholes(w, p.x, p.y, potholes.radius * areaMult(w) * 0.8, 'ground-shock');
+        }
+      }
       p.anim = 'attack'; p.animStartedAt = w.now;
       break;
     }
@@ -6037,14 +6068,31 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
   w.currentWeaponDamageId = undefined;
 }
 
+/** Grants any growth-path milestone a weapon has just reached: extra pieces, plus a short announcement. */
+function syncWeaponMilestones(w: World) {
+  for (const weapon of w.weapons) {
+    if (!weapon.def.milestones) continue;
+    const fresh = claimMilestones(weapon);
+    if (fresh.length === 0) continue;
+    if (weapon.def.kind === 'orbit') rebuildOrbiters(w, weapon);
+    for (const milestone of fresh) {
+      pushAlert(w, `${weapon.def.name} · ${milestone.name}`);
+      w.popups.push({ x: w.player.x, y: w.player.y + 30, text: `★ ${milestone.name}`, color: weapon.def.color ?? w.character.palette.accent, bornAt: w.now, vy: 32 });
+    }
+    w.shake = Math.max(w.shake, 3);
+  }
+}
+
 function updateOrbiters(w: World, dt: number) {
   const p = w.player;
   const orbitWeapons = w.weapons.filter((entry) => entry.def.kind === 'orbit');
   for (const runWeapon of orbitWeapons) {
     const weapon = runWeapon.def;
-    const damage = runWeaponDamage(w, runWeapon);
-    const radius = weapon.range * areaMult(w);
-    const spin = (weapon.speed ?? 2.5) / cooldownMult(w);
+    const path = milestoneEffects(weapon, runWeapon.level);
+    const flaring = surgeActive(path.surge, w.now);
+    const damage = runWeaponDamage(w, runWeapon) * (flaring ? path.surge!.damageMult : 1);
+    const radius = weapon.range * areaMult(w) * (flaring ? path.surge!.radiusMult : 1);
+    const spin = ((weapon.speed ?? 2.5) / cooldownMult(w)) * (flaring ? path.surge!.spinMult : 1);
     const orbs = w.orbiters.filter((orb) => orb.weaponId === weapon.id);
     for (const orb of orbs) {
     orb.angle += spin * dt;
@@ -6059,6 +6107,11 @@ function updateOrbiters(w: World, dt: number) {
       if (dist2(enemy.x, enemy.y, ox, oy) <= reach * reach) {
         orb.cooldowns.set(enemy.uid, w.now + 420);
         damageEnemy(w, enemy, damage, weaponImpact(weapon), ox, oy, undefined, 0, undefined, weapon.id);
+        if (path.hitBurst) {
+          novaDamage(w, ox, oy, path.hitBurst.radius, damage * path.hitBurst.damageMult, 1, path.hitBurst.statusEffectId, weapon.id);
+          w.effects.push({ uid: uid(w), kind: 'ring', weaponId: weapon.id, x: ox, y: oy, radius: path.hitBurst.radius, angle: 0, spread: 0,
+            bornAt: w.now, expiresAt: w.now + 210, color: weapon.color ?? '#a3e635', damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false });
+        }
         if (weapon.id === 'commentstorm-crown' || weapon.id === 'crown-of-replies') {
           const burstRadius = weapon.id === 'crown-of-replies' ? 62 : 38;
           novaDamage(w, ox, oy, burstRadius, damage * 0.32, 1, 'slow', weapon.id);
@@ -12857,6 +12910,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateMission(w, dt);
 
   // Weapon cadence.
+  syncWeaponMilestones(w);
   updateOrbiters(w, dt);
   for (const weapon of w.weapons) {
     if (weapon.def.kind === 'orbit') continue;

@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 191,
+      "version": "0.42.52",
+      "date": "2026-10-25",
+      "publishedAt": "2026-10-25T18:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Spoke Queen and Jackhammer Jean grow with their weapons",
+      "body": [
+        "Spoke Queen and Jackhammer Jean no longer just hit harder as their signature weapons level up. At levels 2, 4, 6 and 8 each weapon gains a new behavior, and a pop-up tells you when it arrives.",
+        "The wheels can surge in a faster, wider orbit, burst when they hit, and finish as a full Mass Ride. The quake can echo, aftershock, slam a ring on every third swing and leave potholes behind.",
+        "The Character Select screen lists each weapon path, so you can see what the next level will do."
+      ]
+    },
+    {
       "number": 190,
       "version": "0.42.51",
       "date": "2026-10-25",
