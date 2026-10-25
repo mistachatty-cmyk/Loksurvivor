@@ -1244,5 +1244,19 @@
   "crash.send.failed": "Could not send. Check your connection and try again.",
   "crash.send.unavailable": "Sending is not set up in this copy of the game.",
   "settings.power.sendCrash": "Send my last crash details",
-  "settings.power.sendCrashBody": "The game kept details of the last crash on this device. This sends that short, scrubbed text to LOK Services once, whatever the switch above says. It has no account, no device id and no page content."
+  "settings.power.sendCrashBody": "The game kept details of the last crash on this device. This sends that short, scrubbed text to LOK Services once, whatever the switch above says. It has no account, no device id and no page content.",
+  "disc.shelf.favorites": "Favorites",
+  "disc.shelf.recent": "Recently played",
+  "listening.favorite": "Add to Favorites",
+  "listening.unfavorite": "Remove from Favorites",
+  "listening.playedOnce": "Played once · {{time}}",
+  "listening.played": "Played {{n}} times · {{time}}",
+  "settings.jukebox.favShelf": "Favorites shelf",
+  "settings.jukebox.favShelfBody": "Songs you heart in the Jukebox Room gather on their own shelf at the front.",
+  "settings.jukebox.recentShelf": "Recently played shelf",
+  "settings.jukebox.recentShelfBody": "Your latest songs, newest first, on a shelf at the front of the room.",
+  "settings.jukebox.history": "Remember what I listen to",
+  "settings.jukebox.historyBody": "Counts plays and listening time on this device only, so the shelves and play counts can work. Nothing is sent anywhere.",
+  "settings.jukebox.historyStats": "{{plays}} plays · {{time}} listened on this device. Nothing is sent anywhere.",
+  "settings.jukebox.historyClear": "Clear history"
 }

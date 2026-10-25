@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildShelves, entriesOf, idHash, shelfDiscItem, shelfIndexFor, shortLabel, stepShelf, type ShelfTrack } from './jukeboxShelves';
+import { buildShelves, entriesOf, idHash, shelfDiscItem, shelfIndexFor, shortLabel, stepShelf, withPersonalShelves, type ShelfTrack } from './jukeboxShelves';
 
 const lok = (n: number, locked = false): ShelfTrack => ({ id: `lokifed-${n}`, title: `Song ${n}`, source: 'bundled', trackNumber: n, album: 'Lokifed — Take 1', unlockObjectiveCount: n, locked });
 const fit = (id: string): ShelfTrack => ({ id, title: `${id} — DJ Misfit`, source: 'bundled', album: 'DJ Misfit — New Fits' });
@@ -61,4 +61,20 @@ test('generated discs never print an artist or licensing claim and never use the
 test('short labels cut at the dash and trim long names', () => {
   assert.equal(shortLabel('His Beat — DJ Misfit'), 'His Beat');
   assert.equal(shortLabel('A very long song title indeed', 12), 'A very long…');
+});
+
+test('hearted and recent songs form their own shelves in front, skipping unknown songs and empty shelves', () => {
+  const albums = buildShelves([lok(1), lok(2), fit('a')]);
+  const titles = { favorites: 'Favorites', recent: 'Recently played' };
+  assert.equal(withPersonalShelves(albums, { favoriteIds: [], recentIds: [], titles }).length, albums.length);
+  const shelves = withPersonalShelves(albums, { favoriteIds: ['a', 'gone', 'lokifed-2'], recentIds: ['lokifed-1'], titles });
+  assert.deepEqual(shelves.map((s) => s.title), ['Favorites', 'Recently played', 'Lokifed — Take 1', 'DJ Misfit — New Fits']);
+  assert.deepEqual(shelves[0]!.tracks.map((t) => t.id), ['a', 'lokifed-2']);
+});
+
+test('opening on the playing song prefers its album over the player\'s own shelves', () => {
+  const albums = buildShelves([lok(1), fit('a')]);
+  const shelves = withPersonalShelves(albums, { favoriteIds: ['a'], recentIds: [], titles: { favorites: 'F', recent: 'R' } });
+  assert.equal(shelves[shelfIndexFor(shelves, 'a')]!.title, 'DJ Misfit — New Fits');
+  assert.equal(shelves[shelfIndexFor(shelves, null, shelves[0]!.id)]!.title, 'F');
 });

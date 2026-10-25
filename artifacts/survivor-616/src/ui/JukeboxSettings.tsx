@@ -5,6 +5,7 @@ import { useMusicPlayer, formatTime } from '@/game/audio/musicPlayer';
 import { useMeta } from '@/game/state/metaStore';
 import { DISC_FX_KEYS, DISC_PULSE_LEVELS, readDiscFx, readDiscPulse, writeDiscFx, writeDiscPulse, type DiscFx, type DiscPulseLevel } from '@/lib/discPulse';
 import { useT } from '@/lib/i18n';
+import { clearListeningHistory, favoritesShelfPref, formatListening, listeningHistoryPref, recentShelfPref, totalPlays, totalSeconds, useListening } from '@/lib/listening';
 import { REACTIVE_BG_LEVELS, readDiscGestures, readKeepAwake, readReactiveBg, readShelves, readTheaterMix, writeDiscGestures, writeKeepAwake, writeReactiveBg, writeShelves, writeTheaterMix, type ReactiveBgLevel } from '@/lib/jukeboxPrefs';
 import { ArrivalDiscsToggle } from './ArrivalDiscsToggle';
 
@@ -37,6 +38,11 @@ export function JukeboxSettings({ onOpenScreen }: { onOpenScreen?: (id: string) 
   const [shelves, setShelves] = useState(readShelves);
   const [gestures, setGestures] = useState(readDiscGestures);
   const [awake, setAwake] = useState(readKeepAwake);
+  const favShelf = favoritesShelfPref.use();
+  const recentShelf = recentShelfPref.use();
+  const history = listeningHistoryPref.use();
+  const listening = useListening();
+  const heard = totalPlays(listening);
   const roomOpen = unlockedRooms.some((room) => room.id === 'jukebox-room');
 
   return (
@@ -69,6 +75,27 @@ export function JukeboxSettings({ onOpenScreen }: { onOpenScreen?: (id: string) 
           <Row title={t('settings.jukebox.shelves')} body={t('settings.jukebox.shelvesBody')}>
             <button type="button" aria-pressed={shelves} onClick={() => { writeShelves(!shelves); setShelves(!shelves); }} className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${shelves ? ON : OFF}`} data-testid="button-jukebox-shelves">
               {shelves ? 'On' : 'Off'}
+            </button>
+          </Row>
+
+          <Row title={t('settings.jukebox.favShelf')} body={t('settings.jukebox.favShelfBody')}>
+            <button type="button" aria-pressed={favShelf} onClick={() => favoritesShelfPref.set(!favShelf)} className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${favShelf ? ON : OFF}`} data-testid="button-jukebox-fav-shelf">
+              {favShelf ? 'On' : 'Off'}
+            </button>
+          </Row>
+
+          <Row title={t('settings.jukebox.recentShelf')} body={t('settings.jukebox.recentShelfBody')}>
+            <button type="button" aria-pressed={recentShelf} onClick={() => recentShelfPref.set(!recentShelf)} className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${recentShelf ? ON : OFF}`} data-testid="button-jukebox-recent-shelf">
+              {recentShelf ? 'On' : 'Off'}
+            </button>
+          </Row>
+
+          <Row title={t('settings.jukebox.history')} body={heard > 0 ? t('settings.jukebox.historyStats', { plays: String(heard), time: formatListening(totalSeconds(listening)) }) : t('settings.jukebox.historyBody')}>
+            <button type="button" aria-pressed={history} onClick={() => listeningHistoryPref.set(!history)} className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${history ? ON : OFF}`} data-testid="button-jukebox-history">
+              {history ? 'On' : 'Off'}
+            </button>
+            <button type="button" disabled={heard === 0} onClick={clearListeningHistory} className="border border-border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white/80 hover:text-white disabled:opacity-30" data-testid="button-jukebox-clear-history">
+              {t('settings.jukebox.historyClear')}
             </button>
           </Row>
 

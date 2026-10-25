@@ -35,3 +35,8 @@ Spec and handoff log: `docs/jukebox-spec.md`. Shared logic: `packages/lok-jukebo
 
 ## Hub sync state (2026-10-24, game 0.42.45)
 - Lore, achievements catalog, LokDex catalog and LokDex art were all stale in `mistachatty-cmyk/gsixhub` and were regenerated and merged (gsixhub PR #50). Its default branch is `claude/gsix-hub-rebuild-0pqf59`, it has no CLAUDE.md, and the session needs `add_repo` (push access) plus one shallow clone. Re-run the four exporters (see CLAUDE.md) after any lore/card/achievement change.
+
+## Favorites and listening (0.42.47)
+- `lib/listening.ts`: device-local `survivor616.listening.v1` = `{stats:{id:{plays,seconds,last}}, favorites:[ids]}`. A play counts at 20s heard (`PLAY_THRESHOLD_SEC`); `ListeningTracker` (mounted in App) adds seconds every 5s only while `listeningHistoryPref` is on. Hearts are kept even with history off or after Clear history. Nothing is ever sent over the network.
+- Personal shelves (`withPersonalShelves`, ids prefixed `mine:`) go in front of album shelves in `DiscShelves`. They are read once per mount (a snapshot) so shelves never shift mid-visit; a new heart shows on the next open. `shelfIndexFor` prefers the album shelf holding the playing song so the room opens where the song lives.
+- Shelf prefs: `favoritesShelfPref`, `recentShelfPref`. Heart button = `ui/FavoriteButton.tsx` (room controls + pull-out); stats line in the pull-out; rows in `JukeboxSettings`.

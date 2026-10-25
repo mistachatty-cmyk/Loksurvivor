@@ -7,6 +7,8 @@
  * Rendered in a portal on the page body so no transform or filter on a parent can bend a fixed
  * layout (`.agents/memory/fixed-popups-and-ancestor-filters.md`).
  */
+import { FavoriteButton } from './FavoriteButton';
+import { formatListening, useListening } from '@/lib/listening';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Pause, Play, Repeat, Repeat1 } from 'lucide-react';
@@ -100,6 +102,8 @@ export function DiscPullOut({ trackId, item, lite, onClose }: DiscPullOutProps) 
   const ownTrack = currentTrack?.id === trackId;
   const duration = ownTrack ? durationSec : 0;
   const progress = ownTrack ? progressSec : 0;
+  const stat = useListening().stats[trackId];
+  const playedLine = stat && stat.plays > 0 ? t(stat.plays === 1 ? 'listening.playedOnce' : 'listening.played', { n: stat.plays, time: formatListening(stat.seconds) }) : null;
   const repeatLabel = t(repeat === 'one' ? 'disc.pull.repeat.one' : repeat === 'all' ? 'disc.pull.repeat.all' : 'disc.pull.repeat.off');
 
   return createPortal(
@@ -203,8 +207,9 @@ export function DiscPullOut({ trackId, item, lite, onClose }: DiscPullOutProps) 
           >
             {playingThis ? <Pause size={28} /> : <Play size={28} />}
           </button>
-          <span className="w-10" aria-hidden="true" />
+          <FavoriteButton trackId={trackId} size={22} testId="button-pullout-favorite" />
         </div>
+        {playedLine ? <p className="text-center font-mono text-[10px] uppercase tracking-[0.18em] text-white/45" data-testid="text-pullout-played">{playedLine}</p> : null}
         <p className="text-center font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">{t('disc.pull.spinHint')}</p>
       </div>
     </div>,

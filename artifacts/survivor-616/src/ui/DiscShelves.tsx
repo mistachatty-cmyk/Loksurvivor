@@ -15,9 +15,10 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 
 import DiscCascadeCarousel from '@/components/ui/disc-cascade-carousel';
 import { startingDisc, type DiscTrack } from '@/game/audio/jukeboxDiscs';
-import { buildShelves, entriesOf, shelfDiscItem, shelfIndexFor, stepShelf, type ShelfEntry, type ShelfTrack } from '@/game/audio/jukeboxShelves';
+import { buildShelves, entriesOf, shelfDiscItem, shelfIndexFor, stepShelf, withPersonalShelves, type ShelfEntry, type ShelfTrack } from '@/game/audio/jukeboxShelves';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { readDiscPulse, type DiscPulseLevel } from '@/lib/discPulse';
+import { favoritesShelfPref, readListening, recentIds, recentShelfPref } from '@/lib/listening';
 import { readDiscGestures, readLastShelf, readShelves, writeLastShelf } from '@/lib/jukeboxPrefs';
 import { useT } from '@/lib/i18n';
 import { useSavingPower } from '@/lib/powerSaver';
@@ -157,13 +158,23 @@ export const DiscShelves = forwardRef<DiscShelvesHandle, DiscShelvesProps>(funct
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   const shelves = useMemo(() => buildShelves(tracks as ShelfTrack[]), [tracks]);
+  // The player's own shelves (hearts, recent plays) are read once when the room opens. Fixing them
+  // for the visit keeps the shelf you are on from shifting under your finger when you heart a song.
+  const [mine] = useState(() => {
+    const listening = readListening();
+    return {
+      favoriteIds: favoritesShelfPref.get() ? listening.favorites : [],
+      recentIds: recentShelfPref.get() ? recentIds(listening, 8) : [],
+    };
+  });
   const view = useMemo<ViewShelf[]>(() => {
     if (shelves.length === 0) return [];
     if (shelvesOn) {
-      return shelves.map((s) => ({ id: s.id, title: s.title, entries: s.tracks.map((track, position) => ({ track, shelfTitle: s.title, position })) }));
+      const withMine = withPersonalShelves(shelves, { ...mine, titles: { favorites: t('disc.shelf.favorites'), recent: t('disc.shelf.recent') } });
+      return withMine.map((s) => ({ id: s.id, title: s.title, entries: s.tracks.map((track, position) => ({ track, shelfTitle: s.title, position })) }));
     }
     return [{ id: 'shelf:all', title: '', entries: entriesOf(shelves) }];
-  }, [shelves, shelvesOn]);
+  }, [shelves, shelvesOn, mine, t]);
 
   const [shelfIdx, setShelfIdx] = useState(() => shelfIndexFor(view.map((v) => ({ id: v.id, title: v.title, tracks: v.entries.map((e) => e.track) })), currentTrack?.id, readLastShelf()));
   const [enter, setEnter] = useState<'next' | 'prev' | undefined>(undefined);

@@ -61,6 +61,7 @@ import { prefetchWhenIdle } from '@/lib/idlePrefetch';
 import { SETTINGS_FOCUS_KEY } from '@/lib/jukeboxPrefs';
 import { CrashRecoveryPrompt } from '@/ui/CrashRecoveryPrompt';
 import { SaveGuardBanner } from '@/ui/SaveGuardBanner';
+import { ListeningTracker } from '@/ui/ListeningTracker';
 import { MenuDock } from '@/ui/MenuDock';
 import { ScreenSlide } from '@/ui/ScreenSlide';
 import { LokChatHost } from '@/ui/LokChatHost';
@@ -920,6 +921,7 @@ function Game() {
       </ScreenSlide>
       <CrashRecoveryPrompt />
       <SaveGuardBanner />
+      <ListeningTracker />
       <LokChatHost />
       {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && screen.name !== 'photosensitivity-notice' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena'].includes(screen.name) ? 'default' : 'menu'} />}
       <GoToPalette

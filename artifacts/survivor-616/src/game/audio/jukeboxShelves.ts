@@ -44,6 +44,30 @@ export function buildShelves<T extends ShelfTrack>(tracks: readonly T[]): DiscSh
   return shelves;
 }
 
+/** Shelf ids that belong to the player (hearts, recent plays), not to an album. */
+export const PERSONAL_SHELF_PREFIX = 'mine:';
+export const FAVORITES_SHELF_ID = `${PERSONAL_SHELF_PREFIX}favorites`;
+export const RECENT_SHELF_ID = `${PERSONAL_SHELF_PREFIX}recent`;
+
+/**
+ * Puts the player's own shelves in front of the albums: hearted songs, then recently played ones.
+ * Only songs that have a disc (the bundled ones) can appear, and an empty shelf is never added.
+ */
+export function withPersonalShelves<T extends ShelfTrack>(
+  shelves: readonly DiscShelf<T>[],
+  mine: { favoriteIds: readonly string[]; recentIds: readonly string[]; titles: { favorites: string; recent: string } },
+): DiscShelf<T>[] {
+  const byId = new Map<string, T>();
+  for (const shelf of shelves) for (const track of shelf.tracks) byId.set(track.id, track);
+  const pick = (ids: readonly string[]) => ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+  const out: DiscShelf<T>[] = [];
+  const favorites = pick(mine.favoriteIds);
+  if (favorites.length > 0) out.push({ id: FAVORITES_SHELF_ID, title: mine.titles.favorites, tracks: favorites });
+  const recent = pick(mine.recentIds);
+  if (recent.length > 0) out.push({ id: RECENT_SHELF_ID, title: mine.titles.recent, tracks: recent });
+  return [...out, ...shelves];
+}
+
 /** Every shelf end to end, for the single-row mode. Each entry remembers its shelf and place on it. */
 export interface ShelfEntry<T extends ShelfTrack = ShelfTrack> {
   track: T;
@@ -58,7 +82,8 @@ export function entriesOf<T extends ShelfTrack>(shelves: readonly DiscShelf<T>[]
 /** Which shelf holds a song (the one to open on), else the remembered shelf, else the first. */
 export function shelfIndexFor(shelves: readonly DiscShelf[], playingId: string | null | undefined, rememberedId?: string | null): number {
   if (playingId) {
-    const holding = shelves.findIndex((s) => s.tracks.some((t) => t.id === playingId));
+    // The album that owns the song comes first; the player's own shelves only when it was left open.
+    const holding = shelves.findIndex((s) => !s.id.startsWith(PERSONAL_SHELF_PREFIX) && s.tracks.some((t) => t.id === playingId));
     if (holding >= 0) return holding;
   }
   if (rememberedId) {

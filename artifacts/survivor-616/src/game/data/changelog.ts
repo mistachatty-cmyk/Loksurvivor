@@ -2121,6 +2121,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'It works even if automatic crash sending is off or your browser asks not to be tracked, because you pressed it. No account, no device id and no page content go with it.',
     ],
   },
+  {
+    version: '0.42.47',
+    date: '2026-10-25',
+    publishedAt: '2026-10-25T03:30:00Z',
+    kind: 'update',
+    title: 'Favorites and your listening',
+    body: [
+      'Heart any song in the Jukebox Room or on a pulled-out disc. Hearted songs gather on a Favorites shelf at the front of the room, and your latest songs sit on a Recently played shelf right behind it.',
+      'The pulled-out disc now shows how many times you have played that song and for how long. Counts and listening time stay on this device only and are never sent anywhere.',
+      'Settings, Music has new switches for the Favorites shelf, the Recently played shelf and remembering what you listen to, plus a Clear history button. Turning history off stops counting right away, and your hearts stay.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
