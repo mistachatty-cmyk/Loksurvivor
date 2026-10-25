@@ -9,7 +9,7 @@
  */
 import { FavoriteButton } from './FavoriteButton';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpFromLine, Library, Moon, Pause, Play, Repeat, Repeat1, RotateCw, Settings2, Shuffle, SkipBack, SkipForward, X } from 'lucide-react';
+import { ArrowUpFromLine, Library, Moon, Pause, Play, Repeat, Repeat1, RotateCw, Settings2, Shuffle, SlidersHorizontal, SkipBack, SkipForward, X } from 'lucide-react';
 import { dampenToTone, gradeFrom, groupBands, IDLE_BANDS, smoothBands, type GroupedBands } from '@lok/jukebox';
 
 import { beatBus } from '@/game/audio/beatBus';
@@ -17,6 +17,7 @@ import { buildShelves, paletteOf, type ShelfTrack } from '@/game/audio/jukeboxSh
 import { formatTime, useMusicPlayer } from '@/game/audio/musicPlayer';
 import { armDiscGuard, watchDiscGuard } from '@/lib/discGuard';
 import { useT } from '@/lib/i18n';
+import { applyPreset, isFlatEq, nextPreset, presetFor, useEq, writeEq } from '@/lib/musicEq';
 import { useTheaterLevel } from '@/lib/useTheaterLevel';
 import { readDiscPulse } from '@/lib/discPulse';
 import { formatCountdown, nextSleepStep } from '@/lib/sleepTimer';
@@ -36,6 +37,7 @@ export interface JukeboxRoomProps {
 
 export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: JukeboxRoomProps) {
   const t = useT();
+  const eq = useEq();
   const music = useMusicPlayer();
   const { tracks, currentTrack, isPlaying, togglePlay, next, previous, seek, progressSec, durationSec, setTheaterTone, shuffle, toggleShuffle, repeat, cycleRepeat } = music;
   const [spinMode, setSpinMode] = useState(false);
@@ -304,6 +306,17 @@ export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: Ju
             data-testid="button-jukebox-repeat"
           >
             {repeat === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => writeEq(applyPreset(eq, nextPreset(eq)))}
+            aria-pressed={!isFlatEq(eq)}
+            aria-label={t('jukebox.eq', { name: t(`sound.preset.${presetFor(eq) ?? 'flat'}` as never) })}
+            title={t('jukebox.eq', { name: t(`sound.preset.${presetFor(eq) ?? 'flat'}` as never) })}
+            className={`rounded-full p-2 ${!isFlatEq(eq) ? 'bg-white/20 text-white' : 'text-white/60'}`}
+            data-testid="button-jukebox-eq"
+          >
+            <SlidersHorizontal size={18} />
           </button>
           <button
             type="button"

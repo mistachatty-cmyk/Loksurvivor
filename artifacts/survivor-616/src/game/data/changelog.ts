@@ -2157,6 +2157,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Four new run modifiers on the Roster page. Glass Cannon hits 60% harder with half the max HP. Paper Horde sends about 60% more enemies with roughly half the HP each. Jackpot Streets gives half again as much XP against tougher enemies. Frenzy attacks 30% faster, and enemies run 15% faster.',
     ],
   },
+  {
+    version: '0.42.50',
+    date: '2026-10-25',
+    publishedAt: '2026-10-25T14:40:00Z',
+    kind: 'update',
+    title: 'Sound settings and your playlists on the shelves',
+    body: [
+      'Music settings has a new Sound section: bass, mid and treble sliders, one-tap presets (Bass boost, Warm, Bright, Vocal, Small speaker, Late night), Even volume to level out loud and quiet parts, and Mono for one-earbud listening. It only shapes your player, so the discs and the beat pulse look the same, and nothing is created until you move a slider.',
+      'The Jukebox Room has a sliders button that cycles through the presets without leaving the room.',
+      'Playlists you build in the Music library now show up as shelves in the Jukebox Room, after your Favorites and Recently played. Songs that have a disc appear on the shelf; the rest stay in the library.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

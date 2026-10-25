@@ -145,7 +145,7 @@ export const DiscShelves = forwardRef<DiscShelvesHandle, DiscShelvesProps>(funct
   ref,
 ) {
   const t = useT();
-  const { tracks, currentTrack, isPlaying, playTrack, togglePlay, soundtrackObjectiveCompletions } = useMusicPlayer();
+  const { tracks, currentTrack, isPlaying, playTrack, togglePlay, soundtrackObjectiveCompletions, playlists } = useMusicPlayer();
   const [shelvesOn] = useState(readShelves);
   const [gestures] = useState(readDiscGestures);
   const saving = useSavingPower();
@@ -165,6 +165,7 @@ export const DiscShelves = forwardRef<DiscShelvesHandle, DiscShelvesProps>(funct
     return {
       favoriteIds: favoritesShelfPref.get() ? listening.favorites : [],
       recentIds: recentShelfPref.get() ? recentIds(listening, 8) : [],
+      playlists: playlists.filter((p) => !p.builtIn).map((p) => ({ id: p.id, name: p.name, trackIds: p.trackIds })),
     };
   });
   const view = useMemo<ViewShelf[]>(() => {

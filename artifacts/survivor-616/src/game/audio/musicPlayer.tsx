@@ -10,6 +10,7 @@
  */
 
 import { readShuffle, writeShuffle } from '@/lib/jukeboxPrefs';
+import { useEq, type EqSettings } from '@/lib/musicEq';
 import { positionStateFor, sessionMetaFor, skipTarget } from '@/lib/mediaSessionMeta';
 import { mediaControlsPref } from '@/lib/powerSaver';
 import { DEFAULT_VOLUME, VOLUME_STORAGE_KEY, parseStoredVolume } from './volumeCurve';
@@ -527,6 +528,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const flushOnRunningRef = useRef(false);
   const analysisRef = useRef<MusicAnalyser | null>(null);
   const toneNodesRef = useRef<{ lowpass: BiquadFilterNode; shelf: BiquadFilterNode } | null>(null);
+  const eqNodesRef = useRef<{ bass: BiquadFilterNode; mid: BiquadFilterNode; treble: BiquadFilterNode } | null>(null);
+  const extraNodesRef = useRef<{ compressor: DynamicsCompressorNode | null; mono: GainNode | null }>({ compressor: null, mono: null });
+  const eq = useEq();
   const pendingToneRef = useRef<Tone | null>(null);
 
   const [tracks, setTracks] = useState<Track[]>(() => {
@@ -694,6 +698,30 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     return audioContextRef.current;
   }, []);
 
+  /**
+   * Joins the output chain: analyser, then the player's own EQ bands, then the theater tone, then the
+   * optional even-volume compressor and mono mix, then the speakers. Run again whenever a stage is
+   * added or removed; stages that were never switched on do not exist at all.
+   */
+  const rewireOutput = useCallback(() => {
+    const context = audioContextRef.current;
+    const analyser = analyserRef.current;
+    if (!context || !analyser) return;
+    const eqNodes = eqNodesRef.current;
+    const tone = toneNodesRef.current;
+    const extra = extraNodesRef.current;
+    const chain: AudioNode[] = [analyser];
+    if (eqNodes) chain.push(eqNodes.bass, eqNodes.mid, eqNodes.treble);
+    if (tone) chain.push(tone.lowpass, tone.shelf);
+    if (extra.compressor) chain.push(extra.compressor);
+    if (extra.mono) chain.push(extra.mono);
+    for (const node of chain) {
+      try { node.disconnect(); } catch { /* it was not connected yet */ }
+    }
+    for (let i = 0; i < chain.length - 1; i += 1) chain[i]!.connect(chain[i + 1]!);
+    chain[chain.length - 1]!.connect(context.destination);
+  }, []);
+
   /** Applies (or lazily builds) the theater tone filters after the analyser. */
   const applyTone = useCallback((tone: Tone | null) => {
     pendingToneRef.current = tone;
@@ -711,11 +739,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         shelf.type = 'lowshelf';
         shelf.frequency.value = 160;
         shelf.gain.value = TRANSPARENT_TONE.bassDb;
-        analyser.disconnect(context.destination);
-        analyser.connect(lowpass);
-        lowpass.connect(shelf);
-        shelf.connect(context.destination);
         toneNodesRef.current = { lowpass, shelf };
+        rewireOutput();
       }
       const nodes = toneNodesRef.current;
       const target = tone ?? TRANSPARENT_TONE;
@@ -728,7 +753,70 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     } catch {
       // Tone is a nicety; playback must never depend on it.
     }
-  }, []);
+  }, [rewireOutput]);
+
+  /** Applies the player's own sound settings. Flat settings that never built anything build nothing. */
+  const applyEq = useCallback((settings: EqSettings) => {
+    const context = audioContextRef.current;
+    if (!context || !analyserRef.current) return; // applied once the analyser exists
+    try {
+      let rewire = false;
+      const wantsBands = settings.bassDb !== 0 || settings.midDb !== 0 || settings.trebleDb !== 0;
+      if (!eqNodesRef.current && wantsBands) {
+        const make = (type: BiquadFilterType, hz: number, q: number) => {
+          const node = context.createBiquadFilter();
+          node.type = type;
+          node.frequency.value = hz;
+          node.Q.value = q;
+          node.gain.value = 0;
+          return node;
+        };
+        eqNodesRef.current = { bass: make('lowshelf', 120, 0.7), mid: make('peaking', 1000, 0.8), treble: make('highshelf', 6000, 0.7) };
+        rewire = true;
+      }
+      const nodes = eqNodesRef.current;
+      if (nodes) {
+        const now = context.currentTime;
+        for (const [node, db] of [[nodes.bass, settings.bassDb], [nodes.mid, settings.midDb], [nodes.treble, settings.trebleDb]] as const) {
+          node.gain.cancelScheduledValues(now);
+          node.gain.setTargetAtTime(db, now, 0.05);
+        }
+      }
+      const extra = extraNodesRef.current;
+      if (settings.evenVolume && !extra.compressor) {
+        const compressor = context.createDynamicsCompressor();
+        compressor.threshold.value = -26;
+        compressor.knee.value = 28;
+        compressor.ratio.value = 4;
+        compressor.attack.value = 0.004;
+        compressor.release.value = 0.25;
+        extra.compressor = compressor;
+        rewire = true;
+      } else if (!settings.evenVolume && extra.compressor) {
+        try { extra.compressor.disconnect(); } catch { /* already free */ }
+        extra.compressor = null;
+        rewire = true;
+      }
+      if (settings.mono && !extra.mono) {
+        const mono = context.createGain();
+        mono.channelCount = 1;
+        mono.channelCountMode = 'explicit';
+        mono.channelInterpretation = 'speakers';
+        extra.mono = mono;
+        rewire = true;
+      } else if (!settings.mono && extra.mono) {
+        try { extra.mono.disconnect(); } catch { /* already free */ }
+        extra.mono = null;
+        rewire = true;
+      }
+      if (rewire) rewireOutput();
+    } catch {
+      // Sound settings are a nicety; playback must never depend on them.
+    }
+  }, [rewireOutput]);
+  const eqRef = useRef(eq);
+  eqRef.current = eq;
+  useEffect(() => { applyEq(eq); }, [eq, applyEq]);
   const setTheaterTone = useCallback((tone: Tone | null) => applyTone(tone), [applyTone]);
 
   const connectAnalyser = useCallback(() => {
@@ -744,11 +832,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         sourceNodeRef.current.connect(analyserRef.current);
         analyserRef.current.connect(context.destination);
         if (pendingToneRef.current) applyTone(pendingToneRef.current);
+        applyEq(eqRef.current);
       }
     } catch {
       // Playback still works if Web Audio analysis is unavailable.
     }
-  }, [ensureAudioContext, applyTone]);
+  }, [ensureAudioContext, applyTone, applyEq]);
 
   /** The id queue playback actually walks: the active playlist, filtered to
    * tracks that exist and have been unlocked, or every unlocked track when no
