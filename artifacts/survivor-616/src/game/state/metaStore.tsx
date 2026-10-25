@@ -311,6 +311,10 @@ function normalizeRunModifiers(value: unknown): RunModifiers {
   if (value.hordeSpinEnabled === true) modifiers.hordeSpinEnabled = true;
   if (value.directorModeEnabled === true) modifiers.directorModeEnabled = true;
   if (value.bionicCluckProtocol === true) modifiers.bionicCluckProtocol = true;
+  if (value.glassCannonMode === true) modifiers.glassCannonMode = true;
+  if (value.paperHordeMode === true) modifiers.paperHordeMode = true;
+  if (value.jackpotMode === true) modifiers.jackpotMode = true;
+  if (value.frenzyMode === true) modifiers.frenzyMode = true;
   return modifiers;
 }
 

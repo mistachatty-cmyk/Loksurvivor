@@ -1570,6 +1570,14 @@ export interface RunModifiers {
   discoMode?: boolean;
   /** Bionic Cluck Protocol: Transmutes fallen enemies into friendly Chicken-Bots that lay restorative eggs. */
   bionicCluckProtocol?: boolean;
+  /** Glass Cannon: you hit 60% harder and have half the max HP. */
+  glassCannonMode?: boolean;
+  /** Paper Horde: far more enemies, each much easier to pop (about half the HP, 1.6x the spawns). */
+  paperHordeMode?: boolean;
+  /** Jackpot Streets: half again as much XP, against enemies with a quarter more HP. */
+  jackpotMode?: boolean;
+  /** Frenzy: you attack 30% faster and enemies run 15% faster. */
+  frenzyMode?: boolean;
 }
 
 export type GraphicsQuality = 'high' | 'balanced' | 'performance';

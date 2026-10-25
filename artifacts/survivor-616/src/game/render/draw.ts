@@ -28,6 +28,7 @@ import { drawRig, drawShadow, studioDirection } from './sprite';
 import { reactionMultiplier } from '@/game/data/reactivity';
 import { clamp, dist2 } from '@/game/engine/math';
 import { drawForgeFiveProjectile } from './forgeFiveVfx';
+import { drawQuakeCracks, drawSpokeWheel } from './creatorPairVfx';
 import { drawMapPackProp } from './mapPackArt';
 import { drawPropDamage, propMaterial } from './breakableFx';
 
@@ -3962,6 +3963,7 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds
         ctx.arc(effect.x, effect.y, effect.radius * (0.45 + life * 0.55),
           effect.angle - effect.spread, effect.angle + effect.spread);
         ctx.stroke();
+        if (effect.weaponId === 'jean-quake') drawQuakeCracks(ctx, effect.x, effect.y, effect.radius * (0.45 + life * 0.55), effect.angle, effect.spread, fade);
         if (effect.weaponId === 'pitch-reaper' || effect.weaponId === 'requiem-return') {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 2 + 2 * fade;
@@ -4611,6 +4613,8 @@ function drawOrbiters(ctx: CanvasRenderingContext2D, w: World) {
       ctx.fillStyle = '#1e293b';
       ctx.font = 'bold 15px monospace';
       ctx.fillText(weapon.def.id === 'crown-of-replies' ? '!' : '?', x - 5, y + 5);
+    } else if (weapon?.def.id === 'spoke-halo') {
+      drawSpokeWheel(ctx, x, y, orb.angle * 3 + w.now / 90, color);
     } else if (weapon?.def.id === 'orbit-rings') {
       // A thin gold-violet annulus rather than a blade -- reads as a ring, not a rectangle.
       ctx.strokeStyle = color;
