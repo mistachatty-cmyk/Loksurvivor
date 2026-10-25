@@ -12,6 +12,8 @@ import { invitable, isLeader, isOnline, MAX_CREW_SIZE, onlineCount, slotsLeft, s
 import { friendShareUrl, normalizeFriendCode } from '@/lib/social/friendCode';
 import { useAuth } from '@/state/authStore';
 import { useSocial, type CrewTab } from '@/state/socialStore';
+import { CrewChatPanel } from './CrewChat';
+import { requestHostCrewRun } from './CrewRunSetup';
 import { ListenTogetherBar } from './ListenTogether';
 import { PlayerAvatar } from './PlayerAvatar';
 import { QrCode } from './QrCode';
@@ -137,7 +139,13 @@ function CrewTabView() {
               )}
             </div>
           ) : null}
+          <section className="space-y-2 border border-border/70 bg-background/50 p-3" data-testid="crewrun-start">
+            <h3 className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-200">{t('crewrun.title')}</h3>
+            <p className="text-sm text-muted-foreground">{t('crewrun.startBody')}</p>
+            <button type="button" className={BTN_ON} onClick={() => { s.closeOverlay(); requestHostCrewRun(); }} data-testid="button-crewrun-start">{t('crewrun.start')}</button>
+          </section>
           <ListenTogetherBar />
+          <CrewChatPanel />
           <button type="button" className={BTN} onClick={() => void s.leave()} data-testid="button-crew-leave">{t('social.crew.leave')}</button>
         </section>
       )}

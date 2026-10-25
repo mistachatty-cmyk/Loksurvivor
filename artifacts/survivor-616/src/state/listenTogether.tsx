@@ -3,11 +3,9 @@
  * small live channel shared by the crew; followers' games match it. Only songs that exist in every game
  * (the soundtrack) are shared, and only the song id and the place in it ever travel.
  */
-import { openCrewChannel } from '@workspace/lok-client';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
-import { lokClient } from '@/lib/lokClient';
 import { followActions, HEARTBEAT_MS, hostChanged, parseListenMessage, type ListenMessage } from '@/lib/social/listenSync';
 import { useSocial } from './socialStore';
 
@@ -44,14 +42,12 @@ export function ListenTogetherProvider({ children }: { children: ReactNode }) {
   const [invite, setInvite] = useState<Invite | null>(null);
   const [notice, setNotice] = useState<ListenNotice>('none');
 
-  const crewId = social.crew.crew?.id ?? null;
   const hasCompany = social.active && social.crew.members.length >= 2;
   const myName = social.me?.displayName ?? 'Player';
 
   // Latest values for callbacks that outlive a render.
   const live = useRef({ player, role, myName });
   live.current = { player, role, myName };
-  const channelRef = useRef<ReturnType<typeof openCrewChannel> | null>(null);
   const lastSent = useRef<{ trackId: string | null; playing: boolean; positionSec: number } | null>(null);
 
   const snapshot = useCallback(() => {
@@ -59,7 +55,8 @@ export function ListenTogetherProvider({ children }: { children: ReactNode }) {
     return { trackId: p.currentTrack?.id ?? null, playing: p.isPlaying, positionSec: p.progressSec };
   }, []);
 
-  const send = useCallback((message: ListenMessage) => channelRef.current?.send('listen', { ...message }), []);
+  const bus = social.bus;
+  const send = useCallback((message: ListenMessage) => bus.send('listen', { ...message }), [bus]);
 
   const apply = useCallback((message: ListenMessage, explicit: boolean) => {
     const p = live.current.player;
@@ -83,14 +80,13 @@ export function ListenTogetherProvider({ children }: { children: ReactNode }) {
 
   // The crew's channel, open only while there is someone to listen with.
   useEffect(() => {
-    if (!lokClient || !crewId || !hasCompany) { channelRef.current = null; reset(); return; }
-    const channel = openCrewChannel(lokClient, crewId, (event, payload) => {
-      if (event !== 'listen') return;
+    if (!bus.up) { reset(); return; }
+    const off = bus.on('listen', (payload) => {
       const message = parseListenMessage(payload);
       if (!message) return;
       const current = live.current.role;
       if (current === 'host') {
-        if (message.kind === 'join') { setFollowers((n) => n + 1); const s = snapshot(); channelRef.current?.send('listen', { kind: 'state', ...s }); }
+        if (message.kind === 'join') { setFollowers((n) => n + 1); const s = snapshot(); bus.send('listen', { kind: 'state', ...s }); }
         else if (message.kind === 'leave') setFollowers((n) => Math.max(0, n - 1));
       } else if (current === 'guest') {
         if (message.kind === 'state') apply(message, !message.heartbeat);
@@ -99,9 +95,8 @@ export function ListenTogetherProvider({ children }: { children: ReactNode }) {
         setInvite({ name: message.name || 'A crewmate', message });
       }
     });
-    channelRef.current = channel;
-    return () => { channel.leave(); channelRef.current = null; reset(); };
-  }, [crewId, hasCompany, snapshot, apply, reset]);
+    return () => { off(); reset(); };
+  }, [bus, snapshot, apply, reset]);
 
   // Host: announce changes, plus a heartbeat so late joiners and stalled phones catch up.
   const progress = player.progressSec;

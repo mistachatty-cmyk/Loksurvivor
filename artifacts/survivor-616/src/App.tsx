@@ -15,6 +15,10 @@ import { SocialProvider, useSocial, type Doing } from '@/state/socialStore';
 import { CrewButton, CrewOverlay } from '@/ui/CrewOverlay';
 import { ListenInviteBanner } from '@/ui/ListenTogether';
 import { CloudSyncProvider } from '@/state/cloudSyncStore';
+import { PlaylistCloudSync } from '@/ui/PlaylistCloudSync';
+import { CrewToasts } from '@/ui/CrewChat';
+import { CrewRunController } from '@/ui/CrewRunSetup';
+import { CrewChatProvider } from '@/state/crewChat';
 import { LokEconomyProvider, useLokEconomy } from '@/state/lokEconomyStore';
 import { getEnemy } from '@/game/data/enemies';
 import { restoreStudioAppearances } from '@/game/studio/v3Appearances';
@@ -102,6 +106,7 @@ const MapBuilder = lazy(() => import('@/ui/MapBuilder').then((m) => ({ default: 
 const SectorCommandScreen = lazy(() => import('@/ui/SectorCommandScreen').then((m) => ({ default: m.SectorCommandScreen })));
 const ArenaSetupScreen = lazy(() => import('@/ui/ArenaSetupScreen').then((m) => ({ default: m.ArenaSetupScreen })));
 const ArenaJoinScreen = lazy(() => import('@/ui/ArenaJoinScreen').then((m) => ({ default: m.ArenaJoinScreen })));
+const CrewRunScreen = lazy(() => import('@/game/CrewRunScreen').then((m) => ({ default: m.CrewRunScreen })));
 const ArenaScreen = lazy(() => import('@/game/ArenaScreen').then((m) => ({ default: m.ArenaScreen })));
 const RunSetupScreen = lazy(() => import('@/ui/RunSetupScreen').then((m) => ({ default: m.RunSetupScreen })));
 const AreaSelect = lazy(() => import('@/ui/AreaSelect').then((m) => ({ default: m.AreaSelect })));
@@ -113,7 +118,7 @@ const WeaponTrainingArenaScreen = lazy(() => import('@/ui/WeaponTrainingArenaScr
 const queryClient = new QueryClient();
 
 /** Full-screen moments where a persistent menu would intrude. */
-const DOCK_HIDDEN_SCREENS = ['jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle', 'weapon-training-arena'];
+const DOCK_HIDDEN_SCREENS = ['jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena', 'crew-run', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle', 'weapon-training-arena'];
 
 /** Screens with no payload that browser Back may return to. */
 const HISTORY_SCREENS = new Set(['intro', 'hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'locker', 'recovery', 'vendor', 'workshop', 'card-shop', 'inventory', 'lok-shop', 'weapon-bans', 'jukebox', 'settings', 'palette-store', 'sound-booth', 'account', 'feedback', 'weapon-training-arena']);
@@ -155,6 +160,7 @@ type Screen =
   | { name: 'arena-setup' }
   | { name: 'arena-join'; initialCode?: string }
   | { name: 'arena'; area: AreaDef; seats: ArenaSeat[]; net?: ArenaNetRole }
+  | { name: 'crew-run'; role: 'host' | 'guest'; crewId: string; characterId: string; areaId?: string }
   | { name: 'run-setup'; areaId?: string; challengeIds?: string[]; episodeId?: string; missionId?: string; destination: 'run' | 'hub' }
   | { name: 'run'; areaId: string; challengeIds?: string[]; seed?: number; episodeId?: string; missionId?: string; tutorial?: boolean }
   | { name: 'summary'; result: RunResult };
@@ -537,7 +543,7 @@ function Game() {
     const onPop = (event: PopStateEvent) => {
       const name = (event.state as { screen?: string } | null)?.screen;
       lastPushedScreen.current = name ?? null;
-      if (screenRef.current.name === 'run' || screenRef.current.name === 'arena') {
+      if (screenRef.current.name === 'run' || screenRef.current.name === 'arena' || screenRef.current.name === 'crew-run') {
         // Never abandon a live run on a stray Back press.
         window.history.pushState({ screen: screenRef.current.name }, '');
         return;
@@ -716,6 +722,9 @@ function Game() {
           onLaunch={(area, seats, net) => setScreen({ name: 'arena', area, seats, net })}
         />
       );
+
+    case 'crew-run':
+      return <CrewRunScreen role={screen.role} crewId={screen.crewId} characterId={screen.characterId} areaId={screen.areaId} onExit={goHub} />;
 
     case 'arena':
       return <ArenaScreen area={screen.area} seats={screen.seats} net={screen.net} onExit={goHub} />;
@@ -933,16 +942,17 @@ function Game() {
       <SaveGuardBanner />
       <ListeningTracker />
       <CrewPresenceSync screenName={screen.name} />
+      <CrewRunController screenName={screen.name} onLaunch={(launch) => setScreen({ name: 'crew-run', ...launch })} />
       <LokChatHost />
-      {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && screen.name !== 'photosensitivity-notice' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena'].includes(screen.name) ? 'default' : 'menu'} />}
+      {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && screen.name !== 'photosensitivity-notice' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena', 'crew-run'].includes(screen.name) ? 'default' : 'menu'} />}
       <GoToPalette
         unlockedFeatures={unlockedFeatures}
-        disabled={['jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena'].includes(screen.name)}
+        disabled={['jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena', 'crew-run'].includes(screen.name)}
         showButton={screen.name === 'hub'}
         onGo={goToScreen}
       />
       {!DOCK_HIDDEN_SCREENS.includes(screen.name) && <MenuDock screenName={screen.name} onGo={goToScreen} onHeadOut={headOut} />}
-      {!['jukebox', 'photosensitivity-notice', 'intro', 'run-setup', 'run', 'arena', 'starter-lokpet-encounter', 'weapon-training-arena'].includes(screen.name) &&
+      {!['jukebox', 'photosensitivity-notice', 'intro', 'run-setup', 'run', 'arena', 'crew-run', 'starter-lokpet-encounter', 'weapon-training-arena'].includes(screen.name) &&
         (screen.name !== 'hub' || meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
           <div
             className="fixed right-[max(0.75rem,var(--safe-right))] top-[max(0.75rem,var(--safe-top))] z-[110] flex items-center gap-1.5"
@@ -998,6 +1008,8 @@ function Game() {
 function CrewPresenceSync({ screenName }: { screenName: string }) {
   const { setDoing } = useSocial();
   useEffect(() => {
+    // The crew run screen announces itself (it knows whether it is hosting an open room).
+    if (screenName === 'crew-run') return;
     const doing: Doing = screenName === 'run' || screenName === 'arena' ? 'run' : screenName === 'jukebox' ? 'theater' : 'menu';
     setDoing(doing);
   }, [screenName, setDoing]);
@@ -1014,11 +1026,15 @@ function Providers({ children }: { children: ReactNode }) {
               <MusicProvider>
                 <SocialProvider>
                   <ListenTogetherProvider>
-                    {children}
-                    <CrewOverlay />
-                    <ListenInviteBanner />
+                    <CrewChatProvider>
+                      {children}
+                      <CrewOverlay />
+                      <ListenInviteBanner />
+                      <CrewToasts />
+                    </CrewChatProvider>
                   </ListenTogetherProvider>
                 </SocialProvider>
+                <PlaylistCloudSync />
                 <FocusWidgetMount />
                 <CheatFxLayer />
               </MusicProvider>

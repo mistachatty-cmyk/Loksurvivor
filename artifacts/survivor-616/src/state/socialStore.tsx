@@ -4,7 +4,7 @@
  * "Friends and crew" switch in Settings is off, or when the page has been hidden for a while.
  */
 import {
-  acceptCrewInvite, createCrew, declineCrewInvite, EMPTY_CREW_STATE, getCrewState, inviteToCrew, joinPresence, kickFromCrew, leaveCrew, listFriends,
+  acceptCrewInvite, createCrew, openCrewChannel, declineCrewInvite, EMPTY_CREW_STATE, getCrewState, inviteToCrew, joinPresence, kickFromCrew, leaveCrew, listFriends,
   listRecentPlayers, newFriendCode, recordRecentPlayers, removeFriend, requestFriend, respondToFriend, setCardSettings, subscribeSocial, syncPlayerCard,
   type CrewAcceptResult, type CrewInviteResult, type FriendRequestResult, type LokCrewState, type LokFriend, type LokPlayerCard, type LokPresence, type LokRecentPlayer,
 } from '@workspace/lok-client';
@@ -22,6 +22,15 @@ export const OPEN_CREW_EVENT = 'lok:open-crew';
 export type CrewTab = 'crew' | 'friends' | 'recent' | 'add';
 export type Doing = 'menu' | 'run' | 'theater';
 
+/** Short live messages shared by everyone in the crew (listening together, chat, emotes). */
+export interface CrewBus {
+  /** True while the crew's channel is open (a crew with at least two players, and friends switched on). */
+  up: boolean;
+  send: (event: string, payload: Record<string, unknown>) => void;
+  /** Listens for one kind of message; returns the way to stop. */
+  on: (event: string, handler: (payload: Record<string, unknown>) => void) => () => void;
+}
+
 /** How long a hidden page keeps its live connection before letting go. */
 const HIDDEN_GRACE_MS = 60_000;
 
@@ -36,6 +45,7 @@ interface SocialValue {
   recent: LokRecentPlayer[];
   crew: LokCrewState;
   online: Record<string, LokPresence>;
+  bus: CrewBus;
   /** Requests and crew invites waiting for an answer. */
   waiting: number;
   open: boolean;
@@ -44,7 +54,8 @@ interface SocialValue {
   openOverlay: (tab?: CrewTab, code?: string | null) => void;
   closeOverlay: () => void;
   setTab: (tab: CrewTab) => void;
-  setDoing: (doing: Doing) => void;
+  /** Tells friends what this player is doing; `room` marks an open crew run others can join. */
+  setDoing: (doing: Doing, room?: string | null) => void;
   refresh: () => Promise<void>;
   addByCode: (code: string) => Promise<FriendRequestResult | 'error'>;
   answerRequest: (userId: string, accept: boolean) => Promise<void>;
@@ -79,7 +90,23 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   const [tab, setTab] = useState<CrewTab>('crew');
   const [prefillCode, setPrefillCode] = useState<string | null>(null);
 
+  const [busUp, setBusUp] = useState(false);
+  const busChannelRef = useRef<ReturnType<typeof openCrewChannel> | null>(null);
+  const busHandlers = useRef(new Map<string, Set<(payload: Record<string, unknown>) => void>>());
+  const bus = useMemo<CrewBus>(() => ({
+    up: busUp,
+    send: (event, payload) => busChannelRef.current?.send(event, payload),
+    on: (event, handler) => {
+      const set = busHandlers.current.get(event) ?? new Set();
+      set.add(handler);
+      busHandlers.current.set(event, set);
+      return () => { set.delete(handler); };
+    },
+  }), [busUp]);
+
   const doingRef = useRef<Doing>('menu');
+  const roomRef = useRef<string | null>(null);
+  const trackState = () => ({ game: GAME_KEY, doing: doingRef.current, ...(roomRef.current ? { room: roomRef.current } : {}) });
   const presenceRef = useRef<ReturnType<typeof joinPresence> | null>(null);
   const showOnlineRef = useRef(true);
   const recordedRef = useRef('');
@@ -125,7 +152,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       if (presenceRef.current) return;
       const channel = joinPresence(lokClient!, userId, setOnline);
       presenceRef.current = channel;
-      if (showOnlineRef.current) channel.track({ game: GAME_KEY, doing: doingRef.current });
+      if (showOnlineRef.current) channel.track(trackState());
     };
     const disconnect = () => {
       presenceRef.current?.leave();
@@ -151,9 +178,23 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     };
   }, [active, userId, setupNeeded, refresh]);
 
-  const setDoing = useCallback((doing: Doing) => {
+  // The crew's shared channel: open only while there is someone to talk to.
+  const crewId = crew.crew?.id ?? null;
+  const hasCompany = active && crew.members.length >= 2;
+  useEffect(() => {
+    if (!lokClient || !crewId || !hasCompany) { busChannelRef.current = null; setBusUp(false); return; }
+    const channel = openCrewChannel(lokClient, crewId, (event, payload) => {
+      busHandlers.current.get(event)?.forEach((handler) => handler(payload));
+    });
+    busChannelRef.current = channel;
+    setBusUp(true);
+    return () => { channel.leave(); busChannelRef.current = null; setBusUp(false); };
+  }, [crewId, hasCompany]);
+
+  const setDoing = useCallback((doing: Doing, room?: string | null) => {
     doingRef.current = doing;
-    if (showOnlineRef.current) presenceRef.current?.track({ game: GAME_KEY, doing });
+    roomRef.current = room ?? null;
+    if (showOnlineRef.current) presenceRef.current?.track({ game: GAME_KEY, doing, ...(room ? { room } : {}) });
   }, []);
 
   // Crewmates become "recent players" once per crew line-up.
@@ -204,7 +245,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   const run = useCallback(async (action: () => Promise<unknown>) => { await action(); await refresh(); }, [refresh]);
 
   const value: SocialValue = {
-    active, signedIn: Boolean(userId), setupNeeded, me, friends, recent, crew, online,
+    active, signedIn: Boolean(userId), setupNeeded, me, friends, recent, crew, online, bus,
     waiting: friends.filter((f) => f.status === 'pending' && f.incoming).length + crew.invites.length,
     open, tab, prefillCode, openOverlay, closeOverlay, setTab, setDoing, refresh, addByCode,
     answerRequest: (id, accept) => run(() => respondToFriend(lokClient!, id, accept)),
@@ -233,7 +274,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       if (!lokClient) return;
       showOnlineRef.current = show;
       setMe((card) => (card ? { ...card, showOnline: show } : card));
-      if (show) presenceRef.current?.track({ game: GAME_KEY, doing: doingRef.current }); else presenceRef.current?.untrack();
+      if (show) presenceRef.current?.track(trackState()); else presenceRef.current?.untrack();
       await setCardSettings(lokClient, { showOnline: show });
     },
   };
