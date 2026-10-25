@@ -1466,5 +1466,16 @@
   "crewrun.promptLater": "Entlassen",
   "crewrun.start": "Starten Sie einen Crew-Run",
   "crewrun.startBody": "Öffnen Sie einen Lauf, in den Ihre Crew einsteigen kann. Jeder spielt auf seinem eigenen Gerät.",
-  "crewrun.needAccount": "Melden Sie sich an, um einen Crew-Lauf zu starten."
+  "crewrun.needAccount": "Melden Sie sich an, um einen Crew-Lauf zu starten.",
+  "social.chat.mute": "Stumm",
+  "social.chat.unmute": "Stummschaltung aufheben",
+  "climb.height": "{{n}} m",
+  "climb.best": "Beste {{n}} m",
+  "climb.fell": "Fiel bei {{n}} m. Wieder!",
+  "climb.hint": "Tippen oder drücken Sie die Leertaste, um zwischen den Wänden zu springen. Vermeiden Sie die Schilder und Lüftungsschlitze.",
+  "climb.loaded": "Geladen! Sie haben {{n}} m erreicht",
+  "settings.power.climbLoader": "Wandkletter-Ladespiel",
+  "settings.power.climbLoaderBody": "Während etwas geladen wird, können Sie mit Ihrem Operator und LokPet einen Wandsprung zwischen zwei Wolkenkratzern spielen. Off zeigt stattdessen den ruhigen Straßenspaziergang.",
+  "loading.title": "Laden",
+  "loading.status": "Warten Sie, während das Spiel fertig wird. Klettern Sie, während Sie warten."
 }

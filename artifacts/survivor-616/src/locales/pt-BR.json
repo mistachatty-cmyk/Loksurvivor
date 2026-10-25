@@ -1466,5 +1466,16 @@
   "crewrun.promptLater": "Dispensar",
   "crewrun.start": "Comece uma corrida de equipe",
   "crewrun.startBody": "Abra uma corrida na qual sua equipe possa participar. Cada um joga em seu próprio dispositivo.",
-  "crewrun.needAccount": "Faça login para iniciar uma corrida de equipe."
+  "crewrun.needAccount": "Faça login para iniciar uma corrida de equipe.",
+  "social.chat.mute": "Mudo",
+  "social.chat.unmute": "Ativar som",
+  "climb.height": "{{n}}m",
+  "climb.best": "Melhor {{n}} m",
+  "climb.fell": "Caiu em {{n}} m. De novo!",
+  "climb.hint": "Toque ou pressione espaço para saltar entre as paredes. Evite os sinais e aberturas de ventilação.",
+  "climb.loaded": "Carregado! Você alcançou {{n}} m",
+  "settings.power.climbLoader": "Jogo de carregamento de escalada na parede",
+  "settings.power.climbLoaderBody": "Enquanto algo carrega, faça uma subida na parede entre dois arranha-céus com seu operador e LokPet. Off mostra a caminhada tranquila pela rua.",
+  "loading.title": "Carregando",
+  "loading.status": "Aguarde enquanto o jogo fica pronto. Suba enquanto espera."
 }
