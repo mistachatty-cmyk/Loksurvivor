@@ -10,6 +10,10 @@ import { useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
 import { Sparkles } from 'lucide-react';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { AuthProvider } from '@/state/authStore';
+import { ListenTogetherProvider } from '@/state/listenTogether';
+import { SocialProvider, useSocial, type Doing } from '@/state/socialStore';
+import { CrewButton, CrewOverlay } from '@/ui/CrewOverlay';
+import { ListenInviteBanner } from '@/ui/ListenTogether';
 import { CloudSyncProvider } from '@/state/cloudSyncStore';
 import { LokEconomyProvider, useLokEconomy } from '@/state/lokEconomyStore';
 import { getEnemy } from '@/game/data/enemies';
@@ -928,6 +932,7 @@ function Game() {
       <CrashRecoveryPrompt />
       <SaveGuardBanner />
       <ListeningTracker />
+      <CrewPresenceSync screenName={screen.name} />
       <LokChatHost />
       {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && screen.name !== 'photosensitivity-notice' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena'].includes(screen.name) ? 'default' : 'menu'} />}
       <GoToPalette
@@ -943,6 +948,7 @@ function Game() {
             className="fixed right-[max(0.75rem,var(--safe-right))] top-[max(0.75rem,var(--safe-top))] z-[110] flex items-center gap-1.5"
             data-testid="global-looks-cluster"
           >
+            <CrewButton />
             <button type="button" onClick={openLooks} aria-label="Looks & LokPets" className="inline-flex min-h-11 min-w-11 active:scale-95 items-center justify-center gap-2 border border-cyan-200/35 bg-slate-950/85 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-xl backdrop-blur transition hover:border-cyan-100" data-testid="button-global-looks-lokpets"><Sparkles className="h-4 w-4 text-cyan-200" /><span className="hidden sm:inline">Looks & LokPets</span></button>
           </div>
         )}
@@ -988,6 +994,16 @@ function Game() {
   );
 }
 
+/** Tells friends where this player is (menus, a run, the Jukebox Room) while they are shown as online. */
+function CrewPresenceSync({ screenName }: { screenName: string }) {
+  const { setDoing } = useSocial();
+  useEffect(() => {
+    const doing: Doing = screenName === 'run' || screenName === 'arena' ? 'run' : screenName === 'jukebox' ? 'theater' : 'menu';
+    setDoing(doing);
+  }, [screenName, setDoing]);
+  return null;
+}
+
 function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
@@ -996,7 +1012,13 @@ function Providers({ children }: { children: ReactNode }) {
           <CloudSyncProvider>
             <LokEconomyProvider>
               <MusicProvider>
-                {children}
+                <SocialProvider>
+                  <ListenTogetherProvider>
+                    {children}
+                    <CrewOverlay />
+                    <ListenInviteBanner />
+                  </ListenTogetherProvider>
+                </SocialProvider>
                 <FocusWidgetMount />
                 <CheatFxLayer />
               </MusicProvider>

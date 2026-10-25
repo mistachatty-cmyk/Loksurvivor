@@ -2169,6 +2169,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Playlists you build in the Music library now show up as shelves in the Jukebox Room, after your Favorites and Recently played. Songs that have a disc appear on the shelf; the rest stay in the library.',
     ],
   },
+  {
+    version: '0.42.51',
+    date: '2026-10-25',
+    publishedAt: '2026-10-25T16:30:00Z',
+    kind: 'update',
+    title: 'Crew: friends, a crew of four, and listening together',
+    body: [
+      'A new Crew button sits at the top right of every menu and opens an overlay above the whole game. Sign in with Discord, GitHub, Google or Apple and your name and picture come with you. Share your short friend code, show a QR code a friend can scan with their phone camera, or paste a code to add someone.',
+      'Start a crew of up to four players, invite friends, and see who is online and what they are doing. Players you have crewed up with show under Recent, so you can add them later. Crew invites and friend requests arrive live.',
+      'In the Jukebox Room, the headphones button invites your crew to listen together: everyone hears the same soundtrack song at the same place, and a follower can pause or leave whenever they like. Only the song and its place are shared, never the audio.',
+      'Settings, under Power, storage and data, has a Friends and crew switch that closes the live connection, and the overlay has Show me as online. Friends need one setup step on the shared Lok database before they switch on; until then the overlay says they are almost ready.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

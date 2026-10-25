@@ -84,7 +84,7 @@ function slimSession(value: string): string {
     const meta = user.user_metadata as Record<string, unknown> | undefined;
     if (meta && typeof meta === "object") {
       const keep: Record<string, unknown> = {};
-      for (const key of ["full_name", "name", "avatar_url", "picture", "email"]) {
+      for (const key of ["full_name", "name", "user_name", "preferred_username", "avatar_url", "picture", "email"]) {
         if (typeof meta[key] === "string") keep[key] = meta[key];
       }
       user.user_metadata = keep;

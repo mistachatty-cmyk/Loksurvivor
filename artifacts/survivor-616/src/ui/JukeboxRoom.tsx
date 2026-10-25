@@ -17,6 +17,7 @@ import { buildShelves, paletteOf, type ShelfTrack } from '@/game/audio/jukeboxSh
 import { formatTime, useMusicPlayer } from '@/game/audio/musicPlayer';
 import { armDiscGuard, watchDiscGuard } from '@/lib/discGuard';
 import { useT } from '@/lib/i18n';
+import { JukeboxListenButton } from './ListenTogether';
 import { applyPreset, isFlatEq, nextPreset, presetFor, useEq, writeEq } from '@/lib/musicEq';
 import { useTheaterLevel } from '@/lib/useTheaterLevel';
 import { readDiscPulse } from '@/lib/discPulse';
@@ -318,6 +319,7 @@ export default function JukeboxRoom({ onClose, onOpenMusic, onOpenSettings }: Ju
           >
             <SlidersHorizontal size={18} />
           </button>
+          <JukeboxListenButton />
           <button
             type="button"
             onClick={() => setSleepMin((m) => nextSleepStep(m))}
