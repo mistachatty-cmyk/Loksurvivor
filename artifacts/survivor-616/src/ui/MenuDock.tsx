@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef } from 'react';
-import { ArrowRight, Home, Map, MessageSquare, Search, Settings, ShoppingBag, Store, Users, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Backpack, Home, Map, MessageSquare, Search, Settings, ShoppingBag, Store, Users, type LucideIcon } from 'lucide-react';
 
 import { useMeta } from '@/game/state/metaStore';
 import { totalUnread, useLokChat } from '@/game/state/lokChatStore';
@@ -23,6 +23,7 @@ const ITEMS: DockItem[] = [
   { id: 'areas', label: 'dock.map', icon: Map, screens: pageScreens('areas') },
   { id: 'roster', label: 'goto.roster', icon: Users, screens: pageScreens('roster') },
   { id: 'card-shop', label: 'dock.cards', icon: ShoppingBag, screens: pageScreens('card-shop') },
+  { id: 'inventory', label: 'dock.items', icon: Backpack, screens: pageScreens('inventory') },
   { id: 'lok-shop', label: 'goto.lokShop', icon: Store, screens: pageScreens('lok-shop') },
   { id: 'settings', label: 'goto.settings', icon: Settings, screens: pageScreens('settings') },
 ];
@@ -48,6 +49,7 @@ export function MenuDock({ screenName, onGo, onHeadOut }: Props) {
   const chatUnread = useLokChat(totalUnread);
   const mailUnread = meta.trainingMailbox.filter((entry) => !entry.read).length;
   const chatBadge = chatUnread + mailUnread;
+  const sealedPacks = Object.values(meta.unopenedCardPacks).reduce<number>((sum, qty) => sum + (qty ?? 0), 0);
 
   // Tell the pages how much room the dock takes, so nothing at the bottom of a page hides behind it:
   // a bar along the bottom on a phone, a slim rail down the left on a wide screen.
@@ -103,7 +105,12 @@ export function MenuDock({ screenName, onGo, onHeadOut }: Props) {
         return (
           <Fragment key={id}>
             <button type="button" onClick={() => onGo(id)} aria-current={active ? 'page' : undefined} className={itemClass(active)} data-testid={`dock-${id}`}>
-              <Icon className="h-5 w-5" aria-hidden="true" />
+              <span className="relative">
+                <Icon className="h-5 w-5" aria-hidden="true" />
+                {id === 'inventory' && sealedPacks > 0 ? (
+                  <span className="absolute -right-2.5 -top-1.5 min-w-4 rounded-full bg-fuchsia-500 px-1 text-center text-[9px] font-black leading-4 text-white" data-testid="dock-inventory-badge">{sealedPacks > 9 ? '9+' : sealedPacks}</span>
+                ) : null}
+              </span>
               <span className="max-w-full truncate">{t(label)}</span>
             </button>
             {id === 'lok-shop' ? (

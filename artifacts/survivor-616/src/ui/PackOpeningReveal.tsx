@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { PackageOpen, Sparkles, X } from 'lucide-react';
 
@@ -165,8 +166,9 @@ export function PackOpeningReveal({
 
   const handleFocalTap = () => (focalFlipped ? advance() : flipUp());
 
-  return (
-    <div className="fixed inset-0 z-[95] grid place-items-center overflow-y-auto bg-black/90 p-4 py-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Lock Pack opening">
+  // Drawn on the page itself, not inside the screen, so nothing on top of the screen (the Looks button) can cover Close.
+  return createPortal(
+    <div className="fixed inset-0 z-[120] grid place-items-center overflow-y-auto bg-black/90 p-4 py-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Lock Pack opening">
       <button
         type="button"
         onClick={() => { onClose(); sfx?.play('uiNav'); }}
@@ -257,7 +259,8 @@ export function PackOpeningReveal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

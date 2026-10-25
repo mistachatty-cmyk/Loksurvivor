@@ -792,6 +792,16 @@ export function CardShopPanel({ onBack, initialTab, onSignIn }: { onBack: () => 
             >
               Open · {pack.cost} CC
             </button>
+            {(meta.unopenedCardPacks[pack.id] ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={() => { openStoredCardPack(pack.id); sfx.play('cardPack'); }}
+                className="mt-2 border border-sky-300/50 bg-sky-300/10 px-3 py-2 font-mono text-[10px] font-black uppercase text-sky-100 transition-all active:scale-[0.97] hover:bg-sky-300/20"
+                data-testid={`button-shop-open-sealed-${pack.id}`}
+              >
+                {`Sealed ×${meta.unopenedCardPacks[pack.id]} · Open`}
+              </button>
+            )}
           </article>
         ))}
       </div>

@@ -25,6 +25,7 @@ export const GO_TO_TARGETS: GoToTarget[] = [
   { id: 'archive', label: 'goto.archive', group: 'goto.group.collect', keywords: 'unlocks registry collection lore', feature: 'unlocks' },
   { id: 'recovery', label: 'goto.recovery', group: 'goto.group.collect', keywords: 'heal recover revive', feature: 'recovery' },
   { id: 'vendor', label: 'goto.vendor', group: 'goto.group.collect', keywords: 'buy shop store items', feature: 'vendor' },
+  { id: 'inventory', label: 'goto.inventory', group: 'goto.group.collect', keywords: 'items bag packs sealed open stash materials gear' },
   { id: 'workshop', label: 'goto.workshop', group: 'goto.group.collect', keywords: 'craft upgrade relic', feature: 'workshop' },
   { id: 'card-shop', label: 'goto.cardShop', group: 'goto.group.collect', keywords: 'cards packs deck shop' },
   { id: 'palette-store', label: 'goto.paletteStore', group: 'goto.group.collect', keywords: 'themes colors palettes auras hats', feature: 'palette-store' },

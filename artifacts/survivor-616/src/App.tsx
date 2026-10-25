@@ -87,6 +87,7 @@ const PaletteGalleryPanel = lazy(() => import('@/ui/PaletteGalleryPanel').then((
 const SoundBoothPanel = lazy(() => import('@/ui/SoundBoothPanel').then((m) => ({ default: m.SoundBoothPanel })));
 const AccountPanel = lazy(() => import('@/ui/AccountPanel').then((m) => ({ default: m.AccountPanel })));
 const FeedbackPanel = lazy(() => import('@/ui/FeedbackPanel').then((m) => ({ default: m.FeedbackPanel })));
+const InventoryPanel = lazy(() => import('@/ui/InventoryPanel').then((m) => ({ default: m.InventoryPanel })));
 const CardShopPanel = lazy(() => import('@/ui/CardShopPanel').then((m) => ({ default: m.CardShopPanel })));
 const WeaponBansScreen = lazy(() => import('@/ui/WeaponBansScreen').then((m) => ({ default: m.WeaponBansScreen })));
 const GrpdArmoryScreen = lazy(() => import('@/ui/GrpdArmoryScreen').then((m) => ({ default: m.GrpdArmoryScreen })));
@@ -111,7 +112,7 @@ const queryClient = new QueryClient();
 const DOCK_HIDDEN_SCREENS = ['jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle', 'weapon-training-arena'];
 
 /** Screens with no payload that browser Back may return to. */
-const HISTORY_SCREENS = new Set(['intro', 'hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'locker', 'recovery', 'vendor', 'workshop', 'card-shop', 'lok-shop', 'weapon-bans', 'jukebox', 'settings', 'palette-store', 'sound-booth', 'account', 'feedback', 'weapon-training-arena']);
+const HISTORY_SCREENS = new Set(['intro', 'hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'locker', 'recovery', 'vendor', 'workshop', 'card-shop', 'inventory', 'lok-shop', 'weapon-bans', 'jukebox', 'settings', 'palette-store', 'sound-booth', 'account', 'feedback', 'weapon-training-arena']);
 
 type Screen =
   | { name: 'intro' }
@@ -128,6 +129,7 @@ type Screen =
   | { name: 'recovery' }
   | { name: 'vendor'; initialCategory?: VendorItemCategory }
   | { name: 'workshop' }
+  | { name: 'inventory' }
   | { name: 'card-shop'; tab?: 'sleeve' | 'binder' | 'singles' }
   | { name: 'lok-shop' }
   | { name: 'weapon-bans' }
@@ -179,7 +181,7 @@ interface PendingTravelEncounter {
  * Lets a screen be opened directly (e.g. `?screen=areas`) so any part of the
  * game can be reached without replaying progress. Only honoured in dev.
  */
-const RESUME_SCREENS = new Set(['hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'recovery', 'vendor', 'workshop', 'card-shop', 'weapon-bans', 'settings', 'account', 'feedback']);
+const RESUME_SCREENS = new Set(['hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'recovery', 'vendor', 'workshop', 'card-shop', 'inventory', 'weapon-bans', 'settings', 'account', 'feedback']);
 
 /** After the automatic reload that picks up a new build, return to where the player was (never the title screen). */
 function resumeScreen(): Screen | null {
@@ -240,6 +242,7 @@ function initialScreen(): Screen {
       requested === 'vendor' ||
       requested === 'workshop' ||
       requested === 'card-shop' ||
+      requested === 'inventory' ||
       requested === 'weapon-bans' ||
       requested === 'grpd-armory' ||
       requested === 'frog-ranch' ||
@@ -787,6 +790,9 @@ function Game() {
 
     case 'workshop':
       return <WorkshopPanel onBack={goHub} />;
+
+    case 'inventory':
+      return <InventoryPanel onBack={goHub} onOpenCardShop={() => setScreen({ name: 'card-shop' })} />;
 
     case 'card-shop':
       return <CardShopPanel onBack={goHub} initialTab={screen.tab} onSignIn={() => setScreen({ name: 'account' })} />;

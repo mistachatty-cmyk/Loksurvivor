@@ -238,3 +238,33 @@ test('the GRPD Vault grants Blue 616 once after the Site Crew zone is cleared', 
   assert.equal(repeated, claimed);
   assert.equal(repeated.meta.savedLokPets.filter((pet) => pet.roll.variantId === 'blue-616').length, 1);
 });
+
+test('sealed packs: new saves store packs, old saves are moved once, opening is free and uses up the pack', () => {
+  assert.equal(createInitialMeta().autoOpenPacksEnabled, false);
+  // A save from before sealed-by-default (no marker) moves to sealed once...
+  assert.equal(normalizeMeta({ version: 1, autoOpenPacksEnabled: true }).autoOpenPacksEnabled, false);
+  // ...and a choice made afterwards is respected.
+  assert.equal(normalizeMeta({ version: 1, packInventoryV1: true, autoOpenPacksEnabled: true }).autoOpenPacksEnabled, true);
+
+  const start = { meta: { ...createInitialMeta(), cardCredits: 100 }, lastRun: null };
+  const bought = reducer(start, { type: 'buyCardPack', packId: 'street', now: 1 });
+  assert.equal(bought.meta.cardCredits, 92);
+  assert.equal(bought.meta.unopenedCardPacks.street, 1);
+
+  const opened = reducer(bought, { type: 'openStoredCardPack', packId: 'street', now: 2 });
+  assert.equal(opened.meta.cardCredits, 92, 'opening must not charge again');
+  assert.equal(opened.meta.unopenedCardPacks.street, undefined, 'the opened pack is used up');
+  assert.equal(opened.lastCardPackReveal?.pulls.length, 1);
+  assert.equal(reducer(opened, { type: 'openStoredCardPack', packId: 'street', now: 3 }), opened, 'nothing left to open');
+});
+
+test('sealed packs: open all rips every stored pack up to the limit and keeps the rest', () => {
+  const base = createInitialMeta();
+  const stocked = { meta: { ...base, unopenedCardPacks: { street: 12, lokpet: 2 } }, lastRun: null };
+  const result = reducer(stocked, { type: 'openAllStoredCardPacks', now: 5 });
+  const left = Object.values(result.meta.unopenedCardPacks).reduce((sum, count) => sum + (count ?? 0), 0);
+  assert.equal(left, 4, 'ten of fourteen packs open at once');
+  assert.ok((result.lastCardPackReveal?.pulls.length ?? 0) >= 10);
+  assert.equal(result.lastCardPackReveal?.pulls.length, result.lastCardPackReveal?.newFlags.length);
+  assert.equal(reducer({ meta: base, lastRun: null }, { type: 'openAllStoredCardPacks', now: 1 }).lastCardPackReveal ?? null, null);
+});

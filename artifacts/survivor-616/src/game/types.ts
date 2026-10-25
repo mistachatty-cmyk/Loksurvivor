@@ -2559,6 +2559,8 @@ export interface MetaState {
   unopenedCardPacks: Partial<Record<CardPackId, number>>;
   /** When true (default), buying or finding a pack opens it immediately. When false, packs are stored sealed in `unopenedCardPacks` for the player to open later. */
   autoOpenPacksEnabled: boolean;
+  /** Set once the sealed-by-default change has been applied to a save, so it never flips a later choice back. */
+  packInventoryV1: boolean;
   activePassiveCardIds: string[];
   /** Up to BATTLE_DECK_SLOTS owned card ids equipped for the travel-encounter minigame's Attack action. Empty deck falls back to an unarmed punch -- never blocks the player. See data/travelEncounters.ts. */
   battleDeckCardIds: string[];
