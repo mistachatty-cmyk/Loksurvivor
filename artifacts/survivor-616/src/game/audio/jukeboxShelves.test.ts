@@ -78,3 +78,14 @@ test('opening on the playing song prefers its album over the player\'s own shelv
   assert.equal(shelves[shelfIndexFor(shelves, 'a')]!.title, 'DJ Misfit — New Fits');
   assert.equal(shelves[shelfIndexFor(shelves, null, shelves[0]!.id)]!.title, 'F');
 });
+
+test('the player\'s own playlists become shelves after hearts and recents, keeping only songs with a disc', () => {
+  const albums = buildShelves([lok(1), fit('a')]);
+  const shelves = withPersonalShelves(albums, {
+    favoriteIds: [], recentIds: ['a'], titles: { favorites: 'F', recent: 'R' },
+    playlists: [{ id: 'p1', name: 'Gym', trackIds: ['a', 'my-file', 'lokifed-1'] }, { id: 'p2', name: 'Empty', trackIds: ['my-file'] }],
+  });
+  assert.deepEqual(shelves.map((s) => s.title), ['R', 'Gym', 'Lokifed — Take 1', 'DJ Misfit — New Fits']);
+  assert.deepEqual(shelves[1]!.tracks.map((t) => t.id), ['a', 'lokifed-1']);
+  assert.equal(shelves[1]!.id, 'mine:playlist:p1');
+});

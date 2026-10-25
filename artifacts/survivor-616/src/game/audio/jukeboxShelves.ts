@@ -47,6 +47,8 @@ export function buildShelves<T extends ShelfTrack>(tracks: readonly T[]): DiscSh
 /** Shelf ids that belong to the player (hearts, recent plays), not to an album. */
 export const PERSONAL_SHELF_PREFIX = 'mine:';
 export const FAVORITES_SHELF_ID = `${PERSONAL_SHELF_PREFIX}favorites`;
+/** More than this many playlists would bury the albums; the rest stay in the library. */
+export const MAX_PLAYLIST_SHELVES = 8;
 export const RECENT_SHELF_ID = `${PERSONAL_SHELF_PREFIX}recent`;
 
 /**
@@ -55,7 +57,13 @@ export const RECENT_SHELF_ID = `${PERSONAL_SHELF_PREFIX}recent`;
  */
 export function withPersonalShelves<T extends ShelfTrack>(
   shelves: readonly DiscShelf<T>[],
-  mine: { favoriteIds: readonly string[]; recentIds: readonly string[]; titles: { favorites: string; recent: string } },
+  mine: {
+    favoriteIds: readonly string[];
+    recentIds: readonly string[];
+    titles: { favorites: string; recent: string };
+    /** The player's own playlists from the library, each becoming a shelf of the songs that have a disc. */
+    playlists?: ReadonlyArray<{ id: string; name: string; trackIds: readonly string[] }>;
+  },
 ): DiscShelf<T>[] {
   const byId = new Map<string, T>();
   for (const shelf of shelves) for (const track of shelf.tracks) byId.set(track.id, track);
@@ -65,6 +73,10 @@ export function withPersonalShelves<T extends ShelfTrack>(
   if (favorites.length > 0) out.push({ id: FAVORITES_SHELF_ID, title: mine.titles.favorites, tracks: favorites });
   const recent = pick(mine.recentIds);
   if (recent.length > 0) out.push({ id: RECENT_SHELF_ID, title: mine.titles.recent, tracks: recent });
+  for (const playlist of (mine.playlists ?? []).slice(0, MAX_PLAYLIST_SHELVES)) {
+    const tracks = pick(playlist.trackIds);
+    if (tracks.length > 0) out.push({ id: `${PERSONAL_SHELF_PREFIX}playlist:${playlist.id}`, title: playlist.name, tracks });
+  }
   return [...out, ...shelves];
 }
 

@@ -8,6 +8,7 @@ import { useT } from '@/lib/i18n';
 import { clearListeningHistory, favoritesShelfPref, formatListening, listeningHistoryPref, recentShelfPref, totalPlays, totalSeconds, useListening } from '@/lib/listening';
 import { REACTIVE_BG_LEVELS, readDiscGestures, readKeepAwake, readReactiveBg, readShelves, readTheaterMix, writeDiscGestures, writeKeepAwake, writeReactiveBg, writeShelves, writeTheaterMix, type ReactiveBgLevel } from '@/lib/jukeboxPrefs';
 import { ArrivalDiscsToggle } from './ArrivalDiscsToggle';
+import { SoundSettings } from './SoundSettings';
 
 const ON = 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100';
 const OFF = 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white';
@@ -63,6 +64,8 @@ export function JukeboxSettings({ onOpenScreen }: { onOpenScreen?: (id: string) 
               aria-label={t('settings.jukebox.volume')} className="w-40 accent-fuchsia-300" data-testid="input-jukebox-volume"
             />
           </Row>
+
+          <SoundSettings />
 
           <Row title={t('settings.jukebox.react')} body={t('settings.jukebox.reactBody')}>
             <button type="button" aria-pressed={meta.musicReactiveEnabled} onClick={() => setMusicReactive(!meta.musicReactiveEnabled)} className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${meta.musicReactiveEnabled ? ON : OFF}`}>
