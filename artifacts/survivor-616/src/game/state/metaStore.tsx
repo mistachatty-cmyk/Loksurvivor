@@ -455,7 +455,8 @@ export function createInitialMeta(): MetaState {
     cardCollection: [],
     boosterCards: [],
     unopenedCardPacks: {},
-    autoOpenPacksEnabled: true,
+    autoOpenPacksEnabled: false,
+    packInventoryV1: true,
     activePassiveCardIds: [],
     battleDeckCardIds: [],
     cardSalvageUnlocked: false,
@@ -626,6 +627,9 @@ function normalizeCardCollection(value: unknown): MetaState['cardCollection'] {
     return [{ cardId: entry.cardId, copies, variants, bestVariant, totalValue: Math.max(copies, counter(entry.totalValue, copies)) }];
   }).slice(0, 500);
 }
+
+/** Most sealed packs one "Open all" tap rips, so the reveal stays a size a person can flip through. */
+export const OPEN_ALL_PACK_LIMIT = 10;
 
 function rollPackForReveal(meta: MetaState, packId: CardPackId, seed: number): { pulls: CardPull[]; newFlags: boolean[] } {
   const pulls = rollCardPack(packId, createRng(seed), CARD_MANIFESTS.map((card) => card.id));
@@ -1576,7 +1580,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     cardCollection,
     boosterCards: normalizeBoosterCards(parsed.boosterCards),
     unopenedCardPacks: normalizeUnopenedCardPacks(parsed.unopenedCardPacks),
-    autoOpenPacksEnabled: parsed.autoOpenPacksEnabled !== false,
+    // Earned packs now go to the inventory by default. Saves from before that keep the old setting only once.
+    autoOpenPacksEnabled: parsed.packInventoryV1 === true ? parsed.autoOpenPacksEnabled !== false : false,
+    packInventoryV1: true,
     activePassiveCardIds: Array.isArray(parsed.activePassiveCardIds) ? [...new Set(parsed.activePassiveCardIds.filter((id): id is string => typeof id === 'string' && ownedPassiveIds.has(id)))].slice(0, 5) : [],
     battleDeckCardIds: Array.isArray(parsed.battleDeckCardIds) ? [...new Set(parsed.battleDeckCardIds.filter((id): id is string => typeof id === 'string' && ownedCardIds.has(id)))].slice(0, BATTLE_DECK_SLOTS) : [],
     cardSalvageUnlocked: parsed.cardSalvageUnlocked === true,
@@ -2180,7 +2186,7 @@ type Action =
   | { type: 'buyKeyItemAction'; keyItemId: string; credCost: number }
   | { type: 'unlockCardCustomization'; customizationId: string; costCC: number }
   | { type: 'setCardCustomization'; cardId: string; customization: { frame?: string; overlay?: string; companionSeal?: string } }
-  | { type: 'openAllStoredCardPacks' }
+  | { type: 'openAllStoredCardPacks'; now: number }
   | { type: 'completeTravelEncounter'; result: TravelEncounterResult }
   | { type: 'toggleSavedLokPet'; id: string }
   | { type: 'setLokPetLoadout'; ids: string[] }
@@ -2539,13 +2545,40 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       else delete unopenedCardPacks[pack.id];
       return {
         ...state,
+        // The price was paid when the pack was bought, so opening it from storage is free.
         meta: {
           ...state.meta,
-          cardCredits: state.meta.cardCredits - pack.cost,
+          unopenedCardPacks,
           cardCollection: mergeCardPulls(state.meta.cardCollection, pulls),
         },
         lastCardPackReveal: { packId: pack.id, pulls, newFlags },
       };
+    }
+
+    case 'openAllStoredCardPacks': {
+      let meta = state.meta;
+      const pulls: CardPull[] = [];
+      const newFlags: boolean[] = [];
+      let firstPackId: CardPackId | null = null;
+      let opened = 0;
+      const stored = (Object.entries(meta.unopenedCardPacks) as [CardPackId, number][]).filter(([id, qty]) => (qty ?? 0) > 0 && CARD_SHOP_PACKS_BY_ID[id]);
+      for (const [packId, qty] of stored) {
+        for (let copy = 0; copy < qty && opened < OPEN_ALL_PACK_LIMIT; copy += 1) {
+          const seed = (action.now ^ meta.totalRuns ^ (opened * 7919) ^ meta.cardCollection.length) >>> 0;
+          const rolled = rollPackForReveal(meta, packId, seed);
+          const remaining = (meta.unopenedCardPacks[packId] ?? 0) - 1;
+          const unopenedCardPacks = { ...meta.unopenedCardPacks };
+          if (remaining > 0) unopenedCardPacks[packId] = remaining;
+          else delete unopenedCardPacks[packId];
+          meta = { ...meta, unopenedCardPacks, cardCollection: mergeCardPulls(meta.cardCollection, rolled.pulls) };
+          pulls.push(...rolled.pulls);
+          newFlags.push(...rolled.newFlags);
+          firstPackId ??= packId;
+          opened += 1;
+        }
+      }
+      if (!firstPackId) return state;
+      return { ...state, meta, lastCardPackReveal: { packId: firstPackId, pulls, newFlags } };
     }
 
     case 'clearCardPackReveal':
@@ -4659,6 +4692,7 @@ export interface MetaContextValue {
   recycleCard: (cardId: string, rewardCC: number) => void;
   recycleAllDuplicates: () => void;
   openStoredCardPack: (packId: CardPackId) => void;
+  openAllStoredCardPacks: () => void;
   setAutoOpenPacksEnabled: (enabled: boolean) => void;
   buyLokPetCardPack: () => void;
   togglePassiveCard: (cardId: string) => void;
@@ -4892,6 +4926,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const recycleCard = useCallback((cardId: string, rewardCC: number) => dispatch({ type: 'recycleCard', cardId, rewardCC }), []);
   const recycleAllDuplicates = useCallback(() => dispatch({ type: 'recycleAllDuplicates' }), []);
   const openStoredCardPack = useCallback((packId: CardPackId) => dispatch({ type: 'openStoredCardPack', packId, now: Date.now() }), []);
+  const openAllStoredCardPacks = useCallback(() => dispatch({ type: 'openAllStoredCardPacks', now: Date.now() }), []);
   const setAutoOpenPacksEnabled = useCallback((enabled: boolean) => dispatch({ type: 'setAutoOpenPacksEnabled', enabled }), []);
   const buyLokPetCardPack = useCallback(() => dispatch({ type: 'buyCardPack', packId: 'lokpet', now: Date.now() }), []);
   const togglePassiveCard = useCallback((cardId: string) => dispatch({ type: 'togglePassiveCard', cardId }), []);
@@ -5242,6 +5277,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       recycleCard,
       recycleAllDuplicates,
       openStoredCardPack,
+      openAllStoredCardPacks,
       setAutoOpenPacksEnabled,
       buyLokPetCardPack,
       togglePassiveCard,
@@ -5441,6 +5477,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     recycleCard,
     recycleAllDuplicates,
     openStoredCardPack,
+    openAllStoredCardPacks,
     setAutoOpenPacksEnabled,
     buyLokPetCardPack,
     togglePassiveCard,

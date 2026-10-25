@@ -91,7 +91,7 @@ test('collector world and meta progression use the selected rank', () => {
 });
 
 test('LokPet card shop spends credits and adds stackable cards', () => {
-  const base = { ...createInitialMeta(), cardCredits: LOKPET_CARD_PACK_COST };
+  const base = { ...createInitialMeta(), autoOpenPacksEnabled: true, cardCredits: LOKPET_CARD_PACK_COST };
   const next = reducer({ meta: base, lastRun: null }, { type: 'buyCardPack', packId: 'lokpet', now: 616 });
   assert.equal(next.meta.cardCredits, 0);
   assert.equal(next.meta.cardCollection.reduce((sum, card) => sum + card.copies, 0), 2);

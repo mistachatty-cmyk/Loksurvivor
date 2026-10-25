@@ -2133,6 +2133,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Settings, Music has new switches for the Favorites shelf, the Recently played shelf and remembering what you listen to, plus a Clear history button. Turning history off stops counting right away, and your hearts stay.',
     ],
   },
+  {
+    version: '0.42.48',
+    date: '2026-10-25',
+    publishedAt: '2026-10-25T13:15:00Z',
+    kind: 'update',
+    title: 'Inventory, and a fix for songs that loop',
+    body: [
+      'There is a new Items page in the bottom bar. Packs you find on runs or buy in the card shop now land there sealed and stack up, so you can save as many as you like and open them whenever you want, one at a time or ten at once. Your stash, crafting materials, key equipment and forged relics are all on the same page, and anything new since your last visit gets a +N chip.',
+      'Opening a sealed pack used to charge you again and never use the pack up. Opening is now free, and the pack is gone once it is opened. Packs found on a run show on the results page, and the shop shows how many sealed ones you already have. If you would rather packs open the moment you get them, flip the switch on the Items page.',
+      'Pausing a song and coming back, especially after switching apps, could replay the same few seconds over and over. The soundtrack now stops cleanly when your phone interrupts the sound, then clears the stuck bit and picks up where you left off. The pack opening screen also sits above everything now, so its Close button is always tappable.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

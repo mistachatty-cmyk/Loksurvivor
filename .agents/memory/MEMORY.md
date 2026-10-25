@@ -92,3 +92,4 @@
 - [Jukebox Room](jukebox.md) — dark theater room for the Lokifed discs: three theater levels, post-analyser dampen filters, Arcade Box unlock, shared `@lok/jukebox` package, `?jukebox` preview.
 - [Mobile stability and sizing](mobile-stability-2026-10-22.md) — why the Jukebox Room crashed iPhone Safari, the fluid root font size, the short photosensitivity screen, crash reports, and optimization notes.
 - [Dock, slide and chat host](dock-chat-and-slide.md) — one dock/swipe page list, crop tall pages while sliding (card-shop crash), dock padding vars, single LOK Chat host with mailbox and tricks, New Fits guest album.
+- [Inventory and sealed packs](inventory.md) — Items page, sealed-by-default packs, pack opening fixes

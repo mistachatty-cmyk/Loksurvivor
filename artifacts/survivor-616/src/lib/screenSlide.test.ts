@@ -7,7 +7,8 @@ test('dock pages own distinct screens', () => {
   const all = DOCK_PAGES.flatMap((page) => page.screens);
   assert.equal(new Set(all).size, all.length);
   assert.equal(dockIndexFor('vendor'), dockIndexFor('card-shop'));
-  assert.equal(dockIndexFor('lok-shop'), dockIndexFor('card-shop') + 1);
+  assert.equal(dockIndexFor('inventory'), dockIndexFor('card-shop') + 1);
+  assert.equal(dockIndexFor('lok-shop'), dockIndexFor('inventory') + 1);
   assert.equal(dockIndexFor('run'), -1);
 });
 
@@ -32,5 +33,6 @@ test('swipes pick the neighbouring page and ignore scrolling, short or slow drag
   assert.equal(swipeTargetId('areas', { dx: -120, dy: 0, ms: 1500 }), null, 'too slow');
   assert.equal(swipeTargetId('bestiary', { dx: -120, dy: 0, ms: 200 }), null, 'not a dock page');
   assert.equal(swipeTargetId('lok-shop', { dx: -120, dy: 0, ms: 200 }), 'settings');
-  assert.equal(swipeTargetId('vendor', { dx: -120, dy: 0, ms: 200 }), 'lok-shop');
+  assert.equal(swipeTargetId('vendor', { dx: -120, dy: 0, ms: 200 }), 'inventory');
+  assert.equal(swipeTargetId('inventory', { dx: -120, dy: 0, ms: 200 }), 'lok-shop');
 });

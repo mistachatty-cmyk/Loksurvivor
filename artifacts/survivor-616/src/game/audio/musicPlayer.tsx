@@ -329,6 +329,20 @@ function withSoundtrackLocks(source: Track[], objectiveCompletions: number): Tra
   );
 }
 
+/**
+ * A phone can interrupt the shared AudioContext (switching apps, a call, the lock screen). While it is
+ * stalled the element keeps handing its buffer to a graph that is not consuming it, and on resume the
+ * same moment plays again and again. Stepping back a hair re-seeks the element and drops that stale buffer.
+ */
+function flushStaleAudio(audio: HTMLAudioElement): void {
+  try {
+    const at = audio.currentTime;
+    if (Number.isFinite(at) && at > 0.1) audio.currentTime = at - 0.05;
+  } catch {
+    // Some sources are not seekable yet; resuming is still fine.
+  }
+}
+
 function titleFromFile(file: File): string {
   return file.name.replace(MEDIA_EXTENSIONS, '').replace(/[_-]+/g, ' ').trim() || file.name;
 }
@@ -509,6 +523,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const pausedByInterruptionRef = useRef(false);
+  const flushOnRunningRef = useRef(false);
   const analysisRef = useRef<MusicAnalyser | null>(null);
   const toneNodesRef = useRef<{ lowpass: BiquadFilterNode; shelf: BiquadFilterNode } | null>(null);
   const pendingToneRef = useRef<Tone | null>(null);
@@ -647,7 +663,29 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     if (!AudioContextConstructor) return null;
     if (!audioContextRef.current) {
       try {
-        audioContextRef.current = new AudioContextConstructor();
+        const created = new AudioContextConstructor();
+        audioContextRef.current = created;
+        created.addEventListener('statechange', () => {
+          const element = audioRef.current;
+          if (!element) return;
+          if (created.state !== 'running') {
+            // Nothing is being heard now, so stop the element feeding a stalled graph (this is what looped the same part).
+            if (!element.paused && sourceNodeRef.current) {
+              pausedByInterruptionRef.current = true;
+              flushOnRunningRef.current = true;
+              element.pause();
+            }
+            return;
+          }
+          if (flushOnRunningRef.current) {
+            flushOnRunningRef.current = false;
+            flushStaleAudio(element);
+          }
+          if (pausedByInterruptionRef.current) {
+            pausedByInterruptionRef.current = false;
+            void element.play().catch(() => {});
+          }
+        });
       } catch {
         return null;
       }
@@ -957,7 +995,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (context && context.state === 'suspended') void context.resume().catch(() => {});
     };
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    window.addEventListener('pageshow', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pageshow', onVisible);
+    };
   }, []);
 
   // Release every object URL when the app unmounts.
@@ -1463,7 +1505,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       playIndex(currentIndex);
       return;
     }
+    // A tap is the player's own wish, so it replaces any automatic pause caused by an interruption.
+    pausedByInterruptionRef.current = false;
     if (audio.paused) {
+      const context = audioContextRef.current;
+      if (context && context.state !== 'running') {
+        // Start inside the tap (phones need that), and drop the stale buffer once the graph is live again.
+        flushOnRunningRef.current = true;
+        void context.resume().catch(() => {});
+      }
       void audio.play().catch(() => {
         setIsPlaying(false);
         setError('Playback was blocked. Tap play once more.');

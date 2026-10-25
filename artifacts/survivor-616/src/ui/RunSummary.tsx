@@ -22,6 +22,8 @@ import { runShareText } from '@/lib/sharePlatforms';
 import { encodeChallenge } from '@/lib/challengeCode';
 import { AREAS_BY_ID } from '@/game/data/areas';
 import { useT } from '@/lib/i18n';
+import { CARD_SHOP_PACKS_BY_ID } from '@/game/data/passiveCards';
+import type { CardPackId } from '@/game/types';
 import { formatClock } from '@lok/recap';
 import { PetGrowthRecap } from './PetGrowthRecap';
 import type { GameRunSummaryLike } from '@lok/recap';
@@ -765,7 +767,7 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
         )}
 
         {/* Loot & Objectives */}
-        {(result.lootBoxesOpened > 0 || lokPets.length > 0 || result.completedObjectives.length > 0 || result.skeletonKeysGained > 0) && (
+        {(result.lootBoxesOpened > 0 || lokPets.length > 0 || result.completedObjectives.length > 0 || result.skeletonKeysGained > 0 || (result.cardPacksFound?.length ?? 0) > 0) && (
           <div className="grid gap-4 md:grid-cols-2">
             {result.lootBoxesOpened > 0 && (
               <div className="border border-border bg-card p-5" data-testid="section-loot">
@@ -787,6 +789,23 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
                     </span>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {(result.cardPacksFound?.length ?? 0) > 0 && (
+              <div className="border border-fuchsia-300/30 bg-card p-5" data-testid="section-packs-found">
+                <div className="mb-3 flex items-center gap-2">
+                  <Package className="h-4 w-4 text-fuchsia-300" />
+                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{t('inv.runFound')}</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries((result.cardPacksFound ?? []).reduce<Record<string, number>>((tally, id) => ({ ...tally, [id]: (tally[id] ?? 0) + 1 }), {})).map(([id, qty]) => (
+                    <span key={id} className="border border-fuchsia-800/60 bg-fuchsia-950/40 px-2 py-0.5 font-mono text-[11px] text-fuchsia-200">
+                      {CARD_SHOP_PACKS_BY_ID[id as CardPackId]?.name ?? id} ×{qty}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">{meta.autoOpenPacksEnabled ? t('inv.runFoundOpened') : t('inv.runFoundSealed')}</p>
               </div>
             )}
 
