@@ -589,6 +589,8 @@ export interface WeaponDef {
   lifetimeMs?: number;
   /** Damage multiplier gained for each weapon level above 1. */
   levelDamageScale: number;
+  /** Growth path: new abilities earned as the weapon levels up. */
+  milestones?: WeaponMilestone[];
   /** Authored physical force on the shared 0–5 impact spectrum. */
   impactIntensity: ImpactIntensity;
   /** Only explicitly tagged ground attacks can open lethal potholes. */
@@ -664,6 +666,33 @@ export interface RunWeapon {
   level: number;
   count: number;
   readyAt: number;
+  /** Highest milestone level already granted, so each one pays out once (see WeaponMilestone). */
+  milestoneLevel?: number;
+  /** How many times this weapon has fired, for milestones that act every few casts. */
+  casts?: number;
+}
+
+/**
+ * A step on a weapon's growth path. As the weapon levels up the player earns these automatically: more
+ * pieces, a burst on every hit, a delayed echo, a periodic surge, a heavy slam every few casts. Each
+ * effect field is optional and a later milestone's value replaces an earlier one's; `bonusCount` adds up.
+ * Handled in one place in the engine (engine/milestones.ts), so a new weapon path is data only.
+ */
+export interface WeaponMilestone {
+  /** Weapon level that grants it (2 to 8). */
+  level: number;
+  name: string;
+  description: string;
+  /** Extra orbiting wheels, waves, projectiles... added once when reached. */
+  bonusCount?: number;
+  /** Orbit weapons: every contact also bursts around the point of contact. */
+  hitBurst?: { radius: number; damageMult: number; statusEffectId?: string };
+  /** Wave weapons: each wave is answered by a wider, softer one after a short delay. */
+  echo?: { delayMs: number; damageMult: number; radiusMult: number };
+  /** Orbit weapons: now and then the whole halo flares: wider, faster and harder. */
+  surge?: { everyMs: number; durationMs: number; radiusMult: number; spinMult: number; damageMult: number };
+  /** Every Nth cast adds a ring slam and/or opens potholes around the player. */
+  every?: { casts: number; slam?: { radius: number; damageMult: number; statusEffectId?: string }; potholes?: { radius: number } };
 }
 
 export interface PassiveDef {

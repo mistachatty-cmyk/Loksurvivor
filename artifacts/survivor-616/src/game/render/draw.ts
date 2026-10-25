@@ -4614,7 +4614,7 @@ function drawOrbiters(ctx: CanvasRenderingContext2D, w: World) {
       ctx.font = 'bold 15px monospace';
       ctx.fillText(weapon.def.id === 'crown-of-replies' ? '!' : '?', x - 5, y + 5);
     } else if (weapon?.def.id === 'spoke-halo') {
-      drawSpokeWheel(ctx, x, y, orb.angle * 3 + w.now / 90, color);
+      drawSpokeWheel(ctx, x, y, orb.angle * 3 + w.now / 90, (weapon.level ?? 1) >= 8 ? '#fef08a' : color);
     } else if (weapon?.def.id === 'orbit-rings') {
       // A thin gold-violet annulus rather than a blade -- reads as a ring, not a rectangle.
       ctx.strokeStyle = color;

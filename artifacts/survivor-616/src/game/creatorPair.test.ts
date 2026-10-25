@@ -41,3 +41,27 @@ test('Spoke Queen circles herself with wheels and Jackhammer Jean sends shock wa
   }
   assert.ok(quake.effects.some((effect) => effect.weaponId === 'jean-quake'), 'the quake fires');
 });
+
+test('leveling the signature weapon unlocks its path: more wheels, an aftershock and a slam', () => {
+  const area = { ...AREAS[0]!, waves: [], obstacles: [], musicEvents: undefined };
+  const queen = CHARACTERS_BY_ID['spoke-queen']!;
+  const world = createWorld(area, queen, queen.stats, 616);
+  world.weapons[0]!.level = 8;
+  for (let frame = 0; frame < 5; frame += 1) stepWorld(world, 1 / 30, { moveX: 0, moveY: 0, ultimate: false });
+  assert.equal(world.weapons[0]!.count, 5, 'Quick-Release and Mass Ride add two wheels');
+  assert.equal(world.orbiters.length, 5);
+  assert.ok(world.alerts.some((alert) => alert.text.includes('Mass Ride')), 'the player is told');
+
+  const jean = CHARACTERS_BY_ID['jackhammer-jean']!;
+  const quake = createWorld(area, jean, jean.stats, 616);
+  quake.weapons[0]!.level = 8;
+  quake.weapons[0]!.readyAt = 0;
+  let rings = 0;
+  for (let frame = 0; frame < 600 && (quake.weapons[0]!.casts ?? 0) < 3; frame += 1) {
+    stepWorld(quake, 1 / 30, { moveX: 0, moveY: 0, ultimate: false });
+    rings = Math.max(rings, quake.effects.filter((effect) => effect.kind === 'ring' && effect.weaponId === 'jean-quake').length);
+  }
+  assert.equal(quake.weapons[0]!.casts, 3);
+  assert.equal(quake.weapons[0]!.count, 3, 'Rebar adds a third wave');
+  assert.ok(rings >= 1, 'the third swing slams a ring');
+});
