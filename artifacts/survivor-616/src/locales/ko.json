@@ -1466,5 +1466,16 @@
   "crewrun.promptLater": "닫기",
   "crewrun.start": "크루 런을 시작하세요",
   "crewrun.startBody": "팀원들이 참여할 수 있는 활주로를 열어보세요. 모두가 자신의 장치에서 플레이합니다.",
-  "crewrun.needAccount": "크루 런을 시작하려면 로그인하세요."
+  "crewrun.needAccount": "크루 런을 시작하려면 로그인하세요.",
+  "social.chat.mute": "음소거",
+  "social.chat.unmute": "음소거 해제",
+  "climb.height": "{{n}}m",
+  "climb.best": "최고의 {{n}}m",
+  "climb.fell": "{{n}}m에서 떨어졌습니다. 다시!",
+  "climb.hint": "벽 사이를 뛰어넘으려면 스페이스바를 탭하거나 누르세요. 표지판과 환풍구를 피하세요.",
+  "climb.loaded": "로드되었습니다! {{n}}m에 도달했습니다.",
+  "settings.power.climbLoader": "벽 오르기 로딩 게임",
+  "settings.power.climbLoaderBody": "무언가가 로드되는 동안 오퍼레이터와 LokPet를 사용하여 두 개의 고층 빌딩 사이에서 벽 점프 등반을 즐겨보세요. Off는 대신 조용한 거리 산책을 보여줍니다.",
+  "loading.title": "로드 중",
+  "loading.status": "게임이 준비되는 동안 잠시 기다려 주세요. 기다리는 동안 올라갑니다."
 }

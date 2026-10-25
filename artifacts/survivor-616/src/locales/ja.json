@@ -1466,5 +1466,16 @@
   "crewrun.promptLater": "解雇する",
   "crewrun.start": "クルーランを開始する",
   "crewrun.startBody": "クルーが参加できるランを開きます。誰もが自分のデバイスでプレイします。",
-  "crewrun.needAccount": "サインインしてクルーの実行を開始します。"
+  "crewrun.needAccount": "サインインしてクルーの実行を開始します。",
+  "social.chat.mute": "ミュート",
+  "social.chat.unmute": "ミュートを解除する",
+  "climb.height": "{{n}}m",
+  "climb.best": "ベスト {{n}} m",
+  "climb.fell": "{{n}}メートルで落下。また！",
+  "climb.hint": "タップまたはスペースを押して壁の間を飛び越えます。標識や通気口を避けてください。",
+  "climb.loaded": "ロードされました! {{n}}メートルに到達しました",
+  "settings.power.climbLoader": "壁登りロードゲーム",
+  "settings.power.climbLoaderBody": "何かが読み込まれている間、オペレーターと LokPet と一緒に 2 つの超高層ビルの間を壁ジャンプして登ってみましょう。オフでは、代わりに静かな通りの散歩が表示されます。",
+  "loading.title": "読み込み中",
+  "loading.status": "ゲームの準備ができるまでお待ちください。待っている間に登ります。"
 }

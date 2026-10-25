@@ -1466,5 +1466,16 @@
   "crewrun.promptLater": "Rejeter",
   "crewrun.start": "Démarrer une course en équipe",
   "crewrun.startBody": "Ouvrez une course à laquelle votre équipe peut participer. Chacun joue sur son propre appareil.",
-  "crewrun.needAccount": "Connectez-vous pour démarrer une course en équipe."
+  "crewrun.needAccount": "Connectez-vous pour démarrer une course en équipe.",
+  "social.chat.mute": "Muet",
+  "social.chat.unmute": "Activer le son",
+  "climb.height": "{{n}}m",
+  "climb.best": "Meilleur {{n}}m",
+  "climb.fell": "Tombé à {{n}} m. Encore!",
+  "climb.hint": "Appuyez ou appuyez sur espace pour sauter entre les murs. Esquivez les panneaux et les bouches d'aération.",
+  "climb.loaded": "Chargé ! Vous avez atteint {{n}} m",
+  "settings.power.climbLoader": "Jeu de chargement d'escalade de mur",
+  "settings.power.climbLoaderBody": "Pendant que quelque chose se charge, jouez à une escalade de mur entre deux gratte-ciel avec votre opérateur et LokPet. Off montre plutôt la promenade tranquille dans la rue.",
+  "loading.title": "Chargement",
+  "loading.status": "Attendez pendant que le jeu se prépare. Grimpez en attendant."
 }

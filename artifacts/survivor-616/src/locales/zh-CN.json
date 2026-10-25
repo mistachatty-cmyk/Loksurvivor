@@ -1466,5 +1466,16 @@
   "crewrun.promptLater": "开除",
   "crewrun.start": "启动乘务员运行",
   "crewrun.startBody": "打开一个运行 你的船员可以掉进。 每个人都玩自己的装置。",
-  "crewrun.needAccount": "签到开始一个团队运行。"
+  "crewrun.needAccount": "签到开始一个团队运行。",
+  "social.chat.mute": "沉默的",
+  "social.chat.unmute": "取消静音",
+  "climb.height": "{{n}}米",
+  "climb.best": "最佳{{n}}米",
+  "climb.fell": "跌至 {{n}} 米。再次！",
+  "climb.hint": "点击或按空格键在墙壁之间跳跃。避开标志和通风口。",
+  "climb.loaded": "已加载！您已达到 {{n}} 米",
+  "settings.power.climbLoader": "爬墙加载游戏",
+  "settings.power.climbLoaderBody": "当某些东西加载时，与操作员和 LokPet 一起在两座摩天大楼之间进行跳墙攀爬。 Off 显示的是安静的街道步行。",
+  "loading.title": "加载中",
+  "loading.status": "比赛准备就绪时请稍候。等待的时候就爬上去。"
 }
