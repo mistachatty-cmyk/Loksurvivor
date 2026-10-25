@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useT } from '@/lib/i18n';
 import { dailyFeedPref } from '@/lib/dailyFeed';
 import { tabGuardPref } from '@/lib/saveGuard';
-import { crewChatPref, friendsPref, playlistSyncPref, mediaControlsPref, playtimeSharingPref, SAVER_CAPS, saverCapPref, saverModePref, usePowerStatus, type SaverMode } from '@/lib/powerSaver';
+import { climbLoaderPref, crewChatPref, friendsPref, playlistSyncPref, mediaControlsPref, playtimeSharingPref, SAVER_CAPS, saverCapPref, saverModePref, usePowerStatus, type SaverMode } from '@/lib/powerSaver';
 import { formatBytes, readStorageReport, requestPersistentStorage, type StorageReport } from '@/lib/storageUsage';
 
 import { CrashReportsToggle } from './CrashReportsToggle';
@@ -59,6 +59,7 @@ export function PowerSettings() {
   const friends = friendsPref.use();
   const playlistSync = playlistSyncPref.use();
   const crewChat = crewChatPref.use();
+  const climbLoader = climbLoaderPref.use();
   const tabGuard = tabGuardPref.use();
   const dailyFeed = dailyFeedPref.use();
   const status = usePowerStatus();
@@ -114,6 +115,7 @@ export function PowerSettings() {
       <SwitchRow title={t('settings.power.controls')} body={t('settings.power.controlsBody')} on={controls} onChange={(next) => mediaControlsPref.set(next)} testId="button-power-media-controls" />
       <SwitchRow title={t('settings.power.playtime')} body={t('settings.power.playtimeBody')} on={playtime} onChange={(next) => playtimeSharingPref.set(next)} testId="button-power-playtime" />
       <SwitchRow title={t('settings.power.friends')} body={t('settings.power.friendsBody')} on={friends} onChange={(next) => friendsPref.set(next)} testId="button-power-friends" />
+      <SwitchRow title={t('settings.power.climbLoader')} body={t('settings.power.climbLoaderBody')} on={climbLoader} onChange={(next) => climbLoaderPref.set(next)} testId="button-power-climb-loader" />
       <SwitchRow title={t('settings.power.crewChat')} body={t('settings.power.crewChatBody')} on={crewChat} onChange={(next) => crewChatPref.set(next)} testId="button-power-crew-chat" />
       <SwitchRow title={t('settings.power.playlistSync')} body={t('settings.power.playlistSyncBody')} on={playlistSync} onChange={(next) => playlistSyncPref.set(next)} testId="button-power-playlist-sync" />
       <SwitchRow title={t('settings.power.daily')} body={t('settings.power.dailyBody')} on={dailyFeed} onChange={(next) => dailyFeedPref.set(next)} testId="button-power-daily-feed" />

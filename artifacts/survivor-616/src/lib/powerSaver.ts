@@ -36,6 +36,8 @@ export const playtimeSharingPref = createPref<boolean>('survivor616.net.playtime
 export const friendsPref = createPref<boolean>('survivor616.net.friends.v1', true);
 /** Keeping custom playlists on the account so they follow the player to other devices. */
 export const playlistSyncPref = createPref<boolean>('survivor616.net.playlistSync.v1', true);
+/** The loading screen game: the wall-jump climb (on) or the quiet street walk (off). */
+export const climbLoaderPref = createPref<boolean>('survivor616.loader.climb.v1', true);
 /** Showing crew chat lines and emotes from crewmates. */
 export const crewChatPref = createPref<boolean>('survivor616.net.crewChat.v1', true);
 

@@ -40,3 +40,11 @@ Until step 3 the overlay says friends are almost ready instead of failing.
 ## Free-tier note
 
 Realtime free tier allows 200 concurrent connections. Each signed-in player with the page open uses one for presence (plus one while in a crew with company, plus one in a crew run). The free tier also limits messages per second across the whole project, which is why crew runs send about 7 ticks a second and guests only send input when it changes. That is plenty for now; the connection-closing rules above exist to keep it that way.
+
+## Keeping the free tier safe (0.42.54)
+
+- The crew channel opens only when `wantBus` is true: crew exists, page awake (hidden for 60s closes it), and a crewmate is online or something holds it. The Crew overlay, a crew run and listen-together each `hold()` the bus while active.
+- Every send goes through a token bucket (`createBudget` in `lib/social/netConfig.ts`, 8/s with a burst of 16). Chat allows 4 lines per 8 seconds plus `chatPerMinute`. Crew runs tick at `runTickHz` (default 4) and the host skips ticks that match the last one unless a second has passed.
+- `public/lok-net.json` is a remote dial read once per session: set `presence`, `chat`, `listen` or `crewRuns` to `false`, or lower `chatPerMinute` / `runTickHz`, and redeploy to shed load without a code change. Defaults apply if the file is missing.
+- Players who hide their online status only receive chat while they have the Crew overlay or a run open.
+- Members can be muted per device (`survivor616.crew.muted.v1`).
