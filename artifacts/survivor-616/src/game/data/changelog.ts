@@ -2220,6 +2220,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'You can now mute a crewmate in the Crew overlay. Their chat lines stop showing for you.',
     ],
   },
+  {
+    version: '0.42.55',
+    date: '2026-10-26',
+    publishedAt: '2026-10-26T03:50:00Z',
+    kind: 'update',
+    title: 'Mute and sound meter from the GSix arcade',
+    body: [
+      'When you play Survivor 616 inside the GSix arcade, the game bar can now mute and unmute the game, and a small meter next to it bounces with the sound so you can see at a glance whether the game is making noise.',
+      'Pick sound or muted before the game loads, and the choice is remembered on your device. Nothing changes when you play Survivor 616 on its own page.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
