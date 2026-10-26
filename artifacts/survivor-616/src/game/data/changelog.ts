@@ -2211,7 +2211,19 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.42.54',
     date: '2026-10-25',
-    publishedAt: '2026-10-25T21:30:00Z',
+    publishedAt: '2026-10-25T21:00:00Z',
+    kind: 'update',
+    title: 'Wall-climb loading game and a lighter crew connection',
+    body: [
+      'Loading screens now have a game: two skyscrapers, a night sky with the moon and stars, and you leap from wall to wall while sliding down to see how high you can climb before the game loads. It uses your own operator and your LokPet, dodges signs and vents, and keeps your best height. Settings has a switch to use the street walk instead.',
+      'Crew connections are lighter. The crew channel only opens when a crewmate is actually online or you have the Crew overlay, a run or a listening session open, and it closes after a minute in a hidden tab. Sends are rate-limited, crew runs send fewer updates and go quiet when nothing changes, and chat has a per-minute limit.',
+      'You can now mute a crewmate in the Crew overlay. Their chat lines stop showing for you.',
+    ],
+  },
+  {
+    version: '0.42.55',
+    date: '2026-10-26',
+    publishedAt: '2026-10-26T03:50:00Z',
     kind: 'update',
     title: 'Mute and sound meter from the GSix arcade',
     body: [

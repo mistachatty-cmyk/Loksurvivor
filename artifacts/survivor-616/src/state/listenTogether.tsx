@@ -56,6 +56,9 @@ export function ListenTogetherProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const bus = social.bus;
+  // Listening together needs the channel open for as long as it lasts.
+  const { hold } = bus;
+  useEffect(() => (role !== 'off' ? hold() : undefined), [role, hold]);
   const send = useCallback((message: ListenMessage) => bus.send('listen', { ...message }), [bus]);
 
   const apply = useCallback((message: ListenMessage, explicit: boolean) => {

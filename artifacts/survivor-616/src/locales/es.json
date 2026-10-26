@@ -1466,5 +1466,16 @@
   "crewrun.promptLater": "Descartar",
   "crewrun.start": "Iniciar una carrera de equipo",
   "crewrun.startBody": "Abre una pista en la que tu tripulación pueda entrar. Cada uno juega en su propio dispositivo.",
-  "crewrun.needAccount": "Inicia sesión para iniciar una carrera en equipo."
+  "crewrun.needAccount": "Inicia sesión para iniciar una carrera en equipo.",
+  "social.chat.mute": "Silenciar",
+  "social.chat.unmute": "Dejar de silenciar",
+  "climb.height": "{{n}}m",
+  "climb.best": "Mejor {{n}}m",
+  "climb.fell": "Cayó a {{n}} m. ¡De nuevo!",
+  "climb.hint": "Toca o presiona la barra espaciadora para saltar entre las paredes. Esquiva las señales y las rejillas de ventilación.",
+  "climb.loaded": "¡Cargado! Llegaste a {{n}} m",
+  "settings.power.climbLoader": "Juego de carga para escalar paredes",
+  "settings.power.climbLoaderBody": "Mientras se carga algo, juega a saltar una pared entre dos rascacielos con tu operador y LokPet. En cambio, Off muestra el tranquilo paseo por la calle.",
+  "loading.title": "Cargando",
+  "loading.status": "Espera mientras el juego se prepara. Sube mientras esperas."
 }

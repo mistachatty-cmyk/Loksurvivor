@@ -10,6 +10,7 @@ import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { areaOpen, useMeta } from '@/game/state/metaStore';
 import { useT } from '@/lib/i18n';
+import { useNetConfig } from '@/lib/social/netConfig';
 import { openCrewRun } from '@/lib/social/crewRun';
 import { useSocial } from '@/state/socialStore';
 
@@ -31,6 +32,7 @@ export interface CrewRunLaunch { role: 'host' | 'guest'; crewId: string; charact
 export function CrewRunController({ screenName, onLaunch }: { screenName: string; onLaunch: (launch: CrewRunLaunch) => void }) {
   const t = useT();
   const social = useSocial();
+  const net = useNetConfig();
   const { meta } = useMeta();
   const [setup, setSetup] = useState<Setup | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
@@ -63,7 +65,7 @@ export function CrewRunController({ screenName, onLaunch }: { screenName: string
   // A dismissed prompt comes back for the next run, not the same one.
   useEffect(() => { if (!open) setDismissed(null); }, [open]);
 
-  const showPrompt = Boolean(open) && dismissed !== open?.userId && !setup && !QUIET_SCREENS.includes(screenName) && social.active;
+  const showPrompt = net.crewRuns && Boolean(open) && dismissed !== open?.userId && !setup && !QUIET_SCREENS.includes(screenName) && social.active;
 
   const launch = () => {
     if (!setup || !characterId) return;

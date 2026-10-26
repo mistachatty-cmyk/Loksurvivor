@@ -12,6 +12,8 @@ import { invitable, isLeader, isOnline, MAX_CREW_SIZE, onlineCount, slotsLeft, s
 import { friendShareUrl, normalizeFriendCode } from '@/lib/social/friendCode';
 import { useAuth } from '@/state/authStore';
 import { useSocial, type CrewTab } from '@/state/socialStore';
+import { useNetConfig } from '@/lib/social/netConfig';
+import { useCrewChat } from '@/state/crewChat';
 import { CrewChatPanel } from './CrewChat';
 import { requestHostCrewRun } from './CrewRunSetup';
 import { ListenTogetherBar } from './ListenTogether';
@@ -75,6 +77,8 @@ function Row({ children, testId }: { children: ReactNode; testId?: string }) {
 function CrewTabView() {
   const t = useT();
   const s = useSocial();
+  const net = useNetConfig();
+  const chat = useCrewChat();
   const [note, setNote] = useState('');
   const leader = isLeader(s.crew, s.me?.userId);
   const candidates = invitable(s.friends, s.crew);
@@ -113,6 +117,7 @@ function CrewTabView() {
                 <PlayerAvatar name={member.name} src={member.avatar} size={52} online={member.userId === s.me?.userId ? true : isOnline(member, s.online)} />
                 <span className="max-w-full truncate text-sm font-bold text-white">{member.userId === s.me?.userId ? t('social.you') : member.name}</span>
                 {s.crew.crew?.leaderId === member.userId ? <span className="font-mono text-[9px] uppercase tracking-widest text-amber-200">{t('social.crew.leader')}</span> : null}
+                {member.userId !== s.me?.userId ? <button type="button" className="font-mono text-[9px] uppercase tracking-widest text-white/50 hover:text-white" aria-pressed={chat.muted.has(member.userId)} onClick={() => chat.toggleMute(member.userId)} data-testid="button-crew-mute">{chat.muted.has(member.userId) ? t('social.chat.unmute') : t('social.chat.mute')}</button> : null}
                 {leader && member.userId !== s.me?.userId ? <button type="button" className="font-mono text-[9px] uppercase tracking-widest text-white/50 hover:text-white" onClick={() => void s.kick(member.userId)}>{t('social.crew.kick')}</button> : null}
               </li>
             ) : (
@@ -139,11 +144,11 @@ function CrewTabView() {
               )}
             </div>
           ) : null}
-          <section className="space-y-2 border border-border/70 bg-background/50 p-3" data-testid="crewrun-start">
+          {net.crewRuns ? <section className="space-y-2 border border-border/70 bg-background/50 p-3" data-testid="crewrun-start">
             <h3 className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-200">{t('crewrun.title')}</h3>
             <p className="text-sm text-muted-foreground">{t('crewrun.startBody')}</p>
             <button type="button" className={BTN_ON} onClick={() => { s.closeOverlay(); requestHostCrewRun(); }} data-testid="button-crewrun-start">{t('crewrun.start')}</button>
-          </section>
+          </section> : null}
           <ListenTogetherBar />
           <CrewChatPanel />
           <button type="button" className={BTN} onClick={() => void s.leave()} data-testid="button-crew-leave">{t('social.crew.leave')}</button>
@@ -314,6 +319,10 @@ export function CrewOverlay() {
   const t = useT();
   const s = useSocial();
   const { open, closeOverlay } = s;
+
+  // Looking at the crew keeps its channel open, so chat works even before a crewmate shows as online.
+  const { hold } = s.bus;
+  useEffect(() => (open && s.active ? hold() : undefined), [open, s.active, hold]);
 
   useEffect(() => {
     if (!open) return;

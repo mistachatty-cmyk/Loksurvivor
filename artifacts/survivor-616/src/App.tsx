@@ -18,6 +18,8 @@ import { CloudSyncProvider } from '@/state/cloudSyncStore';
 import { PlaylistCloudSync } from '@/ui/PlaylistCloudSync';
 import { CrewToasts } from '@/ui/CrewChat';
 import { CrewRunController } from '@/ui/CrewRunSetup';
+import { DelayedLoadingGame } from '@/ui/LoadingGame';
+import { t as translate } from '@/lib/i18n';
 import { CrewChatProvider } from '@/state/crewChat';
 import { LokEconomyProvider, useLokEconomy } from '@/state/lokEconomyStore';
 import { getEnemy } from '@/game/data/enemies';
@@ -936,7 +938,7 @@ function Game() {
         swipeEnabled={!DOCK_HIDDEN_SCREENS.includes(screen.name) && !choiceEvent && !travelEncounter}
         onSwipe={goToScreen}
       >
-        <Suspense fallback={<div className="min-h-dvh bg-background" aria-busy="true" />}>{renderScreen()}</Suspense>
+        <Suspense fallback={['run', 'crew-run', 'arena'].includes(screen.name) ? <DelayedLoadingGame title={translate('loading.title')} status={translate('loading.status')} /> : <div className="min-h-dvh bg-background" aria-busy="true" />}>{renderScreen()}</Suspense>
       </ScreenSlide>
       <CrashRecoveryPrompt />
       <SaveGuardBanner />
