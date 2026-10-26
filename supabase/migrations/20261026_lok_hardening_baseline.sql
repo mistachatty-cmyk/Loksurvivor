@@ -49,3 +49,15 @@ end;
 $$;
 revoke all on function public.lok_dm_open(uuid) from public, anon;
 grant execute on function public.lok_dm_open(uuid) to authenticated;
+
+-- 5. send_loks: inside the function the parameter `amount` shadowed lok_transfers.amount in the daily-cap query
+--    (an ambiguous reference at run time). Qualify the column. Skips itself if already fixed.
+do $$
+declare d text;
+begin
+  select pg_get_functiondef(p.oid) into d from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = 'send_loks';
+  if position('SUM(t.amount)' in d) > 0 then return; end if;
+  d := replace(d, 'SELECT COALESCE(SUM(amount), 0) INTO today_sent' || E'\n' || '  FROM lok_transfers' || E'\n' || '  WHERE from_user_id = sender_id', 'SELECT COALESCE(SUM(t.amount), 0) INTO today_sent' || E'\n' || '  FROM lok_transfers t' || E'\n' || '  WHERE t.from_user_id = sender_id');
+  d := replace(d, 'DATE(created_at) = CURRENT_DATE', 'DATE(t.created_at) = CURRENT_DATE');
+  execute d;
+end $$;

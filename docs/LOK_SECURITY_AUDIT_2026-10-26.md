@@ -9,6 +9,7 @@ Read-only audit of the live project (`jfavkudihasswkhkouxq`) after the ChatGPT h
 - Search path fixed on the seven functions in the handoff (confirmed).
 - NEW: EXECUTE revoked from `public`, `anon`, `authenticated` on the trigger functions `rls_auto_enable()` and
   `send_welcome_email_webhook()` (database-run only, nothing calls them through the API).
+- NEW: `send_loks` daily-cap query fixed (see item 4 below).
 - NEW: friend DM table + `lok_dm_open` (friends only, authenticated only).
 
 ## Found, NOT changed (needs caller mapping first)
@@ -20,10 +21,10 @@ Read-only audit of the live project (`jfavkudihasswkhkouxq`) after the ChatGPT h
    auth.uid()` once those clients sign in.
 3. **`lok_battles`, `lok_bookmarks`, `lok_follows`, `lok_reactions`**: anon insert/delete with `true`; identity is a plain
    `handle` text, so anyone can act as anyone. Leaderboard reads can stay public.
-4. **`send_loks`**: authenticates with `auth.uid()` and caps at 500/day, but the parameter `amount` shares a name with the
-   column `lok_transfers.amount` inside `SUM(amount)`. PL/pgSQL will report an ambiguous reference when the daily-cap query runs.
-   Fix by qualifying the column (`SUM(t.amount)`) and adding a test. It is still executable by `anon` (it returns "Sign in").
-   It also never checks that the recipient is a real account.
+4. **`send_loks`** (APPLIED fix): the parameter `amount` shadowed `lok_transfers.amount` in the daily-cap query, which PL/pgSQL
+   reports as an ambiguous reference. The column is now qualified (`SUM(t.amount)`); grants and search path are unchanged. Still
+   executable by `anon` (it returns "Sign in") and it does not check that the recipient is a real account. Needs a test with a
+   real signed-in session; I could not run one from here.
 5. **`send_welcome_email_webhook`** has a webhook secret written into its body. Rotate it (edge function secret + the
    function) and read it from Vault or a setting instead.
 6. Anon-executable SECURITY DEFINER RPCs that look intentional but deserve review: `gsix_playtime_add`,
