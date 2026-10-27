@@ -152,20 +152,21 @@ function computeBotMove(world: World, bot: BotState, dt: number): { moveX: numbe
 
 export interface AttractModeProps {
   className?: string;
+  /** Menu-free arcade presentation; no saved toggle or progression provider. */
+  card?: boolean;
 }
 
 /** Full-bleed background layer: mount behind intro/menu copy, e.g. as the first child of a `relative` container. */
-export function AttractMode({ className }: AttractModeProps) {
+function AttractPresentation({ className, card = false, enabled, setAttractMode }: AttractModeProps & { enabled: boolean; setAttractMode: (enabled: boolean) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World | null>(null);
   const botRef = useRef<BotState>({ wanderAngle: Math.random() * Math.PI * 2, nextUltimateAt: 0 });
   const sceneRef = useRef<{ characterId?: string; areaId?: string }>({});
   const showcaseRef = useRef<ShowcaseScene | null>(null);
 
-  const { meta, setAttractMode } = useMeta();
-  const enabled = meta.attractModeEnabled;
 
-  const reducedMotion = liveFeedPausedByDevice();
+  const reducedMotion = card ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : liveFeedPausedByDevice();
+  const cardBalanced = card && new URLSearchParams(location.search).get("quality") === "balanced";
   const pausedByDevice = enabled && reducedMotion;
   const playing = enabled && !reducedMotion;
 
@@ -179,6 +180,9 @@ export function AttractMode({ className }: AttractModeProps) {
     let cancelled = false;
     let raf = 0;
     let last = performance.now();
+    let drawnAt = 0;
+    let announced = false;
+    const announce = () => { if (card && !announced) { announced = true; window.parent.postMessage({ type: "gsix-card-ready" }, "*"); } };
     let accumulator = 0;
     let sizeCheckedAt = 0;
     let restartAt = 0;
@@ -189,7 +193,7 @@ export function AttractMode({ className }: AttractModeProps) {
     const resize = (): Viewport => {
       // Attract mode never needs to be pin-sharp -- capping dpr lower than a
       // real run keeps a decorative background cheap on phones.
-      const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+      const ratio = Math.min(window.devicePixelRatio || 1, cardBalanced ? 1 : 1.5);
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
       const height = Math.max(1, rect.height);
@@ -229,6 +233,8 @@ export function AttractMode({ className }: AttractModeProps) {
     const frame = (time: number) => {
       if (cancelled) return;
       raf = requestAnimationFrame(frame);
+      if (cardBalanced && time - drawnAt < 1000 / 30) return;
+      drawnAt = time;
       const dt = Math.min((time - last) / 1000, 0.1);
       last = time;
 
@@ -246,6 +252,7 @@ export function AttractMode({ className }: AttractModeProps) {
         ctx.fillStyle = '#06060a';
         ctx.fillRect(0, 0, view.width, view.height);
         drawShowcaseScene(ctx, scene, time);
+        announce();
         if (time >= showcaseEndsAt) startScene();
         return;
       }
@@ -284,6 +291,7 @@ export function AttractMode({ className }: AttractModeProps) {
       }
 
       renderWorld(ctx, world, view);
+      announce();
     };
 
     raf = requestAnimationFrame(frame);
@@ -312,7 +320,7 @@ export function AttractMode({ className }: AttractModeProps) {
       document.removeEventListener('visibilitychange', handleVisibility);
       window.visualViewport?.removeEventListener('resize', handleViewportResize);
     };
-  }, [enabled, reducedMotion]);
+  }, [enabled, reducedMotion, cardBalanced, card]);
 
   return (
     <div className={`absolute inset-0 overflow-hidden ${className ?? ''}`}>
@@ -322,7 +330,7 @@ export function AttractMode({ className }: AttractModeProps) {
             key="attract-canvas"
             ref={canvasRef}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.55 }}
+            animate={{ opacity: card ? 1 : 0.55 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 1.4, ease: 'easeOut' }}
             className="absolute inset-0 w-full h-full"
@@ -332,9 +340,9 @@ export function AttractMode({ className }: AttractModeProps) {
       </AnimatePresence>
 
       {/* Dim + soft blur so the sim reads as atmosphere and never competes with copy above it. */}
-      <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] pointer-events-none" />
+      {!card && <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] pointer-events-none" />}
 
-      <button
+      {!card && <button
         type="button"
         onClick={() => {
           if (pausedByDevice) {
@@ -351,9 +359,17 @@ export function AttractMode({ className }: AttractModeProps) {
       >
         {playing ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
         {pausedByDevice ? 'Feed paused' : enabled ? 'Live feed' : 'Feed off'}
-      </button>
+      </button>}
     </div>
   );
 }
 
+function SavedAttractMode({ className }: AttractModeProps) {
+  const { meta, setAttractMode } = useMeta();
+  return <AttractPresentation className={className} enabled={meta.attractModeEnabled} setAttractMode={setAttractMode} />;
+}
+const ignoreToggle = () => {};
+export function AttractMode(props: AttractModeProps) {
+  return props.card ? <AttractPresentation {...props} enabled setAttractMode={ignoreToggle} /> : <SavedAttractMode {...props} />;
+}
 export default AttractMode;
