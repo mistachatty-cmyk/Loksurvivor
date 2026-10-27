@@ -1477,5 +1477,10 @@
   "settings.power.climbLoader": "Wall-climb loading game",
   "settings.power.climbLoaderBody": "While something loads, play a wall-jump climb between two skyscrapers with your operator and LokPet. Off shows the quiet street walk instead.",
   "loading.title": "Loading",
-  "loading.status": "Hang on while the game gets ready. Climb while you wait."
+  "loading.status": "Hang on while the game gets ready. Climb while you wait.",
+  "music.release.album": "Albums",
+  "music.release.soundtrack": "Soundtracks",
+  "music.release.ep": "EPs",
+  "music.release.playlist": "Playlists",
+  "music.release.single": "Singles"
 }

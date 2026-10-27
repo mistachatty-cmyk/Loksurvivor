@@ -40,31 +40,9 @@ import {
   type LocalLibrarySummary,
 } from './localTrackLibrary';
 
-/**
- * The album lives in `public/music/` rather than the bundle so it has stable,
- * public URLs: `public/lok-soundtrack.json` lists them for every other Lok app
- * and site (see the Lok playlist standard in the GSix hub's @lok/music).
- */
-const ALBUM_BASE = `${import.meta.env.BASE_URL}music/lokifed-take-1/`;
-const dataSpark = `${ALBUM_BASE}00-data-spark-hidden.m4a`;
-const saveMyGrace = `${ALBUM_BASE}01-save-my-grace.m4a`;
-const bonusMap = `${ALBUM_BASE}02-bonus-map-should-we-survive.m4a`;
-const merciMi = `${ALBUM_BASE}03-merci-mi-shall-we-survive.m4a`;
-const wantYou = `${ALBUM_BASE}04-i-want-you-dont-you-want-it.m4a`;
-const retrieveToKeep = `${ALBUM_BASE}05-retrieve-to-keep.m4a`;
-const idkDoYou = `${ALBUM_BASE}06-idk-do-you.m4a`;
-const blanksMarch = `${ALBUM_BASE}07-blanks-march.m4a`;
-const hideoutUnderSiege = `${ALBUM_BASE}08-hideout-under-siege.m4a`;
-const unraveled = `${ALBUM_BASE}09-unraveled.m4a`;
-const nullVoid = `${ALBUM_BASE}10-null-void.m4a`;
-const exoBite = `${ALBUM_BASE}11-exo-bite-brkn.m4a`;
+import { ECOSYSTEM_RELEASES, ecosystemAlbums, ecosystemTracks } from './ecosystemCatalog';
+import { fetchCatalog, DEFAULT_CATALOGS, CATALOG_TTL_MS } from '@/lib/lok-music/catalog';
 
-/**
- * "New Fits": a featured expansion album from guest artists, starting with DJ Misfit. Bare bones on
- * purpose -- add a track by adding one file under `public/music/dj-misfit-new-fits/` and one record to
- * `NEW_FITS_TRACKS`. Unlike the Lokifed album these songs are open from the start.
- */
-const NEW_FITS_BASE = `${import.meta.env.BASE_URL}music/dj-misfit-new-fits/`;
 export const NEW_FITS_ALBUM_ID = 'album-dj-misfit-new-fits';
 export const NEW_FITS_TITLE = 'DJ Misfit — New Fits';
 
@@ -97,6 +75,11 @@ export interface Track {
   trackNumber?: number;
   /** Objective completions required before an authored release can be played. */
   unlockObjectiveCount?: number;
+  unlockApp?: string;
+  sourceApp?: string;
+  sourceName?: string;
+  releaseKind?: string;
+  releaseId?: string;
   locked?: boolean;
   /**
    * Optional cross-promotion backlink: wherever the artist/label wants
@@ -124,6 +107,9 @@ export interface Playlist {
 }
 
 export interface SoundtrackAlbum {
+  sourceApp?: string;
+  sourceName?: string;
+  kind?: string;
   id: string;
   title: string;
   trackIds: string[];
@@ -282,35 +268,10 @@ const TRACK_CREDITS_STORAGE_KEY = 'survivor616.track-credit-links.v1';
 const ALBUM_CREDITS_STORAGE_KEY = 'survivor616.album-credit-links.v1';
 
 const AUTO_START_STORAGE_KEY = 'survivor616.music.autostart';
-const LOKIFED_TAKE_ONE = 'Lokifed — Take 1';
-
-const LOKIFED_TRACKS: Track[] = (
-  [
-    { id: 'lokifed-00-data-spark', title: 'Data Spark — Hidden Track 0', url: dataSpark, source: 'bundled', trackNumber: 0, unlockObjectiveCount: 0 },
-    { id: 'lokifed-01-save-my-grace', title: 'Save My Grace', url: saveMyGrace, source: 'bundled', trackNumber: 1, unlockObjectiveCount: 1 },
-    { id: 'lokifed-02-bonus-map', title: 'Bonus Map — Should We Survive?', url: bonusMap, source: 'bundled', trackNumber: 2, unlockObjectiveCount: 2 },
-    { id: 'lokifed-03-merci-mi', title: 'Merci Mi — Shall We Survive', url: merciMi, source: 'bundled', trackNumber: 3, unlockObjectiveCount: 3 },
-    { id: 'lokifed-04-i-want-you', title: "I Want You, Don't You Want It", url: wantYou, source: 'bundled', trackNumber: 4, unlockObjectiveCount: 4 },
-    { id: 'lokifed-05-retrieve-to-keep', title: 'Retrieve to Keep', url: retrieveToKeep, source: 'bundled', trackNumber: 5, unlockObjectiveCount: 5 },
-    { id: 'lokifed-06-idk-do-you', title: 'IDK, Do You?', url: idkDoYou, source: 'bundled', trackNumber: 6, unlockObjectiveCount: 6 },
-    { id: 'lokifed-07-blanks-march', title: "Blank's March — Marche à blanc", url: blanksMarch, source: 'bundled', trackNumber: 7, unlockObjectiveCount: 7 },
-    { id: 'lokifed-08-hideout-under-siege', title: 'Hideout Under Siege — IDC, Do You?', url: hideoutUnderSiege, source: 'bundled', trackNumber: 8, unlockObjectiveCount: 8 },
-    { id: 'lokifed-09-unraveled', title: 'Unraveled', url: unraveled, source: 'bundled', trackNumber: 9, unlockObjectiveCount: 9 },
-    { id: 'lokifed-10-null-void', title: 'Null Void', url: nullVoid, source: 'bundled', trackNumber: 10, unlockObjectiveCount: 10 },
-    { id: 'lokifed-11-exo-bite', title: 'Exo Bite — Brkn', url: exoBite, source: 'bundled', trackNumber: 11, unlockObjectiveCount: 11 },
-  ] as const
-).map((track) => ({ ...track, album: LOKIFED_TAKE_ONE, size: 0, duration: null }));
-
-const NEW_FITS_TRACKS: Track[] = (
-  [
-    { id: 'newfits-01-his-beat', title: 'His Beat — DJ Misfit', url: `${NEW_FITS_BASE}01-his-beat.m4a`, source: 'bundled', unlockObjectiveCount: 0 },
-  ] as const
-).map((track) => ({ ...track, album: NEW_FITS_TITLE, size: 0, duration: null }));
-
-/** Every built-in song, Lokifed first so the title-screen default stays Data Spark. */
-const BUNDLED_TRACKS: Track[] = [...LOKIFED_TRACKS, ...NEW_FITS_TRACKS];
-/** Ids of the songs that ship with the game: the only ones a synced playlist may hold. */
-export const BUNDLED_TRACK_IDS: ReadonlySet<string> = new Set(BUNDLED_TRACKS.map((track) => track.id));
+/** Generated ecosystem order keeps Data Spark first and existing ids intact. */
+const BUNDLED_TRACKS: Track[] = ecosystemTracks(ECOSYSTEM_RELEASES);
+const knownBundledIds = new Set(BUNDLED_TRACKS.map((track) => track.id));
+export const BUNDLED_TRACK_IDS: ReadonlySet<string> = knownBundledIds;
 const PLAYLIST_STAMP_KEY = 'survivor616.playlists.v1.stamp';
 
 function readPlaylistStamp(): { fingerprint: string; editedAt: number } | null {
@@ -324,14 +285,7 @@ function readPlaylistStamp(): { fingerprint: string; editedAt: number } | null {
   return null;
 }
 
-const BUNDLED_ALBUMS: SoundtrackAlbum[] = [
-  {
-    id: 'album-lokifed-take-1',
-    title: LOKIFED_TAKE_ONE,
-    trackIds: LOKIFED_TRACKS.map((track) => track.id),
-  },
-  { id: NEW_FITS_ALBUM_ID, title: NEW_FITS_TITLE, trackIds: NEW_FITS_TRACKS.map((track) => track.id) },
-];
+const BUNDLED_ALBUMS: SoundtrackAlbum[] = ecosystemAlbums(ECOSYSTEM_RELEASES);
 
 const BUNDLED_ALBUM_PLAYLISTS: Playlist[] = BUNDLED_ALBUMS.map((album) => ({
   id: album.id,
@@ -344,7 +298,7 @@ const BUNDLED_ALBUM_PLAYLISTS: Playlist[] = BUNDLED_ALBUMS.map((album) => ({
 function withSoundtrackLocks(source: Track[], objectiveCompletions: number): Track[] {
   return source.map((track) =>
     track.source === 'bundled'
-      ? { ...track, locked: (track.unlockObjectiveCount ?? 0) > objectiveCompletions }
+      ? { ...track, locked: (track.unlockObjectiveCount ?? 0) > (track.unlockApp && track.unlockApp !== 'survivor616' ? 0 : objectiveCompletions) }
       : track,
   );
 }
@@ -552,6 +506,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const eq = useEq();
   const pendingToneRef = useRef<Tone | null>(null);
 
+  const catalogTracksRef = useRef<Track[]>(BUNDLED_TRACKS);
+  const [albums, setAlbums] = useState<SoundtrackAlbum[]>(BUNDLED_ALBUMS);
   const [tracks, setTracks] = useState<Track[]>(() => {
     const locked = withSoundtrackLocks(BUNDLED_TRACKS, meta.soundtrackObjectiveCompletions);
     const initialTrackCredits = loadCreditMap(TRACK_CREDITS_STORAGE_KEY);
@@ -637,6 +593,35 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   }
 
   const currentTrack = currentIndex >= 0 ? (tracks[currentIndex] ?? null) : null;
+  useEffect(() => {
+    let cancelled = false;
+    let lastAttempt = 0;
+    const refresh = async () => {
+      if (document.hidden || Date.now() - lastAttempt < CATALOG_TTL_MS) return;
+      lastAttempt = Date.now();
+      const releases = await fetchCatalog(DEFAULT_CATALOGS[0]!);
+      if (cancelled || !releases) return;
+      const fresh = ecosystemTracks(releases);
+      catalogTracksRef.current = fresh;
+      fresh.forEach((track) => knownBundledIds.add(track.id));
+      const nextAlbums = ecosystemAlbums(releases);
+      setAlbums(nextAlbums);
+      setPlaylists((previous) => [...nextAlbums.map((album) => ({ id: album.id, name: album.title, trackIds: album.trackIds, builtIn: true, kind: 'album' as const })), ...previous.filter((entry) => !entry.builtIn)]);
+      setTracks((previous) => {
+        const ids = new Set(previous.map((track) => track.id));
+        const additions = withSoundtrackLocks(fresh.filter((track) => !ids.has(track.id)), meta.soundtrackObjectiveCompletions);
+        const next = [...previous, ...additions];
+        tracksRef.current = next;
+        return next;
+      });
+    };
+    void refresh();
+    const revisit = () => { void refresh(); };
+    document.addEventListener('visibilitychange', revisit);
+    const timer = window.setInterval(revisit, CATALOG_TTL_MS);
+    return () => { cancelled = true; window.clearInterval(timer); document.removeEventListener('visibilitychange', revisit); };
+  }, []);
+
   const activePlaylist = useMemo(
     () => playlists.find((p) => p.id === activePlaylistId) ?? null,
     [playlists, activePlaylistId],
@@ -1573,14 +1558,14 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       .then(refreshLocalLibrary)
       .catch(() => {});
     setFavoriteFingerprints(new Set());
-    const bundled = withSoundtrackLocks(BUNDLED_TRACKS, meta.soundtrackObjectiveCompletions);
+    const bundled = withSoundtrackLocks(catalogTracksRef.current, meta.soundtrackObjectiveCompletions);
     tracksRef.current = bundled;
     setTracks(bundled);
     setCurrentIndex(-1);
     setIsPlaying(false);
     setProgressSec(0);
     setDurationSec(0);
-    const bundledIds = new Set(BUNDLED_TRACKS.map((t) => t.id));
+    const bundledIds = new Set(catalogTracksRef.current.map((t) => t.id));
     setPlaylists((prev) => prev.map((p) => ({ ...p, trackIds: p.trackIds.filter((id) => bundledIds.has(id)) })));
   }, [meta.soundtrackObjectiveCompletions]);
 
@@ -1857,7 +1842,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       addStreamingEmbed,
       removeStreamingEmbed,
       localLibrary,
-      albums: BUNDLED_ALBUMS,
+      albums,
       soundtrackObjectiveCompletions: meta.soundtrackObjectiveCompletions,
       getAudioContext,
       ensureAudioContext,
@@ -1925,6 +1910,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       setTheaterTone,
       playTrackOnRepeat,
       playlists,
+      albums,
       activePlaylistId,
       activePlaylist,
       setActivePlaylist,

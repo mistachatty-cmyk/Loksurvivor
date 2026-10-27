@@ -11,6 +11,7 @@ import { discItemFor, type DiscTrack } from './jukeboxDiscs';
 
 export interface ShelfTrack extends DiscTrack {
   album?: string;
+  releaseId?: string;
 }
 
 export interface DiscShelf<T extends ShelfTrack = ShelfTrack> {
@@ -29,9 +30,11 @@ export function buildShelves<T extends ShelfTrack>(tracks: readonly T[]): DiscSh
   for (const track of tracks) {
     if (track.source !== 'bundled') continue;
     const title = track.album?.trim() || FALLBACK_SHELF;
-    let shelf = shelves.find((s) => s.title === title);
+    const legacy = !track.releaseId || ['g6.616-survivor.lokifed-take-1', 'g6.616-survivor.dj-misfit-new-fits'].includes(track.releaseId);
+    const id = `shelf:${legacy ? title : track.releaseId}`;
+    let shelf = shelves.find((s) => s.id === id);
     if (!shelf) {
-      shelf = { id: `shelf:${title}`, title, tracks: [] };
+      shelf = { id, title, tracks: [] };
       shelves.push(shelf);
     }
     shelf.tracks.push(track);

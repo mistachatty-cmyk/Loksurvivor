@@ -1,0 +1,339 @@
+{
+  "schema": "lok.catalog/v1",
+  "version": 1,
+  "projects": [
+    {
+      "app": "survivor616",
+      "name": "Survivor616",
+      "url": "https://survivor.gsix.online"
+    },
+    {
+      "app": "gsix",
+      "name": "GSix",
+      "url": "https://gsix.online"
+    },
+    {
+      "app": "tamagotchi",
+      "name": "Lok Tamagotchi",
+      "url": "https://gsix.online"
+    }
+  ],
+  "playlists": [
+    {
+      "schema": "lok.playlist/v1",
+      "id": "g6.616-survivor.lokifed-take-1",
+      "title": "Lokifed — Take 1",
+      "artist": "Cante-Digital",
+      "source": {
+        "app": "survivor616",
+        "name": "616 Survivor",
+        "url": "https://survivor.gsix.online"
+      },
+      "tracks": [
+        {
+          "id": "lokifed-00-data-spark",
+          "title": "Data Spark — Hidden Track 0",
+          "album": "Lokifed — Take 1",
+          "url": "https://survivor.gsix.online/music/lokifed-take-1/00-data-spark-hidden.m4a",
+          "mime": "audio/mp4",
+          "gate": {
+            "app": "survivor616",
+            "objectives": 0,
+            "unit": "run objective"
+          }
+        },
+        {
+          "id": "lokifed-01-save-my-grace",
+          "title": "Save My Grace",
+          "album": "Lokifed — Take 1",
+          "url": "https://survivor.gsix.online/music/lokifed-take-1/01-save-my-grace.m4a",
+          "mime": "audio/mp4",
+          "gate": {
+            "app": "survivor616",
+            "objectives": 1,
+            "unit": "run objective"
+          }
+        },
+        {
+          "id": "lokifed-02-bonus-map",
+          "title": "Bonus Map — Should We Survive?",
+          "album": "Lokifed — Take 1",
+          "url": "https://survivor.gsix.online/music/lokifed-take-1/02-bonus-map-should-we-survive.m4a",
+          "mime": "audio/mp4",
+          "gate": {
+            "app": "survivor616",
+            "objectives": 2,
+            "unit": "run objective"
+          }
+        },
+        {
+          "id": "lokifed-03-merci-mi",
+          "title": "Merci Mi — Shall We Survive",
+          "album": "Lokifed — Take 1",
+          "url": "https://survivor.gsix.online/music/lokifed-take-1/03-merci-mi-shall-we-survive.m4a",
+          "mime": "audio/mp4",
+          "gate": {
+            "app": "survivor616",
+            "objectives": 3,
+            "unit": "run objective"
+          }
+        },
+        {
+          "id": "lokifed-04-i-want-you",
+          "title": "I Want You, Don't You Want It",
+          "album": "Lokifed — Take 1",
+          "url": "https://survivor.gsix.online/music/lokifed-take-1/04-i-want-you-dont-you-want-it.m4a",
+          "mime": "audio/mp4",
+          "gate": {
+            "app": "survivor616",
+            "objectives": 4,
+            "unit": "run objective"
+          }
+        },
+        {
+          "id": "lokifed-05-retrieve-to-keep",
+          "title": "Retrieve to Keep",
+          "album": "Lokifed — Take 1",
+          "url": "https://survivor.gsix.online/music/lokifed-take-1/05-retrieve-to-keep.m4a",
+          "mime": "audio/mp4",
+          "gate": {
+            "app": "survivor616",
+            "objectives": 5,
+            "unit": "run objective"
+          }
+        },
+        {
+          "id": "lokifed-06-idk-do-you",
+          "title": "IDK, Do You?",
+          "album": "Lokifed — Take 1",
+          "url": "https://survivor.gsix.online/music/lokifed-take-1/06-idk-do-you.m4a",
+          "mime": "audio/mp4",
+          "gate": {
+            "app": "survivor616",
+            "objectives": 6,
+            "unit": "run objective"
+          }
+        },
+        {
+          "id": "lokifed-07-blanks-march",
+          "title": "Blank's March — Marche à blanc",
+          "album": "Lokifed — Take 1",
+          "url": "https://survivor.gsix.online/music/lokifed-take-1/07-blanks-march.m4a",
+          "mime": "audio/mp4",
+          "gate": {
+            "app": "survivor616",
+            "objectives": 7,
+            "unit": "run objective"
+          }
+        },
+        {
+          "id": "lokifed-08-hideout-under-siege",
+          "title": "Hideout Under Siege — IDC, Do You?",
+          "album": "Lokifed — Take 1",
+          "url": "https://survivor.gsix.online/music/lokifed-take-1/08-hideout-under-siege.m4a",
+          "mime": "audio/mp4",
+          "gate": {
+            "app": "survivor616",
+            "objectives": 8,
+            "unit": "run objective"
+          }
+        },
+        {
+          "id": "lokifed-09-unraveled",
+          "title": "Unraveled",
+          "album": "Lokifed — Take 1",
+          "url": "https://survivor.gsix.online/music/lokifed-take-1/09-unraveled.m4a",
+          "mime": "audio/mp4",
+          "gate": {
+            "app": "survivor616",
+            "objectives": 9,
+            "unit": "run objective"
+          }
+        },
+        {
+          "id": "lokifed-10-null-void",
+          "title": "Null Void",
+          "album": "Lokifed — Take 1",
+          "url": "https://survivor.gsix.online/music/lokifed-take-1/10-null-void.m4a",
+          "mime": "audio/mp4",
+          "gate": {
+            "app": "survivor616",
+            "objectives": 10,
+            "unit": "run objective"
+          }
+        },
+        {
+          "id": "lokifed-11-exo-bite",
+          "title": "Exo Bite — Brkn",
+          "album": "Lokifed — Take 1",
+          "url": "https://survivor.gsix.online/music/lokifed-take-1/11-exo-bite-brkn.m4a",
+          "mime": "audio/mp4",
+          "gate": {
+            "app": "survivor616",
+            "objectives": 11,
+            "unit": "run objective"
+          }
+        }
+      ],
+      "kind": "soundtrack",
+      "legacyAlbumId": "album-lokifed-take-1"
+    },
+    {
+      "schema": "lok.playlist/v1",
+      "id": "g6.616-survivor.dj-misfit-new-fits",
+      "title": "DJ Misfit — New Fits",
+      "kind": "album",
+      "legacyAlbumId": "album-dj-misfit-new-fits",
+      "source": {
+        "app": "survivor616",
+        "name": "Survivor616",
+        "url": "https://survivor.gsix.online"
+      },
+      "tracks": [
+        {
+          "id": "newfits-01-his-beat",
+          "title": "His Beat — DJ Misfit",
+          "artist": "DJ MISFIT",
+          "album": "DJ Misfit — New Fits",
+          "url": "https://survivor.gsix.online/music/dj-misfit-new-fits/01-his-beat.m4a",
+          "mime": "audio/mp4"
+        }
+      ]
+    },
+    {
+      "schema": "lok.playlist/v1",
+      "id": "g6.616-survivor.forgettable-data",
+      "title": "Forgettable Data",
+      "kind": "soundtrack",
+      "legacyAlbumId": "album-forgettable-data",
+      "source": {
+        "app": "survivor616",
+        "name": "Survivor616",
+        "url": "https://survivor.gsix.online"
+      },
+      "tracks": [
+        {
+          "id": "forgettable-01-1heavenwillyousurvive",
+          "title": "1HeavenWillYouSurvive",
+          "album": "Forgettable Data",
+          "url": "https://survivor.gsix.online/music/forgettable-data/01-1heavenwillyousurvive.m4a",
+          "mime": "audio/mp4",
+          "durationSec": 86.866,
+          "trackNumber": 1,
+          "sha256": "64972c047c67bfb1dcc0df2d9fc32ea16929156fac942500b2905d5028bab16f"
+        },
+        {
+          "id": "forgettable-02-valoshei",
+          "title": "ValoShéi",
+          "album": "Forgettable Data",
+          "url": "https://survivor.gsix.online/music/forgettable-data/02-valoshei.m4a",
+          "mime": "audio/mp4",
+          "durationSec": 138.809,
+          "trackNumber": 2,
+          "sha256": "882fe1f3c440319a9fe748a69941cc58866fddbbc03843dc90d730f29992e14c"
+        },
+        {
+          "id": "forgettable-03-justgiveyourdatatome",
+          "title": "Justgiveyourdatatome",
+          "album": "Forgettable Data",
+          "url": "https://survivor.gsix.online/music/forgettable-data/03-justgiveyourdatatome.m4a",
+          "mime": "audio/mp4",
+          "durationSec": 127.942,
+          "trackNumber": 3,
+          "sha256": "aaa5c56b31f10f00161573ff892e9ec89452d919507b178fb9a1c836f75bcf75"
+        },
+        {
+          "id": "forgettable-04-his-beat-by-dj-misfit",
+          "title": "His beat - By DJ MISFIT",
+          "album": "Forgettable Data",
+          "url": "https://survivor.gsix.online/music/forgettable-data/04-his-beat-by-dj-misfit.m4a",
+          "mime": "audio/mp4",
+          "durationSec": 109.92,
+          "trackNumber": 4,
+          "sha256": "dd1868b61bffd73b5dd3aac810a897ecc510bdff843e19a67f2dc8c3035358a0",
+          "artist": "DJ MISFIT"
+        },
+        {
+          "id": "forgettable-05-givemeyou22",
+          "title": "GiveMeYou22",
+          "album": "Forgettable Data",
+          "url": "https://survivor.gsix.online/music/forgettable-data/05-givemeyou22.m4a",
+          "mime": "audio/mp4",
+          "durationSec": 132.354,
+          "trackNumber": 5,
+          "sha256": "e74fbd228a531f3ad321277b8aad42c3b208a95b94cec67755afecc5adec47bd"
+        },
+        {
+          "id": "forgettable-06-uhuhuh",
+          "title": "Uhuhuh",
+          "album": "Forgettable Data",
+          "url": "https://survivor.gsix.online/music/forgettable-data/06-uhuhuh.m4a",
+          "mime": "audio/mp4",
+          "durationSec": 169.854,
+          "trackNumber": 6,
+          "sha256": "fd70326556feb1f80887b8cf5e31ec12ce5f7b6d50c2e87e4ab1f8f443ea3419"
+        },
+        {
+          "id": "forgettable-07-yourdatasmine",
+          "title": "YourDatasMine",
+          "album": "Forgettable Data",
+          "url": "https://survivor.gsix.online/music/forgettable-data/07-yourdatasmine.m4a",
+          "mime": "audio/mp4",
+          "durationSec": 167.3,
+          "trackNumber": 7,
+          "sha256": "d5d4925051a4007b19a05a674af7957bd4a5aab2fd4e129a2ca0e4c59a402ab2"
+        },
+        {
+          "id": "forgettable-08-twassound",
+          "title": "TwasSound",
+          "album": "Forgettable Data",
+          "url": "https://survivor.gsix.online/music/forgettable-data/08-twassound.m4a",
+          "mime": "audio/mp4",
+          "durationSec": 162.516,
+          "trackNumber": 8,
+          "sha256": "a69de64fb459bc76663e8f0523e558a96d00f7c29d3baf8b828ba4d83ae9387c"
+        },
+        {
+          "id": "forgettable-09-dontwannafightnomore",
+          "title": "dontwannaFightnomore",
+          "album": "Forgettable Data",
+          "url": "https://survivor.gsix.online/music/forgettable-data/09-dontwannafightnomore.m4a",
+          "mime": "audio/mp4",
+          "durationSec": 133.468,
+          "trackNumber": 9,
+          "sha256": "95577112215dd89642ac35ddf065d59e03728590a613e7723d1b1655c39fd12e"
+        },
+        {
+          "id": "forgettable-10-experimentaltrio",
+          "title": "Experimentaltrio",
+          "album": "Forgettable Data",
+          "url": "https://survivor.gsix.online/music/forgettable-data/10-experimentaltrio.m4a",
+          "mime": "audio/mp4",
+          "durationSec": 165.907,
+          "trackNumber": 10,
+          "sha256": "dd09c424238d231094c7cf43ebf26a030d9b19ae0245b5a357d3a3df2f8f1433"
+        },
+        {
+          "id": "forgettable-11-sometimeswerun",
+          "title": "SometimesWeRun",
+          "album": "Forgettable Data",
+          "url": "https://survivor.gsix.online/music/forgettable-data/11-sometimeswerun.m4a",
+          "mime": "audio/mp4",
+          "durationSec": 308.338,
+          "trackNumber": 11,
+          "sha256": "4c41496ab94bf1e6a8672390bb20358dda0d7833cc13b57b4c4bb83ea8342474"
+        },
+        {
+          "id": "forgettable-12-combackformydata",
+          "title": "Combackformydata",
+          "album": "Forgettable Data",
+          "url": "https://survivor.gsix.online/music/forgettable-data/12-combackformydata.m4a",
+          "mime": "audio/mp4",
+          "durationSec": 115.868,
+          "trackNumber": 12,
+          "sha256": "bdb26317a442cfb5cc4d9d9e9b73555657fdbc42bfd3f8ce58e36ddd8629174f"
+        }
+      ]
+    }
+  ]
+}

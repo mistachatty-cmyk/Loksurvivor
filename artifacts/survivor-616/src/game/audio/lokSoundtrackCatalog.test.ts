@@ -13,7 +13,8 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../../..');
 const catalog = JSON.parse(readFileSync(path.join(root, 'public/lok-soundtrack.json'), 'utf8'));
-const source = readFileSync(path.join(here, 'musicPlayer.tsx'), 'utf8');
+import { ECOSYSTEM_RELEASES, ecosystemTracks } from './ecosystemCatalog';
+const bundled = ecosystemTracks(ECOSYSTEM_RELEASES);
 
 test('catalog declares the Lok playlist standard', () => {
   assert.equal(catalog.schema, 'lok.playlist/v1');
@@ -38,10 +39,23 @@ test('every catalog track has a unique id and an https URL to a file that exists
   }
 });
 
-test('catalog matches the in-game album: same ids, titles and unlock counts', () => {
+test('legacy catalog preserves the actual generated ids, titles and gates', () => {
   for (const track of catalog.tracks) {
-    assert.ok(source.includes(`id: '${track.id}'`), `${track.id} is not in musicPlayer.tsx`);
-    assert.ok(source.includes(`unlockObjectiveCount: ${track.gate.objectives} }`), `${track.id} gate drifted`);
-    assert.ok(source.includes(track.title.replace(/'/g, "\\'")) || source.includes(track.title), `${track.title} title drifted`);
+    const found = bundled.find((item) => item.id === track.id);
+    assert.ok(found, track.id);
+    assert.equal(found.title, track.title);
+    assert.equal(found.unlockObjectiveCount, track.gate.objectives);
   }
+});
+
+test('all shared Survivor releases resolve to actual bundled audio files', () => {
+  const shared = JSON.parse(readFileSync(path.join(root, 'public/lok-music-catalog.json'), 'utf8'));
+  assert.deepEqual(shared.playlists.map((p: {id: string}) => p.id), ECOSYSTEM_RELEASES.map((p) => p.id));
+  for (const release of shared.playlists) for (const track of release.tracks) {
+    if (release.source.app !== 'survivor616') continue;
+    assert.ok(existsSync(path.join(root, 'public', new URL(track.url).pathname)), track.url);
+  }
+  const forgettable = shared.playlists.find((p: {title: string}) => p.title === 'Forgettable Data');
+  assert.equal(forgettable.kind, 'soundtrack');
+  assert.equal(forgettable.tracks.length, 12);
 });
