@@ -89,3 +89,13 @@ test('the player\'s own playlists become shelves after hearts and recents, keepi
   assert.deepEqual(shelves[1]!.tracks.map((t) => t.id), ['a', 'lokifed-1']);
   assert.equal(shelves[1]!.id, 'mine:playlist:p1');
 });
+
+
+test('identically titled releases from separate games never share a shelf', () => {
+  const shelves = buildShelves([
+    { id: 'a', title: 'A', source: 'bundled' as const, album: 'Origins', releaseId: 'game-a.origins' },
+    { id: 'b', title: 'B', source: 'bundled' as const, album: 'Origins', releaseId: 'game-b.origins' },
+  ]);
+  assert.equal(shelves.length, 2);
+  assert.notEqual(shelves[0].id, shelves[1].id);
+});

@@ -2232,6 +2232,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   { version: '0.42.56', date: '2026-10-27', publishedAt: '2026-10-27T12:20:00Z', kind: 'update', title: 'Arcade gameplay preview', body: ['The GSix arcade can show the real attract simulation in a menu-free, silent card without mounting account or progression screens.'] },
+  {
+    version: '0.42.57',
+    date: '2026-10-27',
+    publishedAt: '2026-10-27T16:15:00Z',
+    kind: 'update',
+    title: 'Forgettable Data and the shared Lok music library',
+    body: [
+      'Forgettable Data adds twelve recordings as a separate Survivor616 soundtrack. Exact duplicate uploads appear once.',
+      'The music library now browses by game, then soundtracks, albums, EPs and playlists. Lok Ecosystem owns the catalog shared with GSix and its Tamagotchi companion.',
+      'Data Spark stays first, existing unlock progress and personal files stay intact, and new releases arrive through a small cached catalog without changing the music currently playing.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

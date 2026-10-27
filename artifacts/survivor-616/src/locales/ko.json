@@ -1477,5 +1477,10 @@
   "settings.power.climbLoader": "벽 오르기 로딩 게임",
   "settings.power.climbLoaderBody": "무언가가 로드되는 동안 오퍼레이터와 LokPet를 사용하여 두 개의 고층 빌딩 사이에서 벽 점프 등반을 즐겨보세요. Off는 대신 조용한 거리 산책을 보여줍니다.",
   "loading.title": "로드 중",
-  "loading.status": "게임이 준비되는 동안 잠시 기다려 주세요. 기다리는 동안 올라갑니다."
+  "loading.status": "게임이 준비되는 동안 잠시 기다려 주세요. 기다리는 동안 올라갑니다.",
+  "music.release.album": "앨범",
+  "music.release.soundtrack": "사운드트랙",
+  "music.release.ep": "EP",
+  "music.release.playlist": "재생목록",
+  "music.release.single": "싱글"
 }

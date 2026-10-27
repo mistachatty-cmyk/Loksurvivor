@@ -1477,5 +1477,10 @@
   "settings.power.climbLoader": "爬墙加载游戏",
   "settings.power.climbLoaderBody": "当某些东西加载时，与操作员和 LokPet 一起在两座摩天大楼之间进行跳墙攀爬。 Off 显示的是安静的街道步行。",
   "loading.title": "加载中",
-  "loading.status": "比赛准备就绪时请稍候。等待的时候就爬上去。"
+  "loading.status": "比赛准备就绪时请稍候。等待的时候就爬上去。",
+  "music.release.album": "专辑",
+  "music.release.soundtrack": "原声带",
+  "music.release.ep": "EP",
+  "music.release.playlist": "播放列表",
+  "music.release.single": "单打"
 }

@@ -371,7 +371,24 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
             >
               All Tracks
             </button>
-            {player.playlists.map((playlist) => (
+            {Array.from(new Set(player.albums.map((album) => album.sourceApp ?? 'survivor616'))).map((app) => (
+              <details key={app} open className="w-full min-w-0 border border-border p-2" data-testid={`music-project-${app}`}>
+                <summary className="cursor-pointer text-sm font-bold text-primary">{player.albums.find((album) => (album.sourceApp ?? 'survivor616') === app)?.sourceName ?? 'Survivor616'}</summary>
+                {Array.from(new Set(player.albums.filter((album) => (album.sourceApp ?? 'survivor616') === app).map((album) => album.kind ?? 'album'))).map((kind) => (
+                  <details key={kind} open className="ml-2 mt-2 min-w-0">
+                    <summary className="cursor-pointer text-xs font-bold text-muted-foreground">{t(`music.release.${kind}` as 'music.release.album')}</summary>
+                    <div className="flex min-w-0 flex-wrap gap-2 p-2">
+                      {player.albums.filter((album) => (album.sourceApp ?? 'survivor616') === app && (album.kind ?? 'album') === kind).map((album) => (
+                        <button key={album.id} type="button" onClick={() => player.setActivePlaylist(album.id)} aria-pressed={player.activePlaylistId === album.id} className="max-w-full break-words border border-border px-3 py-2 text-left text-xs text-foreground aria-pressed:border-primary aria-pressed:text-primary" data-testid={`button-playlist-${album.id}`}>
+                          {album.title} ({album.trackIds.length})
+                        </button>
+                      ))}
+                    </div>
+                  </details>
+                ))}
+              </details>
+            ))}
+            {player.playlists.filter((playlist) => !playlist.builtIn).map((playlist) => (
               <div
                 key={playlist.id}
                 className={`group flex items-center border transition-colors ${

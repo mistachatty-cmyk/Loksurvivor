@@ -1477,5 +1477,10 @@
   "settings.power.climbLoader": "Jogo de carregamento de escalada na parede",
   "settings.power.climbLoaderBody": "Enquanto algo carrega, faça uma subida na parede entre dois arranha-céus com seu operador e LokPet. Off mostra a caminhada tranquila pela rua.",
   "loading.title": "Carregando",
-  "loading.status": "Aguarde enquanto o jogo fica pronto. Suba enquanto espera."
+  "loading.status": "Aguarde enquanto o jogo fica pronto. Suba enquanto espera.",
+  "music.release.album": "Álbuns",
+  "music.release.soundtrack": "Trilhas sonoras",
+  "music.release.ep": "EPs",
+  "music.release.playlist": "Listas de reprodução",
+  "music.release.single": "Solteiros"
 }

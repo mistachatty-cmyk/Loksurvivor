@@ -1477,5 +1477,10 @@
   "settings.power.climbLoader": "Jeu de chargement d'escalade de mur",
   "settings.power.climbLoaderBody": "Pendant que quelque chose se charge, jouez à une escalade de mur entre deux gratte-ciel avec votre opérateur et LokPet. Off montre plutôt la promenade tranquille dans la rue.",
   "loading.title": "Chargement",
-  "loading.status": "Attendez pendant que le jeu se prépare. Grimpez en attendant."
+  "loading.status": "Attendez pendant que le jeu se prépare. Grimpez en attendant.",
+  "music.release.album": "Albums",
+  "music.release.soundtrack": "Bandes sonores",
+  "music.release.ep": "EP",
+  "music.release.playlist": "Listes de lecture",
+  "music.release.single": "Célibataires"
 }
