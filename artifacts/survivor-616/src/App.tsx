@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AttractMode } from '@/ui/AttractMode';
 import { CheatFxLayer } from '@/ui/CheatFxLayer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -1071,6 +1072,7 @@ function ThemedGame() {
 }
 
 function App() {
+  if (new URLSearchParams(location.search).get("embed") === "card") return <div className="fixed inset-0 overflow-hidden bg-black"><AttractMode card /></div>;
   return (
     <ErrorBoundary>
       <Providers>

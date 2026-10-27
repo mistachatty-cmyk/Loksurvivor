@@ -2231,8 +2231,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Pick sound or muted before the game loads, and the choice is remembered on your device. Nothing changes when you play Survivor 616 on its own page.',
     ],
   },
+  { version: '0.42.56', date: '2026-10-27', publishedAt: '2026-10-27T12:20:00Z', kind: 'update', title: 'Arcade gameplay preview', body: ['The GSix arcade can show the real attract simulation in a menu-free, silent card without mounting account or progression screens.'] },
   {
-    version: '0.42.56',
+    version: '0.42.57',
     date: '2026-10-27',
     publishedAt: '2026-10-27T16:15:00Z',
     kind: 'update',

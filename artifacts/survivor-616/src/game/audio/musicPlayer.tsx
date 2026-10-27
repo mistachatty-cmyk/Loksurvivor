@@ -506,6 +506,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const eq = useEq();
   const pendingToneRef = useRef<Tone | null>(null);
 
+  const objectiveCountRef = useRef(meta.soundtrackObjectiveCompletions);
+  objectiveCountRef.current = meta.soundtrackObjectiveCompletions;
   const catalogTracksRef = useRef<Track[]>(BUNDLED_TRACKS);
   const [albums, setAlbums] = useState<SoundtrackAlbum[]>(BUNDLED_ALBUMS);
   const [tracks, setTracks] = useState<Track[]>(() => {
@@ -609,7 +611,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       setPlaylists((previous) => [...nextAlbums.map((album) => ({ id: album.id, name: album.title, trackIds: album.trackIds, builtIn: true, kind: 'album' as const })), ...previous.filter((entry) => !entry.builtIn)]);
       setTracks((previous) => {
         const ids = new Set(previous.map((track) => track.id));
-        const additions = withSoundtrackLocks(fresh.filter((track) => !ids.has(track.id)), meta.soundtrackObjectiveCompletions);
+        const additions = withSoundtrackLocks(fresh.filter((track) => !ids.has(track.id)), objectiveCountRef.current);
         const next = [...previous, ...additions];
         tracksRef.current = next;
         return next;
