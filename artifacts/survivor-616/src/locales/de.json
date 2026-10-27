@@ -1477,5 +1477,10 @@
   "settings.power.climbLoader": "Wandkletter-Ladespiel",
   "settings.power.climbLoaderBody": "Während etwas geladen wird, können Sie mit Ihrem Operator und LokPet einen Wandsprung zwischen zwei Wolkenkratzern spielen. Off zeigt stattdessen den ruhigen Straßenspaziergang.",
   "loading.title": "Laden",
-  "loading.status": "Warten Sie, während das Spiel fertig wird. Klettern Sie, während Sie warten."
+  "loading.status": "Warten Sie, während das Spiel fertig wird. Klettern Sie, während Sie warten.",
+  "music.release.album": "Alben",
+  "music.release.soundtrack": "Soundtracks",
+  "music.release.ep": "EPs",
+  "music.release.playlist": "Wiedergabelisten",
+  "music.release.single": "Singles"
 }

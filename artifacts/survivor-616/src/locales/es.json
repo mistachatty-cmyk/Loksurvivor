@@ -1477,5 +1477,10 @@
   "settings.power.climbLoader": "Juego de carga para escalar paredes",
   "settings.power.climbLoaderBody": "Mientras se carga algo, juega a saltar una pared entre dos rascacielos con tu operador y LokPet. En cambio, Off muestra el tranquilo paseo por la calle.",
   "loading.title": "Cargando",
-  "loading.status": "Espera mientras el juego se prepara. Sube mientras esperas."
+  "loading.status": "Espera mientras el juego se prepara. Sube mientras esperas.",
+  "music.release.album": "Álbumes",
+  "music.release.soundtrack": "Bandas sonoras",
+  "music.release.ep": "EP",
+  "music.release.playlist": "Listas de reproducción",
+  "music.release.single": "Solteros"
 }

@@ -1477,5 +1477,10 @@
   "settings.power.climbLoader": "壁登りロードゲーム",
   "settings.power.climbLoaderBody": "何かが読み込まれている間、オペレーターと LokPet と一緒に 2 つの超高層ビルの間を壁ジャンプして登ってみましょう。オフでは、代わりに静かな通りの散歩が表示されます。",
   "loading.title": "読み込み中",
-  "loading.status": "ゲームの準備ができるまでお待ちください。待っている間に登ります。"
+  "loading.status": "ゲームの準備ができるまでお待ちください。待っている間に登ります。",
+  "music.release.album": "アルバム",
+  "music.release.soundtrack": "サウンドトラック",
+  "music.release.ep": "EP",
+  "music.release.playlist": "プレイリスト",
+  "music.release.single": "シングル"
 }
