@@ -25,19 +25,25 @@ export function NotificationToasts() {
   const notifications = meta.pendingNotifications;
   const reduced = prefersReducedMotion();
   const scheduled = useRef(new Map<string, number>());
-  // While the arrival scene or a full-screen notice covers the hub the toasts wait, so their timers do not burn unseen.
+  // Defer announcements while a dialog or arrival scene covers the hub, including their dismiss timers.
   const [covered, setCovered] = useState(() => typeof document !== 'undefined' && document.body.hasAttribute('data-hide-dock'));
   useEffect(() => {
-    const sync = () => setCovered(document.body.hasAttribute('data-hide-dock'));
+    const host = document.getElementById('viewport-overlays');
+    const sync = () => setCovered(document.body.hasAttribute('data-hide-dock') || Boolean(host?.childElementCount));
     sync();
     const observer = new MutationObserver(sync);
     observer.observe(document.body, { attributes: true, attributeFilter: ['data-hide-dock'] });
+    if (host) observer.observe(host, { childList: true });
     return () => observer.disconnect();
   }, []);
 
   // One timer per toast, so a new arrival never resets or cuts short the others.
   useEffect(() => {
-    if (covered) return;
+    if (covered) {
+      for (const timer of scheduled.current.values()) window.clearTimeout(timer);
+      scheduled.current.clear();
+      return;
+    }
     const live = new Set(notifications.map((n) => n.id));
     for (const [id, timer] of scheduled.current) {
       if (!live.has(id)) { window.clearTimeout(timer); scheduled.current.delete(id); }

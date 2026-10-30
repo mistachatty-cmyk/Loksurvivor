@@ -1,3 +1,4 @@
+import { overlayContainer } from './ViewportOverlay';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { Repeat, Repeat1, Shuffle, Volume1, Volume2, VolumeX } from 'lucide-react';
@@ -197,6 +198,6 @@ export function SoundbarPanel({ anchorRef, onClose }: { anchorRef: RefObject<HTM
         </button>
       </div>
     </div>,
-    document.body,
+    overlayContainer(),
   );
 }

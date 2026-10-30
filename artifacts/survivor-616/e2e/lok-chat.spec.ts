@@ -18,7 +18,7 @@ test.describe('LOK Chat', () => {
     page.on('pageerror', (error) => errors.push(error.message));
     await page.setViewportSize({ width: 1100, height: 900 });
     await page.goto('/?screen=hub');
-    await page.getByTestId('button-lok-chat').click();
+    await page.getByTestId('dock-chat').click();
     await expect(page.getByRole('dialog', { name: 'LOK Chat' })).toBeVisible();
 
     await page.getByTestId('lok-chat-row-vee').click();
@@ -46,7 +46,7 @@ test.describe('LOK Chat', () => {
   test('conversations persist on this device across a reload', async ({ page }) => {
     await page.setViewportSize({ width: 1100, height: 900 });
     await page.goto('/?screen=hub');
-    await page.getByTestId('button-lok-chat').click();
+    await page.getByTestId('dock-chat').click();
     await page.getByTestId('lok-chat-row-deacon').click();
     await page.getByTestId('lok-chat-input').fill('hello');
     await page.keyboard.press('Enter');
@@ -56,7 +56,7 @@ test.describe('LOK Chat', () => {
     await page.waitForTimeout(700);
 
     await page.reload();
-    await page.getByTestId('button-lok-chat').click();
+    await page.getByTestId('dock-chat').click();
     await page.getByTestId('lok-chat-row-deacon').click();
     await expect(page.getByTestId('lok-chat-message-mine')).toHaveCount(1);
     await expect(page.getByTestId('lok-chat-message-theirs')).toHaveCount(1);
@@ -70,7 +70,7 @@ test.describe('LOK Chat', () => {
   test('on a phone the chat list and the conversation take turns', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/?screen=hub');
-    await page.getByTestId('button-lok-chat').click();
+    await page.getByTestId('dock-chat').click();
     await expect(page.getByTestId('lok-chat-input')).toBeVisible();
     await page.getByRole('button', { name: 'Back to chats' }).click();
     await expect(page.getByTestId('lok-chat-row-mamajo')).toBeVisible();

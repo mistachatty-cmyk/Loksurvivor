@@ -1,0 +1,12 @@
+import { chromium } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+import { mkdir } from 'node:fs/promises';
+const out = fileURLToPath(new URL('../../../docs/previews/scenery-ui/', import.meta.url));
+await mkdir(out, { recursive: true });
+const browser = await chromium.launch({headless:true,args:['--no-sandbox']});
+const page = await browser.newPage({viewport:{width:1440,height:1160},reducedMotion:'reduce'});
+await page.goto('http://127.0.0.1:3000/previews/scenery-fracture.html');
+await page.waitForTimeout(500);
+await page.screenshot({path:out+'scenery-fracture.png',fullPage:true});
+await browser.close();
+console.log(out+'scenery-fracture.png');

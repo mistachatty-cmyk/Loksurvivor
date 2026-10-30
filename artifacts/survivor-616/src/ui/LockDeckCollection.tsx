@@ -1,3 +1,4 @@
+import { ViewportOverlay } from './ViewportOverlay';
 import { useEffect, useMemo, useState } from 'react';
 import {
   BarChart3,
@@ -140,6 +141,7 @@ export function CardDetail({ card, owned, onClose, frame, motion }: { card: LokA
   const weakAgainst = elemMeta?.weakVs?.map((e) => ELEMENT_METADATA[e]?.label).join(', ') || 'Neutral';
 
   return (
+    <ViewportOverlay>
     <div
       className="fixed inset-0 z-[90] grid place-items-center bg-black/85 p-3 sm:p-5 backdrop-blur-md"
       role="dialog"
@@ -317,6 +319,7 @@ export function CardDetail({ card, owned, onClose, frame, motion }: { card: LokA
         </div>
       </div>
     </div>
+    </ViewportOverlay>
   );
 }
 

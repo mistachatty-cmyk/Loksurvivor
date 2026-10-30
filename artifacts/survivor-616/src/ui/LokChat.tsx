@@ -1,3 +1,4 @@
+import { ViewportOverlay } from './ViewportOverlay';
 /**
  * LOK Chat: message the crew you have rescued. Their answers come from the procedural chat
  * rules (`engine/lokChat.ts`), not a model, so it works offline, costs nothing to run and
@@ -278,6 +279,7 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, in
   );
 
   return (
+    <ViewportOverlay>
     <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/75 p-2 sm:p-4" data-testid="lok-chat" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div
         role="dialog"
@@ -486,6 +488,7 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, in
         </div>
       </div>
     </div>
+    </ViewportOverlay>
   );
 }
 

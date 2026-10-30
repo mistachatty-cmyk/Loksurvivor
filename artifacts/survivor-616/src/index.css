@@ -1412,3 +1412,8 @@ html[data-power-save] .hub-cred-pulse {
 html[data-power-save] .hideout-weather-heat .hideout-weather-particles {
   filter: none;
 }
+
+/* One viewport layer above navigation, outside every animated screen. Utility pointer-events-none still wins. */
+:where(#viewport-overlays > *) { pointer-events: auto; }
+/* Popup transparency is applied once, never compounded by a dialog nested in its backdrop. */
+:is([data-testid^='overlay-'], [role='dialog']) :is([data-testid^='overlay-'], [role='dialog']) { opacity: 1; }

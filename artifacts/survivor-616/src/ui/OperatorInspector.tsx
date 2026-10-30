@@ -1,3 +1,4 @@
+import { overlayContainer } from './ViewportOverlay';
 /**
  * Full-screen operator viewer. Opened from a roster tile's magnifier (or by
  * double-clicking a tile), it shows the operator's real sprite rig at a large,
@@ -238,7 +239,7 @@ export function OperatorInspector({ entries, startId, selectedId, onSelect, onCl
         </aside>
       </div>
     </div>,
-    document.body,
+    overlayContainer(),
   );
 }
 

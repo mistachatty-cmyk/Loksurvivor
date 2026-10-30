@@ -1,3 +1,4 @@
+import { overlayContainer } from './ViewportOverlay';
 /**
  * The Operator Forge: a hidden, optional screen for designing and generating
  * brand-new operators. It never edits an authored operator; everything made
@@ -793,6 +794,6 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
         </div>
       </div>
     </div>,
-    document.body,
+    overlayContainer(),
   );
 }

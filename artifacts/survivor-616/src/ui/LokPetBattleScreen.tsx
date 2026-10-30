@@ -1,3 +1,4 @@
+import { ViewportOverlay } from './ViewportOverlay';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Trophy,
@@ -834,6 +835,7 @@ export function LokPetBattleScreen({
 
         {/* Switch Companion Modal */}
         {showSwitchModal && (
+          <ViewportOverlay>
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
               <h3 className="text-lg font-bold text-white">Switch Companion</h3>
@@ -885,10 +887,12 @@ export function LokPetBattleScreen({
               </button>
             </div>
           </div>
+          </ViewportOverlay>
         )}
 
         {/* Victory / Defeat Modal */}
         {(isVictory || isDefeat) && (
+          <ViewportOverlay>
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
             <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl text-center">
               {isVictory ? (
@@ -997,6 +1001,7 @@ export function LokPetBattleScreen({
               )}
             </div>
           </div>
+          </ViewportOverlay>
         )}
       </div>
     );

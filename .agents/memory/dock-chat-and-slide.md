@@ -6,3 +6,14 @@
 - **One LOK Chat window**: `ui/LokChatHost.tsx` is mounted in `App.tsx`; open it with `openLokChat()` / `openLokChat('mail')` from `lib/lokChatOpen.ts`. It opens to the mailbox when mail is unread. The floating Mailbox button is gone; `MailboxPanel` lives inside chat.
 - **Chat tricks** are records in `game/engine/chatCommands.ts` returning message keys (`lokChat.cmd.*` in `en.json`); `chatCommands.test.ts` fails if a key is missing. Replies are never saved.
 - **New Fits** (`musicPlayer.tsx` `NEW_FITS_TRACKS`) is the guest-artist expansion album, open from the start, starting with DJ Misfit's "His Beat". Add a song by adding a file under `public/music/dj-misfit-new-fits/` and a record. It has no `trackNumber`, so it does not get a disc on the arrival shelf yet.
+
+## Overlay and dock correction (0.42.59)
+
+- The menu dock owns both LOK Chat and Crew access. Removed duplicate hideout chat launchers and moved the global Crew button out of the top-right cluster into the dock's launch row.
+- `ui/ViewportOverlay.tsx` portals custom dialogs into `#viewport-overlays`, a themed viewport sibling outside animated screens. Shared Radix dialogs/sheets and menu/select/popover/tooltip portals use the same host. Priority inside it: dialogs 200, nested menus 300, tooltips 400. Existing inspectors, forge, crew, discs, pack reveal and soundbar also use this host.
+- Run pause/settings/soundtrack/reel and classic level-up overlays use this host. World mirror/invert/colour animation now affects the canvas, so controls and menus remain upright. Phase changes close stale settings/drawers, GUI changes reset auxiliary drawers, and loot reels do not display through pause/settings.
+- Run hotkeys ignore input/select/contenteditable targets and other modal dialogs; held pause repeats do not toggle twice. Popup opacity is no longer multiplied a second time for a dialog nested inside its backdrop.
+- ScreenSlide removes its animation class at completion, so no dormant animation declaration can retain a screen containing block.
+- Regression tests: `e2e/overlay-layering.spec.ts`, with evidence under `docs/previews/scenery-ui/`. Use one Playwright process per output directory; competing runners can delete each other's traces.
+
+- Hub unlock toasts defer while the viewport host has an open overlay; existing timers are cleared and restart on return, so notifications neither overlap dialogs nor expire unseen. Encounter, card/detail, evolution and battle modals also use the viewport host. The mobile regression switches GUI layouts inside paused settings and checks the current panel stays open.

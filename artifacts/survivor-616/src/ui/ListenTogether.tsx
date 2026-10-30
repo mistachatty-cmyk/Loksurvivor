@@ -1,3 +1,4 @@
+import { overlayContainer } from './ViewportOverlay';
 import { Headphones } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
@@ -62,6 +63,6 @@ export function ListenInviteBanner() {
       <button type="button" className={BTN_ON} onClick={listen.accept} data-testid="button-listen-join">{t('social.listen.join')}</button>
       <button type="button" className={BTN} onClick={listen.decline}>{t('social.crew.decline')}</button>
     </div>,
-    document.body,
+    overlayContainer(),
   );
 }

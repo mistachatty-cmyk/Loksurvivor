@@ -91,7 +91,7 @@ export function ScreenSlide({ screenName, dockVisible = false, swipeEnabled, onS
       onAnimationEnd={(event) => {
         if (event.target === event.currentTarget) setState((current) => ({ ...current, animating: false }));
       }}
-      className={state.kind === 'none' ? undefined : `screen-slide screen-slide-${state.kind}`}
+      className={!state.animating || state.kind === 'none' ? undefined : `screen-slide screen-slide-${state.kind}`}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
       onTouchCancel={() => {

@@ -1,3 +1,4 @@
+import { overlayContainer } from './ViewportOverlay';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
@@ -260,7 +261,7 @@ export function PackOpeningReveal({
         </div>
       </div>
     </div>,
-    document.body,
+    overlayContainer(),
   );
 }
 

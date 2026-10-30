@@ -1,3 +1,4 @@
+import { ViewportOverlay } from './ViewportOverlay';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldAlert, X, Sparkles, BookOpen, Bug, Flame, Cpu, Compass } from 'lucide-react';
@@ -24,6 +25,7 @@ export function LorePopup({ onClose, initialChapterId }: LorePopupProps) {
   const prefersReducedMotion = prefersReducedMotionNow();
 
   return (
+    <ViewportOverlay>
     <div
       className="fixed inset-0 z-[160] grid place-items-center overflow-y-auto bg-black/90 p-4 py-6 backdrop-blur-md"
       role="dialog"
@@ -193,6 +195,7 @@ export function LorePopup({ onClose, initialChapterId }: LorePopupProps) {
         </button>
       </motion.div>
     </div>
+    </ViewportOverlay>
   );
 }
 

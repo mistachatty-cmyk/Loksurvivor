@@ -1,6 +1,7 @@
 import { drawPropSurface } from './propSurface';
 import { MAP_PROP_ART_BY_ID } from '@/game/data/mapPack';
-import { drawPropDamage, propMaterial } from './breakableFx';
+import { drawFracturedProp } from './propFracture';
+import { propMaterial } from './breakableFx';
 
 export interface MapPropDamageFeedback {
   seed?: number;
@@ -11,6 +12,7 @@ export interface MapPropDamageFeedback {
   brokenAt?: number;
   motionEnabled?: boolean;
   fragmentLimit?: number;
+  marks?: readonly number[];
 }
 
 /** Top-down, layered world art. Coordinates and animation are shared by editor and run. */
@@ -25,11 +27,22 @@ export function drawMapPackProp(
   damage = 0,
   feedback: MapPropDamageFeedback = {},
 ) {
+  drawFracturedProp(ctx, {
+    x, y, w, h, damageRatio: damage, material: propMaterial('map-prop', id),
+    seed: feedback.seed ?? (id.length * 7919 + Math.round(x) * 31 + Math.round(y)),
+    now: feedback.now ?? now, lastHitAt: feedback.lastHitAt, lastHitX: feedback.lastHitX,
+    lastHitY: feedback.lastHitY, brokenAt: feedback.brokenAt, motionEnabled: feedback.motionEnabled,
+    marks: feedback.marks, cacheKey: id,
+    quality: (feedback.fragmentLimit ?? 9) <= 4 ? 'performance' : (feedback.fragmentLimit ?? 9) <= 6 ? 'balanced' : 'high',
+  }, target => drawMapPackBody(target, id, x, y, w, h, now, feedback));
+}
+
+function drawMapPackBody(ctx: CanvasRenderingContext2D, id: string, x: number, y: number, w: number, h: number, now: number, feedback: MapPropDamageFeedback) {
   const art = MAP_PROP_ART_BY_ID[id];
   if (!art) return;
   const animationTime = feedback.motionEnabled === false ? 0 : now;
   const pulse = 0.65 + Math.sin(animationTime / 570 + x * 0.02) * 0.24;
-  const breakFade = feedback.brokenAt === undefined ? 1 : Math.max(0, Math.min(1, 1 - (now - feedback.brokenAt) / 190));
+  const breakFade = 1;
   ctx.save();
   ctx.globalAlpha = breakFade;
   ctx.translate(x, y);
@@ -140,16 +153,4 @@ export function drawMapPackProp(
   }
 
   ctx.restore();
-  drawPropDamage(ctx, {
-    x, y, w, h, damageRatio: damage,
-    material: propMaterial('map-prop', id),
-    seed: feedback.seed ?? (id.length * 7919 + Math.round(x) * 31 + Math.round(y)),
-    now: feedback.now ?? now,
-    lastHitAt: feedback.lastHitAt,
-    lastHitX: feedback.lastHitX,
-    lastHitY: feedback.lastHitY,
-    brokenAt: feedback.brokenAt,
-    motionEnabled: feedback.motionEnabled,
-    fragmentLimit: feedback.fragmentLimit,
-  });
 }

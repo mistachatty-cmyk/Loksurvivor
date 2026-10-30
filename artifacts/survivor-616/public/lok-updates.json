@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 198,
+      "version": "0.42.59",
+      "date": "2026-10-30",
+      "publishedAt": "2026-10-30T10:55:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Objects come apart, menus stay in reach",
+      "body": [
+        "Map props now split into pieces of their own artwork, with growing impact fractures, board and panel separation, tumbling shards and a settling rubble phase, using the ice and glass fracture system.",
+        "Dialogs, run settings, soundtrack controls and nested menus share a viewport layer above navigation. Typing in settings no longer triggers run shortcuts, and changing GUI layouts clears stale drawers.",
+        "Both chat and crew access now live in the navigation dock; duplicate hideout chat buttons have been removed."
+      ]
+    },
+    {
       "number": 197,
       "version": "0.42.58",
       "date": "2026-10-30",

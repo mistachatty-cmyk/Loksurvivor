@@ -21,3 +21,5 @@ as a whole rather than clipping its first column.
 
 Check: set `data-ui-theme` to each theme above, scroll the page, open a popup,
 and compare its top/bottom gap to the viewport.
+
+0.42.59: viewport dialogs now live under `#viewport-overlays`, inside the theme but outside screen animations. Use `ViewportOverlay` for custom viewport overlays and `overlayContainer()` for an existing portal. Shared Radix components already use this host. Avoid adding new portals to `document.body` with low z-index: a Crew dialog opened from pause must appear above pause, and its nested menus must appear above that dialog. World inversion/colour filters belong on the game canvas, never the run's UI ancestor.

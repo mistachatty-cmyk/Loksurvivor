@@ -1,0 +1,21 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>616 Scenery Fracture Study</title>
+<style>body{margin:0;background:#080e16;color:#dceaf5;font:14px system-ui}header{padding:20px 24px;border-bottom:1px solid #345;display:flex;gap:20px;align-items:center;flex-wrap:wrap}h1{font-size:19px;margin:0}label{display:flex;gap:8px;align-items:center}button,select{background:#142434;color:inherit;border:1px solid #476;padding:7px}canvas{display:block;max-width:100%;height:auto}p{margin:0;color:#9eb4c9}</style>
+<header><div><h1>616 / Object fracture study</h1><p>The same artwork stays on the pieces as they split, tumble and settle.</p></div><button id="play">Play / pause</button><label>Break time <input id="time" type="range" min="0" max="2200" value="420"><output id="age">420 ms</output></label><label>Quality <select id="quality"><option>high</option><option>balanced</option><option>performance</option></select></label><label><input id="motion" type="checkbox" checked>Motion</label></header><canvas id="study" width="1440" height="1060"></canvas>
+<script type="module">
+import {drawMapPackProp} from '../src/game/render/mapPackArt.ts';
+const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d');
+const time=document.querySelector('#time'), quality=document.querySelector('#quality'), motion=document.querySelector('#motion');
+let playing=false,last=0;
+document.querySelector('#play').onclick=()=>playing=!playing;
+const ids=['cache-cart','barricade','ticket-kiosk','power-cabinet','transit-shelter','resin-pod','bus-wreck','crystal-stump'];
+const labels=['Intact','Impact / growing cracks','Heavily damaged','Split / 120 ms','Collapse / 450 ms','Settled / 1600 ms'];
+function draw(){
+ctx.fillStyle='#080e16';ctx.fillRect(0,0,1440,1060);ctx.font='14px monospace';ctx.fillStyle='#9eb4c9';
+labels.forEach((v,i)=>ctx.fillText(v,180+i*205,32));
+ids.forEach((id,row)=>{const y=100+row*125;ctx.font='13px monospace';ctx.fillStyle='#dceaf5';ctx.fillText(id,16,y+3);
+for(let col=0;col<6;col++){const x=250+col*205;const damage=[0,.28,.88,1,1,1][col];const age=col===3?120:col===4?Number(time.value):1600;
+drawMapPackProp(ctx,id,x,y,112,76,3000,damage,{seed:616+row,now:3000,lastHitX:x-22,lastHitY:y+7,lastHitAt:col===1?2940:2000,marks:[x-22,y+7],brokenAt:col>=3?3000-age:undefined,motionEnabled:motion.checked,fragmentLimit:quality.value==='high'?9:quality.value==='balanced'?6:4});}
+});document.querySelector('#age').value=time.value+' ms';}
+function frame(now){if(playing&&!document.hidden&&motion.checked){time.value=(Number(time.value)+Math.min(40,now-last))%2200;}last=now;draw();requestAnimationFrame(frame);}
+requestAnimationFrame(frame);
+</script></html>

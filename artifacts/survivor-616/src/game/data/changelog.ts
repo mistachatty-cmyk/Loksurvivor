@@ -2245,6 +2245,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   { version: '0.42.58', date: '2026-10-30', publishedAt: '2026-10-30T05:45:00Z', kind: 'update', title: 'Scenery with substance', body: ['Scenery across maps now carries plank grain, fasteners, masonry seams, glass reflections and living veins, with detail scaled to graphics quality.', 'Damage grows branching fractures; broken props throw material-shaped fragments with lift, spin and restrained dust. Prop details fade with the body, and reduced-motion effects stay still.'] },
+  { version: '0.42.59', date: '2026-10-30', publishedAt: '2026-10-30T10:55:00Z', kind: 'update', title: 'Objects come apart, menus stay in reach', body: ['Map props now split into pieces of their own artwork, with growing impact fractures, board and panel separation, tumbling shards and a settling rubble phase, using the ice and glass fracture system.', 'Dialogs, run settings, soundtrack controls and nested menus share a viewport layer above navigation. Typing in settings no longer triggers run shortcuts, and changing GUI layouts clears stale drawers.', 'Both chat and crew access now live in the navigation dock; duplicate hideout chat buttons have been removed.'] },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
