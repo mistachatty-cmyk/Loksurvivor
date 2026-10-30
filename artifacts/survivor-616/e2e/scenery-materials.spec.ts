@@ -58,12 +58,14 @@ test('fractures carry the original artwork, animate its pieces, and remain stati
       const pixels = Array.from(ctx.getImageData(0, 0, 300, 300).data);
       const red = pixels.filter((value, i) => i % 4 === 0 && value > 200 && pixels[i + 2]! < 10).length;
       const blue = pixels.filter((value, i) => i % 4 === 2 && value > 200 && pixels[i - 2]! < 10).length;
-      return { pixels, red, blue, alpha: ctx.globalAlpha };
+      const ink = pixels.filter((value, i) => i % 4 === 0 && pixels[i + 1]! > value + 3 && pixels[i + 2]! > pixels[i + 1]! + 5 && pixels[i + 3]! > 200).length;
+      return { pixels, red, blue, ink, alpha: ctx.globalAlpha };
     };
     return { early: draw(120, true), late: draw(800, true), stillA: draw(120, false), stillB: draw(800, false), expired: draw(2200, true) };
   });
   expect(result.early.red).toBeGreaterThan(500);
   expect(result.early.blue).toBeGreaterThan(500);
+  expect(result.early.ink).toBeGreaterThan(10);
   expect(result.early.pixels).not.toEqual(result.late.pixels);
   expect(result.stillA.pixels).toEqual(result.stillB.pixels);
   expect(result.expired.pixels.every(value => value === 0)).toBe(true);

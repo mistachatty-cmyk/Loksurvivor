@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 199,
+      "version": "0.42.60",
+      "date": "2026-10-30",
+      "publishedAt": "2026-10-30T12:15:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Cleaner breaks and keyboard exits",
+      "body": [
+        "Broken pieces keep their fractures and leave ground shadows on the ground. Fresh hits add a short recoil, and crowded damage scenes reuse their hottest artwork snapshots instead of churning the entire cache.",
+        "Escape returns from run settings and soundtrack search without resuming the run. Chat keeps keyboard focus inside its window and returns focus to the dock when closed."
+      ]
+    },
+    {
       "number": 198,
       "version": "0.42.59",
       "date": "2026-10-30",

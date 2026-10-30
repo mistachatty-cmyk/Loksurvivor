@@ -2209,14 +2209,16 @@ type SceneObstacle = {
     marks?: readonly number[]; sliding?: boolean;
   };
 
-function drawOrdinaryPropBody(ctx: CanvasRenderingContext2D, w: World, obstacle: SceneObstacle, colors: { top: string; side: string; trim: string }) {
+function drawOrdinaryPropBody(ctx: CanvasRenderingContext2D, w: World, obstacle: SceneObstacle, colors: { top: string; side: string; trim: string }, snapshot = false) {
   const height = 16;
   const x = obstacle.x - obstacle.w / 2, y = obstacle.y - obstacle.h / 2;
   const breakFade = 1;
   ctx.save();
-  ctx.globalAlpha = 0.35 * breakFade;
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(x + 10, y + obstacle.h + 10, obstacle.w, Math.max(5, obstacle.h * 0.18));
+  if (!snapshot) {
+    ctx.globalAlpha = 0.35 * breakFade;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(x + 10, y + obstacle.h + 10, obstacle.w, Math.max(5, obstacle.h * 0.18));
+  }
   ctx.globalAlpha = breakFade;
 
   ctx.fillStyle = colors.side;
@@ -2845,11 +2847,11 @@ function drawObstacles(
       motionEnabled: w.effectMotionEnabled,
       fragmentLimit: w.graphicsQuality === 'performance' ? 4 : w.graphicsQuality === 'balanced' ? 6 : 9,
       marks: obstacle.marks?.map((value, index) => index % 2 ? value - height : value),
-      cacheKey: `${obstacle.kind}:${obstacle.artAssetId ?? ''}:${colors.top}`,
+      cacheKey: `${obstacle.kind}:${obstacle.artAssetId ?? ''}:${colors.top}:${colors.side}:${colors.trim}`,
       quality: w.graphicsQuality === 'performance' ? 'performance' as const : w.graphicsQuality === 'balanced' ? 'balanced' as const : 'high' as const,
       padding: /tree/.test(obstacle.kind) ? Math.max(obstacle.w, obstacle.h) : 18,
     };
-    if (obstacle.breakable) drawFracturedProp(ctx, damageVisual, (target) => drawOrdinaryPropBody(target, w, obstacle, colors));
+    if (obstacle.breakable) drawFracturedProp(ctx, damageVisual, (target, snapshot) => drawOrdinaryPropBody(target, w, obstacle, colors, snapshot));
     else drawOrdinaryPropBody(ctx, w, obstacle, colors);
     if (obstacle.brokenAt === undefined) drawOrdinaryPropState(ctx, w, obstacle);
   }

@@ -1,3 +1,4 @@
+import { PropTextureCache } from './propTextureCache';
 import { buildCrackNetwork, shardTiling } from './blockBreak';
 import { propNoise, type PropDamageVisual, type PropMaterial } from './breakableFx';
 
@@ -34,25 +35,24 @@ export function propPieces(seed: number, material: PropMaterial, quality: Qualit
   return pieces;
 }
 
-const textures = new Map<string, HTMLCanvasElement>();
-const TEXTURE_LIMIT = 24;
+const textures = new PropTextureCache<HTMLCanvasElement | undefined>();
 function textureFor(art: FracturedProp, paint: (ctx: CanvasRenderingContext2D, snapshot?: boolean) => void, padding: number) {
   if (typeof document === 'undefined') return undefined;
-  const key = `${art.cacheKey}:${art.seed}:${art.w}:${art.h}:${art.quality}:${art.brokenAt ?? 'damage'}`;
-  const old = textures.get(key);
-  if (old) return old;
-  const canvas = document.createElement('canvas');
-  const width = art.w + padding * 2, height = art.h + padding * 2;
-  const resolution = Math.min(1.5, 192 / Math.max(width, height));
-  canvas.width = Math.max(1, Math.ceil(width * resolution)); canvas.height = Math.max(1, Math.ceil(height * resolution));
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return undefined;
-  ctx.scale(canvas.width / width, canvas.height / height);
-  ctx.translate(width / 2 - art.x, height / 2 - art.y);
-  paint(ctx, true);
-  if (textures.size >= TEXTURE_LIMIT) textures.delete(textures.keys().next().value!);
-  textures.set(key, canvas);
-  return canvas;
+  const key = `${art.cacheKey}:${art.seed}:${art.w}:${art.h}:${padding}:${art.material}:${art.quality}:${art.brokenAt ?? 'damage'}`;
+  return textures.getOrCreate(key, art.now, () => {
+    const canvas = document.createElement('canvas');
+    const width = art.w + padding * 2, height = art.h + padding * 2;
+    const resolution = Math.min(1.5, 192 / Math.max(width, height));
+    canvas.width = Math.max(1, Math.ceil(width * resolution)); canvas.height = Math.max(1, Math.ceil(height * resolution));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return undefined;
+    ctx.scale(canvas.width / width, canvas.height / height);
+    ctx.translate(width / 2 - art.x, height / 2 - art.y);
+    paint(ctx, true);
+    // The fractures travel with the painted pieces instead of disappearing at the break.
+    if (art.brokenAt !== undefined) drawNetwork(ctx, { ...art, damageRatio: 1, motionEnabled: false });
+    return canvas;
+  });
 }
 
 const EDGE: Record<PropMaterial, string> = { wood: '#e8b67b', stone: '#cbd5e1', metal: '#a5bbc9', glass: '#d5faff', organic: '#88b896' };
@@ -75,6 +75,17 @@ export function drawFracturedProp(ctx: CanvasRenderingContext2D, art: FracturedP
   const width = art.w + padding * 2, height = art.h + padding * 2;
   const texture = separated ? textureFor(art, paint, padding) : undefined;
   ctx.save();
+  if (texture && !broken) {
+    // A damaged object keeps one grounded footprint; it is never cut into the artwork.
+    ctx.fillStyle = '#000000'; ctx.globalAlpha = 0.24;
+    ctx.beginPath(); ctx.ellipse(art.x + 4, art.y + art.h * 0.5 + 10, art.w * 0.44, Math.max(3, art.h * 0.1), 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  const hitAge = art.lastHitAt === undefined ? Infinity : art.now - art.lastHitAt;
+  if (!broken && motion && hitAge >= 0 && hitAge < 140) {
+    const recoil = 1 - hitAge / 140;
+    ctx.translate(Math.sin(hitAge * 0.12) * recoil * 2.2, Math.cos(hitAge * 0.1) * recoil * 0.8);
+  }
   if (!texture) paint(ctx);
   else {
     const pieces = propPieces(art.seed, art.material, art.quality);

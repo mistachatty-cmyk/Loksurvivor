@@ -19,3 +19,10 @@ Object cracking and destruction are a standing major gameplay priority requested
 - `e2e/scenery-materials.spec.ts` checks all 96 map-prop/motion/quality expiry combinations, reduced-motion spores, original artwork carried on fragments, motion versus static poses, and canvas-state restoration.
 - Interactive preview: `artifacts/survivor-616/previews/scenery-fracture.html`. Screenshots and reproduction instructions live under `docs/previews/scenery-ui/`, as requested by the owner. Keep future visual evidence in the repository too.
 - Next: crowded combat on physical phones, especially cache churn when many large props break together. Chromium evidence does not establish an iPhone frame-rate or memory guarantee.
+
+## Follow-up repairs (0.42.60)
+
+- Body painters now honor the snapshot flag: floor shadows are excluded from fragmented artwork. Damaged props retain one stationary footprint; broken props use their separate fragment shadows.
+- The full fracture network is painted into a destroyed snapshot so its crack detail travels on the pieces. Motion-enabled intact hits add a short, bounded recoil; reduced motion skips it.
+- `propTextureCache.ts` retains the hot 24 snapshots instead of evicting them on every overflow. Uncached overflow props still render faithfully. Entries unused for more than 250 ms may be replaced, and elapsed-clock rollback clears prior-run artwork. A 25-prop/three-frame regression needs 27 paints instead of 75. This reduces churn without increasing the retained texture budget; larger overflow groups can still cost extra raster work.
+- Snapshot keys include material, padding and the full ordinary prop palette. Geometry/rewards remain unchanged.

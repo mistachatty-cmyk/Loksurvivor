@@ -1,3 +1,4 @@
+import { ModalFocus } from './ModalFocus';
 import { ViewportOverlay } from './ViewportOverlay';
 /**
  * LOK Chat: message the crew you have rescued. Their answers come from the procedural chat
@@ -172,19 +173,7 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, in
     return () => setOpenThread(null);
   }, [ally?.id]);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
   useEffect(() => { inputRef.current?.focus(); }, [selected]);
-
-  // Hand focus back to whatever opened the window (the hub's LOK Chat button) when it closes.
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    return () => { if (opener && typeof opener.focus === 'function') opener.focus(); };
-  }, []);
 
   const clearAll = () => {
     if (window.confirm(t('lokChat.clearConfirm'))) clearLokChat();
@@ -280,6 +269,7 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, in
 
   return (
     <ViewportOverlay>
+    <ModalFocus onClose={onClose}>
     <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/75 p-2 sm:p-4" data-testid="lok-chat" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div
         role="dialog"
@@ -488,6 +478,7 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, in
         </div>
       </div>
     </div>
+    </ModalFocus>
     </ViewportOverlay>
   );
 }

@@ -38,8 +38,18 @@ for (const layout of ['classic', 'new']) {
     await reachable(page, 'button-lok-chat-close');
     await expect(page.getByTestId('notification-toast-stack')).toHaveCount(0);
     await page.screenshot({ path: path.join(previews, `chat-${layout}-phone.png`) });
-    await page.getByTestId('button-lok-chat-close').click();
+    const close = page.getByTestId('button-lok-chat-close');
+    // Tabbing backwards from the first visible control wraps inside chat, not into the dock.
+    await page.getByTestId('button-lok-chat-clear').focus();
+    await page.keyboard.press('Shift+Tab');
+    expect(await page.evaluate(() => !!document.activeElement?.closest('[data-testid="lok-chat"]'))).toBe(true);
+    for (let index = 0; index < 24; index += 1) {
+      await page.keyboard.press('Tab');
+      expect(await page.evaluate(() => !!document.activeElement?.closest('[data-testid="lok-chat"]'))).toBe(true);
+    }
+    await close.click();
     await expect(page.getByTestId('lok-chat')).toHaveCount(0);
+    await expect(page.getByTestId('dock-chat')).toBeFocused();
     await page.getByTestId('dock-search').click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -70,7 +80,17 @@ for (const layout of ['classic', 'new']) {
     await expect(settings).toBeVisible();
     await reachable(page, 'button-back');
     await page.screenshot({ path: path.join(previews, `settings-${layout}-phone.png`) });
-    await page.getByTestId('button-back').click();
+    await search.focus();
+    await page.keyboard.press('Escape');
+    await expect(settings).toHaveCount(0);
+    await expect(page.getByTestId('overlay-paused')).toBeVisible();
+    await page.getByTestId('button-pause-soundtrack').click();
+    const soundtrack = page.getByTestId('overlay-pause-soundtrack');
+    await expect(soundtrack).toBeVisible();
+    const musicInput = soundtrack.locator('input').first();
+    if (await musicInput.count()) await musicInput.focus();
+    await page.keyboard.press('Escape');
+    await expect(soundtrack).toHaveCount(0);
     await expect(page.getByTestId('overlay-paused')).toBeVisible();
     await page.getByTestId('button-resume').click();
     await expect(page.getByTestId('overlay-paused')).toHaveCount(0);

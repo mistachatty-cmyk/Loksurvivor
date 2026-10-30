@@ -543,9 +543,14 @@ export function RunScreen({
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
       const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest('input,textarea,select,[contenteditable="true"]')) return;
       if (document.querySelector('#viewport-overlays [aria-modal="true"]')) return;
       const key = event.key.toLowerCase();
+      if (key === 'escape' && phaseRef.current === 'paused' && (runSettingsOpenRef.current || pauseSoundtrackOpenRef.current)) {
+        event.preventDefault();
+        if (!event.repeat) { setRunSettingsOpen(false); setPauseSoundtrackOpen(false); }
+        return;
+      }
+      if (target?.closest('input,textarea,select,[contenteditable="true"]')) return;
       const controls = getControls();
       const action = actionForKey(controls, key);
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key) || action === 'dash') {

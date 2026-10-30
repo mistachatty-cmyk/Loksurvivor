@@ -17,3 +17,5 @@
 - Regression tests: `e2e/overlay-layering.spec.ts`, with evidence under `docs/previews/scenery-ui/`. Use one Playwright process per output directory; competing runners can delete each other's traces.
 
 - Hub unlock toasts defer while the viewport host has an open overlay; existing timers are cleared and restart on return, so notifications neither overlap dialogs nor expire unseen. Encounter, card/detail, evolution and battle modals also use the viewport host. The mobile regression switches GUI layouts inside paused settings and checks the current panel stays open.
+
+0.42.60: Escape closes paused settings or soundtrack panels even while an input has focus, without resuming the game. LOK Chat now uses `ModalFocus` inside its viewport portal to wrap Tab/Shift+Tab, keep focus out of the dock while open, consume Escape, and restore the actual launcher on close. Capture the opener before focusing the chat input; the old passive-effect ordering could accidentally remember that input as the opener.

@@ -11,3 +11,5 @@ Mobile evidence is saved alongside this file for Classic and New GUI layouts: do
 To regenerate the material screenshot, run `node scripts/capture-scenery-preview.mjs` from `artifacts/survivor-616` with the dev server at port 3000. To regenerate the phone screenshots, run `E2E_PORT=3000 pnpm exec playwright test e2e/overlay-layering.spec.ts` from the same folder. Run only one Playwright process per output directory.
 
 These are Chromium screenshots. Physical iPhone memory and touch behavior still need a device check.
+
+0.42.60 adds Tab/Shift+Tab containment and dock-focus restoration checks for chat, plus Escape from settings and soundtrack inputs. The material preview now keeps floor shadows out of the moving artwork and carries the fracture detail on each piece. The bounded-cache regression is documented in `src/game/render/propTextureCache.test.ts` under the game package.

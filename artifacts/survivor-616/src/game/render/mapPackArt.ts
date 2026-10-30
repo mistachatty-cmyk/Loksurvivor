@@ -34,10 +34,10 @@ export function drawMapPackProp(
     lastHitY: feedback.lastHitY, brokenAt: feedback.brokenAt, motionEnabled: feedback.motionEnabled,
     marks: feedback.marks, cacheKey: id,
     quality: (feedback.fragmentLimit ?? 9) <= 4 ? 'performance' : (feedback.fragmentLimit ?? 9) <= 6 ? 'balanced' : 'high',
-  }, target => drawMapPackBody(target, id, x, y, w, h, now, feedback));
+  }, (target, snapshot) => drawMapPackBody(target, id, x, y, w, h, now, feedback, snapshot));
 }
 
-function drawMapPackBody(ctx: CanvasRenderingContext2D, id: string, x: number, y: number, w: number, h: number, now: number, feedback: MapPropDamageFeedback) {
+function drawMapPackBody(ctx: CanvasRenderingContext2D, id: string, x: number, y: number, w: number, h: number, now: number, feedback: MapPropDamageFeedback, snapshot = false) {
   const art = MAP_PROP_ART_BY_ID[id];
   if (!art) return;
   const animationTime = feedback.motionEnabled === false ? 0 : now;
@@ -60,8 +60,10 @@ function drawMapPackBody(ctx: CanvasRenderingContext2D, id: string, x: number, y
   };
 
   // A soft footprint and a darker lower edge keep every object grounded.
-  ctx.globalAlpha = 0.32 * breakFade;
-  fill('#000000', -47, -39, 100, 92);
+  if (!snapshot) {
+    ctx.globalAlpha = 0.32 * breakFade;
+    fill('#000000', -47, -39, 100, 92);
+  }
   ctx.globalAlpha = breakFade;
   fill(art.theme === 'null' ? '#06251e' : '#1c2630', -50, -50, 100, 100);
   fill(art.theme === 'null' ? '#0b4231' : '#334155', -47, -48, 94, 88);
