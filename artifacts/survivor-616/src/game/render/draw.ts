@@ -30,6 +30,7 @@ import { clamp, dist2 } from '@/game/engine/math';
 import { drawForgeFiveProjectile } from './forgeFiveVfx';
 import { drawQuakeCracks, drawSpokeWheel } from './creatorPairVfx';
 import { drawMapPackProp } from './mapPackArt';
+import { drawPropSurface } from './propSurface';
 import { drawPropDamage, propMaterial } from './breakableFx';
 
 /** World units of sprite height per rig pixel. */
@@ -2276,13 +2277,34 @@ function drawObstacles(
     const x = obstacle.x - obstacle.w / 2;
     const y = obstacle.y - obstacle.h / 2;
 
-    ctx.globalAlpha = 0.35;
+    const breakFade = obstacle.brokenAt === undefined ? 1 : clamp(1 - (w.now - obstacle.brokenAt) / 190, 0, 1);
+    const damageVisual = obstacle.breakable ? {
+      x: obstacle.x,
+      y: obstacle.y - height,
+      w: obstacle.w,
+      h: obstacle.h,
+      damageRatio: obstacle.damage ?? 0,
+      material: propMaterial(obstacle.kind, obstacle.artAssetId),
+      seed: obstacle.seed ?? (Math.round(obstacle.x) * 31 + Math.round(obstacle.y)),
+      now: w.now,
+      lastHitAt: obstacle.lastHitAt,
+      lastHitX: obstacle.lastHitX,
+      lastHitY: obstacle.lastHitY === undefined ? undefined : obstacle.lastHitY - height,
+      brokenAt: obstacle.brokenAt,
+      motionEnabled: w.effectMotionEnabled,
+      fragmentLimit: w.graphicsQuality === 'performance' ? 4 : w.graphicsQuality === 'balanced' ? 6 : 9,
+    } : undefined;
+    if (breakFade <= 0) {
+      if (damageVisual) drawPropDamage(ctx, damageVisual);
+      continue;
+    }
+    ctx.save();
+    ctx.globalAlpha = 0.35 * breakFade;
     ctx.fillStyle = '#000000';
     ctx.fillRect(x + 10, y + obstacle.h + 10, obstacle.w, Math.max(5, obstacle.h * 0.18));
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = breakFade;
 
     ctx.fillStyle = colors.side;
-    const breakFade = obstacle.brokenAt === undefined ? 1 : clamp(1 - (w.now - obstacle.brokenAt) / 190, 0, 1);
     ctx.globalAlpha = breakFade;
     ctx.fillRect(x, y - height + obstacle.h, obstacle.w, height);
     ctx.fillStyle = colors.top;
@@ -2290,12 +2312,14 @@ function drawObstacles(
     ctx.strokeStyle = colors.trim;
     ctx.lineWidth = 2;
     ctx.strokeRect(x + 1, y - height + 1, obstacle.w - 2, obstacle.h - 2);
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = breakFade;
+
+    drawPropSurface(ctx, propMaterial(obstacle.kind), obstacle.x, y - height + obstacle.h / 2, obstacle.w, obstacle.h, obstacle.seed ?? Math.round(obstacle.x * 31 + obstacle.y), w.graphicsQuality === 'performance' ? 'performance' : w.graphicsQuality === 'balanced' ? 'balanced' : 'high');
 
     // Combat props get a strong, readable symbol in addition to their silhouette.
     if (obstacle.kind === 'cover') {
       ctx.save();
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.9 * breakFade;
       ctx.strokeStyle = '#fbbf24';
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -2307,7 +2331,7 @@ function drawObstacles(
       ctx.restore();
     } else if (obstacle.kind === 'reflective-surface') {
       ctx.save();
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.9 * breakFade;
       ctx.strokeStyle = '#f5e8ff';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -2319,7 +2343,7 @@ function drawObstacles(
     } else if (obstacle.kind === 'flora') {
       ctx.save();
       ctx.fillStyle = '#18321f';
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.9 * breakFade;
       ctx.fillRect(obstacle.x - 3, y - height + obstacle.h * 0.55, 6, obstacle.h * 0.45);
       ctx.fillStyle = '#4fbd68';
       for (let i = 0; i < 5; i += 1) {
@@ -2335,14 +2359,14 @@ function drawObstacles(
       // object instead of another arena wall.
       ctx.save();
       ctx.fillStyle = colors.trim;
-      ctx.globalAlpha = 0.75;
+      ctx.globalAlpha = 0.75 * breakFade;
       for (let marker = x + 12; marker < x + obstacle.w - 6; marker += 24) {
         ctx.fillRect(marker, y - height + obstacle.h * 0.35, 8, 3);
       }
       ctx.restore();
     } else if (obstacle.kind === 'car' || obstacle.kind === 'car-wreck') {
       ctx.save();
-      ctx.globalAlpha = 0.6;
+      ctx.globalAlpha = 0.6 * breakFade;
       ctx.fillStyle = '#d8b4fe';
       ctx.fillRect(x + obstacle.w * 0.18, y - height + obstacle.h * 0.22, obstacle.w * 0.64, 5);
       ctx.fillStyle = '#11121a';
@@ -2351,7 +2375,7 @@ function drawObstacles(
       ctx.restore();
     } else if (obstacle.kind === 'trash-can') {
       ctx.save();
-      ctx.globalAlpha = 0.85;
+      ctx.globalAlpha = 0.85 * breakFade;
       ctx.strokeStyle = colors.trim;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -2368,7 +2392,7 @@ function drawObstacles(
       ctx.restore();
     } else if (obstacle.kind === 'mailbox') {
       ctx.save();
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.9 * breakFade;
       ctx.fillStyle = colors.trim;
       ctx.fillRect(x + obstacle.w * 0.6, y - height + obstacle.h * 0.1, obstacle.w * 0.32, obstacle.h * 0.16);
       ctx.strokeStyle = '#0f2440';
@@ -2377,7 +2401,7 @@ function drawObstacles(
       ctx.restore();
     } else if (obstacle.kind === 'fire-hydrant') {
       ctx.save();
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.9 * breakFade;
       ctx.fillStyle = colors.trim;
       ctx.fillRect(x - 3, y - height + obstacle.h * 0.42, 5, 5);
       ctx.fillRect(x + obstacle.w - 2, y - height + obstacle.h * 0.42, 5, 5);
@@ -2387,7 +2411,7 @@ function drawObstacles(
       ctx.restore();
     } else if (obstacle.kind === 'parking-meter') {
       ctx.save();
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.9 * breakFade;
       ctx.strokeStyle = colors.trim;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -2408,7 +2432,7 @@ function drawObstacles(
         // Glowing root network on ground radiating outwards
         ctx.strokeStyle = '#10b981';
         ctx.lineWidth = 3.5;
-        ctx.globalAlpha = 0.85;
+        ctx.globalAlpha = 0.85 * breakFade;
         for (let r = 0; r < 8; r += 1) {
           const rootAngle = (r * Math.PI) / 4 + Math.sin(w.now * 0.001) * 0.05;
           const rDist = obstacle.w * 0.9;
@@ -2424,12 +2448,12 @@ function drawObstacles(
 
         // Carbon trunk
         ctx.fillStyle = '#0f1f18';
-        ctx.globalAlpha = 0.98;
+        ctx.globalAlpha = 0.98 * breakFade;
         ctx.fillRect(obstacle.x - trunkW / 2, y - trunkH, trunkW, trunkH);
 
         // Vertical emerald circuit veins on trunk
         ctx.fillStyle = '#34d399';
-        ctx.globalAlpha = 0.8 + Math.sin(w.now * 0.003) * 0.2;
+        ctx.globalAlpha = (0.8 + Math.sin(w.now * 0.003) * 0.2) * breakFade;
         for (let v = -2; v <= 2; v += 1) {
           ctx.fillRect(obstacle.x + v * (trunkW * 0.18) - 1.5, y - trunkH + 4, 3, trunkH - 8);
         }
@@ -2438,7 +2462,7 @@ function drawObstacles(
         const canopyW = obstacle.w * 1.85;
         const canopyH = obstacle.h * 1.55;
         const pulse = 0.9 + Math.sin(w.now * 0.002) * 0.1;
-        ctx.globalAlpha = 0.95;
+        ctx.globalAlpha = 0.95 * breakFade;
 
         // Canopy shadow & dark underlayer
         ctx.fillStyle = '#022c22';
@@ -2458,7 +2482,7 @@ function drawObstacles(
 
         // Bright neon circuit foliage highlights
         ctx.fillStyle = '#10b981';
-        ctx.globalAlpha = pulse;
+        ctx.globalAlpha = (pulse) * breakFade;
         for (let c = 0; c < 6; c += 1) {
           const cx = obstacle.x + Math.sin(c * 1.2) * (canopyW * 0.2);
           const cy = treeTopY - 10 + Math.cos(c * 1.2) * (canopyH * 0.18);
@@ -2486,7 +2510,7 @@ function drawObstacles(
 
         // Circuit line
         ctx.fillStyle = '#10b981';
-        ctx.globalAlpha = 0.8;
+        ctx.globalAlpha = 0.8 * breakFade;
         ctx.fillRect(obstacle.x - 1, y - trunkH + 2, 2, trunkH - 4);
 
         // Foliage layers
@@ -2496,7 +2520,7 @@ function drawObstacles(
         ctx.fill();
 
         ctx.fillStyle = '#10b981';
-        ctx.globalAlpha = 0.9;
+        ctx.globalAlpha = 0.9 * breakFade;
         ctx.beginPath();
         ctx.ellipse(obstacle.x, treeTopY - 6, obstacle.w * 0.42, obstacle.h * 0.38, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -2506,7 +2530,7 @@ function drawObstacles(
       // Holographic Decoy Tree: translucent, cyan/teal flickering scanlines
       ctx.save();
       const flicker = 0.48 + Math.sin(w.now * 0.012 + obstacle.x) * 0.2;
-      ctx.globalAlpha = flicker;
+      ctx.globalAlpha = (flicker) * breakFade;
 
       // Base projector pedestal
       ctx.fillStyle = '#083344';
@@ -2556,13 +2580,13 @@ function drawObstacles(
           const litSeed = Math.sin((obstacle.x + c * 17) * 12.9898 + (obstacle.y + r * 13) * 78.233);
           if (litSeed > -0.1) {
             ctx.fillStyle = litSeed > 0.5 ? '#38bdf8' : litSeed > 0.2 ? '#fef08a' : '#0284c7';
-            ctx.globalAlpha = 0.75 + Math.sin(w.now * 0.002 + litSeed * 10) * 0.2;
+            ctx.globalAlpha = (0.75 + Math.sin(w.now * 0.002 + litSeed * 10) * 0.2) * breakFade;
             ctx.fillRect(winX, winY, cellW - 4, cellH - 4);
           }
         }
       }
       // Rooftop parapet trim & elevator penthouse
-      ctx.globalAlpha = 0.95;
+      ctx.globalAlpha = 0.95 * breakFade;
       ctx.fillStyle = '#334155';
       ctx.fillRect(x + obstacle.w * 0.35, roofY - 14, obstacle.w * 0.3, 14);
       ctx.fillStyle = '#0ea5e9';
@@ -2621,12 +2645,12 @@ function drawObstacles(
       const roofY = y - height;
       // Illuminated turquoise walkway floor strip
       ctx.fillStyle = '#06b6d4';
-      ctx.globalAlpha = 0.85;
+      ctx.globalAlpha = 0.85 * breakFade;
       ctx.fillRect(x + 2, roofY + obstacle.h * 0.4, obstacle.w - 4, 3);
       // Steel suspension trusses & glass canopy balustrade
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 1.5;
-      ctx.globalAlpha = 0.7;
+      ctx.globalAlpha = 0.7 * breakFade;
       ctx.beginPath();
       for (let tx = x; tx <= x + obstacle.w; tx += 20) {
         ctx.moveTo(tx, roofY + obstacle.h * 0.4);
@@ -2651,7 +2675,7 @@ function drawObstacles(
       // Concentric radio signal pulses expanding outward
       const pulsePhase = (w.now * 0.003 + obstacle.y) % 1;
       ctx.strokeStyle = '#ec4899';
-      ctx.globalAlpha = (1 - pulsePhase) * 0.8;
+      ctx.globalAlpha = ((1 - pulsePhase) * 0.8) * breakFade;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(obstacle.x, roofY - 28, 6 + pulsePhase * 24, -Math.PI * 0.8, -Math.PI * 0.2);
@@ -2666,7 +2690,7 @@ function drawObstacles(
       ctx.fillRect(x + obstacle.w - 8, roofY, 8, obstacle.h);
       // Laser security tripwire beam
       const laserGlow = 0.6 + Math.sin(w.now * 0.008) * 0.3;
-      ctx.globalAlpha = laserGlow;
+      ctx.globalAlpha = (laserGlow) * breakFade;
       ctx.fillStyle = '#ea580c';
       ctx.fillRect(x + 8, roofY + obstacle.h * 0.45, obstacle.w - 16, 2.5);
       // Biometric status LED
@@ -2717,7 +2741,7 @@ function drawObstacles(
       ctx.save();
       const severity = live.rawDataBreakage;
       const blocks = Math.max(1, Math.ceil(severity * 7));
-      ctx.globalAlpha = 0.22 + severity * 0.55;
+      ctx.globalAlpha = (0.22 + severity * 0.55) * breakFade;
       ctx.fillStyle = severity > 0.65 ? '#facc15' : '#86efac';
       for (let i = 0; i < blocks; i += 1) {
         const rx = hashCell(live.uid, i * 13) * Math.max(4, obstacle.w - 8);
@@ -2726,7 +2750,7 @@ function drawObstacles(
         ctx.fillRect(x + 4 + rx, y - height + 4 + ry, size, size);
       }
       if (severity > 0.72) {
-        ctx.globalAlpha = 0.8;
+        ctx.globalAlpha = 0.8 * breakFade;
         ctx.font = 'bold 8px ui-monospace, SFMono-Regular, Menlo, monospace';
         ctx.textAlign = 'center';
         ctx.fillText('RAW DATA', obstacle.x, y - height - 5);
@@ -2737,7 +2761,7 @@ function drawObstacles(
       ctx.save();
       const speed = Math.hypot(live.vx, live.vy);
       const pulse = 0.62 + Math.sin(w.now / 92) * 0.2;
-      ctx.globalAlpha = pulse;
+      ctx.globalAlpha = (pulse) * breakFade;
       ctx.shadowColor = '#ffb347';
       ctx.shadowBlur = 12;
       ctx.strokeStyle = '#ffb347';
@@ -2758,21 +2782,21 @@ function drawObstacles(
     if (live?.landedHeatActive) {
       ctx.save();
       const pulse = 0.65 + Math.sin(w.now / 105) * 0.25;
-      ctx.globalAlpha = pulse;
+      ctx.globalAlpha = (pulse) * breakFade;
       ctx.shadowColor = '#ff4d5e';
       ctx.shadowBlur = 18;
       ctx.strokeStyle = '#ff4d5e';
       ctx.lineWidth = 3;
       ctx.strokeRect(x - 5, y - height - 5, obstacle.w + 10, obstacle.h + 10);
       ctx.fillStyle = '#ff4d5e';
-      ctx.globalAlpha = 0.28 + pulse * 0.18;
+      ctx.globalAlpha = (0.28 + pulse * 0.18) * breakFade;
       ctx.fillRect(x, y - height, obstacle.w, obstacle.h);
       ctx.restore();
     }
     if (live?.clickPrimed) {
       ctx.save();
       const pulse = 0.7 + Math.sin(w.now / 120) * 0.2;
-      ctx.globalAlpha = pulse;
+      ctx.globalAlpha = (pulse) * breakFade;
       ctx.strokeStyle = '#7dd3fc';
       ctx.lineWidth = 3;
       ctx.setLineDash([5, 4]);
@@ -2786,7 +2810,7 @@ function drawObstacles(
     }
     if (obstacle.kind === 'metal-box') {
       ctx.save();
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.9 * breakFade;
       ctx.strokeStyle = '#e2e8f0';
       ctx.lineWidth = 2;
       ctx.strokeRect(x + 7, y - height + 7, obstacle.w - 14, obstacle.h - 14);
@@ -2799,7 +2823,7 @@ function drawObstacles(
       ctx.restore();
     } else if (obstacle.kind === 'bench') {
       ctx.save();
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.9 * breakFade;
       ctx.strokeStyle = '#e2b07a';
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -2810,24 +2834,8 @@ function drawObstacles(
       ctx.stroke();
       ctx.restore();
     }
-    if (obstacle.breakable) {
-      drawPropDamage(ctx, {
-        x: obstacle.x,
-        y: y - height / 2,
-        w: obstacle.w,
-        h: obstacle.h,
-        damageRatio: obstacle.damage ?? 0,
-        material: propMaterial(obstacle.kind, obstacle.artAssetId),
-        seed: obstacle.seed ?? (Math.round(obstacle.x) * 31 + Math.round(obstacle.y)),
-        now: w.now,
-        lastHitAt: obstacle.lastHitAt,
-        lastHitX: obstacle.lastHitX,
-        lastHitY: obstacle.lastHitY,
-        brokenAt: obstacle.brokenAt,
-        motionEnabled: w.effectMotionEnabled,
-        fragmentLimit: w.graphicsQuality === 'performance' ? 4 : w.graphicsQuality === 'balanced' ? 6 : 9,
-      });
-    }
+    ctx.restore();
+    if (damageVisual) drawPropDamage(ctx, damageVisual);
   }
 }
 

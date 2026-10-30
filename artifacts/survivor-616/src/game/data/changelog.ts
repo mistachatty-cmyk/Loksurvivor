@@ -2244,6 +2244,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Data Spark stays first, existing unlock progress and personal files stay intact, and new releases arrive through a small cached catalog without changing the music currently playing.',
     ],
   },
+  { version: '0.42.58', date: '2026-10-30', publishedAt: '2026-10-30T05:45:00Z', kind: 'update', title: 'Scenery with substance', body: ['Scenery across maps now carries plank grain, fasteners, masonry seams, glass reflections and living veins, with detail scaled to graphics quality.', 'Damage grows branching fractures; broken props throw material-shaped fragments with lift, spin and restrained dust. Prop details fade with the body, and reduced-motion effects stay still.'] },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
