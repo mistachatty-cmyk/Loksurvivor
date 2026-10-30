@@ -1,3 +1,4 @@
+import { overlayContainer } from './ViewportOverlay';
 /**
  * Everything around starting or joining a crew run: the "Start a crew run" request from the Crew overlay,
  * the "your crew is in a run" prompt, and the small dialog to pick an operator (and, for the host, an area).
@@ -108,6 +109,6 @@ export function CrewRunController({ screenName, onLaunch }: { screenName: string
         </div>
       ) : null}
     </>,
-    document.body,
+    overlayContainer(),
   );
 }

@@ -1,5 +1,7 @@
+import { drawPropSurface } from './propSurface';
 import { MAP_PROP_ART_BY_ID } from '@/game/data/mapPack';
-import { drawPropDamage, propMaterial } from './breakableFx';
+import { drawFracturedProp } from './propFracture';
+import { propMaterial } from './breakableFx';
 
 export interface MapPropDamageFeedback {
   seed?: number;
@@ -10,6 +12,7 @@ export interface MapPropDamageFeedback {
   brokenAt?: number;
   motionEnabled?: boolean;
   fragmentLimit?: number;
+  marks?: readonly number[];
 }
 
 /** Top-down, layered world art. Coordinates and animation are shared by editor and run. */
@@ -24,10 +27,22 @@ export function drawMapPackProp(
   damage = 0,
   feedback: MapPropDamageFeedback = {},
 ) {
+  drawFracturedProp(ctx, {
+    x, y, w, h, damageRatio: damage, material: propMaterial('map-prop', id),
+    seed: feedback.seed ?? (id.length * 7919 + Math.round(x) * 31 + Math.round(y)),
+    now: feedback.now ?? now, lastHitAt: feedback.lastHitAt, lastHitX: feedback.lastHitX,
+    lastHitY: feedback.lastHitY, brokenAt: feedback.brokenAt, motionEnabled: feedback.motionEnabled,
+    marks: feedback.marks, cacheKey: id,
+    quality: (feedback.fragmentLimit ?? 9) <= 4 ? 'performance' : (feedback.fragmentLimit ?? 9) <= 6 ? 'balanced' : 'high',
+  }, (target, snapshot) => drawMapPackBody(target, id, x, y, w, h, now, feedback, snapshot));
+}
+
+function drawMapPackBody(ctx: CanvasRenderingContext2D, id: string, x: number, y: number, w: number, h: number, now: number, feedback: MapPropDamageFeedback, snapshot = false) {
   const art = MAP_PROP_ART_BY_ID[id];
   if (!art) return;
-  const pulse = 0.65 + Math.sin(now / 570 + x * 0.02) * 0.24;
-  const breakFade = feedback.brokenAt === undefined ? 1 : Math.max(0, Math.min(1, 1 - (now - feedback.brokenAt) / 190));
+  const animationTime = feedback.motionEnabled === false ? 0 : now;
+  const pulse = 0.65 + Math.sin(animationTime / 570 + x * 0.02) * 0.24;
+  const breakFade = 1;
   ctx.save();
   ctx.globalAlpha = breakFade;
   ctx.translate(x, y);
@@ -45,12 +60,16 @@ export function drawMapPackProp(
   };
 
   // A soft footprint and a darker lower edge keep every object grounded.
-  ctx.globalAlpha = 0.32;
-  fill('#000000', -47, -39, 100, 92);
-  ctx.globalAlpha = 1;
+  if (!snapshot) {
+    ctx.globalAlpha = 0.32 * breakFade;
+    fill('#000000', -47, -39, 100, 92);
+  }
+  ctx.globalAlpha = breakFade;
   fill(art.theme === 'null' ? '#06251e' : '#1c2630', -50, -50, 100, 100);
   fill(art.theme === 'null' ? '#0b4231' : '#334155', -47, -48, 94, 88);
   ctx.strokeStyle = art.color; ctx.lineWidth = 3; ctx.strokeRect(-47, -48, 94, 88);
+
+  drawPropSurface(ctx, propMaterial('map-prop', id), 0, -4, 92, 84, feedback.seed ?? 1, (feedback.fragmentLimit ?? 9) <= 4 ? 'performance' : (feedback.fragmentLimit ?? 9) <= 6 ? 'balanced' : 'high');
 
   switch (id) {
     case 'transit-shelter':
@@ -76,7 +95,7 @@ export function drawMapPackProp(
       break;
     case 'lamp-cluster':
       for (const px of [-27, 27]) { fill('#475569', px - 5, -37, 10, 76); ring('#fde68a', px, -36, 16, 12, 5); }
-      ctx.globalAlpha = pulse * 0.2; fill('#fde68a', -47, -43, 94, 80); ctx.globalAlpha = 1;
+      ctx.globalAlpha = (pulse * 0.2) * breakFade; fill('#fde68a', -47, -43, 94, 80); ctx.globalAlpha = breakFade;
       break;
     case 'power-cabinet':
       fill('#1e3a4a', -37, -41, 74, 78); fill('#0f172a', -26, -27, 52, 46);
@@ -103,15 +122,15 @@ export function drawMapPackProp(
       ring('#d1fae5', 0, -17, 5 + pulse * 3, 5 + pulse * 3);
       break;
     case 'holographic-tree':
-      ctx.globalAlpha = 0.6 + pulse * 0.25;
+      ctx.globalAlpha = (0.6 + pulse * 0.25) * breakFade;
       line('#67e8f9', 9, [[0, 39], [0, -13]]);
       for (let i = 0; i < 4; i += 1) ring('#22d3ee', Math.sin(i * 2.1) * 22, -23 + Math.cos(i * 1.8) * 15, 19, 10, 3);
       for (let i = 0; i < 5; i += 1) fill('#a5f3fc', -35, -36 + i * 13, 70, 2);
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = breakFade;
       break;
     case 'spore-vent':
       ring('#115e45', 0, 6, 39, 27, 11); ring('#0b1724', 0, 6, 25, 17, 6);
-      for (let i = 0; i < 7; i += 1) { const sx = Math.sin(i * 2.2 + now / 850) * 29; const sy = -33 + (i * 13 + now / 80) % 63; ring('#a7f3d0', sx, sy, 2, 2, 2); }
+      for (let i = 0; i < 7; i += 1) { const sx = Math.sin(i * 2.2 + animationTime / 850) * 29; const sy = -33 + (i * 13 + animationTime / 80) % 63; ring('#a7f3d0', sx, sy, 2, 2, 2); }
       break;
     case 'resin-pod':
       ring('#064e3b', 0, 0, 33, 40, 12); ring('#2dd4bf', 0, -6, 25, 28, 6);
@@ -136,16 +155,4 @@ export function drawMapPackProp(
   }
 
   ctx.restore();
-  drawPropDamage(ctx, {
-    x, y, w, h, damageRatio: damage,
-    material: propMaterial('map-prop', id),
-    seed: feedback.seed ?? (id.length * 7919 + Math.round(x) * 31 + Math.round(y)),
-    now: feedback.now ?? now,
-    lastHitAt: feedback.lastHitAt,
-    lastHitX: feedback.lastHitX,
-    lastHitY: feedback.lastHitY,
-    brokenAt: feedback.brokenAt,
-    motionEnabled: feedback.motionEnabled,
-    fragmentLimit: feedback.fragmentLimit,
-  });
 }

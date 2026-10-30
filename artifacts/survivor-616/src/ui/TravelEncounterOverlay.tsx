@@ -1,3 +1,4 @@
+import { ViewportOverlay } from './ViewportOverlay';
 /**
  * The "classic version" travel encounter popup: player on the left, an
  * enemy or wild LokPet on the right, simple turn-based combat. See
@@ -174,6 +175,7 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
   const lastLog = combat.log[combat.log.length - 1];
 
   return (
+    <ViewportOverlay>
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/85 p-4" data-testid="overlay-travel-encounter">
       <div className="w-full max-w-md border border-fuchsia-300/40 bg-[#0a0a12] p-5">
         <p className="text-center font-mono text-[10px] uppercase tracking-widest text-fuchsia-200">{label}</p>
@@ -395,6 +397,7 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
         )}
       </div>
     </div>
+    </ViewportOverlay>
   );
 }
 

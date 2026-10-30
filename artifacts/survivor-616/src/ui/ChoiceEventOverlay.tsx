@@ -1,3 +1,4 @@
+import { ViewportOverlay } from './ViewportOverlay';
 /**
  * A choice event: a short scene, two or three options, and a result. The scene is a record in
  * `data/choiceEvents.ts`; the rules are in `engine/choiceEvents.ts`. Rendered from App.tsx, next
@@ -97,6 +98,7 @@ export function ChoiceEventOverlay({ eventId, petId, propId, onClose }: ChoiceEv
   };
 
   return (
+    <ViewportOverlay>
     <div
       className="fixed inset-0 z-[130] overflow-y-auto bg-black/85 backdrop-blur-sm"
       role="dialog"
@@ -162,6 +164,7 @@ export function ChoiceEventOverlay({ eventId, petId, propId, onClose }: ChoiceEv
         </div>
       </div>
     </div>
+    </ViewportOverlay>
   );
 }
 

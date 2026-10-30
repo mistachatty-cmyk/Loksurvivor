@@ -1,3 +1,4 @@
+import { overlayContainer } from './ViewportOverlay';
 /**
  * The pulled-out song: one disc, full screen, spinning while the song plays. Reached by dragging
  * the centered disc up (or the "pull the song out" button). Only this song is shown: a big disc
@@ -213,6 +214,6 @@ export function DiscPullOut({ trackId, item, lite, onClose }: DiscPullOutProps) 
         <p className="text-center font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">{t('disc.pull.spinHint')}</p>
       </div>
     </div>,
-    document.body,
+    overlayContainer(),
   );
 }

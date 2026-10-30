@@ -1,3 +1,4 @@
+import { ViewportOverlay } from './ViewportOverlay';
 /**
  * Bestiary. Entries reveal themselves as the player defeats each enemy.
  * Owned by the design pass -- keep the export name and props stable.
@@ -243,6 +244,7 @@ function EnemyIntelModal({
   }, [onClose]);
 
   return (
+    <ViewportOverlay>
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 p-3 sm:p-5 backdrop-blur-md"
       role="dialog"
@@ -424,6 +426,7 @@ function EnemyIntelModal({
         </div>
       </div>
     </div>
+    </ViewportOverlay>
   );
 }
 

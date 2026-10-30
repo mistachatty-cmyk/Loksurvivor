@@ -1,3 +1,4 @@
+import { overlayContainer } from './ViewportOverlay';
 import { Send } from 'lucide-react';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -83,6 +84,6 @@ export function CrewToasts() {
         </div>
       ))}
     </div>,
-    document.body,
+    overlayContainer(),
   );
 }

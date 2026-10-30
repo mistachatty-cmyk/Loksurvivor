@@ -1,3 +1,4 @@
+import { ViewportOverlay } from './ViewportOverlay';
 /**
  * Travel-encounter fights on the arena engine, in three presentations that
  * share one state machine (game/engine/quickFight.ts):
@@ -483,6 +484,7 @@ export function EncounterFightOverlay({ style, opponent, rng, label, onClose }: 
   );
 
   return (
+    <ViewportOverlay>
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/85 p-3 sm:p-4" data-testid="overlay-quick-fight" data-fight-style={style} data-fight-layout={wide ? 'wide' : 'stacked'}>
       <div className="flex min-h-full items-start justify-center sm:items-center">
         <div className={`w-full border border-fuchsia-300/40 bg-[#0a0a12] p-4 sm:p-5 ${wide ? 'max-w-3xl' : 'max-w-md'}`}>
@@ -545,6 +547,7 @@ export function EncounterFightOverlay({ style, opponent, rng, label, onClose }: 
         </div>
       </div>
     </div>
+    </ViewportOverlay>
   );
 }
 

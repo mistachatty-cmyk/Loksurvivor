@@ -30,7 +30,9 @@ import { clamp, dist2 } from '@/game/engine/math';
 import { drawForgeFiveProjectile } from './forgeFiveVfx';
 import { drawQuakeCracks, drawSpokeWheel } from './creatorPairVfx';
 import { drawMapPackProp } from './mapPackArt';
-import { drawPropDamage, propMaterial } from './breakableFx';
+import { drawPropSurface } from './propSurface';
+import { drawFracturedProp, PROP_FRACTURE_LINGER_MS } from './propFracture';
+import { propMaterial } from './breakableFx';
 
 /** World units of sprite height per rig pixel. */
 export const SPRITE_SCALE = 2.05;
@@ -2201,6 +2203,562 @@ function drawPotholes(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
+type SceneObstacle = {
+    x: number; y: number; w: number; h: number; kind: ObstacleDef['kind']; artAssetId?: string; damage?: number;
+    breakable?: boolean; seed?: number; lastHitAt?: number; lastHitX?: number; lastHitY?: number; brokenAt?: number;
+    marks?: readonly number[]; sliding?: boolean;
+  };
+
+function drawOrdinaryPropBody(ctx: CanvasRenderingContext2D, w: World, obstacle: SceneObstacle, colors: { top: string; side: string; trim: string }, snapshot = false) {
+  const height = 16;
+  const x = obstacle.x - obstacle.w / 2, y = obstacle.y - obstacle.h / 2;
+  const breakFade = 1;
+  ctx.save();
+  if (!snapshot) {
+    ctx.globalAlpha = 0.35 * breakFade;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(x + 10, y + obstacle.h + 10, obstacle.w, Math.max(5, obstacle.h * 0.18));
+  }
+  ctx.globalAlpha = breakFade;
+
+  ctx.fillStyle = colors.side;
+  ctx.globalAlpha = breakFade;
+  ctx.fillRect(x, y - height + obstacle.h, obstacle.w, height);
+  ctx.fillStyle = colors.top;
+  ctx.fillRect(x, y - height, obstacle.w, obstacle.h);
+  ctx.strokeStyle = colors.trim;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y - height + 1, obstacle.w - 2, obstacle.h - 2);
+  ctx.globalAlpha = breakFade;
+
+  drawPropSurface(ctx, propMaterial(obstacle.kind), obstacle.x, y - height + obstacle.h / 2, obstacle.w, obstacle.h, obstacle.seed ?? Math.round(obstacle.x * 31 + obstacle.y), w.graphicsQuality === 'performance' ? 'performance' : w.graphicsQuality === 'balanced' ? 'balanced' : 'high');
+
+  // Combat props get a strong, readable symbol in addition to their silhouette.
+  if (obstacle.kind === 'cover') {
+    ctx.save();
+    ctx.globalAlpha = 0.9 * breakFade;
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x + obstacle.w * 0.18, y - height + obstacle.h * 0.65);
+    ctx.lineTo(x + obstacle.w * 0.38, y - height + obstacle.h * 0.28);
+    ctx.lineTo(x + obstacle.w * 0.62, y - height + obstacle.h * 0.65);
+    ctx.lineTo(x + obstacle.w * 0.82, y - height + obstacle.h * 0.28);
+    ctx.stroke();
+    ctx.restore();
+  } else if (obstacle.kind === 'reflective-surface') {
+    ctx.save();
+    ctx.globalAlpha = 0.9 * breakFade;
+    ctx.strokeStyle = '#f5e8ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.75);
+    ctx.lineTo(x + obstacle.w * 0.5, y - height + obstacle.h * 0.2);
+    ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.75);
+    ctx.stroke();
+    ctx.restore();
+  } else if (obstacle.kind === 'flora') {
+    ctx.save();
+    ctx.fillStyle = '#18321f';
+    ctx.globalAlpha = 0.9 * breakFade;
+    ctx.fillRect(obstacle.x - 3, y - height + obstacle.h * 0.55, 6, obstacle.h * 0.45);
+    ctx.fillStyle = '#4fbd68';
+    for (let i = 0; i < 5; i += 1) {
+      const leafX = obstacle.x + Math.sin(i * 2.7) * obstacle.w * 0.35;
+      const leafY = y - height + obstacle.h * (0.2 + i * 0.13);
+      ctx.beginPath();
+      ctx.ellipse(leafX, leafY, obstacle.w * 0.28, obstacle.h * 0.13, i % 2 ? 0.45 : -0.45, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  } else if (obstacle.kind === 'barrier') {
+    // Add a curb and repeating reflectors so long cover reads as a street
+    // object instead of another arena wall.
+    ctx.save();
+    ctx.fillStyle = colors.trim;
+    ctx.globalAlpha = 0.75 * breakFade;
+    for (let marker = x + 12; marker < x + obstacle.w - 6; marker += 24) {
+      ctx.fillRect(marker, y - height + obstacle.h * 0.35, 8, 3);
+    }
+    ctx.restore();
+  } else if (obstacle.kind === 'car' || obstacle.kind === 'car-wreck') {
+    ctx.save();
+    ctx.globalAlpha = 0.6 * breakFade;
+    ctx.fillStyle = '#d8b4fe';
+    ctx.fillRect(x + obstacle.w * 0.18, y - height + obstacle.h * 0.22, obstacle.w * 0.64, 5);
+    ctx.fillStyle = '#11121a';
+    ctx.fillRect(x + obstacle.w * 0.16, y - height + obstacle.h * 0.7, 12, 5);
+    ctx.fillRect(x + obstacle.w * 0.72, y - height + obstacle.h * 0.7, 12, 5);
+    ctx.restore();
+  } else if (obstacle.kind === 'trash-can') {
+    ctx.save();
+    ctx.globalAlpha = 0.85 * breakFade;
+    ctx.strokeStyle = colors.trim;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(obstacle.x, y - height + obstacle.h * 0.16, obstacle.w * 0.42, obstacle.h * 0.1, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = '#3f2b19';
+    ctx.lineWidth = 1.5;
+    for (let i = -1; i <= 1; i += 1) {
+      ctx.beginPath();
+      ctx.moveTo(obstacle.x + i * obstacle.w * 0.18, y - height + obstacle.h * 0.05);
+      ctx.lineTo(obstacle.x + i * obstacle.w * 0.24, y - height - obstacle.h * 0.14);
+      ctx.stroke();
+    }
+    ctx.restore();
+  } else if (obstacle.kind === 'mailbox') {
+    ctx.save();
+    ctx.globalAlpha = 0.9 * breakFade;
+    ctx.fillStyle = colors.trim;
+    ctx.fillRect(x + obstacle.w * 0.6, y - height + obstacle.h * 0.1, obstacle.w * 0.32, obstacle.h * 0.16);
+    ctx.strokeStyle = '#0f2440';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x + obstacle.w * 0.18, y - height + obstacle.h * 0.45, obstacle.w * 0.64, 2);
+    ctx.restore();
+  } else if (obstacle.kind === 'fire-hydrant') {
+    ctx.save();
+    ctx.globalAlpha = 0.9 * breakFade;
+    ctx.fillStyle = colors.trim;
+    ctx.fillRect(x - 3, y - height + obstacle.h * 0.42, 5, 5);
+    ctx.fillRect(x + obstacle.w - 2, y - height + obstacle.h * 0.42, 5, 5);
+    ctx.beginPath();
+    ctx.arc(obstacle.x, y - height + obstacle.h * 0.16, obstacle.w * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  } else if (obstacle.kind === 'parking-meter') {
+    ctx.save();
+    ctx.globalAlpha = 0.9 * breakFade;
+    ctx.strokeStyle = colors.trim;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(obstacle.x, y - height + obstacle.h * 0.22, obstacle.w * 0.55, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#28282e';
+    ctx.fillRect(obstacle.x - 1, y - height + obstacle.h * 0.16, 2, obstacle.h * 0.12);
+    ctx.restore();
+  } else if (obstacle.kind === 'tree-digital') {
+    ctx.save();
+    const isCentralTree = obstacle.w >= 100 || (Math.abs(obstacle.x) < 5 && Math.abs(obstacle.y) < 5);
+    if (isCentralTree) {
+      // Massive Central Living Digital Tree: Yggdrasil Null
+      const trunkW = obstacle.w * 0.44;
+      const trunkH = obstacle.h * 1.15;
+      const treeTopY = y - height - obstacle.h * 0.95;
+
+      // Glowing root network on ground radiating outwards
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 3.5;
+      ctx.globalAlpha = 0.85 * breakFade;
+      for (let r = 0; r < 8; r += 1) {
+        const rootAngle = (r * Math.PI) / 4 + Math.sin(w.now * 0.001) * 0.05;
+        const rDist = obstacle.w * 0.9;
+        ctx.beginPath();
+        ctx.moveTo(obstacle.x, y);
+        const midX = obstacle.x + Math.cos(rootAngle) * (rDist * 0.5);
+        const midY = y + Math.sin(rootAngle) * (rDist * 0.5) * 0.55;
+        const endX = obstacle.x + Math.cos(rootAngle) * rDist;
+        const endY = y + Math.sin(rootAngle) * rDist * 0.55;
+        ctx.quadraticCurveTo(midX + Math.sin(r) * 12, midY, endX, endY);
+        ctx.stroke();
+      }
+
+      // Carbon trunk
+      ctx.fillStyle = '#0f1f18';
+      ctx.globalAlpha = 0.98 * breakFade;
+      ctx.fillRect(obstacle.x - trunkW / 2, y - trunkH, trunkW, trunkH);
+
+      // Vertical emerald circuit veins on trunk
+      ctx.fillStyle = '#34d399';
+      ctx.globalAlpha = (0.8 + Math.sin(w.now * 0.003) * 0.2) * breakFade;
+      for (let v = -2; v <= 2; v += 1) {
+        ctx.fillRect(obstacle.x + v * (trunkW * 0.18) - 1.5, y - trunkH + 4, 3, trunkH - 8);
+      }
+
+      // Sprawling digital foliage canopy
+      const canopyW = obstacle.w * 1.85;
+      const canopyH = obstacle.h * 1.55;
+      const pulse = 0.9 + Math.sin(w.now * 0.002) * 0.1;
+      ctx.globalAlpha = 0.95 * breakFade;
+
+      // Canopy shadow & dark underlayer
+      ctx.fillStyle = '#022c22';
+      ctx.beginPath();
+      ctx.ellipse(obstacle.x, treeTopY + 18, canopyW * 0.52, canopyH * 0.42, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Layered emerald pixel foliage clusters
+      ctx.fillStyle = '#047857';
+      for (let c = 0; c < 9; c += 1) {
+        const cx = obstacle.x + Math.cos(c * 0.72) * (canopyW * 0.3);
+        const cy = treeTopY + Math.sin(c * 0.72) * (canopyH * 0.25);
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, canopyW * 0.28, canopyH * 0.24, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Bright neon circuit foliage highlights
+      ctx.fillStyle = '#10b981';
+      ctx.globalAlpha = (pulse) * breakFade;
+      for (let c = 0; c < 6; c += 1) {
+        const cx = obstacle.x + Math.sin(c * 1.2) * (canopyW * 0.2);
+        const cy = treeTopY - 10 + Math.cos(c * 1.2) * (canopyH * 0.18);
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, canopyW * 0.18, canopyH * 0.15, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Floating digital data leaves orbiting crown
+      ctx.fillStyle = '#6ee7b7';
+      for (let l = 0; l < 6; l += 1) {
+        const orbitAngle = (w.now * 0.0015 + l * 1.05) % (Math.PI * 2);
+        const lx = obstacle.x + Math.cos(orbitAngle) * (canopyW * 0.48);
+        const ly = treeTopY + Math.sin(orbitAngle) * (canopyH * 0.28);
+        ctx.fillRect(lx - 3, ly - 3, 6, 6);
+      }
+    } else {
+      // Standard Cybernetic Tree
+      const trunkW = obstacle.w * 0.32;
+      const trunkH = obstacle.h * 0.85;
+      const treeTopY = y - height - obstacle.h * 0.4;
+
+      ctx.fillStyle = '#0a1d15';
+      ctx.fillRect(obstacle.x - trunkW / 2, y - trunkH, trunkW, trunkH);
+
+      // Circuit line
+      ctx.fillStyle = '#10b981';
+      ctx.globalAlpha = 0.8 * breakFade;
+      ctx.fillRect(obstacle.x - 1, y - trunkH + 2, 2, trunkH - 4);
+
+      // Foliage layers
+      ctx.fillStyle = '#064e3b';
+      ctx.beginPath();
+      ctx.ellipse(obstacle.x, treeTopY, obstacle.w * 0.65, obstacle.h * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#10b981';
+      ctx.globalAlpha = 0.9 * breakFade;
+      ctx.beginPath();
+      ctx.ellipse(obstacle.x, treeTopY - 6, obstacle.w * 0.42, obstacle.h * 0.38, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  } else if (obstacle.kind === 'tree-fake') {
+    // Holographic Decoy Tree: translucent, cyan/teal flickering scanlines
+    ctx.save();
+    const flicker = 0.48 + Math.sin(w.now * 0.012 + obstacle.x) * 0.2;
+    ctx.globalAlpha = (flicker) * breakFade;
+
+    // Base projector pedestal
+    ctx.fillStyle = '#083344';
+    ctx.fillRect(obstacle.x - 9, y - 4, 18, 6);
+    ctx.fillStyle = '#06b6d4';
+    ctx.fillRect(obstacle.x - 6, y - 3, 12, 2);
+
+    // Holographic trunk
+    const trunkW = obstacle.w * 0.26;
+    const trunkH = obstacle.h * 0.8;
+    const treeTopY = y - height - obstacle.h * 0.35;
+
+    ctx.fillStyle = '#0891b2';
+    ctx.fillRect(obstacle.x - trunkW / 2, y - trunkH, trunkW, trunkH);
+
+    // Hologram canopy outline & fill
+    ctx.fillStyle = '#06b6d4';
+    ctx.beginPath();
+    ctx.ellipse(obstacle.x, treeTopY, obstacle.w * 0.6, obstacle.h * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // CRT horizontal holographic scanlines
+    ctx.fillStyle = '#a5f3fc';
+    for (let s = y - height - obstacle.h * 0.8; s < y; s += 5) {
+      ctx.fillRect(obstacle.x - obstacle.w * 0.55, s, obstacle.w * 1.1, 1.5);
+    }
+
+    // Glitch tear offset
+    if (Math.sin(w.now * 0.005 + obstacle.y) > 0.75) {
+      ctx.fillStyle = '#ec4899';
+      ctx.fillRect(obstacle.x - obstacle.w * 0.4, treeTopY, obstacle.w * 0.8, 3);
+    }
+    ctx.restore();
+  } else if (obstacle.kind === 'skyscraper') {
+    ctx.save();
+    // Multi-story corporate skyscraper facade with glowing window matrix & rooftop spire
+    const roofY = y - height;
+    // Window matrix on side facade
+    const rows = Math.max(2, Math.floor(height / 14));
+    const cols = Math.max(3, Math.floor(obstacle.w / 16));
+    const cellW = (obstacle.w - 12) / cols;
+    const cellH = (height - 10) / rows;
+    for (let r = 0; r < rows; r += 1) {
+      for (let c = 0; c < cols; c += 1) {
+        const winX = x + 6 + c * cellW;
+        const winY = roofY + 6 + r * cellH;
+        const litSeed = Math.sin((obstacle.x + c * 17) * 12.9898 + (obstacle.y + r * 13) * 78.233);
+        if (litSeed > -0.1) {
+          ctx.fillStyle = litSeed > 0.5 ? '#38bdf8' : litSeed > 0.2 ? '#fef08a' : '#0284c7';
+          ctx.globalAlpha = (0.75 + Math.sin(w.now * 0.002 + litSeed * 10) * 0.2) * breakFade;
+          ctx.fillRect(winX, winY, cellW - 4, cellH - 4);
+        }
+      }
+    }
+    // Rooftop parapet trim & elevator penthouse
+    ctx.globalAlpha = 0.95 * breakFade;
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(x + obstacle.w * 0.35, roofY - 14, obstacle.w * 0.3, 14);
+    ctx.fillStyle = '#0ea5e9';
+    ctx.fillRect(x + obstacle.w * 0.35 + 3, roofY - 10, obstacle.w * 0.3 - 6, 2);
+    // Warning antenna spire
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(obstacle.x, roofY - 14);
+    ctx.lineTo(obstacle.x, roofY - 32);
+    ctx.stroke();
+    // Blinking red aircraft collision beacon
+    const beaconLit = Math.sin(w.now * 0.006 + obstacle.x) > 0;
+    ctx.fillStyle = beaconLit ? '#ef4444' : '#450a0a';
+    ctx.beginPath();
+    ctx.arc(obstacle.x, roofY - 33, beaconLit ? 3.5 : 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  } else if (obstacle.kind === 'transformer-station') {
+    ctx.save();
+    const roofY = y - height;
+    // High-voltage warning hazard stripes on face
+    ctx.fillStyle = '#eab308';
+    ctx.fillRect(x + 4, roofY + 4, obstacle.w - 8, 5);
+    ctx.fillStyle = '#000000';
+    for (let s = x + 4; s < x + obstacle.w - 8; s += 10) {
+      ctx.beginPath();
+      ctx.moveTo(s, roofY + 4);
+      ctx.lineTo(s + 5, roofY + 9);
+      ctx.lineTo(s + 3, roofY + 9);
+      ctx.lineTo(s - 2, roofY + 4);
+      ctx.fill();
+    }
+    // Twin porcelain insulator coils atop unit
+    const coilCount = Math.max(2, Math.floor(obstacle.w / 28));
+    for (let i = 0; i < coilCount; i += 1) {
+      const cx = x + (i + 0.5) * (obstacle.w / coilCount);
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(cx - 4, roofY - 12, 8, 12);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(cx - 6, roofY - 8, 12, 2);
+      ctx.fillRect(cx - 6, roofY - 4, 12, 2);
+      // Intermittent electric spark discharge
+      if (Math.sin(w.now * 0.015 + i * 3 + obstacle.x) > 0.85) {
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx, roofY - 12);
+        ctx.lineTo(cx + (Math.random() - 0.5) * 14, roofY - 20 - Math.random() * 8);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  } else if (obstacle.kind === 'skyline-bridge') {
+    ctx.save();
+    const roofY = y - height;
+    // Illuminated turquoise walkway floor strip
+    ctx.fillStyle = '#06b6d4';
+    ctx.globalAlpha = 0.85 * breakFade;
+    ctx.fillRect(x + 2, roofY + obstacle.h * 0.4, obstacle.w - 4, 3);
+    // Steel suspension trusses & glass canopy balustrade
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.7 * breakFade;
+    ctx.beginPath();
+    for (let tx = x; tx <= x + obstacle.w; tx += 20) {
+      ctx.moveTo(tx, roofY + obstacle.h * 0.4);
+      ctx.lineTo(tx + 10, roofY);
+      ctx.lineTo(tx + 20, roofY + obstacle.h * 0.4);
+    }
+    ctx.stroke();
+    ctx.restore();
+  } else if (obstacle.kind === 'beacon-tower') {
+    ctx.save();
+    const roofY = y - height;
+    // Communication lattice mast
+    ctx.strokeStyle = '#a855f7';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(obstacle.x - 6, roofY - 26, 12, 26);
+    ctx.beginPath();
+    ctx.moveTo(obstacle.x - 6, roofY);
+    ctx.lineTo(obstacle.x + 6, roofY - 26);
+    ctx.moveTo(obstacle.x + 6, roofY);
+    ctx.lineTo(obstacle.x - 6, roofY - 26);
+    ctx.stroke();
+    // Concentric radio signal pulses expanding outward
+    const pulsePhase = (w.now * 0.003 + obstacle.y) % 1;
+    ctx.strokeStyle = '#ec4899';
+    ctx.globalAlpha = ((1 - pulsePhase) * 0.8) * breakFade;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(obstacle.x, roofY - 28, 6 + pulsePhase * 24, -Math.PI * 0.8, -Math.PI * 0.2);
+    ctx.stroke();
+    ctx.restore();
+  } else if (obstacle.kind === 'security-gate') {
+    ctx.save();
+    const roofY = y - height;
+    // Twin armored biometric stanchions
+    ctx.fillStyle = '#78350f';
+    ctx.fillRect(x, roofY, 8, obstacle.h);
+    ctx.fillRect(x + obstacle.w - 8, roofY, 8, obstacle.h);
+    // Laser security tripwire beam
+    const laserGlow = 0.6 + Math.sin(w.now * 0.008) * 0.3;
+    ctx.globalAlpha = (laserGlow) * breakFade;
+    ctx.fillStyle = '#ea580c';
+    ctx.fillRect(x + 8, roofY + obstacle.h * 0.45, obstacle.w - 16, 2.5);
+    // Biometric status LED
+    ctx.fillStyle = Math.sin(w.now * 0.004) > 0 ? '#22c55e' : '#ef4444';
+    ctx.beginPath();
+    ctx.arc(x + 4, roofY + 6, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  } else if (obstacle.kind === 'bunker-hatch') {
+    ctx.save();
+    // Subterranean blast door flush with asphalt
+    const cx = obstacle.x;
+    const cy = y - height * 0.5;
+    const r = Math.min(obstacle.w, obstacle.h) * 0.44;
+    // Bolted steel perimeter ring
+    ctx.fillStyle = '#292524';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#78716c';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Inner hatch plate
+    ctx.fillStyle = '#44403c';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.75, 0, Math.PI * 2);
+    ctx.fill();
+    // Hydraulic locking spokes
+    ctx.strokeStyle = '#a8a29e';
+    ctx.lineWidth = 2.5;
+    for (let a = 0; a < 4; a += 1) {
+      const ang = (a * Math.PI) / 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(ang) * (r * 0.7), cy + Math.sin(ang) * (r * 0.7));
+      ctx.stroke();
+    }
+    // Status indicator light
+    ctx.fillStyle = '#06b6d4';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  if (obstacle.kind === 'metal-box') {
+    ctx.save();
+    ctx.globalAlpha = 0.9 * breakFade;
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 7, y - height + 7, obstacle.w - 14, obstacle.h - 14);
+    ctx.beginPath();
+    ctx.moveTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.2);
+    ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.8);
+    ctx.moveTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.2);
+    ctx.lineTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.8);
+    ctx.stroke();
+    ctx.restore();
+  } else if (obstacle.kind === 'bench') {
+    ctx.save();
+    ctx.globalAlpha = 0.9 * breakFade;
+    ctx.strokeStyle = '#e2b07a';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x + obstacle.w * 0.12, y - height + obstacle.h * 0.32);
+    ctx.lineTo(x + obstacle.w * 0.88, y - height + obstacle.h * 0.32);
+    ctx.moveTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.75);
+    ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.75);
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawOrdinaryPropState(ctx: CanvasRenderingContext2D, w: World, obstacle: SceneObstacle) {
+  const height = 16, breakFade = 1;
+  const x = obstacle.x - obstacle.w / 2, y = obstacle.y - obstacle.h / 2;
+  const live = w.breakables.find((b) => Math.abs(b.x - obstacle.x) < 1 && Math.abs(b.y - obstacle.y) < 1);
+  if (live && live.rawDataBreakage > 0.025) {
+    ctx.save();
+    const severity = live.rawDataBreakage;
+    const blocks = Math.max(1, Math.ceil(severity * 7));
+    ctx.globalAlpha = (0.22 + severity * 0.55) * breakFade;
+    ctx.fillStyle = severity > 0.65 ? '#facc15' : '#86efac';
+    for (let i = 0; i < blocks; i += 1) {
+      const rx = hashCell(live.uid, i * 13) * Math.max(4, obstacle.w - 8);
+      const ry = hashCell(live.uid + 31, i * 17) * Math.max(4, obstacle.h - 8);
+      const size = 3 + Math.floor(hashCell(live.uid + 67, i * 19) * 6);
+      ctx.fillRect(x + 4 + rx, y - height + 4 + ry, size, size);
+    }
+    if (severity > 0.72) {
+      ctx.globalAlpha = 0.8 * breakFade;
+      ctx.font = 'bold 8px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('RAW DATA', obstacle.x, y - height - 5);
+    }
+    ctx.restore();
+  }
+  if (live?.chainActive && !live.landedHeatActive) {
+    ctx.save();
+    const speed = Math.hypot(live.vx, live.vy);
+    const pulse = 0.62 + Math.sin(w.now / 92) * 0.2;
+    ctx.globalAlpha = (pulse) * breakFade;
+    ctx.shadowColor = '#ffb347';
+    ctx.shadowBlur = 12;
+    ctx.strokeStyle = '#ffb347';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 5]);
+    ctx.strokeRect(x - 4, y - height - 4, obstacle.w + 8, obstacle.h + 8);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ffb347';
+    ctx.font = 'bold 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      live.chainCycles > 0 ? `CHAIN ${Math.min(3, live.chainCycles)}/3` : speed > 0 ? 'CHAIN LIVE' : 'CHAIN READY',
+      obstacle.x,
+      y - height - 9,
+    );
+    ctx.restore();
+  }
+  if (live?.landedHeatActive) {
+    ctx.save();
+    const pulse = 0.65 + Math.sin(w.now / 105) * 0.25;
+    ctx.globalAlpha = (pulse) * breakFade;
+    ctx.shadowColor = '#ff4d5e';
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = '#ff4d5e';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x - 5, y - height - 5, obstacle.w + 10, obstacle.h + 10);
+    ctx.fillStyle = '#ff4d5e';
+    ctx.globalAlpha = (0.28 + pulse * 0.18) * breakFade;
+    ctx.fillRect(x, y - height, obstacle.w, obstacle.h);
+    ctx.restore();
+  }
+  if (live?.clickPrimed) {
+    ctx.save();
+    const pulse = 0.7 + Math.sin(w.now / 120) * 0.2;
+    ctx.globalAlpha = (pulse) * breakFade;
+    ctx.strokeStyle = '#7dd3fc';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([5, 4]);
+    ctx.strokeRect(x - 5, y - height - 5, obstacle.w + 10, obstacle.h + 10);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#7dd3fc';
+    ctx.font = 'bold 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('NEXT HIT REVERSES', obstacle.x, y - height - 10);
+    ctx.restore();
+  }
+}
+
 function drawObstacles(
   ctx: CanvasRenderingContext2D,
   w: World,
@@ -2212,11 +2770,7 @@ function drawObstacles(
   // same authored silhouette and profile. Culled to the camera viewport --
   // endless mode can have a full 5x5 chunk window's worth of breakables
   // loaded at once, and this ran unfiltered every frame before.
-  const obstacleList: Array<{
-    x: number; y: number; w: number; h: number; kind: ObstacleDef['kind']; artAssetId?: string; damage?: number;
-    breakable?: boolean; seed?: number; lastHitAt?: number; lastHitX?: number; lastHitY?: number; brokenAt?: number;
-    marks?: readonly number[]; sliding?: boolean;
-  }> = [];
+  const obstacleList: SceneObstacle[] = [];
   const closedBuildings = w.endless?.buildingEntryStyle === 'seamless' && !w.endless.inDungeon
     ? w.endless.buildings.filter((building) =>
         building.id !== w.endless!.walkInBuildingId &&
@@ -2227,7 +2781,7 @@ function drawObstacles(
       )
     : [];
   for (const o of w.breakables) {
-    if (o.broken && w.now - o.brokenAt > (blockMaterialOf(o.kind) ? BLOCK_FX_LINGER_MS : 760)) continue;
+    if (o.broken && w.now - o.brokenAt > (blockMaterialOf(o.kind) ? BLOCK_FX_LINGER_MS : PROP_FRACTURE_LINGER_MS)) continue;
     if (o.x < viewBounds.left - margin || o.x > viewBounds.right + margin
       || o.y < viewBounds.top - margin || o.y > viewBounds.bottom + margin) continue;
     if (closedBuildings.some((building) =>
@@ -2254,6 +2808,7 @@ function drawObstacles(
         seed: obstacle.seed, now: w.now, lastHitAt: obstacle.lastHitAt,
         lastHitX: obstacle.lastHitX, lastHitY: obstacle.lastHitY, brokenAt: obstacle.brokenAt,
         motionEnabled: w.effectMotionEnabled,
+        marks: obstacle.marks,
         fragmentLimit: w.graphicsQuality === 'performance' ? 4 : w.graphicsQuality === 'balanced' ? 6 : 9,
       });
       continue;
@@ -2276,558 +2831,29 @@ function drawObstacles(
     const x = obstacle.x - obstacle.w / 2;
     const y = obstacle.y - obstacle.h / 2;
 
-    ctx.globalAlpha = 0.35;
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(x + 10, y + obstacle.h + 10, obstacle.w, Math.max(5, obstacle.h * 0.18));
-    ctx.globalAlpha = 1;
-
-    ctx.fillStyle = colors.side;
-    const breakFade = obstacle.brokenAt === undefined ? 1 : clamp(1 - (w.now - obstacle.brokenAt) / 190, 0, 1);
-    ctx.globalAlpha = breakFade;
-    ctx.fillRect(x, y - height + obstacle.h, obstacle.w, height);
-    ctx.fillStyle = colors.top;
-    ctx.fillRect(x, y - height, obstacle.w, obstacle.h);
-    ctx.strokeStyle = colors.trim;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x + 1, y - height + 1, obstacle.w - 2, obstacle.h - 2);
-    ctx.globalAlpha = 1;
-
-    // Combat props get a strong, readable symbol in addition to their silhouette.
-    if (obstacle.kind === 'cover') {
-      ctx.save();
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = '#fbbf24';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(x + obstacle.w * 0.18, y - height + obstacle.h * 0.65);
-      ctx.lineTo(x + obstacle.w * 0.38, y - height + obstacle.h * 0.28);
-      ctx.lineTo(x + obstacle.w * 0.62, y - height + obstacle.h * 0.65);
-      ctx.lineTo(x + obstacle.w * 0.82, y - height + obstacle.h * 0.28);
-      ctx.stroke();
-      ctx.restore();
-    } else if (obstacle.kind === 'reflective-surface') {
-      ctx.save();
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = '#f5e8ff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.75);
-      ctx.lineTo(x + obstacle.w * 0.5, y - height + obstacle.h * 0.2);
-      ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.75);
-      ctx.stroke();
-      ctx.restore();
-    } else if (obstacle.kind === 'flora') {
-      ctx.save();
-      ctx.fillStyle = '#18321f';
-      ctx.globalAlpha = 0.9;
-      ctx.fillRect(obstacle.x - 3, y - height + obstacle.h * 0.55, 6, obstacle.h * 0.45);
-      ctx.fillStyle = '#4fbd68';
-      for (let i = 0; i < 5; i += 1) {
-        const leafX = obstacle.x + Math.sin(i * 2.7) * obstacle.w * 0.35;
-        const leafY = y - height + obstacle.h * (0.2 + i * 0.13);
-        ctx.beginPath();
-        ctx.ellipse(leafX, leafY, obstacle.w * 0.28, obstacle.h * 0.13, i % 2 ? 0.45 : -0.45, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
-    } else if (obstacle.kind === 'barrier') {
-      // Add a curb and repeating reflectors so long cover reads as a street
-      // object instead of another arena wall.
-      ctx.save();
-      ctx.fillStyle = colors.trim;
-      ctx.globalAlpha = 0.75;
-      for (let marker = x + 12; marker < x + obstacle.w - 6; marker += 24) {
-        ctx.fillRect(marker, y - height + obstacle.h * 0.35, 8, 3);
-      }
-      ctx.restore();
-    } else if (obstacle.kind === 'car' || obstacle.kind === 'car-wreck') {
-      ctx.save();
-      ctx.globalAlpha = 0.6;
-      ctx.fillStyle = '#d8b4fe';
-      ctx.fillRect(x + obstacle.w * 0.18, y - height + obstacle.h * 0.22, obstacle.w * 0.64, 5);
-      ctx.fillStyle = '#11121a';
-      ctx.fillRect(x + obstacle.w * 0.16, y - height + obstacle.h * 0.7, 12, 5);
-      ctx.fillRect(x + obstacle.w * 0.72, y - height + obstacle.h * 0.7, 12, 5);
-      ctx.restore();
-    } else if (obstacle.kind === 'trash-can') {
-      ctx.save();
-      ctx.globalAlpha = 0.85;
-      ctx.strokeStyle = colors.trim;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(obstacle.x, y - height + obstacle.h * 0.16, obstacle.w * 0.42, obstacle.h * 0.1, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.strokeStyle = '#3f2b19';
-      ctx.lineWidth = 1.5;
-      for (let i = -1; i <= 1; i += 1) {
-        ctx.beginPath();
-        ctx.moveTo(obstacle.x + i * obstacle.w * 0.18, y - height + obstacle.h * 0.05);
-        ctx.lineTo(obstacle.x + i * obstacle.w * 0.24, y - height - obstacle.h * 0.14);
-        ctx.stroke();
-      }
-      ctx.restore();
-    } else if (obstacle.kind === 'mailbox') {
-      ctx.save();
-      ctx.globalAlpha = 0.9;
-      ctx.fillStyle = colors.trim;
-      ctx.fillRect(x + obstacle.w * 0.6, y - height + obstacle.h * 0.1, obstacle.w * 0.32, obstacle.h * 0.16);
-      ctx.strokeStyle = '#0f2440';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(x + obstacle.w * 0.18, y - height + obstacle.h * 0.45, obstacle.w * 0.64, 2);
-      ctx.restore();
-    } else if (obstacle.kind === 'fire-hydrant') {
-      ctx.save();
-      ctx.globalAlpha = 0.9;
-      ctx.fillStyle = colors.trim;
-      ctx.fillRect(x - 3, y - height + obstacle.h * 0.42, 5, 5);
-      ctx.fillRect(x + obstacle.w - 2, y - height + obstacle.h * 0.42, 5, 5);
-      ctx.beginPath();
-      ctx.arc(obstacle.x, y - height + obstacle.h * 0.16, obstacle.w * 0.16, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    } else if (obstacle.kind === 'parking-meter') {
-      ctx.save();
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = colors.trim;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(obstacle.x, y - height + obstacle.h * 0.22, obstacle.w * 0.55, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = '#28282e';
-      ctx.fillRect(obstacle.x - 1, y - height + obstacle.h * 0.16, 2, obstacle.h * 0.12);
-      ctx.restore();
-    } else if (obstacle.kind === 'tree-digital') {
-      ctx.save();
-      const isCentralTree = obstacle.w >= 100 || (Math.abs(obstacle.x) < 5 && Math.abs(obstacle.y) < 5);
-      if (isCentralTree) {
-        // Massive Central Living Digital Tree: Yggdrasil Null
-        const trunkW = obstacle.w * 0.44;
-        const trunkH = obstacle.h * 1.15;
-        const treeTopY = y - height - obstacle.h * 0.95;
-
-        // Glowing root network on ground radiating outwards
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 3.5;
-        ctx.globalAlpha = 0.85;
-        for (let r = 0; r < 8; r += 1) {
-          const rootAngle = (r * Math.PI) / 4 + Math.sin(w.now * 0.001) * 0.05;
-          const rDist = obstacle.w * 0.9;
-          ctx.beginPath();
-          ctx.moveTo(obstacle.x, y);
-          const midX = obstacle.x + Math.cos(rootAngle) * (rDist * 0.5);
-          const midY = y + Math.sin(rootAngle) * (rDist * 0.5) * 0.55;
-          const endX = obstacle.x + Math.cos(rootAngle) * rDist;
-          const endY = y + Math.sin(rootAngle) * rDist * 0.55;
-          ctx.quadraticCurveTo(midX + Math.sin(r) * 12, midY, endX, endY);
-          ctx.stroke();
-        }
-
-        // Carbon trunk
-        ctx.fillStyle = '#0f1f18';
-        ctx.globalAlpha = 0.98;
-        ctx.fillRect(obstacle.x - trunkW / 2, y - trunkH, trunkW, trunkH);
-
-        // Vertical emerald circuit veins on trunk
-        ctx.fillStyle = '#34d399';
-        ctx.globalAlpha = 0.8 + Math.sin(w.now * 0.003) * 0.2;
-        for (let v = -2; v <= 2; v += 1) {
-          ctx.fillRect(obstacle.x + v * (trunkW * 0.18) - 1.5, y - trunkH + 4, 3, trunkH - 8);
-        }
-
-        // Sprawling digital foliage canopy
-        const canopyW = obstacle.w * 1.85;
-        const canopyH = obstacle.h * 1.55;
-        const pulse = 0.9 + Math.sin(w.now * 0.002) * 0.1;
-        ctx.globalAlpha = 0.95;
-
-        // Canopy shadow & dark underlayer
-        ctx.fillStyle = '#022c22';
-        ctx.beginPath();
-        ctx.ellipse(obstacle.x, treeTopY + 18, canopyW * 0.52, canopyH * 0.42, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Layered emerald pixel foliage clusters
-        ctx.fillStyle = '#047857';
-        for (let c = 0; c < 9; c += 1) {
-          const cx = obstacle.x + Math.cos(c * 0.72) * (canopyW * 0.3);
-          const cy = treeTopY + Math.sin(c * 0.72) * (canopyH * 0.25);
-          ctx.beginPath();
-          ctx.ellipse(cx, cy, canopyW * 0.28, canopyH * 0.24, 0, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        // Bright neon circuit foliage highlights
-        ctx.fillStyle = '#10b981';
-        ctx.globalAlpha = pulse;
-        for (let c = 0; c < 6; c += 1) {
-          const cx = obstacle.x + Math.sin(c * 1.2) * (canopyW * 0.2);
-          const cy = treeTopY - 10 + Math.cos(c * 1.2) * (canopyH * 0.18);
-          ctx.beginPath();
-          ctx.ellipse(cx, cy, canopyW * 0.18, canopyH * 0.15, 0, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        // Floating digital data leaves orbiting crown
-        ctx.fillStyle = '#6ee7b7';
-        for (let l = 0; l < 6; l += 1) {
-          const orbitAngle = (w.now * 0.0015 + l * 1.05) % (Math.PI * 2);
-          const lx = obstacle.x + Math.cos(orbitAngle) * (canopyW * 0.48);
-          const ly = treeTopY + Math.sin(orbitAngle) * (canopyH * 0.28);
-          ctx.fillRect(lx - 3, ly - 3, 6, 6);
-        }
-      } else {
-        // Standard Cybernetic Tree
-        const trunkW = obstacle.w * 0.32;
-        const trunkH = obstacle.h * 0.85;
-        const treeTopY = y - height - obstacle.h * 0.4;
-
-        ctx.fillStyle = '#0a1d15';
-        ctx.fillRect(obstacle.x - trunkW / 2, y - trunkH, trunkW, trunkH);
-
-        // Circuit line
-        ctx.fillStyle = '#10b981';
-        ctx.globalAlpha = 0.8;
-        ctx.fillRect(obstacle.x - 1, y - trunkH + 2, 2, trunkH - 4);
-
-        // Foliage layers
-        ctx.fillStyle = '#064e3b';
-        ctx.beginPath();
-        ctx.ellipse(obstacle.x, treeTopY, obstacle.w * 0.65, obstacle.h * 0.55, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#10b981';
-        ctx.globalAlpha = 0.9;
-        ctx.beginPath();
-        ctx.ellipse(obstacle.x, treeTopY - 6, obstacle.w * 0.42, obstacle.h * 0.38, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
-    } else if (obstacle.kind === 'tree-fake') {
-      // Holographic Decoy Tree: translucent, cyan/teal flickering scanlines
-      ctx.save();
-      const flicker = 0.48 + Math.sin(w.now * 0.012 + obstacle.x) * 0.2;
-      ctx.globalAlpha = flicker;
-
-      // Base projector pedestal
-      ctx.fillStyle = '#083344';
-      ctx.fillRect(obstacle.x - 9, y - 4, 18, 6);
-      ctx.fillStyle = '#06b6d4';
-      ctx.fillRect(obstacle.x - 6, y - 3, 12, 2);
-
-      // Holographic trunk
-      const trunkW = obstacle.w * 0.26;
-      const trunkH = obstacle.h * 0.8;
-      const treeTopY = y - height - obstacle.h * 0.35;
-
-      ctx.fillStyle = '#0891b2';
-      ctx.fillRect(obstacle.x - trunkW / 2, y - trunkH, trunkW, trunkH);
-
-      // Hologram canopy outline & fill
-      ctx.fillStyle = '#06b6d4';
-      ctx.beginPath();
-      ctx.ellipse(obstacle.x, treeTopY, obstacle.w * 0.6, obstacle.h * 0.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // CRT horizontal holographic scanlines
-      ctx.fillStyle = '#a5f3fc';
-      for (let s = y - height - obstacle.h * 0.8; s < y; s += 5) {
-        ctx.fillRect(obstacle.x - obstacle.w * 0.55, s, obstacle.w * 1.1, 1.5);
-      }
-
-      // Glitch tear offset
-      if (Math.sin(w.now * 0.005 + obstacle.y) > 0.75) {
-        ctx.fillStyle = '#ec4899';
-        ctx.fillRect(obstacle.x - obstacle.w * 0.4, treeTopY, obstacle.w * 0.8, 3);
-      }
-      ctx.restore();
-    } else if (obstacle.kind === 'skyscraper') {
-      ctx.save();
-      // Multi-story corporate skyscraper facade with glowing window matrix & rooftop spire
-      const roofY = y - height;
-      // Window matrix on side facade
-      const rows = Math.max(2, Math.floor(height / 14));
-      const cols = Math.max(3, Math.floor(obstacle.w / 16));
-      const cellW = (obstacle.w - 12) / cols;
-      const cellH = (height - 10) / rows;
-      for (let r = 0; r < rows; r += 1) {
-        for (let c = 0; c < cols; c += 1) {
-          const winX = x + 6 + c * cellW;
-          const winY = roofY + 6 + r * cellH;
-          const litSeed = Math.sin((obstacle.x + c * 17) * 12.9898 + (obstacle.y + r * 13) * 78.233);
-          if (litSeed > -0.1) {
-            ctx.fillStyle = litSeed > 0.5 ? '#38bdf8' : litSeed > 0.2 ? '#fef08a' : '#0284c7';
-            ctx.globalAlpha = 0.75 + Math.sin(w.now * 0.002 + litSeed * 10) * 0.2;
-            ctx.fillRect(winX, winY, cellW - 4, cellH - 4);
-          }
-        }
-      }
-      // Rooftop parapet trim & elevator penthouse
-      ctx.globalAlpha = 0.95;
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(x + obstacle.w * 0.35, roofY - 14, obstacle.w * 0.3, 14);
-      ctx.fillStyle = '#0ea5e9';
-      ctx.fillRect(x + obstacle.w * 0.35 + 3, roofY - 10, obstacle.w * 0.3 - 6, 2);
-      // Warning antenna spire
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(obstacle.x, roofY - 14);
-      ctx.lineTo(obstacle.x, roofY - 32);
-      ctx.stroke();
-      // Blinking red aircraft collision beacon
-      const beaconLit = Math.sin(w.now * 0.006 + obstacle.x) > 0;
-      ctx.fillStyle = beaconLit ? '#ef4444' : '#450a0a';
-      ctx.beginPath();
-      ctx.arc(obstacle.x, roofY - 33, beaconLit ? 3.5 : 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    } else if (obstacle.kind === 'transformer-station') {
-      ctx.save();
-      const roofY = y - height;
-      // High-voltage warning hazard stripes on face
-      ctx.fillStyle = '#eab308';
-      ctx.fillRect(x + 4, roofY + 4, obstacle.w - 8, 5);
-      ctx.fillStyle = '#000000';
-      for (let s = x + 4; s < x + obstacle.w - 8; s += 10) {
-        ctx.beginPath();
-        ctx.moveTo(s, roofY + 4);
-        ctx.lineTo(s + 5, roofY + 9);
-        ctx.lineTo(s + 3, roofY + 9);
-        ctx.lineTo(s - 2, roofY + 4);
-        ctx.fill();
-      }
-      // Twin porcelain insulator coils atop unit
-      const coilCount = Math.max(2, Math.floor(obstacle.w / 28));
-      for (let i = 0; i < coilCount; i += 1) {
-        const cx = x + (i + 0.5) * (obstacle.w / coilCount);
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillRect(cx - 4, roofY - 12, 8, 12);
-        ctx.fillStyle = '#f59e0b';
-        ctx.fillRect(cx - 6, roofY - 8, 12, 2);
-        ctx.fillRect(cx - 6, roofY - 4, 12, 2);
-        // Intermittent electric spark discharge
-        if (Math.sin(w.now * 0.015 + i * 3 + obstacle.x) > 0.85) {
-          ctx.strokeStyle = '#38bdf8';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(cx, roofY - 12);
-          ctx.lineTo(cx + (Math.random() - 0.5) * 14, roofY - 20 - Math.random() * 8);
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-    } else if (obstacle.kind === 'skyline-bridge') {
-      ctx.save();
-      const roofY = y - height;
-      // Illuminated turquoise walkway floor strip
-      ctx.fillStyle = '#06b6d4';
-      ctx.globalAlpha = 0.85;
-      ctx.fillRect(x + 2, roofY + obstacle.h * 0.4, obstacle.w - 4, 3);
-      // Steel suspension trusses & glass canopy balustrade
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 1.5;
-      ctx.globalAlpha = 0.7;
-      ctx.beginPath();
-      for (let tx = x; tx <= x + obstacle.w; tx += 20) {
-        ctx.moveTo(tx, roofY + obstacle.h * 0.4);
-        ctx.lineTo(tx + 10, roofY);
-        ctx.lineTo(tx + 20, roofY + obstacle.h * 0.4);
-      }
-      ctx.stroke();
-      ctx.restore();
-    } else if (obstacle.kind === 'beacon-tower') {
-      ctx.save();
-      const roofY = y - height;
-      // Communication lattice mast
-      ctx.strokeStyle = '#a855f7';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(obstacle.x - 6, roofY - 26, 12, 26);
-      ctx.beginPath();
-      ctx.moveTo(obstacle.x - 6, roofY);
-      ctx.lineTo(obstacle.x + 6, roofY - 26);
-      ctx.moveTo(obstacle.x + 6, roofY);
-      ctx.lineTo(obstacle.x - 6, roofY - 26);
-      ctx.stroke();
-      // Concentric radio signal pulses expanding outward
-      const pulsePhase = (w.now * 0.003 + obstacle.y) % 1;
-      ctx.strokeStyle = '#ec4899';
-      ctx.globalAlpha = (1 - pulsePhase) * 0.8;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(obstacle.x, roofY - 28, 6 + pulsePhase * 24, -Math.PI * 0.8, -Math.PI * 0.2);
-      ctx.stroke();
-      ctx.restore();
-    } else if (obstacle.kind === 'security-gate') {
-      ctx.save();
-      const roofY = y - height;
-      // Twin armored biometric stanchions
-      ctx.fillStyle = '#78350f';
-      ctx.fillRect(x, roofY, 8, obstacle.h);
-      ctx.fillRect(x + obstacle.w - 8, roofY, 8, obstacle.h);
-      // Laser security tripwire beam
-      const laserGlow = 0.6 + Math.sin(w.now * 0.008) * 0.3;
-      ctx.globalAlpha = laserGlow;
-      ctx.fillStyle = '#ea580c';
-      ctx.fillRect(x + 8, roofY + obstacle.h * 0.45, obstacle.w - 16, 2.5);
-      // Biometric status LED
-      ctx.fillStyle = Math.sin(w.now * 0.004) > 0 ? '#22c55e' : '#ef4444';
-      ctx.beginPath();
-      ctx.arc(x + 4, roofY + 6, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    } else if (obstacle.kind === 'bunker-hatch') {
-      ctx.save();
-      // Subterranean blast door flush with asphalt
-      const cx = obstacle.x;
-      const cy = y - height * 0.5;
-      const r = Math.min(obstacle.w, obstacle.h) * 0.44;
-      // Bolted steel perimeter ring
-      ctx.fillStyle = '#292524';
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#78716c';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      // Inner hatch plate
-      ctx.fillStyle = '#44403c';
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 0.75, 0, Math.PI * 2);
-      ctx.fill();
-      // Hydraulic locking spokes
-      ctx.strokeStyle = '#a8a29e';
-      ctx.lineWidth = 2.5;
-      for (let a = 0; a < 4; a += 1) {
-        const ang = (a * Math.PI) / 2;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + Math.cos(ang) * (r * 0.7), cy + Math.sin(ang) * (r * 0.7));
-        ctx.stroke();
-      }
-      // Status indicator light
-      ctx.fillStyle = '#06b6d4';
-      ctx.beginPath();
-      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    const live = w.breakables.find((b) => Math.abs(b.x - obstacle.x) < 1 && Math.abs(b.y - obstacle.y) < 1);
-    if (live && live.rawDataBreakage > 0.025) {
-      ctx.save();
-      const severity = live.rawDataBreakage;
-      const blocks = Math.max(1, Math.ceil(severity * 7));
-      ctx.globalAlpha = 0.22 + severity * 0.55;
-      ctx.fillStyle = severity > 0.65 ? '#facc15' : '#86efac';
-      for (let i = 0; i < blocks; i += 1) {
-        const rx = hashCell(live.uid, i * 13) * Math.max(4, obstacle.w - 8);
-        const ry = hashCell(live.uid + 31, i * 17) * Math.max(4, obstacle.h - 8);
-        const size = 3 + Math.floor(hashCell(live.uid + 67, i * 19) * 6);
-        ctx.fillRect(x + 4 + rx, y - height + 4 + ry, size, size);
-      }
-      if (severity > 0.72) {
-        ctx.globalAlpha = 0.8;
-        ctx.font = 'bold 8px ui-monospace, SFMono-Regular, Menlo, monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('RAW DATA', obstacle.x, y - height - 5);
-      }
-      ctx.restore();
-    }
-    if (live?.chainActive && !live.landedHeatActive) {
-      ctx.save();
-      const speed = Math.hypot(live.vx, live.vy);
-      const pulse = 0.62 + Math.sin(w.now / 92) * 0.2;
-      ctx.globalAlpha = pulse;
-      ctx.shadowColor = '#ffb347';
-      ctx.shadowBlur = 12;
-      ctx.strokeStyle = '#ffb347';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([7, 5]);
-      ctx.strokeRect(x - 4, y - height - 4, obstacle.w + 8, obstacle.h + 8);
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#ffb347';
-      ctx.font = 'bold 9px ui-monospace, SFMono-Regular, Menlo, monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(
-        live.chainCycles > 0 ? `CHAIN ${Math.min(3, live.chainCycles)}/3` : speed > 0 ? 'CHAIN LIVE' : 'CHAIN READY',
-        obstacle.x,
-        y - height - 9,
-      );
-      ctx.restore();
-    }
-    if (live?.landedHeatActive) {
-      ctx.save();
-      const pulse = 0.65 + Math.sin(w.now / 105) * 0.25;
-      ctx.globalAlpha = pulse;
-      ctx.shadowColor = '#ff4d5e';
-      ctx.shadowBlur = 18;
-      ctx.strokeStyle = '#ff4d5e';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(x - 5, y - height - 5, obstacle.w + 10, obstacle.h + 10);
-      ctx.fillStyle = '#ff4d5e';
-      ctx.globalAlpha = 0.28 + pulse * 0.18;
-      ctx.fillRect(x, y - height, obstacle.w, obstacle.h);
-      ctx.restore();
-    }
-    if (live?.clickPrimed) {
-      ctx.save();
-      const pulse = 0.7 + Math.sin(w.now / 120) * 0.2;
-      ctx.globalAlpha = pulse;
-      ctx.strokeStyle = '#7dd3fc';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([5, 4]);
-      ctx.strokeRect(x - 5, y - height - 5, obstacle.w + 10, obstacle.h + 10);
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#7dd3fc';
-      ctx.font = 'bold 9px ui-monospace, SFMono-Regular, Menlo, monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('NEXT HIT REVERSES', obstacle.x, y - height - 10);
-      ctx.restore();
-    }
-    if (obstacle.kind === 'metal-box') {
-      ctx.save();
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = '#e2e8f0';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x + 7, y - height + 7, obstacle.w - 14, obstacle.h - 14);
-      ctx.beginPath();
-      ctx.moveTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.2);
-      ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.8);
-      ctx.moveTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.2);
-      ctx.lineTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.8);
-      ctx.stroke();
-      ctx.restore();
-    } else if (obstacle.kind === 'bench') {
-      ctx.save();
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = '#e2b07a';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(x + obstacle.w * 0.12, y - height + obstacle.h * 0.32);
-      ctx.lineTo(x + obstacle.w * 0.88, y - height + obstacle.h * 0.32);
-      ctx.moveTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.75);
-      ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.75);
-      ctx.stroke();
-      ctx.restore();
-    }
-    if (obstacle.breakable) {
-      drawPropDamage(ctx, {
-        x: obstacle.x,
-        y: y - height / 2,
-        w: obstacle.w,
-        h: obstacle.h,
-        damageRatio: obstacle.damage ?? 0,
-        material: propMaterial(obstacle.kind, obstacle.artAssetId),
-        seed: obstacle.seed ?? (Math.round(obstacle.x) * 31 + Math.round(obstacle.y)),
-        now: w.now,
-        lastHitAt: obstacle.lastHitAt,
-        lastHitX: obstacle.lastHitX,
-        lastHitY: obstacle.lastHitY,
-        brokenAt: obstacle.brokenAt,
-        motionEnabled: w.effectMotionEnabled,
-        fragmentLimit: w.graphicsQuality === 'performance' ? 4 : w.graphicsQuality === 'balanced' ? 6 : 9,
-      });
-    }
+    const damageVisual = {
+      x: obstacle.x,
+      y: obstacle.y - height,
+      w: obstacle.w,
+      h: obstacle.h,
+      damageRatio: obstacle.damage ?? 0,
+      material: propMaterial(obstacle.kind, obstacle.artAssetId),
+      seed: obstacle.seed ?? (Math.round(obstacle.x) * 31 + Math.round(obstacle.y)),
+      now: w.now,
+      lastHitAt: obstacle.lastHitAt,
+      lastHitX: obstacle.lastHitX,
+      lastHitY: obstacle.lastHitY === undefined ? undefined : obstacle.lastHitY - height,
+      brokenAt: obstacle.brokenAt,
+      motionEnabled: w.effectMotionEnabled,
+      fragmentLimit: w.graphicsQuality === 'performance' ? 4 : w.graphicsQuality === 'balanced' ? 6 : 9,
+      marks: obstacle.marks?.map((value, index) => index % 2 ? value - height : value),
+      cacheKey: `${obstacle.kind}:${obstacle.artAssetId ?? ''}:${colors.top}:${colors.side}:${colors.trim}`,
+      quality: w.graphicsQuality === 'performance' ? 'performance' as const : w.graphicsQuality === 'balanced' ? 'balanced' as const : 'high' as const,
+      padding: /tree/.test(obstacle.kind) ? Math.max(obstacle.w, obstacle.h) : 18,
+    };
+    if (obstacle.breakable) drawFracturedProp(ctx, damageVisual, (target, snapshot) => drawOrdinaryPropBody(target, w, obstacle, colors, snapshot));
+    else drawOrdinaryPropBody(ctx, w, obstacle, colors);
+    if (obstacle.brokenAt === undefined) drawOrdinaryPropState(ctx, w, obstacle);
   }
 }
 

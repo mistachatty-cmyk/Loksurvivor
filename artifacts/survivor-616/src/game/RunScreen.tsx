@@ -1,3 +1,4 @@
+import { ViewportOverlay } from '@/ui/ViewportOverlay';
 /**
  * A single run: canvas simulation, HUD, touch controls, level-up draft,
  * pause, reel overlay, and the hand-off back to the meta layer when it ends.
@@ -358,6 +359,12 @@ export function RunScreen({
   const [randomUpgradeReveal, setRandomUpgradeReveal] = useState<RandomUpgradeReveal | null>(null);
   const [liveDashboardOpen, setLiveDashboardOpen] = useState(false);
   const [hudIntelOpen, setHudIntelOpen] = useState(false);
+  useEffect(() => {
+    setLiveDashboardOpen(false);
+    setLootTrayOpen(false);
+    setHudIntelOpen(false);
+  }, [barUi, meta.liveModeEnabled]);
+
   const reelTimerRef = useRef<number | null>(null);
   const upgradeChoicesRef = useRef<UpgradeDef[]>([]);
   const levelUpPausesRef = useRef(meta.levelUpPresentation === 'pause-focus' && !meta.liveModeEnabled);
@@ -437,6 +444,13 @@ export function RunScreen({
   const setPhaseBoth = useCallback((next: RunPhase) => {
     // Once a run is over it stays over -- nothing may steal the hand-off.
     if (phaseRef.current === 'over') return;
+    if (next !== 'paused') {
+      setRunSettingsOpen(false);
+      setPauseSoundtrackOpen(false);
+    }
+    if (next !== 'playing') setLiveDashboardOpen(false);
+    setLootTrayOpen(false);
+    setHudIntelOpen(false);
     phaseRef.current = next;
     setPhase(next);
   }, []);
@@ -528,7 +542,15 @@ export function RunScreen({
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (document.querySelector('#viewport-overlays [aria-modal="true"]')) return;
       const key = event.key.toLowerCase();
+      if (key === 'escape' && phaseRef.current === 'paused' && (runSettingsOpenRef.current || pauseSoundtrackOpenRef.current)) {
+        event.preventDefault();
+        if (!event.repeat) { setRunSettingsOpen(false); setPauseSoundtrackOpen(false); }
+        return;
+      }
+      if (target?.closest('input,textarea,select,[contenteditable="true"]')) return;
       const controls = getControls();
       const action = actionForKey(controls, key);
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key) || action === 'dash') {
@@ -549,7 +571,7 @@ export function RunScreen({
         const nextZoom = tacticalCameraRef.current.cycleManualZoom();
         setZoomLevel(nextZoom);
       }
-      if (action === 'pause' || key === 'p') {
+      if ((action === 'pause' || key === 'p') && !event.repeat) {
         if (phaseRef.current === 'playing' && meta.liveModeEnabled) setLiveDashboardOpen((open) => !open);
         else if (phaseRef.current === 'playing' && !worldRef.current?.player.falling) setPhaseBoth('paused');
         else if (phaseRef.current === 'paused') {
@@ -1591,17 +1613,14 @@ export function RunScreen({
     <div
       className="relative h-dvh w-full overflow-hidden bg-black select-none"
       style={{
-        transform: chaosTransform || undefined,
         WebkitTouchCallout: 'none',
         WebkitUserSelect: 'none',
-        filter: meta.paletteInvertEnabled ? 'invert(1)' : undefined,
-        animation: hud?.wheelSpin?.colorFluctuation ? 'hordespin-hue 2.2s linear infinite' : undefined,
       }}
       data-testid="screen-run"
     >
       {/* 666 HordeSpin tier only -- pure screen-space decoration, never touches the simulation. */}
       <style>{`@keyframes hordespin-hue { from { filter: hue-rotate(0deg) saturate(1.4); } to { filter: hue-rotate(360deg) saturate(1.4); } }`}</style>
-      <canvas ref={canvasRef} onWheel={handleCanvasWheel} className="absolute inset-0 h-full w-full" />
+      <canvas style={{ transform: chaosTransform || undefined, filter: meta.paletteInvertEnabled ? 'invert(1)' : undefined, animation: hud?.wheelSpin?.colorFluctuation ? 'hordespin-hue 2.2s linear infinite' : undefined }} ref={canvasRef} onWheel={handleCanvasWheel} className="absolute inset-0 h-full w-full" />
 
       {/* Fires on level change only, never on mount -- loading a run mid-level stays quiet. The one full-screen effect in the game. */}
       <LokLightHint worldRef={worldRef} />
@@ -2493,6 +2512,7 @@ export function RunScreen({
 
       {/* Level up */}
       {phase === 'levelup' && meta.levelUpPausesEnabled && !barUi ? (
+        <ViewportOverlay>
         <div
           className="ui-fade-in absolute inset-0 flex items-end justify-start bg-black/55 p-3"
           style={{
@@ -2501,7 +2521,7 @@ export function RunScreen({
           }}
           data-testid="overlay-levelup"
         >
-          <div className="max-h-[60vh] w-[min(75vw,260px)] space-y-2 overflow-y-auto border border-primary/40 bg-black/90 p-2 shadow-[0_0_24px_rgba(251,191,36,.16)]">
+          <div className="max-h-[60dvh] w-[min(75vw,260px)] space-y-2 overflow-y-auto border border-primary/40 bg-black/90 p-2 shadow-[0_0_24px_rgba(251,191,36,.16)]">
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/60">Level {hud?.level}</p>
             <h2 className="text-xs font-black uppercase text-white">Pick your edge</h2>
             {hud?.crewRumor?.rumorId === 'pantry-surge' && hud.crewRumor.ready ? (
@@ -2559,6 +2579,7 @@ export function RunScreen({
             </div>
           </div>
         </div>
+        </ViewportOverlay>
       ) : null}
 
       {phase === 'playing' && !meta.levelUpPausesEnabled && choices.length > 0 && !barUi ? (
@@ -2651,7 +2672,8 @@ export function RunScreen({
       ) : null}
 
       {/* Pause */}
-      {(phase === 'paused' || liveDashboardOpen) && !runSettingsOpen && !pauseSoundtrackOpen ? (
+      {(phase === 'paused' || (phase === 'playing' && liveDashboardOpen)) && !runSettingsOpen && !pauseSoundtrackOpen ? (
+        <ViewportOverlay>
         <div className={`${liveDashboardOpen ? 'pointer-events-none absolute inset-y-12 right-2 z-50 flex w-[min(78vw,420px)] items-start justify-end' : 'ui-fade-in absolute inset-0 z-50 flex items-center justify-center bg-black/72 p-3'}`} data-testid="overlay-paused">
           <div className="ui-pop-in pointer-events-auto max-h-full w-full max-w-4xl overflow-y-auto border border-cyan-200/30 bg-[#050911]/95 p-3 shadow-[0_0_36px_rgba(34,211,238,.16)]">
             <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-mono text-[9px] uppercase tracking-[.25em] text-cyan-200">Tactical dashboard</p><h2 className="text-xl font-black uppercase text-white">{liveDashboardOpen ? 'Live view' : 'Paused'}</h2></div><div className="flex gap-2">{liveDashboardOpen ? <button type="button" onClick={() => { setLiveDashboardOpen(false); setPhaseBoth('paused'); }} className="border border-amber-300/40 px-3 py-2 font-mono text-[10px] uppercase text-amber-100">Pause</button> : null}<button type="button" onClick={() => liveDashboardOpen ? setLiveDashboardOpen(false) : setPhaseBoth('playing')} className="border border-white/25 px-3 py-2 font-mono text-[10px] uppercase text-white">{liveDashboardOpen ? 'Close' : 'Resume'}</button></div></div>
@@ -2771,22 +2793,28 @@ export function RunScreen({
             </div>
           </div>
         </div>
+        </ViewportOverlay>
       ) : null}
 
       {phase === 'paused' && runSettingsOpen ? (
+        <ViewportOverlay>
         <div className="absolute inset-0 z-[70] overflow-y-auto bg-background" data-testid="overlay-run-settings">
           <SettingsPanel onBack={() => setRunSettingsOpen(false)} />
         </div>
+        </ViewportOverlay>
       ) : null}
 
       {phase === 'paused' && pauseSoundtrackOpen ? (
+        <ViewportOverlay>
         <div className="ui-fade-in absolute inset-0 z-[70] overflow-y-auto bg-background" data-testid="overlay-pause-soundtrack">
           <MusicPanel onBack={() => setPauseSoundtrackOpen(false)} />
         </div>
+        </ViewportOverlay>
       ) : null}
 
       {/* Loot box reel overlay */}
-      {reel ? (
+      {reel && !runSettingsOpen && !pauseSoundtrackOpen && phase !== 'paused' && !liveDashboardOpen ? (
+        <ViewportOverlay>
         <div
           className={meta.liveModeEnabled ? 'absolute bottom-20 right-2 z-50 flex max-h-[42dvh] w-[min(58vw,220px)] flex-col items-center justify-center overflow-y-auto border border-blue-300/45 bg-black/90 p-2 shadow-[0_0_28px_rgba(96,165,250,.25)]' : 'absolute inset-0 z-50 flex max-h-dvh flex-col items-center justify-center overflow-y-auto bg-black/92 px-4 py-6'}
           data-testid="overlay-reel"
@@ -2858,6 +2886,7 @@ export function RunScreen({
             {reel.phase === 'landed' ? 'Continue' : 'Skip'}
           </button>
         </div>
+        </ViewportOverlay>
       ) : null}
 
       {celebration ? (

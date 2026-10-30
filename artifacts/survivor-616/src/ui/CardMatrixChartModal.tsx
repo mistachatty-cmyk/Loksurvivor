@@ -1,3 +1,4 @@
+import { ViewportOverlay } from './ViewportOverlay';
 import { useState, useMemo } from 'react';
 import {
   X,
@@ -136,6 +137,7 @@ export function CardMatrixChartModal({
   };
 
   return (
+    <ViewportOverlay>
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-3 sm:p-6 backdrop-blur-md"
       role="dialog"
@@ -896,6 +898,7 @@ export function CardMatrixChartModal({
         </div>
       </div>
     </div>
+    </ViewportOverlay>
   );
 }
 export default CardMatrixChartModal;

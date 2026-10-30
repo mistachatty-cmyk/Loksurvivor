@@ -1,3 +1,4 @@
+import { overlayContainer } from './ViewportOverlay';
 /**
  * The Crew overlay: friends, your crew of up to four, recent players and adding people by code or
  * QR. A button opens it from any screen and it sits above everything, runs included. Rendered into
@@ -361,6 +362,6 @@ export function CrewOverlay() {
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{body}</div>
       </div>
     </div>,
-    document.body,
+    overlayContainer(),
   );
 }

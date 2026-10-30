@@ -1,3 +1,4 @@
+import { ViewportOverlay } from './ViewportOverlay';
 import { Check, ChevronDown, Lock, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -95,6 +96,7 @@ function EvolutionCinematic({ pet, before, after, onClose }: { pet: SavedLokPet;
   ];
 
   return (
+    <ViewportOverlay>
     <div
       className="fixed inset-0 z-[80] grid place-items-center bg-black/90 p-4"
       role="dialog"
@@ -151,6 +153,7 @@ function EvolutionCinematic({ pet, before, after, onClose }: { pet: SavedLokPet;
         )}
       </div>
     </div>
+    </ViewportOverlay>
   );
 }
 

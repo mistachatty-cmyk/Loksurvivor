@@ -13,7 +13,7 @@ import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { AuthProvider } from '@/state/authStore';
 import { ListenTogetherProvider } from '@/state/listenTogether';
 import { SocialProvider, useSocial, type Doing } from '@/state/socialStore';
-import { CrewButton, CrewOverlay } from '@/ui/CrewOverlay';
+import { CrewOverlay } from '@/ui/CrewOverlay';
 import { ListenInviteBanner } from '@/ui/ListenTogether';
 import { CloudSyncProvider } from '@/state/cloudSyncStore';
 import { PlaylistCloudSync } from '@/ui/PlaylistCloudSync';
@@ -961,7 +961,6 @@ function Game() {
             className="fixed right-[max(0.75rem,var(--safe-right))] top-[max(0.75rem,var(--safe-top))] z-[110] flex items-center gap-1.5"
             data-testid="global-looks-cluster"
           >
-            <CrewButton />
             <button type="button" onClick={openLooks} aria-label="Looks & LokPets" className="inline-flex min-h-11 min-w-11 active:scale-95 items-center justify-center gap-2 border border-cyan-200/35 bg-slate-950/85 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-xl backdrop-blur transition hover:border-cyan-100" data-testid="button-global-looks-lokpets"><Sparkles className="h-4 w-4 text-cyan-200" /><span className="hidden sm:inline">Looks & LokPets</span></button>
           </div>
         )}
@@ -1067,6 +1066,7 @@ function ThemedGame() {
     >
       <Game />
       <SupporterBar />
+      <div id="viewport-overlays" className="pointer-events-none fixed inset-0 z-[200]" />
     </div>
   );
 }

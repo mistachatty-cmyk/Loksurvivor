@@ -1,3 +1,4 @@
+import { ViewportOverlay } from './ViewportOverlay';
 import { SupporterBar } from './SupporterBar';
 import { LokWalletStrip } from './LokWalletStrip';
 import { useState } from 'react';
@@ -904,6 +905,7 @@ export function CardShopPanel({ onBack, initialTab, onSignIn }: { onBack: () => 
         };
 
         return (
+          <ViewportOverlay>
           <div
             className="fixed inset-0 z-[110] flex items-center justify-center bg-black/85 p-3 sm:p-5 backdrop-blur-sm"
             role="dialog"
@@ -1066,6 +1068,7 @@ export function CardShopPanel({ onBack, initialTab, onSignIn }: { onBack: () => 
               </div>
             </div>
           </div>
+          </ViewportOverlay>
         );
       })()}
 

@@ -1,3 +1,4 @@
+import { ViewportOverlay } from './ViewportOverlay';
 /**
  * The match-over share panel. Two tabs:
  *  - Card: the run recap picture, plus one tap to the device share sheet, "Save image", copy the message, or send
@@ -175,6 +176,7 @@ export function ShareSheet({ summary, text, highlightClips, onClose }: Props) {
   const actionClass = 'inline-flex min-h-11 items-center justify-center gap-2 border border-border bg-card px-3 font-mono text-[11px] font-bold uppercase tracking-widest text-white transition-colors hover:border-primary active:scale-[0.98] disabled:opacity-40';
 
   return (
+    <ViewportOverlay>
     <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/80 p-0 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={t('share.title')} data-testid="share-sheet">
       <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col border border-border bg-background shadow-2xl">
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
@@ -256,6 +258,7 @@ export function ShareSheet({ summary, text, highlightClips, onClose }: Props) {
         <p className="min-h-8 border-t border-border px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-primary" aria-live="polite" data-testid="share-note">{note}</p>
       </div>
     </div>
+    </ViewportOverlay>
   );
 }
 

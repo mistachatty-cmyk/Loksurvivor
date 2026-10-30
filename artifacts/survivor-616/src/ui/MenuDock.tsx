@@ -1,3 +1,4 @@
+import { CrewButton } from './CrewOverlay';
 import { Fragment, useEffect, useRef } from 'react';
 import { ArrowRight, Backpack, Home, Map, MessageSquare, Search, Settings, ShoppingBag, Store, Users, type LucideIcon } from 'lucide-react';
 
@@ -86,6 +87,7 @@ export function MenuDock({ screenName, onGo, onHeadOut }: Props) {
       className="fixed inset-x-0 bottom-0 z-[100] flex flex-col border-t border-white/15 bg-black/90 pb-[var(--safe-bottom)] pl-[var(--safe-left)] pr-[var(--safe-right)] backdrop-blur sm:inset-x-auto sm:inset-y-0 sm:left-0 sm:w-20 sm:justify-center sm:border-r sm:border-t-0 sm:pb-0 sm:pr-0"
       data-testid="menu-dock"
     >
+      <div className="flex items-stretch sm:flex-col">
       <button
         type="button"
         onClick={onHeadOut}
@@ -99,6 +101,8 @@ export function MenuDock({ screenName, onGo, onHeadOut }: Props) {
           {t('dock.headOut')} <ArrowRight className="h-4 w-4 sm:h-3 sm:w-3" aria-hidden="true" />
         </span>
       </button>
+      <CrewButton />
+      </div>
       <div className="flex sm:flex-col">
       {ITEMS.map(({ id, label, icon: Icon, screens }) => {
         const active = screens.includes(screenName);
