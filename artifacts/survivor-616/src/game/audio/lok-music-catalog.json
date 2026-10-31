@@ -16,6 +16,16 @@
       "app": "tamagotchi",
       "name": "Lok Tamagotchi",
       "url": "https://gsix.online"
+    },
+    {
+      "app": "djshoey",
+      "name": "DJ Shoey’s Arcade",
+      "url": "https://shoey.gsix.online"
+    },
+    {
+      "app": "haicuu",
+      "name": "The HaiCuu Experience",
+      "url": "https://haicuu.gsix.online"
     }
   ],
   "playlists": [
@@ -332,6 +342,170 @@
           "durationSec": 115.868,
           "trackNumber": 12,
           "sha256": "bdb26317a442cfb5cc4d9d9e9b73555657fdbc42bfd3f8ce58e36ddd8629174f"
+        }
+      ]
+    },
+    {
+      "schema": "lok.playlist/v1",
+      "id": "g6.dj-shoey.mp3-demo-prototype",
+      "title": "DJ Shoey MP3 Demo Prototype",
+      "kind": "playlist",
+      "source": {
+        "app": "djshoey",
+        "name": "DJ Shoey’s Arcade",
+        "url": "https://shoey.gsix.online"
+      },
+      "tracks": [
+        {
+          "id": "01-stuck-in-a-pickle",
+          "title": "I Think We’re Stuck in a Pickle",
+          "album": "DJ Shoey MP3 Demo Prototype",
+          "url": "https://shoey.gsix.online/music/demo/i-think-were-stuck-in-a-pickle.m4a",
+          "mime": "audio/mp4",
+          "sha256": "7ce4712e832de3fb9740677a28194fe26f561a67bc2b18428340fb39e52a6765"
+        },
+        {
+          "id": "02-we-will-call",
+          "title": "We Will Call",
+          "album": "DJ Shoey MP3 Demo Prototype",
+          "url": "https://shoey.gsix.online/music/demo/we-will-call.m4a",
+          "mime": "audio/mp4",
+          "artist": "Exo Wrkn × Mista Cante",
+          "sha256": "3b8e23973f6d6d16f2c51bcde8d2508bbfef1328a15e44b5e0099fce29b1afa2"
+        },
+        {
+          "id": "03-come-back-for-my-data",
+          "title": "Come Back for My Data",
+          "album": "DJ Shoey MP3 Demo Prototype",
+          "url": "https://shoey.gsix.online/music/demo/come-back-for-my-data.m4a",
+          "mime": "audio/mp4",
+          "sha256": "bdb26317a442cfb5cc4d9d9e9b73555657fdbc42bfd3f8ce58e36ddd8629174f"
+        },
+        {
+          "id": "04-data-spark",
+          "title": "Data Spark — Hidden Track 0",
+          "album": "DJ Shoey MP3 Demo Prototype",
+          "url": "https://shoey.gsix.online/music/demo/data-spark-hidden-track-0.m4a",
+          "mime": "audio/mp4",
+          "sha256": "ac4b36ca5609e48f1c9cdb08825ca5063f3b26bf17b6e2ccc4e610ecca7bc02c"
+        },
+        {
+          "id": "05-feel-you-no-more",
+          "title": "I Don’t Wanna Feel You No More",
+          "album": "DJ Shoey MP3 Demo Prototype",
+          "url": "https://shoey.gsix.online/music/demo/i-dont-wanna-feel-you-no-more.m4a",
+          "mime": "audio/mp4",
+          "sha256": "de9057aaccf77d11bdacacb861716fed4c0d25b057220a8fc2447fd348b5f2a2"
+        },
+        {
+          "id": "06-fight-no-more",
+          "title": "Don’t Wanna Fight No More",
+          "album": "DJ Shoey MP3 Demo Prototype",
+          "url": "https://shoey.gsix.online/music/demo/dont-wanna-fight-no-more.m4a",
+          "mime": "audio/mp4",
+          "sha256": "95577112215dd89642ac35ddf065d59e03728590a613e7723d1b1655c39fd12e"
+        }
+      ]
+    },
+    {
+      "schema": "lok.playlist/v1",
+      "id": "g6.haicuu.cuu-jo-mixverse",
+      "title": "Cuu Jo’s Mixverse",
+      "kind": "playlist",
+      "artist": "Cuu Jo",
+      "source": {
+        "app": "haicuu",
+        "name": "The HaiCuu Experience",
+        "url": "https://haicuu.gsix.online"
+      },
+      "tracks": [
+        {
+          "id": "01-rbm",
+          "title": "RBM",
+          "album": "Cuu Jo’s Mixverse",
+          "url": "https://haicuu.gsix.online/music/rbm.mp3",
+          "mime": "audio/mpeg",
+          "sha256": "8e69ff60f30b0efa553810d664608d11b576731c382a01de780d115a84962fee"
+        },
+        {
+          "id": "02-f-a-t-2",
+          "title": "F.A.T. 2",
+          "album": "Cuu Jo’s Mixverse",
+          "url": "https://haicuu.gsix.online/music/f-a-t-2.mp3",
+          "mime": "audio/mpeg",
+          "sha256": "089be0ac900e0f8a1ddb498d6d43589cf132063b1cfebf777ce210d77e9a840e"
+        },
+        {
+          "id": "03-believe-me-now",
+          "title": "Believe Me Now",
+          "album": "Cuu Jo’s Mixverse",
+          "url": "https://haicuu.gsix.online/music/believe-me-now.mp3",
+          "mime": "audio/mpeg",
+          "sha256": "a30cffc0e52a7295202b3388043b4817ae21bcdd79b80ee20be4789d95e439fe"
+        },
+        {
+          "id": "04-bend",
+          "title": "BEND",
+          "album": "Cuu Jo’s Mixverse",
+          "url": "https://haicuu.gsix.online/music/bend.mp3",
+          "mime": "audio/mpeg",
+          "sha256": "92cc82d90dfda0320f9ac78b97d8bbceaf697ac6ab741b40d512a2c839ddfad8"
+        },
+        {
+          "id": "05-itns",
+          "title": "ITNS",
+          "album": "Cuu Jo’s Mixverse",
+          "url": "https://haicuu.gsix.online/music/itns.mp3",
+          "mime": "audio/mpeg",
+          "sha256": "63f3d867206ca4c66cbf74457d17599f8ce71f9a19eb97267841959c00b6c0f0"
+        },
+        {
+          "id": "06-momas-boy",
+          "title": "MOMAS Boy",
+          "album": "Cuu Jo’s Mixverse",
+          "url": "https://haicuu.gsix.online/music/momas-boy.mp3",
+          "mime": "audio/mpeg",
+          "sha256": "eb0f4fc540b9a6f805dcd4a26afb55dff1f164ed91a77894728e0689de63924c"
+        },
+        {
+          "id": "07-platonic",
+          "title": "Platonic",
+          "album": "Cuu Jo’s Mixverse",
+          "url": "https://haicuu.gsix.online/music/platonic.mp3",
+          "mime": "audio/mpeg",
+          "sha256": "7bbff55b00b3cd8002bd19ae07dee0b215a0e400af113d33393156bb6b65a603"
+        },
+        {
+          "id": "08-big-boys-don-t-cry",
+          "title": "BIG BOYS DON’T CRY",
+          "album": "Cuu Jo’s Mixverse",
+          "url": "https://haicuu.gsix.online/music/big-boys-don-t-cry.mp3",
+          "mime": "audio/mpeg",
+          "sha256": "1aaccf9335aae511a2ff91d09000f1d5c2680807f55237b4f48eff540aae2aaf"
+        },
+        {
+          "id": "09-the-guy",
+          "title": "The Guy",
+          "album": "Cuu Jo’s Mixverse",
+          "url": "https://haicuu.gsix.online/music/the-guy.mp3",
+          "mime": "audio/mpeg",
+          "sha256": "02e20aec1d3c21ac609e00d8cc3a65bac9bf172805c2f49261c278b21fc04f2b"
+        },
+        {
+          "id": "10-csws",
+          "title": "CSWS",
+          "album": "Cuu Jo’s Mixverse",
+          "url": "https://haicuu.gsix.online/music/csws.mp3",
+          "mime": "audio/mpeg",
+          "sha256": "bee46712308b5ceb2ce6992ec82b08e878d1af3be1a1c9666a5dee20f6912b81"
+        },
+        {
+          "id": "11-where-i-wanna-be",
+          "title": "Where I Wanna Be",
+          "album": "Cuu Jo’s Mixverse",
+          "url": "https://haicuu.gsix.online/music/where-i-wanna-be.mp3",
+          "mime": "audio/mpeg",
+          "sha256": "4e6da921dbac3a27281a59946ffab6b3ed0208ca3b34125fc1461ed0cd2c883d"
         }
       ]
     }
