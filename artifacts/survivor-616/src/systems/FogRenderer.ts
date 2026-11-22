@@ -20,6 +20,20 @@ export class FogRenderer {
   private readonly FOG_COLOR = 'rgba(10, 10, 20, 0.85)'; // Dark blue-black fog
   private readonly EYE_PULSE_SPEED = 2; // Radians per second
   private eyePulseTime: number = 0;
+  private layerCanvas: HTMLCanvasElement | null = null;
+
+  /** Reusable off-screen layer the fog is built on (null outside a browser, e.g. in unit tests). */
+  private getLayer(canvasWidth: number, canvasHeight: number, dpr: number) {
+    if (typeof document === 'undefined') return null;
+    const safeDpr = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+    const width = Math.max(1, Math.ceil(canvasWidth * safeDpr));
+    const height = Math.max(1, Math.ceil(canvasHeight * safeDpr));
+    if (!this.layerCanvas) this.layerCanvas = document.createElement('canvas');
+    if (this.layerCanvas.width !== width) this.layerCanvas.width = width;
+    if (this.layerCanvas.height !== height) this.layerCanvas.height = height;
+    const layerCtx = this.layerCanvas.getContext('2d');
+    return layerCtx ? { canvas: this.layerCanvas, ctx: layerCtx } : null;
+  }
 
   /**
    * Render the fog overlay with vision radius cutout and extra light sources
@@ -41,18 +55,25 @@ export class FogRenderer {
       return;
     }
 
-    // Save current state
+    // Build the fog on a private layer. `destination-out` erases whatever it is
+    // drawn over, so cutting the vision hole straight into the game canvas
+    // deleted the world itself (the map went black). Cut the hole in the layer,
+    // then composite the finished layer over the world.
+    const layer = this.getLayer(canvasWidth, canvasHeight, dpr);
+    // No layer (no DOM): skip the fog rather than ever erasing the game canvas.
+    if (!layer) return;
+    const target = layer.ctx;
+    target.setTransform(1, 0, 0, 1, 0, 0);
+    target.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
     ctx.save();
-
-    // Apply camera transform with DPR
-    camera.applyTransform(ctx, canvasWidth, canvasHeight, dpr);
+    camera.applyTransform(target, canvasWidth, canvasHeight, dpr);
 
     // Draw fog everywhere across full screen bounds
     const zoom = Math.max(0.01, camera.getZoom());
     const halfSpanX = (canvasWidth / zoom) * 1.5;
     const halfSpanY = (canvasHeight / zoom) * 1.5;
-    ctx.fillStyle = customFogColor ?? this.FOG_COLOR;
-    ctx.fillRect(
+    target.fillStyle = customFogColor ?? this.FOG_COLOR;
+    target.fillRect(
       playerX - halfSpanX,
       playerY - halfSpanY,
       halfSpanX * 2,
@@ -60,12 +81,12 @@ export class FogRenderer {
     );
 
     // Cut out the vision radius (clear fog in player's view)
-    ctx.globalCompositeOperation = 'destination-out';
+    target.globalCompositeOperation = 'destination-out';
 
     // Create radial gradient for soft edge
     const innerRadius = Math.max(0, visionRadius * 0.7);
     const outerRadius = Math.max(innerRadius + 0.1, visionRadius);
-    const gradient = ctx.createRadialGradient(
+    const gradient = target.createRadialGradient(
       playerX,
       playerY,
       innerRadius,
@@ -75,10 +96,10 @@ export class FogRenderer {
     );
     gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
     gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(playerX, playerY, outerRadius, 0, Math.PI * 2);
-    ctx.fill();
+    target.fillStyle = gradient;
+    target.beginPath();
+    target.arc(playerX, playerY, outerRadius, 0, Math.PI * 2);
+    target.fill();
 
     // Cut out extra light sources (ambient fireflies, glowing enemies, lanterns, light orbs)
     if (lightSources && lightSources.length > 0) {
@@ -86,23 +107,25 @@ export class FogRenderer {
         if (!Number.isFinite(light.x) || !Number.isFinite(light.y) || light.radius <= 0) continue;
         const inner = Math.max(0, light.radius * 0.35);
         const outer = Math.max(inner + 1, light.radius);
-        const lightGrad = ctx.createRadialGradient(light.x, light.y, inner, light.x, light.y, outer);
+        const lightGrad = target.createRadialGradient(light.x, light.y, inner, light.x, light.y, outer);
         const alpha = Math.min(1, Math.max(0.1, light.intensity ?? 0.88));
         lightGrad.addColorStop(0, `rgba(0, 0, 0, ${alpha})`);
         lightGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = lightGrad;
-        ctx.beginPath();
-        ctx.arc(light.x, light.y, outer, 0, Math.PI * 2);
-        ctx.fill();
+        target.fillStyle = lightGrad;
+        target.beginPath();
+        target.arc(light.x, light.y, outer, 0, Math.PI * 2);
+        target.fill();
       }
     }
 
     // Reset composite operation
-    ctx.globalCompositeOperation = 'source-over';
+    target.globalCompositeOperation = 'source-over';
 
-    // Reset camera transform
-    camera.resetTransform(ctx);
+    // Reset camera transform (pops the save made by applyTransform on the same context)
+    camera.resetTransform(target);
 
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(layer.canvas, 0, 0);
     // Restore state
     ctx.restore();
   }
