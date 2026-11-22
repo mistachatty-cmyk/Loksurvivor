@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 201,
+      "version": "0.42.62",
+      "date": "2026-11-22",
+      "publishedAt": "2026-11-22T23:30:00Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "Steadier jukebox, one unlocked map",
+      "body": [
+        "The jukebox recovers on its own when a song fails to start: it retries once, then skips to the next track instead of getting stuck, and quick track switching no longer shows a false error.",
+        "Digital Disco can be unlocked again (it was waiting on a map that does not exist), Firefly Hollows Extreme has its backdrop back, and four maps gained their discovery text. Lit maps also draw their glows a little faster."
+      ]
+    },
+    {
       "number": 200,
       "version": "0.42.61",
       "date": "2026-11-22",
