@@ -14,6 +14,8 @@ interface GameIconProps {
   style?: CSSProperties;
   size?: number | string;
   title?: string;
+  /** Plays a short pop when the glyph appears or changes state (a check landing, a rank earned). */
+  pop?: boolean;
 }
 
 export function isGlyphKey(name: string): name is LokGlyphKey {
@@ -21,7 +23,7 @@ export function isGlyphKey(name: string): name is LokGlyphKey {
 }
 
 /** Unknown names render as plain text so non-icon labels keep working. */
-export function GameIcon({ name, className, style, size = '1em', title }: GameIconProps) {
+export function GameIcon({ name, className, style, size = '1em', title, pop }: GameIconProps) {
   if (!isGlyphKey(name)) return <>{name}</>;
   return (
     <svg
@@ -33,7 +35,7 @@ export function GameIcon({ name, className, style, size = '1em', title }: GameIc
       role={title ? 'img' : undefined}
       aria-label={title}
       aria-hidden={title ? undefined : true}
-      className={className}
+      className={`lok-glyph${pop ? ' lok-glyph-pop' : ''}${className ? ` ${className}` : ''}`}
       style={{ display: 'inline-block', verticalAlign: '-0.125em', flex: 'none', ...style }}
     >
       <path d={LOK_GLYPH_PATHS[name]} />

@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 200,
+      "version": "0.42.61",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T01:45:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "New icon art, nothing borrowed",
+      "body": [
+        "Every icon in the game is now original art drawn for 616: elements, fighting styles, relics, rarity marks, hats, celebrations, arrows, the minimap legend and the HUD. Emoji and stock symbols are gone from menus, popups and alerts.",
+        "Icons answer your touch: they lift when you hover or focus, snap down when you press, and dim when a control is locked. Reduced motion and power saver turn the movement off."
+      ]
+    },
+    {
       "number": 199,
       "version": "0.42.60",
       "date": "2026-10-30",

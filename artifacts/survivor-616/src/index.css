@@ -1417,3 +1417,17 @@ html[data-power-save] .hideout-weather-heat .hideout-weather-particles {
 :where(#viewport-overlays > *) { pointer-events: auto; }
 /* Popup transparency is applied once, never compounded by a dialog nested in its backdrop. */
 :is([data-testid^='overlay-'], [role='dialog']) :is([data-testid^='overlay-'], [role='dialog']) { opacity: 1; }
+
+/* Lok glyph feedback (design standard: every icon answers the pointer). Icons inside controls lift on hover,
+   snap on press, dim when disabled. CSS only, so no per-frame cost; reduced motion and power-save turn it off. */
+.lok-glyph { pointer-events: none; transition: transform 140ms cubic-bezier(.2, .8, .2, 1), filter 140ms ease-out, opacity 140ms ease-out; }
+:is(button, a, [role='button'], [role='tab'], summary, label):is(:hover, :focus-visible):not(:disabled, [aria-disabled='true']) .lok-glyph { transform: scale(1.12); filter: drop-shadow(0 0 3px currentColor); }
+:is(button, a, [role='button'], [role='tab'], summary):active:not(:disabled, [aria-disabled='true']) .lok-glyph { transform: scale(.86); filter: none; transition-duration: 60ms; }
+:is(button, a, [role='button'], [role='tab']):is(:disabled, [aria-disabled='true']) .lok-glyph { opacity: .45; filter: grayscale(.6); }
+.lok-glyph-pop { animation: lok-glyph-pop 260ms cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes lok-glyph-pop { 0% { transform: scale(.4); opacity: 0; } 70% { transform: scale(1.18); opacity: 1; } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .lok-glyph, .lok-glyph-pop { transition: none; animation: none; }
+  :is(button, a, [role='button'], [role='tab'], summary, label):is(:hover, :focus-visible, :active) .lok-glyph { transform: none; }
+}
+html[data-power-save] .lok-glyph { filter: none !important; transition: none; }
