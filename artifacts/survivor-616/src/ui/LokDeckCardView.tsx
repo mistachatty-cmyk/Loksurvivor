@@ -1,5 +1,6 @@
 import { useState, useRef, type CSSProperties, type MouseEvent } from 'react';
 import { Sparkles, Lock, Crown, Info } from 'lucide-react';
+import { GameIcon } from './GameIcon';
 import type { LokAssetManifest } from '@/game/lok/types';
 import { CardArtwork, RARITY_STYLE, cardMetadata } from './LockDeckCollection';
 import { cardPackFor } from '@/game/data/cards';
@@ -125,13 +126,13 @@ export function LokDeckCardView({
 
   const sealIcon =
     companionSeal === 'seal-digi-wolf'
-      ? '🐺'
+      ? 'wolf'
       : companionSeal === 'seal-circuit-frog'
-      ? '🐸'
+      ? 'frog'
       : companionSeal === 'seal-dust-mite'
-      ? '⚙️'
+      ? 'gear'
       : companionSeal === 'seal-firefly-hive'
-      ? '🐝'
+      ? 'hive'
       : null;
 
   // -------------------------------------------------------------
@@ -215,7 +216,7 @@ export function LokDeckCardView({
         {/* Companion Seal */}
         {sealIcon && (
           <span className="absolute top-1 right-8 z-20 rounded-full bg-black/80 px-1 py-0.2 text-[8px] border border-white/20" title={`Companion Seal: ${companionSeal}`}>
-            {sealIcon}
+            <GameIcon name={sealIcon} />
           </span>
         )}
         {/* Subtle radial inner glow */}
@@ -246,7 +247,7 @@ export function LokDeckCardView({
               style={{ backgroundColor: profile.elementColor, color: '#000' }}
               title={`Element: ${profile.elementLabel}`}
             >
-              {elemMeta.icon}
+              <GameIcon name={elemMeta.icon} />
             </span>
             {secondaryElemMeta && (
               <span
@@ -254,7 +255,7 @@ export function LokDeckCardView({
                 style={{ backgroundColor: secondaryElemMeta.color, color: '#000' }}
                 title={`Dual Element: ${secondaryElemMeta.label}`}
               >
-                {secondaryElemMeta.icon}
+                <GameIcon name={secondaryElemMeta.icon} />
               </span>
             )}
           </div>
@@ -405,14 +406,14 @@ export function LokDeckCardView({
               className="grid h-3.5 w-3.5 place-items-center rounded-full text-[7px] font-bold"
               style={{ backgroundColor: profile.elementColor, color: '#000' }}
             >
-              {elemMeta.icon}
+              <GameIcon name={elemMeta.icon} />
             </span>
             {secondaryElemMeta && (
               <span
                 className="grid h-3 w-3 place-items-center rounded-full text-[6.5px] font-bold"
                 style={{ backgroundColor: secondaryElemMeta.color, color: '#000' }}
               >
-                {secondaryElemMeta.icon}
+                <GameIcon name={secondaryElemMeta.icon} />
               </span>
             )}
           </div>

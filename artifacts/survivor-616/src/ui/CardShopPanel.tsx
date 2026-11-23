@@ -1,5 +1,6 @@
 import { ViewportOverlay } from './ViewportOverlay';
 import { SupporterBar } from './SupporterBar';
+import { GameIcon } from './GameIcon';
 import { LokWalletStrip } from './LokWalletStrip';
 import { useState } from 'react';
 import {
@@ -481,7 +482,7 @@ export function CardShopPanel({ onBack, initialTab, onSignIn }: { onBack: () => 
                         style={{ backgroundColor: elemMeta.color, color: '#000' }}
                         title={elemMeta.label}
                       >
-                        {elemMeta.icon}
+                        <GameIcon name={elemMeta.icon} />
                       </span>
                     )}
                   </div>

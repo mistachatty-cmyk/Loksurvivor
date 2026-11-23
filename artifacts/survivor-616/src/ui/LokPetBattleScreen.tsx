@@ -1,5 +1,6 @@
 import { ViewportOverlay } from './ViewportOverlay';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { GameIcon } from './GameIcon';
 import {
   Trophy,
   Swords,
@@ -944,12 +945,12 @@ export function LokPetBattleScreen({
                           {battleState.rewards.levelUps.map((lvl, idx) => (
                             <div key={idx} className="flex flex-col gap-0.5 text-xs text-emerald-400 font-semibold">
                               <div className="flex items-center justify-between">
-                                <span>🎉 {lvl.petName} Leveled Up!</span>
+                                <span>{lvl.petName} Leveled Up!</span>
                                 <span className="font-mono text-emerald-300">Lv.{lvl.oldLevel} → Lv.{lvl.newLevel}</span>
                               </div>
                               {lvl.evolved && (
                                 <div className="mt-1 rounded border border-cyan-400/60 bg-cyan-950/60 p-1.5 text-[11px] text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.2)]">
-                                  <span className="font-bold text-cyan-300">✨ DIGI-EVOLUTION!</span> Evolved into <strong className="text-white">{lvl.newTitle}</strong> (Stage {lvl.newStage})!
+                                  <span className="font-bold text-cyan-300"><GameIcon name="light" /> DIGI-EVOLUTION!</span> Evolved into <strong className="text-white">{lvl.newTitle}</strong> (Stage {lvl.newStage})!
                                 </div>
                               )}
                             </div>
@@ -1544,7 +1545,7 @@ export function LokPetBattleScreen({
                       <option value="">None (Unequipped)</option>
                       {BATTLE_TRINKETS.map((trinket) => (
                         <option key={trinket.id} value={trinket.id}>
-                          {trinket.icon} {trinket.name} ({trinket.description.split('.')[0]})
+                          <GameIcon name={trinket.icon} /> {trinket.name} ({trinket.description.split('.')[0]})
                         </option>
                       ))}
                     </select>

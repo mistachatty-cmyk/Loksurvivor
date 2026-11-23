@@ -51,6 +51,21 @@ const SIZE_CLASS_SCALE: Record<NonNullable<import('@/game/types').EnemyDef['size
   giant: 1.55,
   boss: 1.8,
 };
+
+/** Vector lightning bolt (replaces the old emoji glyph). Fills with the current fillStyle, centered on x,y. */
+function drawBoltIcon(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  const s = size / 10;
+  ctx.beginPath();
+  ctx.moveTo(x + 1.5 * s, y - 5 * s);
+  ctx.lineTo(x - 3.5 * s, y + 0.5 * s);
+  ctx.lineTo(x - 0.2 * s, y + 0.5 * s);
+  ctx.lineTo(x - 1.5 * s, y + 5 * s);
+  ctx.lineTo(x + 3.5 * s, y - 0.5 * s);
+  ctx.lineTo(x + 0.2 * s, y - 0.5 * s);
+  ctx.closePath();
+  ctx.fill();
+}
+
 function sizeClassScale(def: import('@/game/types').EnemyDef): number {
   if (def.sizeClass) return SIZE_CLASS_SCALE[def.sizeClass];
   // Pre-existing content never set sizeClass; keep the old Boss-only bump.
@@ -4803,7 +4818,7 @@ function drawProjectiles(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBo
         ctx.fillStyle = '#c084fc';
         ctx.shadowColor = '#38bdf8';
         ctx.shadowBlur = 8;
-        ctx.fillText('⚡', -14, -6 + heartOffset);
+        drawBoltIcon(ctx, -14, -6 + heartOffset, 10);
       } else {
         ctx.fillStyle = '#f43f5e';
         ctx.shadowColor = '#fb7185';
@@ -5978,7 +5993,7 @@ function drawActors(
         ctx.fillStyle = isOverlord ? '#c084fc' : '#f43f5e';
         ctx.shadowColor = isOverlord ? '#a855f7' : '#fb7185';
         ctx.shadowBlur = 8;
-        ctx.fillText(isOverlord ? `👑 SUPREMACY +${ego}` : `👑 EGO +${ego}`, p.x, overheadY);
+        ctx.fillText(isOverlord ? `SUPREMACY +${ego}` : `EGO +${ego}`, p.x, overheadY);
       }
       if (w.llamaMamaRageUntil && w.now < w.llamaMamaRageUntil) {
         const rageY = ego > 0 ? overheadY - 14 : overheadY;
@@ -6804,7 +6819,7 @@ function drawMapSetPieces(ctx: CanvasRenderingContext2D, w: World) {
       ctx.save(); ctx.strokeStyle = entry.kind === 'plate' ? '#fbbf24' : entry.kind === 'arcade-box' ? '#ff2ec4' : '#67e8f9'; ctx.fillStyle = '#071116';
       ctx.lineWidth = 3; ctx.fillRect(entry.x - 17, entry.y - 17, 34, 34); ctx.strokeRect(entry.x - 17, entry.y - 17, 34, 34);
       ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#e0f2fe'; ctx.fillText(entry.kind === 'plate' ? '616' : entry.kind === 'coil' ? '⚡' : entry.kind === 'arcade-box' ? '♪' : '▣', entry.x, entry.y);
+      ctx.fillStyle = '#e0f2fe'; if (entry.kind === 'coil') { drawBoltIcon(ctx, entry.x, entry.y, 14); } else { ctx.fillText(entry.kind === 'plate' ? '616' : entry.kind === 'arcade-box' ? '♪' : '▣', entry.x, entry.y); }
       ctx.restore();
     }
   }

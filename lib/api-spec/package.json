@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "codegen": "orval --config ./orval.config.ts && npm run typecheck:libs"
+    "codegen": "orval --config ./orval.config.ts && node ../../scripts/strip-emoji-banner.mjs && npm run typecheck:libs"
   },
   "devDependencies": {
     "orval": "^8.23.0"

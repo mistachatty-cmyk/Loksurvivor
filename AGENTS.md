@@ -31,3 +31,10 @@ When the user says **“Pullcheck,” read `docs/PULLCHECK.md` first**. It recor
 - Preserve the supplied pixel-art assets and follow `.agents/memory/survivor-616-art-assets.md`.
 - Keep endless-mode behavior consistent with `.agents/memory/endless-mode-engine.md`.
 - Do not invent real artists, names, likenesses, or licensed music. Player-selected local music is the supported soundtrack path.
+
+## Design standard: no emoji (Lok ecosystem rule, before MVP)
+
+No emoji characters anywhere: UI, copy, data files, alerts, popups, favicons, docs, generated headers.
+- UI icons: store an icon KEY in data and render with `GameIcon` (artifacts/survivor-616/src/ui/GameIcon.tsx, lucide line icons).
+- Canvas: draw vector paths (see `drawBoltIcon` in game/render/draw.ts) or use plain text.
+- Run `node scripts/check-no-emoji.mjs` before every commit; it fails on any emoji.

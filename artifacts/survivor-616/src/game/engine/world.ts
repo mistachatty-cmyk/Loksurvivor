@@ -7364,7 +7364,7 @@ function updateBubbleWash(w: World, dt: number) {
       bw.warningStartedAt = w.now;
       bw.direction = w.rng() > 0.5 ? 1 : -1;
       const dirText = bw.direction > 0 ? 'EAST ➔' : 'WEST ⬅';
-      pushAlert(w, `⚠️ TORRENTIAL BUBBLE WASH IMMINENT! HEADING ${dirText}`);
+      pushAlert(w, `WARNING: TORRENTIAL BUBBLE WASH IMMINENT! HEADING ${dirText}`);
       w.shake = Math.max(w.shake, 3);
     }
   } else if (bw.state === 'warning') {
@@ -7387,7 +7387,7 @@ function updateBubbleWash(w: World, dt: number) {
     if (w.now >= bw.nextSurgeAt) {
       bw.state = 'surging';
       bw.surgeActiveUntil = w.now + 5000;
-      pushAlert(w, '🌊 SUDS SURGE ACTIVE! WASHOUT IN PROGRESS!');
+      pushAlert(w, 'SUDS SURGE ACTIVE! WASHOUT IN PROGRESS!');
       w.shake = Math.max(w.shake, 7);
     }
   } else if (bw.state === 'surging') {
@@ -11705,7 +11705,7 @@ function updatePickups(w: World, dt: number) {
         }
         case 'prism-quartz': {
           w.craftingMaterialsCollected['prism-quartz'] = (w.craftingMaterialsCollected['prism-quartz'] ?? 0) + 1;
-          w.popups.push({ x: p.x, y: p.y - 20, text: '+1 PRISM QUARTZ 💎', color: '#f43f5e', bornAt: w.now, vy: 30 });
+          w.popups.push({ x: p.x, y: p.y - 20, text: '+1 PRISM QUARTZ', color: '#f43f5e', bornAt: w.now, vy: 30 });
           spawnParticles(w, p.x, p.y, '#f43f5e', 10, 90);
           pushSfx(w, 'pickupKey');
           break;

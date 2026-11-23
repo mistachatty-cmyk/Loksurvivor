@@ -1,5 +1,6 @@
 import { ViewportOverlay } from './ViewportOverlay';
 import { useEffect, useMemo, useState } from 'react';
+import { GameIcon } from './GameIcon';
 import {
   BarChart3,
   Check,
@@ -202,7 +203,7 @@ export function CardDetail({ card, owned, onClose, frame, motion }: { card: LokA
               {dataMeta.label}
             </span>
             <span className="font-mono text-[8.5px] text-emerald-300 uppercase">
-              {styleMeta.icon} {styleMeta.label}
+              <GameIcon name={styleMeta.icon} /> {styleMeta.label}
               {profile.secondaryFightingStyleLabel ? ` / ${profile.secondaryFightingStyleLabel}` : ''}
             </span>
             <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[8px] uppercase font-bold text-amber-200">
@@ -469,7 +470,7 @@ export function LockDeckCollection({
           <option value="all">All Elements</option>
           {Object.entries(ELEMENT_METADATA).map(([key, data]) => (
             <option key={key} value={key}>
-              {data.icon} {data.label}
+              <GameIcon name={data.icon} /> {data.label}
             </option>
           ))}
         </select>
@@ -497,7 +498,7 @@ export function LockDeckCollection({
           <option value="all">All Fighting Styles</option>
           {Object.entries(FIGHTING_STYLE_METADATA).map(([key, data]) => (
             <option key={key} value={key}>
-              {data.icon} {data.label}
+              <GameIcon name={data.icon} /> {data.label}
             </option>
           ))}
         </select>

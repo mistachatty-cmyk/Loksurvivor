@@ -8,6 +8,7 @@ import { ViewportOverlay } from './ViewportOverlay';
  * formula (cardThrowOutcome in data/travelEncounters.ts).
  */
 import { useEffect, useRef, useState } from 'react';
+import { GameIcon } from './GameIcon';
 import { useT } from '@/lib/i18n';
 import { LogOut, PawPrint, Sparkles, Swords, Zap } from 'lucide-react';
 import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
@@ -231,7 +232,7 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
               className="rounded px-1.5 py-0.2 font-mono text-[8px] font-bold"
               style={{ backgroundColor: opponentElemMeta.color, color: '#000' }}
             >
-              {opponentElemMeta.icon} {opponentElemMeta.label}
+              <GameIcon name={opponentElemMeta.icon} /> {opponentElemMeta.label}
             </span>
           ) : null}
         </div>
@@ -307,7 +308,7 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
                             style={{ backgroundColor: elemMeta.color, color: '#000' }}
                             title={elemMeta.label}
                           >
-                            {elemMeta.icon}
+                            <GameIcon name={elemMeta.icon} />
                           </span>
                         )}
                       </div>

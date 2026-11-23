@@ -1,5 +1,6 @@
 import { ViewportOverlay } from './ViewportOverlay';
 import { useState, useMemo } from 'react';
+import { GameIcon } from './GameIcon';
 import {
   X,
   Layers,
@@ -373,7 +374,7 @@ export function CardMatrixChartModal({
                           }`}
                           style={{ backgroundColor: active ? data.color : 'transparent' }}
                         >
-                          <span>{data.icon}</span>
+                          <span><GameIcon name={data.icon} /></span>
                           <span>{data.label.split(' ')[0]}</span>
                           {active && <Check className="h-3 w-3 ml-0.5" />}
                         </button>
@@ -430,7 +431,7 @@ export function CardMatrixChartModal({
                               : 'border-white/15 text-white/70 hover:border-white/40'
                           }`}
                         >
-                          <span>{data.icon}</span>
+                          <span><GameIcon name={data.icon} /></span>
                           <span>{data.label}</span>
                           {active && <Check className="h-3 w-3 ml-0.5" />}
                         </button>
@@ -577,7 +578,7 @@ export function CardMatrixChartModal({
                         >
                           <div className="flex items-center justify-between">
                             <span className="flex items-center gap-1.5 text-xs font-bold text-white">
-                              <span style={{ color: metaInfo.color }}>{metaInfo.icon}</span>
+                              <span style={{ color: metaInfo.color }}><GameIcon name={metaInfo.icon} /></span>
                               {metaInfo.label.split(' ')[0]}
                             </span>
                             <span className="font-mono text-[9px] font-black text-amber-200">
@@ -682,7 +683,7 @@ export function CardMatrixChartModal({
                         >
                           <div className="flex items-center justify-between">
                             <span className="flex items-center gap-1.5 font-display text-xs font-black uppercase text-white">
-                              <span>{styleMeta.icon}</span>
+                              <span><GameIcon name={styleMeta.icon} /></span>
                               {styleMeta.label}
                             </span>
                             <span className="font-mono text-[9px] font-black text-amber-200">
@@ -784,7 +785,7 @@ export function CardMatrixChartModal({
                       return (
                         <tr key={elem} className="border-b border-white/5 hover:bg-white/[.02]">
                           <td className="p-2.5 font-bold flex items-center gap-1.5" style={{ color: elemMeta.color }}>
-                            <span>{elemMeta.icon}</span>
+                            <span><GameIcon name={elemMeta.icon} /></span>
                             {elemMeta.label.split(' ')[0]}
                           </td>
                           {Object.keys(matrix.byFightingStyle).map((style) => {
