@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 211,
+      "version": "0.42.72",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T18:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Juicier rescues, better dungeon doors and chests",
+      "body": [
+        "Rescues feel livelier: the survivor notices you and the cage rattles as you near, pips light up each quarter of the lock, the last stretch strobes, and the release has a flash, cracks in the ground, confetti and a survivor who hops out and runs to you. You also see +25 CRED.",
+        "Dungeon doorways are now stone arches with torchlit stairs. The way-out door has running chevrons, and treasure chests show locked, unlocked and opened with chains, a breathing lid and light pouring out."
+      ]
+    },
+    {
       "number": 210,
       "version": "0.42.71",
       "date": "2026-11-23",

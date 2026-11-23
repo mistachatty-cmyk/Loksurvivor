@@ -91,7 +91,33 @@ export function drawRescue(ctx: CanvasRenderingContext2D, w: World): void {
     ctx.lineCap = 'butt';
   }
 
-  const shakeX = freeing ? Math.sin(w.now / 38) * (0.8 + p * 1.6) : Math.sin(w.now / 700) * 0.5;
+  // Reactive: the survivor notices you. Within 240 units the cage rattles harder and the survivor faces you.
+  const near = Math.max(0, 1 - Math.hypot(w.player.x - x, w.player.y - y) / 240);
+  const facing: 1 | -1 = w.player.x >= x ? 1 : -1;
+  const shakeX = freeing ? Math.sin(w.now / 38) * (0.8 + p * 1.6) : Math.sin(w.now / (260 - near * 160)) * (0.5 + near * 1.3);
+  // Hype mark and rising dust while someone works the lock.
+  const strobe = p > 0.82 ? (Math.sin(w.now / 40) > 0 ? 1 : 0) : 0;
+  // Quarter pips on the arc light up as the lock progresses.
+  if (p > 0) {
+    for (let q = 1; q <= 4; q += 1) {
+      const a = -Math.PI / 2 + (q / 4) * Math.PI * 2;
+      const lit = p >= q / 4 - 0.001;
+      ctx.fillStyle = lit ? '#fff' : 'rgba(255,255,255,0.28)';
+      const px = x + Math.cos(a) * (RESCUE_RING_R + 5), py = y + 4 + Math.sin(a) * (RESCUE_RING_R + 5) * 0.7;
+      ctx.fillRect(px - 2, py - 2, 4, 4);
+      if (lit && p < q / 4 + 0.06) { ctx.globalAlpha = 1 - (p - q / 4) / 0.06; ctx.strokeStyle = glow; ctx.lineWidth = 2; ctx.strokeRect(px - 6, py - 6, 12, 12); ctx.globalAlpha = 1; }
+    }
+  }
+  if (freeing) {
+    ctx.fillStyle = 'rgba(210,200,190,0.45)';
+    for (let i = 0; i < 6; i += 1) {
+      const life = ((w.now / 22 + i * 17) % 100) / 100;
+      ctx.globalAlpha = (1 - life) * 0.5;
+      const dx = (i - 2.5) * 9 + Math.sin(i * 3 + w.now / 200) * 3;
+      ctx.fillRect(x + dx - 2, y + 4 - life * 20, 4 - life * 2, 4 - life * 2);
+    }
+    ctx.globalAlpha = 1;
+  }
   const spread = p * 5;            // bars bow outward as the lock gives
   const top = y - 40, bottom = y + 6, half = 17;
 
@@ -106,7 +132,7 @@ export function drawRescue(ctx: CanvasRenderingContext2D, w: World): void {
     ctx.beginPath();
     ctx.rect(x - half + 1, top + 2, half * 2 - 2, bottom - top);
     ctx.clip();
-    drawRig(ctx, allyRig(ally), ally.palette, 'idle', w.now, x, y + 4 + bob, 1, 2.3, { outline: true });
+    drawRig(ctx, allyRig(ally), ally.palette, freeing ? 'hurt' : near > 0.35 ? 'walk' : 'idle', w.now, x, y + 4 + bob, facing, 2.3, { outline: true, flash: strobe === 1 });
     ctx.restore();
   } else {
     ctx.fillStyle = 'rgba(20,16,24,0.85)';
@@ -120,6 +146,12 @@ export function drawRescue(ctx: CanvasRenderingContext2D, w: World): void {
     ctx.fillRect(bx - 1.6, top, 3.2, bottom - top);
     ctx.fillStyle = p > 0.01 ? mix(IRON_LIGHT, glow, Math.min(1, p * 1.4)) : IRON_LIGHT;
     ctx.fillRect(bx - 1.6, top, 1.4, bottom - top);
+  }
+  if (strobe) {   // last stretch: the whole cage flashes white-hot
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x - half - 3, top - 4, half * 2 + 6, bottom - top + 10);
+    ctx.globalAlpha = 1;
   }
   // Top and base plates with corner studs.
   ctx.fillStyle = IRON_DARK;
@@ -187,11 +219,39 @@ function drawBurst(ctx: CanvasRenderingContext2D, w: World, t: number): void {
     ctx.fillRect(-1.6, -17, 3.2, 34);
     ctx.restore();
   }
+  // Light pillar punches up and thins out.
+  ctx.globalAlpha = fade * fade * 0.55;
   ctx.fillStyle = glow;
-  for (let i = 0; i < 9; i += 1) {
-    const a = (i / 9) * Math.PI * 2, d = t * (30 + (i % 3) * 14);
-    ctx.fillRect(r.x + Math.cos(a) * d - 1.5, r.y - 14 + Math.sin(a) * d * 0.8 - t * 26 - 1.5, 3, 3);
+  ctx.fillRect(r.x - 14 * fade, r.y - 190, 28 * fade, 196);
+  // Ground cracks radiating from the cage.
+  ctx.globalAlpha = Math.min(1, fade * 1.6) * 0.7;
+  ctx.strokeStyle = '#0b0b10';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 7; i += 1) {
+    const a = (i / 7) * Math.PI * 2 + 0.4, len = 16 + t * 30 + (i % 3) * 5;
+    ctx.beginPath();
+    ctx.moveTo(r.x, r.y + 6);
+    ctx.lineTo(r.x + Math.cos(a) * len * 0.5 + (i % 2 ? 3 : -3), r.y + 6 + Math.sin(a) * len * 0.35);
+    ctx.lineTo(r.x + Math.cos(a) * len, r.y + 6 + Math.sin(a) * len * 0.7);
+    ctx.stroke();
   }
+  // Confetti in the survivor's own colours, with gravity.
+  ctx.globalAlpha = fade;
+  const accent = ally?.palette.accent ?? '#c9a26a';
+  for (let i = 0; i < 18; i += 1) {
+    const a = (i / 18) * Math.PI * 2 + i, sp = 40 + (i % 5) * 16;
+    const px = r.x + Math.cos(a) * sp * t, py = r.y - 14 + Math.sin(a) * sp * 0.6 * t - 60 * t * (1 - t) * 2 + t * t * 80;
+    ctx.fillStyle = i % 2 ? glow : accent;
+    ctx.save(); ctx.translate(px, py); ctx.rotate(t * 9 + i); ctx.fillRect(-2, -1, 4, 2); ctx.restore();
+  }
+  // The survivor springs out, hops once and then runs for the player (a ghost that fades as they join you).
+  if (ally) {
+    const hop = Math.abs(Math.sin(t * Math.PI * 2.5)) * 14 * (1 - t);
+    const run = t * t * Math.sign(w.player.x - r.x || 1) * 26;
+    ctx.globalAlpha = Math.min(1, fade * 1.5);
+    drawRig(ctx, allyRig(ally), ally.palette, t < 0.5 ? 'idle' : 'walk', w.now, r.x + run, r.y + 4 - hop, w.player.x >= r.x ? 1 : -1, 2.3, { outline: true });
+  }
+  ctx.globalAlpha = fade;
   ctx.globalAlpha = fade * 0.8;
   drawGlyph(ctx, 'spark', r.x, r.y - 30 - t * 34, 16 + t * 6);
   ctx.restore();
@@ -202,6 +262,25 @@ export function drawRescuePointer(
   ctx: CanvasRenderingContext2D, w: World, width: number, height: number, zoom: number,
 ): void {
   const r = w.rescue;
+  // Screen flash on release, then a colour wash on the edges while the lock works.
+  const allyGlow = (r.allyId ? ALLIES_BY_ID[r.allyId] : undefined)?.palette.glow ?? '#ffe08a';
+  if (r.status === 'freed' && r.freedAt !== undefined && w.now - r.freedAt < 220) {
+    ctx.save();
+    ctx.globalAlpha = (1 - (w.now - r.freedAt) / 220) * 0.55;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
+  if (r.status === 'freeing' && r.progress > 0) {
+    const edge = ctx.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.4, width / 2, height / 2, Math.max(width, height) * 0.75);
+    edge.addColorStop(0, 'rgba(0,0,0,0)');
+    edge.addColorStop(1, allyGlow);
+    ctx.save();
+    ctx.globalAlpha = r.progress * (0.22 + Math.sin(w.now / 90) * 0.05);
+    ctx.fillStyle = edge;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
   if (r.status !== 'available' && r.status !== 'freeing') return;
   const sx = (r.x - w.camera.x) * zoom + width / 2;
   const sy = (r.y - w.camera.y) * zoom + height / 2;

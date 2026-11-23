@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 When the user says **“Pullcheck,” read `docs/PULLCHECK.md` before inspecting pull requests**. It lists old PR branches that must be skipped during routine review.
 
+**Docs index: `docs/README.md`.** The full list of every game asset is `docs/ASSETS.md` (generated: after adding or renaming content run `pnpm exec tsx scripts/export-asset-catalog.ts ../../docs/ASSETS.md` from `artifacts/survivor-616/`; a test fails when it is stale).
+
 ## What this repo is
 
 A pnpm workspace monorepo. The only real product is **"616 Survivor"**, a browser

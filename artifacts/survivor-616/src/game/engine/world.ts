@@ -11930,7 +11930,10 @@ function updateRescue(w: World, dt: number) {
   if (distance < 46) {
     if (rescue.status !== 'freeing') pushSfx(w, 'uiNav');   // the player stepped into the ring
     rescue.status = 'freeing';
+    const before = rescue.progress;
     rescue.progress = clamp(rescue.progress + dt / 2.4, 0, 1);
+    w.shake = Math.max(w.shake, 1 + rescue.progress * 2.5);   // the cage works harder, the screen hums
+    for (const q of [0.25, 0.5, 0.75]) if (before < q && rescue.progress >= q) pushSfx(w, 'uiClick');   // a tick per quarter
     if (rescue.progress >= 1) {
       rescue.status = 'freed';
       rescue.freedAt = w.now;
@@ -11942,6 +11945,7 @@ function updateRescue(w: World, dt: number) {
       pushAlert(w, ally ? `${ally.name} is rescued — get them home` : 'Rescued — get them home');
       spawnParticles(w, rescue.x, rescue.y + 12, ally?.palette.glow ?? '#ffe08a', 22, 130);
       w.cred += 25;
+      w.popups.push({ x: rescue.x, y: rescue.y - 12, text: '+25 CRED', color: '#fde68a', bornAt: w.now, vy: 22 });
     }
   } else {
     rescue.status = 'available';

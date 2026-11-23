@@ -9,6 +9,7 @@
 import { BLOCK_FX_LINGER_MS, blockMaterialOf, drawBlockMaterial } from './blockBreak';
 import { drawGlyph } from '../../ui/lokGlyphCanvas';
 import { drawRescue, drawRescuePointer } from './rescueArt';
+import { drawDungeonChest, drawDungeonEntrances, drawDungeonExit } from './objectiveArt';
 import type { LokGlyphKey } from '../../ui/lokGlyphs.generated';
 import { shakeScale } from '@/anim/motion';
 import { ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
@@ -1875,100 +1876,6 @@ function drawArenaEdges(
     ctx.fillRect(x, -halfH + 4, 24, thickness * 0.35);
     ctx.fillRect(x, halfH - 4 - thickness * 0.35, 24, thickness * 0.35);
   }
-  ctx.restore();
-}
-
-/** Glowing doorway markers for dungeon entrances on the street. */
-function drawDungeonEntrances(ctx: CanvasRenderingContext2D, w: World) {
-  const e = w.endless;
-  if (!e || e.inDungeon) return;
-
-  const pulse = 0.65 + Math.sin(w.now / 380) * 0.35;
-
-  for (const en of e.dungeonEntrances) {
-    const x = en.x - en.w / 2;
-    const y = en.y - en.h / 2;
-
-    // Glow
-    ctx.save();
-    ctx.shadowColor = '#f0a848';
-    ctx.shadowBlur = 22 * pulse;
-    ctx.globalAlpha = 0.55 + pulse * 0.3;
-
-    // Portal frame
-    ctx.fillStyle = '#f0a848';
-    ctx.fillRect(x, y, en.w, 4);               // top bar
-    ctx.fillRect(x, y + en.h - 4, en.w, 4);    // bottom bar
-    ctx.fillRect(x, y, 4, en.h);               // left post
-    ctx.fillRect(x + en.w - 4, y, 4, en.h);    // right post
-
-    // Stair symbol inside
-    ctx.globalAlpha = 0.4 * pulse;
-    ctx.fillStyle = '#fff8e0';
-    const cx = en.x;
-    const cy = en.y;
-    for (let i = 0; i < 3; i += 1) {
-      ctx.fillRect(cx - 7 + i * 5, cy - 3 + i * 3, 12 - i * 4, 2);
-    }
-
-    ctx.restore();
-  }
-}
-
-/** Exit zone marker shown inside dungeon rooms. */
-function drawDungeonExit(ctx: CanvasRenderingContext2D, w: World) {
-  const e = w.endless;
-  if (!e || (!e.inDungeon && !e.inBuilding) || !e.exitZone) return;
-
-  const exit = e.exitZone;
-  const x = exit.x - exit.w / 2;
-  const y = exit.y - exit.h / 2;
-  const pulse = 0.65 + Math.sin(w.now / 300) * 0.35;
-
-  ctx.save();
-  ctx.shadowColor = '#7ef0bd';
-  ctx.shadowBlur = 20 * pulse;
-  ctx.globalAlpha = 0.6 + pulse * 0.25;
-
-  ctx.strokeStyle = '#7ef0bd';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(x + 2, y + 2, exit.w - 4, exit.h - 4);
-
-  // Arrow points toward the outside of the active room.
-  ctx.fillStyle = '#7ef0bd';
-  ctx.globalAlpha = 0.55 * pulse;
-  ctx.beginPath();
-  const mx = exit.x + 4;
-  const my = exit.y;
-  ctx.moveTo(mx - 8, my - 6);
-  ctx.lineTo(mx + 8, my);
-  ctx.lineTo(mx - 8, my + 6);
-  ctx.closePath();
-  ctx.fill();
-  ctx.globalAlpha = 0.9;
-  ctx.font = 'bold 9px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(e.inBuilding ? 'OUT' : 'EXIT', exit.x, exit.y + 31);
-  ctx.textAlign = 'left';
-
-  ctx.restore();
-}
-
-function drawDungeonChest(ctx: CanvasRenderingContext2D, w: World) {
-  const chest = w.endless?.dungeonChest;
-  if (!chest || !w.endless?.inDungeon) return;
-  const pulse = 0.65 + Math.sin(w.now / 260) * 0.35;
-  ctx.save();
-  ctx.globalAlpha = chest.unlocked ? 0.85 + pulse * 0.15 : 0.55;
-  ctx.shadowColor = chest.unlocked ? '#ffd166' : '#64748b';
-  ctx.shadowBlur = chest.unlocked ? 20 * pulse : 6;
-  ctx.fillStyle = chest.unlocked ? '#a16207' : '#334155';
-  ctx.fillRect(chest.x - 20, chest.y - 16, 40, 28);
-  ctx.fillStyle = chest.unlocked ? '#fde68a' : '#94a3b8';
-  ctx.fillRect(chest.x - 20, chest.y - 16, 40, 7);
-  ctx.fillRect(chest.x - 3, chest.y - 5, 6, 10);
-  ctx.font = '9px monospace';
-  ctx.fillText(chest.opened ? 'SECURED' : chest.unlocked ? 'OPEN' : 'LOCKED', chest.x - 28, chest.y + 30);
   ctx.restore();
 }
 
