@@ -47,7 +47,7 @@ export const AREAS_DISCO: AreaDef[] = [
     durationSec: 240,
     threat: 'severe',
     discoveryId: 'mirrorball-frequency',
-    unlock: { kind: 'clearArea', areaId: 'crystal-cellar-4x' },
+    unlock: { kind: 'clearArea', areaId: 'blackout-skyway-4x' },
     waves: [
       { fromSec: 0, toSec: 60, enemyId: 'discoball-marshal', ratePerSec: 1.1, burst: 2, hpMult: 1.1 },
       { fromSec: 20, toSec: 110, enemyId: 'strobe-fault', ratePerSec: 0.9, burst: 2, group: ['chromatic-hustler'], formation: 'wedge' },

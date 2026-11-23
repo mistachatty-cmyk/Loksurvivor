@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Heart, PackageOpen, Shield, Sparkles, Swords, Zap } from 'lucide-react';
 
@@ -9,6 +9,11 @@ import type { CharacterDef, EnemyDef } from '@/game/types';
 import { LokPetEntrance } from '@/ui/LokPetEntrance';
 import { LokPetIcon } from '@/ui/LokPetVariantSheet';
 import { RigPortrait } from '@/ui/RigPortrait';
+import { useT } from '@/lib/i18n';
+import { useAuth } from '@/state/authStore';
+
+// The account page opens on top of this screen (not as a new screen), so the fight and the partner you picked are kept.
+const AccountPanel = lazy(() => import('@/ui/AccountPanel').then((m) => ({ default: m.AccountPanel })));
 
 type Phase = 'fists' | 'rustle' | 'ambush' | 'choose' | 'partner' | 'victory';
 const AMBUSH_REVEAL_MS = 1300;
@@ -63,6 +68,10 @@ function EnemyModel({ enemy, hp }: { enemy: EnemyDef; hp: number }) {
 }
 
 export function StarterLokPetEncounter({ onEnterHideout, onStartTutorial }: { onEnterHideout: () => void; onStartTutorial?: () => void }) {
+  const t = useT();
+  const { available, session } = useAuth();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const canSaveProgress = available && !session;
   const { completeStarterLokPetOnboarding, selectedCharacter, unlockedCharacters, meta } = useMeta();
   const [starterCharacter] = useState<CharacterDef>(() => (
     unlockedCharacters[Math.floor(Math.random() * unlockedCharacters.length)] ?? selectedCharacter
@@ -114,7 +123,7 @@ export function StarterLokPetEncounter({ onEnterHideout, onStartTutorial }: { on
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_55%,rgba(34,211,238,.1),transparent_34%),linear-gradient(to_bottom,rgba(0,0,0,.12),rgba(0,0,0,.9))]" aria-hidden="true" />
       <div className="pointer-events-none absolute inset-0 opacity-[.07] [background-image:repeating-linear-gradient(0deg,transparent_0,transparent_3px,#fff_4px)]" aria-hidden="true" />
 
-      <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-4xl flex-col px-4 py-5 sm:px-8 sm:py-8">
+      <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-4xl flex-col px-4 pb-24 pt-5 sm:px-8 sm:py-8">
         <header className="flex items-start justify-between gap-4 border-b border-white/15 pb-4">
           <div>
             <p className="font-mono text-[10px] font-bold uppercase tracking-[.32em] text-orange-300">First arrival · en route to the hideout</p>
@@ -124,11 +133,11 @@ export function StarterLokPetEncounter({ onEnterHideout, onStartTutorial }: { on
           <p className="max-w-32 pt-1 text-right font-mono text-[10px] font-black uppercase tracking-[.16em] text-cyan-100/75">{starterCharacter.name}</p>
         </header>
 
-        <section className="relative my-5 min-h-[360px] overflow-hidden border-y border-white/15 bg-black/30 p-5 shadow-[inset_0_0_60px_rgba(0,0,0,.65)] sm:min-h-[420px] sm:p-8">
+        <section className={`relative my-5 overflow-hidden border-y border-white/15 bg-black/30 p-5 shadow-[inset_0_0_60px_rgba(0,0,0,.65)] sm:min-h-[420px] sm:p-8 ${phase === 'victory' ? 'max-sm:min-h-0' : 'min-h-[360px]'}`}>
           <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(transparent,rgba(249,115,22,.09))]" />
           <div className="absolute inset-x-8 bottom-16 h-px bg-gradient-to-r from-transparent via-orange-200/20 to-transparent" />
 
-          <div className="relative grid min-h-[310px] grid-cols-1 items-end gap-8 sm:min-h-[360px] sm:grid-cols-[1.2fr_1fr] sm:gap-6">
+          <div className={`relative grid grid-cols-1 items-end gap-8 sm:min-h-[360px] sm:grid-cols-[1.2fr_1fr] sm:gap-6 ${phase === 'victory' ? 'max-sm:min-h-0' : 'min-h-[310px]'}`}>
             <div className="relative min-w-0 pb-2 text-center">
               {/* Classic reveal: a static "something's in the brush" prompt near the fighter, tapped to advance. */}
               <AnimatePresence>
@@ -172,7 +181,7 @@ export function StarterLokPetEncounter({ onEnterHideout, onStartTutorial }: { on
                   />
                 )}
               </div>
-              <p className="mt-3 truncate text-sm font-black uppercase tracking-wide text-white">
+              <p className="mt-6 truncate text-sm font-black uppercase tracking-wide text-white">
                 {starterCharacter.name}{chosenVariant ? ` + ${chosenVariant.name}` : ''}
               </p>
               <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[.18em] text-cyan-100/65">
@@ -180,9 +189,9 @@ export function StarterLokPetEncounter({ onEnterHideout, onStartTutorial }: { on
               </p>
             </div>
 
-            <div className="min-w-0 pb-2 text-center">
+            <div className={`min-w-0 pb-2 text-center ${phase === 'victory' ? 'max-sm:hidden' : ''}`}>
               <EnemyModel enemy={enemy} hp={enemyHp} />
-              <p className="mt-3 truncate text-sm font-black uppercase tracking-wide text-red-100">Block Scavenger</p>
+              <p className="mt-6 truncate text-sm font-black uppercase tracking-wide text-red-100">Block Scavenger</p>
               <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[.18em] text-red-200/60">{enemy.name} · street threat</p>
               <div className="mx-auto mt-2 h-2 max-w-36 overflow-hidden border border-white/5 bg-white/10"><motion.div className="h-full bg-red-400 shadow-[0_0_10px_rgba(248,113,113,.55)]" animate={{ width: `${enemyHp}%` }} /></div>
             </div>
@@ -294,9 +303,20 @@ export function StarterLokPetEncounter({ onEnterHideout, onStartTutorial }: { on
             ) : (
               <button type="button" onClick={onEnterHideout} className="mt-5 inline-flex min-h-14 items-center gap-2 bg-orange-400 px-7 py-4 text-xs font-black uppercase tracking-[.2em] text-black active:scale-[.98]" data-testid="button-enter-hideout-after-starter"><PackageOpen className="h-5 w-5" /> Enter hideout & open packs</button>
             )}
+            {canSaveProgress ? (
+              <div className="mt-3 flex flex-col items-center gap-1">
+                <button type="button" onClick={() => setAccountOpen(true)} className="min-h-11 border border-cyan-300/50 px-5 font-mono text-[11px] font-black uppercase tracking-widest text-cyan-200 hover:bg-cyan-300/10" data-testid="button-starter-save-progress">{t('starter.saveProgress')}</button>
+                <p className="font-mono text-[10px] text-white/45">{t('starter.saveProgress.hint')}</p>
+              </div>
+            ) : null}
           </motion.section>
         )}
       </div>
+      {accountOpen ? (
+        <div className="fixed inset-0 z-[80] overflow-y-auto bg-background" data-testid="starter-account-overlay">
+          <Suspense fallback={null}><AccountPanel onBack={() => setAccountOpen(false)} /></Suspense>
+        </div>
+      ) : null}
     </main>
   );
 }

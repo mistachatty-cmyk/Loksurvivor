@@ -11,8 +11,18 @@ import type { WaveDef } from '@/game/types';
 
 const seconds = Number(process.argv[2] ?? 60);
 const mode = process.argv[3] ?? 'million';
+// Optional: `[areaId]` picks the map (default: the first), and `--max-avg <ms>` / `--max-p99 <ms>` make the
+// script exit 1 when a limit is exceeded, so CI can fail on a slowdown.
+const argv = process.argv.slice(4);
+const flag = (name: string): number | undefined => {
+  const at = argv.indexOf(name);
+  return at === -1 ? undefined : Number(argv[at + 1]);
+};
+const areaArg = argv.find((a, i) => !a.startsWith('--') && !argv[i - 1]?.startsWith('--'));
+const baseArea = areaArg ? AREAS.find((a) => a.id === areaArg) : AREAS[0];
+if (!baseArea) throw new Error(`Unknown area "${areaArg}"`);
 const wave: WaveDef = { fromSec: 0, toSec: 99999, enemyId: 'nightcrawler', ratePerSec: 40, burst: 2 };
-const area = { ...AREAS[0]!, durationSec: 99999, waves: [wave], musicEvents: undefined, rescueAllyId: undefined };
+const area = { ...baseArea, durationSec: 99999, waves: [wave], musicEvents: undefined, rescueAllyId: undefined };
 const character = CHARACTERS[0]!;
 const modifiers =
   mode === 'million' ? { millionHordeMode: true, unleashedMode: true }
@@ -39,9 +49,16 @@ times.sort((a, b) => a - b);
 const avg = times.reduce((s, v) => s + v, 0) / times.length;
 const q = (p: number) => times[Math.min(times.length - 1, Math.floor(times.length * p))]!.toFixed(3);
 const horde = world.millionHorde;
-console.log(JSON.stringify({
-  mode, simSeconds: seconds, actors: world.enemies.length, kills: world.kills,
+const result = {
+  mode, areaId: baseArea.id, simSeconds: seconds, actors: world.enemies.length, kills: world.kills,
   population: world.hordeField ? world.hordeField.count + world.enemies.length : undefined,
   projectiles: world.projectiles.length, particles: world.particles.length,
   avgMs: +avg.toFixed(3), p50: q(0.5), p99: q(0.99), p999: q(0.999), maxMs: times[times.length - 1]!.toFixed(3),
-}));
+};
+console.log(JSON.stringify(result));
+const maxAvg = flag('--max-avg');
+const maxP99 = flag('--max-p99');
+if ((maxAvg !== undefined && avg > maxAvg) || (maxP99 !== undefined && Number(q(0.99)) > maxP99)) {
+  console.error(`bench-sim: over budget (avg ${avg.toFixed(3)} ms, p99 ${q(0.99)} ms; limits avg ${maxAvg ?? '-'}, p99 ${maxP99 ?? '-'})`);
+  process.exit(1);
+}

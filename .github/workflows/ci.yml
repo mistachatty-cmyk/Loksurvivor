@@ -48,3 +48,17 @@ jobs:
 
       - name: Tests
         run: pnpm test
+
+      - name: Install browser for smoke tests
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Map and music smoke tests (dark maps are visible, songs switch cleanly)
+        run: pnpm exec playwright test e2e/dark-maps-visible.spec.ts e2e/music-rapid-switch.spec.ts
+
+      # Speed budgets (limits are ~3-4x what a laptop measures, so only a real slowdown trips them).
+      - name: Simulation speed budget
+        run: |
+          pnpm exec tsx scripts/bench-sim.ts 20 normal monroe-strip --max-avg 2.5 --max-p99 25
+          pnpm exec tsx scripts/bench-sim.ts 20 million monroe-strip --max-avg 10 --max-p99 40
+          pnpm exec tsx scripts/bench-sim.ts 20 normal abyssal-subway-4x --max-avg 2.5 --max-p99 25
+          pnpm exec tsx scripts/bench-sim.ts 20 normal endless-catacombs --max-avg 2.5 --max-p99 25

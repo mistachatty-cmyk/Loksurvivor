@@ -38,7 +38,7 @@ test.describe('hideout companions', () => {
       expect(dockBox!.y + dockBox!.height).toBeLessThanOrEqual(walkBox!.y);
       const controls = [
         page.getByTestId('button-hub-mission-briefing'),
-        page.getByTestId('button-open-run-setup'),
+        page.getByTestId('button-global-looks-lokpets'),
         page.locator('[data-testid="music-now-playing-global"], [data-testid="button-global-random-music"]').first(),
         page.getByTestId('hideout-lokpet-companion'),
       ];

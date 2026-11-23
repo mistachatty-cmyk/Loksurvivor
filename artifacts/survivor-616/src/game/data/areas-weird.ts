@@ -257,7 +257,7 @@ export const BONUS_DIGIVERSE_AREAS: AreaDef[] = [
     name: 'Abyssal Firefly Hollows // Extreme Dark',
     district: 'Subterranean Bioluminescent Chasm',
     description: 'A subterranean cavern locked in absolute pitch-black darkness. Waving bio-phosphor trees and swarms of wrangled fireflies cast faint light, while Firefly Miners and Spikers defend their subterranean ore veins.',
-    backdrop: 'art/subway.jpeg',
+    backdrop: 'art/cellar.jpeg',
     bounds: { w: 2200, h: 1400 },
     ground: { base: '#030712', tile: '#0f172a', seam: '#020617', glow: '#f59e0b' },
     sky: 'roofed',

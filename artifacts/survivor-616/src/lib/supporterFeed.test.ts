@@ -19,8 +19,8 @@ describe('supporter feed rules (shared SDK)', () => {
   });
 
   it('marks founders and keeps scroll speed steady', () => {
-    assert.equal(supporterItemText({ display: 'Ada', tier: 'lifetime', founder: true }), '★ Ada · FOUNDER');
-    assert.equal(supporterItemText({ display: 'Ada', tier: 'pass', founder: false }), '◆ Ada');
+    assert.equal(supporterItemText({ display: 'Ada', tier: 'lifetime', founder: true }), 'Ada · FOUNDER');
+    assert.equal(supporterItemText({ display: 'Ada', tier: 'pass', founder: false }), 'Ada');
     assert.equal(supporterScrollSeconds(2), 30);
     assert.equal(supporterScrollSeconds(20), 100);
   });

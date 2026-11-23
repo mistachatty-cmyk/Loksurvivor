@@ -1109,6 +1109,9 @@ export const AREAS_BY_ID: Record<string, AreaDef> = Object.fromEntries(
 export function getArea(id: string): AreaDef {
   const found = AREAS_BY_ID[id];
   if (!found) {
+    // A wrong id used to quietly load Monroe Strip. Fail loudly while developing so a typo is seen at once;
+    // a shipped build still falls back so a stale saved id cannot crash a player's run.
+    if (import.meta.env?.DEV) throw new Error(`[getArea] Unknown area id "${id}".`);
     console.warn(`[getArea] Unknown area id "${id}", falling back to safe default area.`);
     return AREAS[0];
   }
