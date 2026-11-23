@@ -197,6 +197,8 @@
   "common.back": "Back",
   "common.looksLokpets": "Looks & LokPets",
   "intro.enterHideout": "Enter the hideout",
+  "starter.saveProgress": "Save my progress with a Lok account",
+  "starter.saveProgress.hint": "Optional. Your first team stays on this device either way.",
   "intro.updates.aria": "Game updates",
   "intro.updates.dismissAria": "Dismiss update notice",
   "intro.updates.heading": "Updates & Patch Notes",

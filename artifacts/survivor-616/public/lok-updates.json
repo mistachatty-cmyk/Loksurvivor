@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 203,
+      "version": "0.42.64",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T04:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Save your progress after the first win",
+      "body": [
+        "After your first fight, the reward card now has an optional Save my progress with a Lok account button when sign-in is available. It opens the account page on top of the card, so your partner and rewards are kept when you close it."
+      ]
+    },
+    {
       "number": 202,
       "version": "0.42.63",
       "date": "2026-11-23",

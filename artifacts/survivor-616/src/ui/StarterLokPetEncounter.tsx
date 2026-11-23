@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Heart, PackageOpen, Shield, Sparkles, Swords, Zap } from 'lucide-react';
 
@@ -9,6 +9,11 @@ import type { CharacterDef, EnemyDef } from '@/game/types';
 import { LokPetEntrance } from '@/ui/LokPetEntrance';
 import { LokPetIcon } from '@/ui/LokPetVariantSheet';
 import { RigPortrait } from '@/ui/RigPortrait';
+import { useT } from '@/lib/i18n';
+import { useAuth } from '@/state/authStore';
+
+// The account page opens on top of this screen (not as a new screen), so the fight and the partner you picked are kept.
+const AccountPanel = lazy(() => import('@/ui/AccountPanel').then((m) => ({ default: m.AccountPanel })));
 
 type Phase = 'fists' | 'rustle' | 'ambush' | 'choose' | 'partner' | 'victory';
 const AMBUSH_REVEAL_MS = 1300;
@@ -63,6 +68,10 @@ function EnemyModel({ enemy, hp }: { enemy: EnemyDef; hp: number }) {
 }
 
 export function StarterLokPetEncounter({ onEnterHideout, onStartTutorial }: { onEnterHideout: () => void; onStartTutorial?: () => void }) {
+  const t = useT();
+  const { available, session } = useAuth();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const canSaveProgress = available && !session;
   const { completeStarterLokPetOnboarding, selectedCharacter, unlockedCharacters, meta } = useMeta();
   const [starterCharacter] = useState<CharacterDef>(() => (
     unlockedCharacters[Math.floor(Math.random() * unlockedCharacters.length)] ?? selectedCharacter
@@ -294,9 +303,20 @@ export function StarterLokPetEncounter({ onEnterHideout, onStartTutorial }: { on
             ) : (
               <button type="button" onClick={onEnterHideout} className="mt-5 inline-flex min-h-14 items-center gap-2 bg-orange-400 px-7 py-4 text-xs font-black uppercase tracking-[.2em] text-black active:scale-[.98]" data-testid="button-enter-hideout-after-starter"><PackageOpen className="h-5 w-5" /> Enter hideout & open packs</button>
             )}
+            {canSaveProgress ? (
+              <div className="mt-3 flex flex-col items-center gap-1">
+                <button type="button" onClick={() => setAccountOpen(true)} className="min-h-11 border border-cyan-300/50 px-5 font-mono text-[11px] font-black uppercase tracking-widest text-cyan-200 hover:bg-cyan-300/10" data-testid="button-starter-save-progress">{t('starter.saveProgress')}</button>
+                <p className="font-mono text-[10px] text-white/45">{t('starter.saveProgress.hint')}</p>
+              </div>
+            ) : null}
           </motion.section>
         )}
       </div>
+      {accountOpen ? (
+        <div className="fixed inset-0 z-[80] overflow-y-auto bg-background" data-testid="starter-account-overlay">
+          <Suspense fallback={null}><AccountPanel onBack={() => setAccountOpen(false)} /></Suspense>
+        </div>
+      ) : null}
     </main>
   );
 }
