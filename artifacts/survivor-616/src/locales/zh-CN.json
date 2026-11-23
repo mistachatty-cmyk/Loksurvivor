@@ -1525,5 +1525,8 @@
   "room.note.moreGames": "更多大厅即将到来",
   "room.qnk.leaving": "在新选项卡中打开 Queens N Kings",
   "room.hall616.closed": "616大厅还没开放",
-  "room.back.menu": "菜单视图"
+  "room.back.menu": "菜单视图",
+  "room.note.stash": "你的日常藏品",
+  "room.stash.claimed": "每日收集的藏品",
+  "room.stash.empty": "今天已经收藏了。明天回来保持连胜。"
 }

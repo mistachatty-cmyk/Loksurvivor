@@ -1525,5 +1525,8 @@
   "room.note.moreGames": "D'autres salles arrivent",
   "room.qnk.leaving": "Ouverture de Queens N Kings dans un nouvel onglet",
   "room.hall616.closed": "La salle 616 n'est pas encore ouverte",
-  "room.back.menu": "Affichage des menus"
+  "room.back.menu": "Affichage des menus",
+  "room.note.stash": "Votre réserve quotidienne",
+  "room.stash.claimed": "Cachette quotidienne collectée",
+  "room.stash.empty": "Déjà récupéré aujourd'hui. Revenez demain pour garder la séquence."
 }

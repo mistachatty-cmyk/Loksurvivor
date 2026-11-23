@@ -1525,5 +1525,8 @@
   "room.note.moreGames": "Mais salões estão chegando",
   "room.qnk.leaving": "Abrindo Queens N Kings em uma nova aba",
   "room.hall616.closed": "O salão 616 ainda não está aberto",
-  "room.back.menu": "Visualização do menu"
+  "room.back.menu": "Visualização do menu",
+  "room.note.stash": "Seu estoque diário",
+  "room.stash.claimed": "Estoque diário coletado",
+  "room.stash.empty": "Já coletado hoje. Volte amanhã para manter a seqüência."
 }

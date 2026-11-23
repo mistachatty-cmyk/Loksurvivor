@@ -1525,5 +1525,8 @@
   "room.note.moreGames": "さらに多くのホールが登場",
   "room.qnk.leaving": "新しいタブでQueens N Kingsを開く",
   "room.hall616.closed": "616ホールはまだオープンしていません",
-  "room.back.menu": "メニュービュー"
+  "room.back.menu": "メニュービュー",
+  "room.note.stash": "あなたの毎日の隠し場所",
+  "room.stash.claimed": "毎日集められる隠し場所",
+  "room.stash.empty": "本日すでに回収済みです。連勝記録を維持するために明日また来てください。"
 }

@@ -1525,5 +1525,8 @@
   "room.note.moreGames": "Weitere Hallen kommen",
   "room.qnk.leaving": "Queens N Kings wird in einem neuen Tab geöffnet",
   "room.hall616.closed": "Die Halle 616 ist noch nicht geöffnet",
-  "room.back.menu": "Menüansicht"
+  "room.back.menu": "Menüansicht",
+  "room.note.stash": "Ihr täglicher Vorrat",
+  "room.stash.claimed": "Täglicher Vorrat gesammelt",
+  "room.stash.empty": "Heute schon abgeholt. Kommen Sie morgen wieder, um die Serie aufrechtzuerhalten."
 }

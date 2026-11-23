@@ -1525,5 +1525,8 @@
   "room.note.moreGames": "홀이 더 많아지네요",
   "room.qnk.leaving": "새 탭에서 Queens N Kings 열기",
   "room.hall616.closed": "616홀은 아직 오픈하지 않았습니다",
-  "room.back.menu": "메뉴 보기"
+  "room.back.menu": "메뉴 보기",
+  "room.note.stash": "당신의 일일 보관함",
+  "room.stash.claimed": "일일 보관함 수집",
+  "room.stash.empty": "오늘 이미 수집되었습니다. 연속 기록을 유지하려면 내일 다시 오세요."
 }
