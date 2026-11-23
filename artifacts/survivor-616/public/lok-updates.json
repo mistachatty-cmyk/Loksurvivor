@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 201,
+      "version": "0.42.62",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T03:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "One invite link, one QR",
+      "body": [
+        "Arena rooms now show a QR code next to the room link. Scan it or open the link and you land on the join screen with the code filled in.",
+        "Friend and room links use one shared format that Queens N Kings understands too. Links for modes only Queens N Kings has (matches, halls, watching) carry you across to that game. Older links keep working."
+      ]
+    },
+    {
       "number": 200,
       "version": "0.42.61",
       "date": "2026-11-23",

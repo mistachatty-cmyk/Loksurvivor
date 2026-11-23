@@ -82,6 +82,7 @@ import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { customMapToArea } from '@/game/data/customMaps';
+import { inviteDestination, parseInvite } from '../../../lib/lok-universe/src/invite';
 const ArchivePanel = lazy(() => import('@/ui/ArchivePanel').then((m) => ({ default: m.ArchivePanel })));
 const DirectorTerminalPanel = lazy(() => import('@/ui/DirectorTerminalPanel').then((m) => ({ default: m.DirectorTerminalPanel })));
 const BestiaryPanel = lazy(() => import('@/ui/BestiaryPanel').then((m) => ({ default: m.BestiaryPanel })));
@@ -222,9 +223,15 @@ function initialScreen(): Screen {
   // `?room=CODE` is the shareable arena-invite link -- honoured in every
   // build (not dev-only like the rest of this function), since it's how a
   // friend actually joins a LokSurvivorArena online room.
+  // Any Lok invite link (`?go=room.CODE`, or the older `?room=CODE`): a room opens the
+  // join screen; a mode only Queens N Kings has hops to that game with the same code.
   if (typeof window !== 'undefined') {
-    const roomCode = new URLSearchParams(window.location.search).get('room');
-    if (roomCode) return { name: 'arena-join', initialCode: roomCode };
+    const invite = parseInvite(window.location.search, 'survivor');
+    if (invite) {
+      const where = inviteDestination(invite, 'survivor');
+      if (where.action === 'redirect') window.location.replace(where.url);
+      else if (where.mode === 'room-join' && where.code) return { name: 'arena-join', initialCode: where.code };
+    }
   }
   // Hidden preview of the Jukebox Room (`?jukebox`), honoured in every build
   // so it can be tried before the Arcade Box is found.
