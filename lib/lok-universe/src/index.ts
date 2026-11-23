@@ -11,3 +11,4 @@ export * from "./playtime";
 export * from "./achievements";
 export * from "./crash";
 export * from "./invite";
+export * from "./onboarding";

@@ -2861,6 +2861,35 @@ function drawObstacles(
   }
 }
 
+/**
+ * Soft light glows for lamps, signs and barrels. Building a fresh radial gradient for each one every
+ * frame was a steady cost in ordinary scenes; the disc never changes shape, so it is cached per
+ * (colour, radius rounded to 4) and stamped with drawImage. Null outside a browser.
+ */
+const GLOW_SPRITES = new Map<string, HTMLCanvasElement>();
+function glowSprite(color: string, radius: number): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  const r = Math.max(8, Math.round(radius / 4) * 4);
+  const key = `${color}:${r}`;
+  let sprite = GLOW_SPRITES.get(key);
+  if (!sprite) {
+    if (GLOW_SPRITES.size > 64) GLOW_SPRITES.clear();
+    sprite = document.createElement('canvas');
+    sprite.width = r * 2;
+    sprite.height = r * 2;
+    const g = sprite.getContext('2d');
+    if (!g) return null;
+    const gradient = g.createRadialGradient(r, r, 4, r, r, r);
+    gradient.addColorStop(0, `${color}55`);
+    gradient.addColorStop(0.45, `${color}20`);
+    gradient.addColorStop(1, `${color}00`);
+    g.fillStyle = gradient;
+    g.fillRect(0, 0, r * 2, r * 2);
+    GLOW_SPRITES.set(key, sprite);
+  }
+  return sprite;
+}
+
 function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds) {
   const LIGHT_MARGIN = 280;
   for (const prop of w.breakables) {
@@ -2958,14 +2987,20 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World, bounds: Vie
       : b.kind === 'fuse-box' ? '#7ef0bd' : b.kind === 'attack-block' ? '#ff5c5c'
       : b.kind === 'server-rack' ? '#1fe6ff' : '#ffd166';
     const pulse = b.kind === 'neon-sign' ? neonFlicker(w.now, b.uid) : 1;
-    const gradient = ctx.createRadialGradient(b.x, b.y, 4, b.x, b.y, radius);
-    gradient.addColorStop(0, `${color}55`);
-    gradient.addColorStop(0.45, `${color}20`);
-    gradient.addColorStop(1, `${color}00`);
     ctx.save();
     ctx.globalAlpha = pulse;
-    ctx.fillStyle = gradient;
-    ctx.fillRect(b.x - radius, b.y - radius, radius * 2, radius * 2);
+    // The glow is the same soft disc every frame, so it is painted once to a small sprite and stamped.
+    const glow = glowSprite(color, radius);
+    if (glow) {
+      ctx.drawImage(glow, b.x - glow.width / 2, b.y - glow.height / 2);
+    } else {
+      const gradient = ctx.createRadialGradient(b.x, b.y, 4, b.x, b.y, radius);
+      gradient.addColorStop(0, `${color}55`);
+      gradient.addColorStop(0.45, `${color}20`);
+      gradient.addColorStop(1, `${color}00`);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(b.x - radius, b.y - radius, radius * 2, radius * 2);
+    }
     if (b.kind === 'fuse-box') {
       ctx.globalAlpha = 0.28;
       ctx.fillStyle = color;

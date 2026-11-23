@@ -9,6 +9,7 @@
  * like a dropped file; nothing routes through a server this app doesn't have.
  */
 
+import { isAbortError, isCrossOriginUrl, nextFailureAction } from './playbackRecovery';
 import { readShuffle, writeShuffle } from '@/lib/jukeboxPrefs';
 import { useEq, type EqSettings } from '@/lib/musicEq';
 import { positionStateFor, sessionMetaFor, skipTarget } from '@/lib/mediaSessionMeta';
@@ -492,6 +493,13 @@ function loadStoredPlaylists(): StoredPlaylists {
 export function MusicProvider({ children }: { children: ReactNode }) {
   const { meta } = useMeta();
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  /** Bumped for every track start so a late answer about an older track can be ignored. */
+  const playRequestRef = useRef(0);
+  /** The request already handled by failure recovery (the play() rejection and the element error both report). */
+  const failureHandledRef = useRef(0);
+  const retriedTrackIdRef = useRef<string | null>(null);
+  const consecutiveFailuresRef = useRef(0);
+  const playIndexRef = useRef<(index: number) => void>(() => {});
   const currentTrackRef = useRef<Track | null>(null);
   const tracksRef = useRef<Track[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -882,6 +890,43 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [shuffle, repeat, activeQueueIds],
   );
 
+  /**
+   * A song did not start or died mid-stream: retry it once, then move to the next song, and stop only
+   * when every song in the queue has failed in a row (so a dead network never loops forever).
+   */
+  const recoverFromFailure = useCallback(
+    (index: number, requestId: number) => {
+      if (requestId !== playRequestRef.current || failureHandledRef.current === requestId) return;
+      failureHandledRef.current = requestId;
+      const track = tracksRef.current[index];
+      if (!track) return;
+      const action = nextFailureAction({
+        alreadyRetried: retriedTrackIdRef.current === track.id,
+        consecutiveFailures: consecutiveFailuresRef.current,
+        queueLength: activeQueueIds().length,
+      });
+      if (action === 'retry') {
+        retriedTrackIdRef.current = track.id;
+        window.setTimeout(() => {
+          if (requestId === playRequestRef.current) playIndexRef.current(index);
+        }, 600);
+        return;
+      }
+      consecutiveFailuresRef.current += 1;
+      if (action === 'skip') {
+        const next = pickNextIndex(track.id, 1);
+        if (next !== -1 && next !== index) {
+          setError(`"${track.title}" would not play, so the next song started.`);
+          playIndexRef.current(next);
+          return;
+        }
+      }
+      setIsPlaying(false);
+      setError(`Could not play "${track.title}". The file may be missing, blocked by its host, or in a format this browser cannot play.`);
+    },
+    [activeQueueIds, pickNextIndex],
+  );
+
   const playIndex = useCallback(
     (index: number) => {
       const audio = audioRef.current;
@@ -895,13 +940,23 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         setError(`"${track.title}" is no longer available -- add the file again.`);
         return;
       }
+      const requestId = playRequestRef.current + 1;
+      playRequestRef.current = requestId;
       setCurrentIndex(index);
       currentTrackRef.current = track;
+      // Web Audio turns a cross-origin file into silence unless it was requested with CORS, so files on
+      // other sites ask for it. Must be set before `src`.
+      if (isCrossOriginUrl(track.url, window.location.href)) audio.crossOrigin = 'anonymous';
+      else audio.removeAttribute('crossorigin');
       audio.src = track.url;
       audio.currentTime = 0;
       void audio
         .play()
         .then(() => {
+          // A newer song was started while this one was loading; its own request owns the UI now.
+          if (requestId !== playRequestRef.current) return;
+          retriedTrackIdRef.current = null;
+          consecutiveFailuresRef.current = 0;
           connectAnalyser();
           // A new track has a new tempo -- drop the old grid rather than easing
           // toward the new one from a stale estimate.
@@ -910,13 +965,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           setIsPlaying(true);
           setError(null);
         })
-        .catch(() => {
-          setIsPlaying(false);
-          setError(`Could not play "${track.title}". The browser may not support this format.`);
+        .catch((error: unknown) => {
+          // Loading a newer song cancels this request. That is not a failure of this song.
+          if (requestId !== playRequestRef.current || isAbortError(error)) return;
+          recoverFromFailure(index, requestId);
         });
     },
-    [connectAnalyser, startEnergyMeter],
+    [connectAnalyser, startEnergyMeter, recoverFromFailure],
   );
+  playIndexRef.current = playIndex;
 
   /* --------------------------------------------------------------- */
   /* Audio element wiring                                             */
@@ -934,9 +991,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       stopEnergyMeter();
     };
     const onError = () => {
-      setIsPlaying(false);
-      const title = tracksRef.current[currentIndex]?.title;
-      setError(title ? `"${title}" could not be decoded.` : 'That audio file could not be played.');
+      // Ignore the empty-source error a cleared element can raise; real failures go through recovery.
+      if (!audio.getAttribute('src')) return;
+      recoverFromFailure(currentIndex, playRequestRef.current);
     };
     const onEnded = () => {
       if (repeat === 'one') {
@@ -967,7 +1024,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener('error', onError);
       audio.removeEventListener('ended', onEnded);
     };
-  }, [currentIndex, pickNextIndex, playIndex, repeat, stopEnergyMeter]);
+  }, [currentIndex, pickNextIndex, playIndex, recoverFromFailure, repeat, stopEnergyMeter]);
 
   useEffect(() => {
     const audio = audioRef.current;

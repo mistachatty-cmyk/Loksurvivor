@@ -79,6 +79,7 @@ import { LokChatHost } from '@/ui/LokChatHost';
 import { readSelectedMap } from '@/lib/selectedMap';
 import { readTutorialDone, writeTutorialDone } from '@/lib/tutorial';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
+import { markOnboardingDone } from '@/lib/onboardingStore';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { customMapToArea } from '@/game/data/customMaps';
@@ -637,6 +638,7 @@ function Game() {
         <StarterLokPetEncounter
           onEnterHideout={() => {
             writeTutorialDone();
+            markOnboardingDone({ id: 'first-packs', version: 1 }); // the skip route lands in the card shop, so the packs step is already met
             enterHideout();
             setScreen({ name: 'card-shop' });
           }}

@@ -99,3 +99,32 @@ test('FogRenderer handles edge cases gracefully without throwing', () => {
     fog.renderTacticalVignette(mockCtx, 0, 0, 1);
   });
 });
+
+test('fog never erases the game canvas: the cut-out happens on a private layer', () => {
+  const layerOps: string[] = [];
+  const layerCtx = {
+    save: () => {}, restore: () => {}, setTransform: () => {}, translate: () => {}, scale: () => {},
+    clearRect: () => {}, fillRect: () => {}, beginPath: () => {}, arc: () => {}, fill: () => {},
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+    set globalCompositeOperation(v: string) { layerOps.push(v); },
+    fillStyle: '',
+  };
+  const layerCanvas = { width: 0, height: 0, getContext: () => layerCtx };
+  const realDocument = (globalThis as { document?: unknown }).document;
+  (globalThis as { document?: unknown }).document = { createElement: () => layerCanvas };
+  try {
+    const drawn: unknown[] = [];
+    const modes: string[] = [];
+    const mainCtx = {
+      save: () => {}, restore: () => {}, setTransform: () => {},
+      drawImage: (img: unknown) => drawn.push(img),
+      set globalCompositeOperation(v: string) { modes.push(v); },
+    } as unknown as CanvasRenderingContext2D;
+    new FogRenderer().renderFog(mainCtx, new TacticalCamera(0, 0), 800, 600, 1, 'rgba(0,0,0,0.9)', 300, []);
+    assert.deepEqual(modes, [], 'main canvas must never change composite mode');
+    assert.ok(layerOps.includes('destination-out'), 'the hole is cut on the layer');
+    assert.deepEqual(drawn, [layerCanvas], 'finished layer is composited once over the world');
+  } finally {
+    (globalThis as { document?: unknown }).document = realDocument;
+  }
+});

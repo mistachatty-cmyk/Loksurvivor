@@ -66,6 +66,7 @@ test.describe('end game settings', () => {
 
     // The switches take effect on the roster.
     await page.goto('/?screen=roster');
+    await expect(page.locator('[data-testid^="button-inspect-"]').first()).toBeVisible({ timeout: 15_000 });
     expect(await page.locator('[data-testid^="button-inspect-"]').count()).toBeGreaterThan(10);
     expect(await page.locator('.foil-tile').count()).toBe(1);
     expect(errors, errors.join('\n')).toEqual([]);
