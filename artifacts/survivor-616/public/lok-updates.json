@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 208,
+      "version": "0.42.69",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T06:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "More original icons",
+      "body": [
+        "Seven new hand-drawn icons joined the set: house, trophy, scroll, map, menu, sound and mute. They share the same faceted look as the rest, so screens that need them stay in one style.",
+        "They also match the icons in Queens N Kings, so both games feel like one family."
+      ]
+    },
+    {
       "number": 207,
       "version": "0.42.68",
       "date": "2026-11-23",
