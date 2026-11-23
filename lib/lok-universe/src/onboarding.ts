@@ -40,10 +40,10 @@ export type OnboardingStepDef = {
   /** Lower comes first among steps of the same kind. Default 0. */
   priority?: number;
   /** Games decide with their own state, e.g. "already has an account" or "second run or later". */
-  when?: (ctx: OnboardingContext) => boolean;
+  when?: (ctx: OnboardingStepContext) => boolean;
 };
 
-export type OnboardingContext = {
+export type OnboardingStepContext = {
   /** Signed in to a Lok account right now. */
   signedIn: boolean;
   /** Number of runs / matches / sessions finished on this device. */
@@ -150,7 +150,7 @@ export function validateOnboardingSteps(defs: OnboardingStepDef[]): void {
 export function nextOnboardingStep(
   defs: OnboardingStepDef[],
   state: OnboardingState,
-  ctx: OnboardingContext,
+  ctx: OnboardingStepContext,
 ): OnboardingStepDef | null {
   if (!ctx.canInterrupt) return null;
   const byId = new Map(defs.map((d) => [d.id, d]));
