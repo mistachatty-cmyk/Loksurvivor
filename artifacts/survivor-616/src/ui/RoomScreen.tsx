@@ -6,6 +6,7 @@
  * contract (`lib/lok-universe/src/rooms.ts`). Reduced motion removes the bob and glow pulses' motion only.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { HallPeer } from '../../../../lib/lok-universe/src/hallPresence';
 import { nearestAnchor, startPos, stepAvatar, useTiles, type RoomAnchor, type RoomLayout, type RoomPos } from '../../../../lib/lok-universe/src/rooms';
 import { drawRig, drawShadow } from '@/game/render/sprite';
 import type { CharacterDef } from '@/game/types';
@@ -30,10 +31,14 @@ export interface RoomScreenProps {
   notice?: string;
   /** Live save info drawn on objects. */
   status?: Record<string, { count?: number; alert?: boolean }>;
+  /** Other players in this room (the Lok hall). Drawn as small tokens with a name and a game tag. */
+  peers?: HallPeer[];
+  /** Called with the avatar's position while it moves (the hall throttles and shares it). */
+  onMove?: (x: number, y: number) => void;
   testId: string;
 }
 
-export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, title, leverPublic = false, notice, status, testId }: RoomScreenProps) {
+export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, title, leverPublic = false, notice, status, peers, onMove, testId }: RoomScreenProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const posRef = useRef<RoomPos>(startPos(layout));
@@ -46,6 +51,11 @@ export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, t
   const reduceMotion = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches, []);
   const useRef2 = useRef(onUse);
   useRef2.current = onUse;
+  const peersRef = useRef<HallPeer[] | undefined>(peers);
+  peersRef.current = peers;
+  const shown = useRef(new Map<string, { x: number; y: number }>());
+  const moveRef = useRef(onMove);
+  moveRef.current = onMove;
   const statusRef = useRef(status);
   statusRef.current = status;
   const leverRef = useRef(leverPublic);
@@ -115,6 +125,7 @@ export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, t
         if (targetRef.current && posRef.current.x === before.x && posRef.current.y === before.y) targetRef.current = null;   // stuck: give up
       }
 
+      if (movingRef.current) moveRef.current?.(posRef.current.x, posRef.current.y);
       const near = nearestAnchor(layout, posRef.current);
       if ((near?.id ?? null) !== focusRef.current) { focusRef.current = near?.id ?? null; setFocus(near); }
 
@@ -138,6 +149,12 @@ export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, t
           drawRig(ctx, character.rig, character.palette, movingRef.current ? 'walk' : 'idle', now, posRef.current.x, feetY - bob, facingRef.current, AVATAR_SCALE, { outline: true });
         },
       });
+      for (const peer of peersRef.current ?? []) {
+        const cur = shown.current.get(peer.id) ?? { x: peer.x, y: peer.y };
+        cur.x += (peer.x - cur.x) * Math.min(1, dt * 8); cur.y += (peer.y - cur.y) * Math.min(1, dt * 8);
+        shown.current.set(peer.id, cur);
+        drawables.push({ y: cur.y, draw: () => drawPeerToken(ctx, skin, cur.x, cur.y, peer) });
+      }
       drawables.sort((p, q) => p.y - q.y).forEach((d) => d.draw());
       ctx.restore();
       raf = requestAnimationFrame(frame);
@@ -184,4 +201,20 @@ export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, t
       </div>
     </div>
   );
+}
+
+const GAME_TAG: Record<string, { tag: string; color: string }> = { survivor: { tag: '616', color: '#ff3d8b' }, qnk: { tag: 'QnK', color: '#4c8dff' }, lok: { tag: 'LOK', color: '#f2c14e' } };
+
+/** Another player: a small round token with a game tag and a short name. Deliberately not a character, since each game has its own. */
+function drawPeerToken(ctx: CanvasRenderingContext2D, skin: RoomSkin, x: number, y: number, peer: HallPeer): void {
+  const g = GAME_TAG[peer.game] ?? GAME_TAG.lok!;
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(x, y + 2, 11, 4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = skin.ink; ctx.beginPath(); ctx.arc(x, y - 14, 12, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = g.color; ctx.beginPath(); ctx.arc(x, y - 14, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(g.tag, x, y - 14);
+  ctx.font = 'bold 9px monospace'; ctx.fillStyle = '#fff'; ctx.strokeStyle = skin.ink; ctx.lineWidth = 3;
+  ctx.strokeText(peer.name, x, y - 32); ctx.fillText(peer.name, x, y - 32);
+  ctx.restore();
 }

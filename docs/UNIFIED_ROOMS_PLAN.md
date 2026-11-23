@@ -115,3 +115,7 @@ Still to do: Queens N Kings adopts the vendored `rooms.ts` and wires its bedroom
 ### v0.42.75 additions
 
 Live status on objects (`roomStatus.ts`: counts and a daily-stash alert), 616 skyline and furniture art, and a `?hall=lok` link that lands in the Lok hall. Queens N Kings reuses its existing bedroom door setting: a third choice, "Lok hall", opens `survivor.gsix.online/?hall=lok` (route in `apps/v2/lobby/hallRoute.ts`). Moving the hall itself into a shared module, so both games render the same room in place, is the next step.
+
+### v0.42.77: hall presence
+
+`lib/lok-universe/src/hallPresence.ts` (SDK) shares who is in the Lok hall over one realtime channel (`lok-hall:v1`): presence for join/leave and the tag, throttled broadcasts (4/s) for position, no tables, nothing stored, max 24 peers, peers sanitised. Both games draw peers as tokens with a game tag. Guests show as "Guest XXXX"; a public handle can be passed in later. Not verified against the live project from the build sandbox (its network blocks websockets): check in a real browser with two tabs. If the project requires private channels, add a realtime policy for topic `lok-hall:v1`.

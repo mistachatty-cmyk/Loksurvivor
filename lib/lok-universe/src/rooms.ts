@@ -1,3 +1,4 @@
+// VENDORED from Lok-EcoSystsem/universe-sdk -- DO NOT EDIT HERE. Edit the SDK and run sync-sdk.sh.
 /**
  * Lok rooms: the shared, style-free contract for walkable rooms (bedrooms and halls) in every Lok game.
  *

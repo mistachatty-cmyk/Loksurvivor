@@ -3,13 +3,16 @@
  * Panel objects hand back to the app (which opens the same screen the menu button does); doors switch rooms
  * here; the door to Queens N Kings opens that game in a new tab.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadHallChoice, pullLever, resolveBedroomDoor, saveHallChoice, type HallChoice, type RoomAnchor } from '../../../../lib/lok-universe/src/rooms';
 import { useMeta } from '@/game/state/metaStore';
 import { bedroomStatus } from '@/game/data/roomStatus';
 import { BEDROOM_616, UNIVERSAL_HALL } from '@/game/data/rooms616';
 import type { CharacterDef } from '@/game/types';
 import { useT, type MessageKey } from '@/lib/i18n';
+import { joinHall, type HallPeer, type HallPresence } from '../../../../lib/lok-universe/src/hallPresence';
+import { lokClient } from '@/lib/lokClient';
+import { LOK_HALL_LAYOUT } from '../../../../lib/lok-universe/src/rooms';
 import { RoomScreen } from './RoomScreen';
 import { SKIN_BEDROOM_616, SKIN_LOK_HALL } from './roomSkins';
 
@@ -31,6 +34,20 @@ export function RoomWorld({ character, onOpenPanel, onExit, initialRoom = 'room.
   const [room, setRoom] = useState<'room.616' | 'hall.lok'>(initialRoom);
   const [choice, setChoice] = useState<HallChoice>(() => loadHallChoice('survivor'));
   const [notice, setNotice] = useState<string | undefined>();
+
+  // Other players in the Lok hall: joined only while you stand in it and the tab is visible.
+  const [peers, setPeers] = useState<HallPeer[]>([]);
+  const presence = useRef<HallPresence | null>(null);
+  useEffect(() => {
+    if (room !== 'hall.lok' || !lokClient) return undefined;
+    const id = (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Math.random()).slice(2)).slice(0, 12);
+    const join = () => { presence.current = joinHall(lokClient as never, { id, game: 'survivor', layout: LOK_HALL_LAYOUT, onPeers: setPeers }); };
+    const leave = () => { presence.current?.leave(); presence.current = null; setPeers([]); };
+    const vis = () => { if (document.hidden) leave(); else if (!presence.current) join(); };
+    if (!document.hidden) join();
+    document.addEventListener('visibilitychange', vis);
+    return () => { document.removeEventListener('visibilitychange', vis); leave(); };
+  }, [room]);
 
   useEffect(() => { if (!notice) return; const id = window.setTimeout(() => setNotice(undefined), 3500); return () => window.clearTimeout(id); }, [notice]);
 
@@ -83,6 +100,8 @@ export function RoomWorld({ character, onOpenPanel, onExit, initialRoom = 'room.
       title={t(inRoom ? 'room.title.616' : 'room.title.lok')}
       leverPublic={choice === 'public'}
       notice={notice}
+      peers={inRoom ? undefined : peers}
+      onMove={inRoom ? undefined : (x, y) => presence.current?.move(x, y)}
       status={inRoom ? status : undefined}
       testId={inRoom ? 'room-616' : 'room-lok-hall'}
     />
