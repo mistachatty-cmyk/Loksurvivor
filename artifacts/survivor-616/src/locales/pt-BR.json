@@ -197,6 +197,8 @@
   "common.back": "Voltar",
   "common.looksLokpets": "Aparência e LokPets",
   "intro.enterHideout": "Entre no esconderijo",
+  "starter.saveProgress": "Salve meu progresso com uma conta Lok",
+  "starter.saveProgress.hint": "Opcional. Sua primeira equipe permanece neste dispositivo de qualquer maneira.",
   "intro.updates.aria": "Atualizações do jogo",
   "intro.updates.dismissAria": "Ignorar aviso de atualização",
   "intro.updates.heading": "Atualizações e notas de patch",

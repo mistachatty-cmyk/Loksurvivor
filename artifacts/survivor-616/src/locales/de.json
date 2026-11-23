@@ -197,6 +197,8 @@
   "common.back": "Zurück",
   "common.looksLokpets": "Aussehen & LokPets",
   "intro.enterHideout": "Betreten Sie das Versteck",
+  "starter.saveProgress": "Speichern Sie meinen Fortschritt mit einem Lok-Konto",
+  "starter.saveProgress.hint": "Optional. Ihr erstes Team bleibt in jedem Fall auf diesem Gerät.",
   "intro.updates.aria": "Spielaktualisierungen",
   "intro.updates.dismissAria": "Aktualisierungsmitteilung verwerfen",
   "intro.updates.heading": "Updates und Patchnotizen",

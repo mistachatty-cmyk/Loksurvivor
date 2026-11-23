@@ -197,6 +197,8 @@
   "common.back": "Retour",
   "common.looksLokpets": "Looks & LokPets",
   "intro.enterHideout": "Entrez dans la cachette",
+  "starter.saveProgress": "Sauvegarder ma progression avec un compte Lok",
+  "starter.saveProgress.hint": "Facultatif. Votre première équipe reste sur cet appareil de toute façon.",
   "intro.updates.aria": "Mises à jour du jeu",
   "intro.updates.dismissAria": "Ignorer l'avis de mise à jour",
   "intro.updates.heading": "Mises à jour et notes de mise à jour",

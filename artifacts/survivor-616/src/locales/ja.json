@@ -197,6 +197,8 @@
   "common.back": "戻る",
   "common.looksLokpets": "ルックスとLokPets",
   "intro.enterHideout": "隠れ家に入る",
+  "starter.saveProgress": "Lok アカウントで進行状況を保存する",
+  "starter.saveProgress.hint": "オプション。どちらの場合でも、最初のチームはこのデバイスに留まります。",
   "intro.updates.aria": "ゲームのアップデート",
   "intro.updates.dismissAria": "更新通知を閉じる",
   "intro.updates.heading": "アップデートとパッチノート",

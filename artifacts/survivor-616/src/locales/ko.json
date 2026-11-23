@@ -197,6 +197,8 @@
   "common.back": "뒤로",
   "common.looksLokpets": "룩 & LokPets",
   "intro.enterHideout": "은신처에 들어가세요",
+  "starter.saveProgress": "Lok 계정으로 진행 상황을 저장하세요",
+  "starter.saveProgress.hint": "선택사항. 첫 번째 팀은 어느 쪽이든 이 장치를 사용합니다.",
   "intro.updates.aria": "게임 업데이트",
   "intro.updates.dismissAria": "업데이트 알림 닫기",
   "intro.updates.heading": "업데이트 및 패치 노트",

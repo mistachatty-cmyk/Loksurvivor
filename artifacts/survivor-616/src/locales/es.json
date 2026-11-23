@@ -197,6 +197,8 @@
   "common.back": "Atrás",
   "common.looksLokpets": "Apariencia y LokPets",
   "intro.enterHideout": "Entra al escondite",
+  "starter.saveProgress": "Guardar mi progreso con una cuenta Lok",
+  "starter.saveProgress.hint": "Opcional. Tu primer equipo permanece en este dispositivo de cualquier manera.",
   "intro.updates.aria": "Actualizaciones del juego",
   "intro.updates.dismissAria": "Descartar aviso de actualización",
   "intro.updates.heading": "Actualizaciones y notas del parche",

@@ -197,6 +197,8 @@
   "common.back": "后退",
   "common.looksLokpets": "外观&LokPets",
   "intro.enterHideout": "进入藏身处",
+  "starter.saveProgress": "使用 Lok 帐户保存我的进度",
+  "starter.saveProgress.hint": "选修的。无论哪种方式，您的第一个团队都会留在此设备上。",
   "intro.updates.aria": "游戏更新",
   "intro.updates.dismissAria": "关闭更新通知",
   "intro.updates.heading": "更新和补丁说明",
