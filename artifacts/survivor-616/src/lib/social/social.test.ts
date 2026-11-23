@@ -5,6 +5,7 @@ import type { LokCrewState, LokFriend } from '@workspace/lok-client';
 
 import { crewmateIds, invitable, isLeader, MAX_CREW_SIZE, onlineCount, slotsLeft, sortFriends } from './crewRules';
 import { friendCodeFromSearch, friendShareUrl, normalizeFriendCode } from './friendCode';
+import { buildInviteUrl, inviteDestination, parseInvite } from '../../../../../lib/lok-universe/src/invite';
 import { avatarFor, displayNameFor, initialsOf, safeAvatarUrl } from './identity';
 
 const friend = (userId: string, name: string, extra: Partial<LokFriend> = {}): LokFriend => ({ userId, name, avatar: null, showOnline: true, status: 'accepted', incoming: false, ...extra });
@@ -21,7 +22,8 @@ test('friend codes read back from sloppy typing and reject anything else', () =>
 
 test('the share link carries the code and reads back from the address', () => {
   const url = friendShareUrl('LOK-7K2M-Q9XD');
-  assert.equal(url, 'https://survivor.gsix.online/?friend=LOK-7K2M-Q9XD');
+  assert.equal(url, 'https://survivor.gsix.online/?go=friend.LOK-7K2M-Q9XD');
+  assert.equal(friendCodeFromSearch('?friend=LOK-7K2M-Q9XD'), 'LOK-7K2M-Q9XD', 'older links still work');
   assert.equal(friendCodeFromSearch(new URL(url).search), 'LOK-7K2M-Q9XD');
   assert.equal(friendCodeFromSearch('?friend=nope'), null);
   assert.equal(friendCodeFromSearch('?other=1'), null);
@@ -174,4 +176,13 @@ test('run length is capped and the touch stick has a dead zone', () => {
   const full = stickToMove(200, 0);
   assert.equal(full.moveX, 1);
   assert.ok(Math.abs(stickToMove(27, 0).moveX - 0.5) < 1e-9);
+});
+
+test('arena room links use the shared grammar and hop across games when needed', () => {
+  const room = buildInviteUrl({ kind: 'room', code: 'K7M2Q' }, 'survivor');
+  assert.equal(room, 'https://survivor.gsix.online/?go=room.K7M2Q');
+  assert.deepEqual(parseInvite(new URL(room).search, 'survivor'), { kind: 'room', code: 'K7M2Q' });
+  assert.deepEqual(parseInvite('?room=k7m2q', 'survivor'), { kind: 'room', code: 'K7M2Q' }, 'older room links still work');
+  const hall = inviteDestination({ kind: 'hall', code: null }, 'survivor');
+  assert.equal(hall.action, 'redirect');
 });

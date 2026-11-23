@@ -66,7 +66,7 @@ export function FoilFilter({ id, metal, drift }: { id: string; metal: MetalDef; 
 export function RetroPack({ pack, walkers, live, arcade = false, fan = [], badge = null }: { pack: PurchasableCardPack; walkers: ReactNode[]; live: boolean; arcade?: boolean; fan?: ReactNode[]; badge?: ReactNode }) {
   const uid = `ccw-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const edge: MetalDef = arcade ? { ...METALS.holo, surface: 3, specular: 0.9, freq: '0.006 0.03', seed: 5 } : { ...METALS.platinum, surface: 3, specular: 0.9, freq: '0.006 0.03', seed: 5 };
-  const ring = `COMES WITH ${pack.cards} CARD${pack.cards > 1 ? 'S' : ''} ✦`;
+  const ring = `COMES WITH ${pack.cards} CARD${pack.cards > 1 ? 'S' : ''}`;
   const burstPoints = '60,2 69,17 87,5 90,23 112,21 102,38 119,48 98,55 107,73 86,67 77,80 66,63 56,80 48,63 30,76 32,57 9,59 22,42 3,32 26,28 21,10 42,18 52,3';
   return (
     <div className={`cc-retro${live ? ' cc-retro--live' : ''}${arcade ? ' cc-retro--arcade' : ''}`}>

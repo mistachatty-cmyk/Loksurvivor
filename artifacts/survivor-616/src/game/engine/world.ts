@@ -6015,7 +6015,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       w.popups.push({
         x: cx,
         y: cy - 28,
-        text: weapon.id === 'dev-cursor' ? 'DEL [■]' : (weapon.id === 'kernel-panic' ? '0xBSOD' : 'GLITCH'),
+        text: weapon.id === 'dev-cursor' ? 'DEL [X]' : (weapon.id === 'kernel-panic' ? '0xBSOD' : 'GLITCH'),
         color: weapon.color ?? '#38bdf8',
         bornAt: w.now,
         vy: 38,
@@ -6056,7 +6056,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
           hitUids: new Set(),
           evolutionBehavior: behavior,
         });
-        pushAlert(w, weapon.id === 'dvd-screensaver' ? '★ DVD SCREENSAVER OVERDRIVE ACTIVE ★' : 'DVD BOUNCING LOGO DEPLOYED');
+        pushAlert(w, weapon.id === 'dvd-screensaver' ? 'DVD SCREENSAVER OVERDRIVE ACTIVE' : 'DVD BOUNCING LOGO DEPLOYED');
       } else {
         // Update stats on active DVD projectiles
         for (const proj of activeDvds) {
@@ -6087,7 +6087,7 @@ function syncWeaponMilestones(w: World) {
     if (weapon.def.kind === 'orbit') rebuildOrbiters(w, weapon);
     for (const milestone of fresh) {
       pushAlert(w, `${weapon.def.name} · ${milestone.name}`);
-      w.popups.push({ x: w.player.x, y: w.player.y + 30, text: `★ ${milestone.name}`, color: weapon.def.color ?? w.character.palette.accent, bornAt: w.now, vy: 32 });
+      w.popups.push({ x: w.player.x, y: w.player.y + 30, text: `${milestone.name}`, color: weapon.def.color ?? w.character.palette.accent, bornAt: w.now, vy: 32 });
     }
     w.shake = Math.max(w.shake, 3);
   }
@@ -6470,7 +6470,7 @@ export function applyUpgrade(w: World, upgrade: UpgradeDef) {
         w.popups.push({
           x: w.player.x,
           y: w.player.y + 32,
-          text: `★ FUSION · ${evolution.name} ★`,
+          text: `FUSION · ${evolution.name}`,
           color: evolution.color,
           bornAt: w.now,
           vy: 35,
@@ -7363,8 +7363,8 @@ function updateBubbleWash(w: World, dt: number) {
       bw.state = 'warning';
       bw.warningStartedAt = w.now;
       bw.direction = w.rng() > 0.5 ? 1 : -1;
-      const dirText = bw.direction > 0 ? 'EAST ➔' : 'WEST ⬅';
-      pushAlert(w, `⚠️ TORRENTIAL BUBBLE WASH IMMINENT! HEADING ${dirText}`);
+      const dirText = bw.direction > 0 ? 'EAST' : 'WEST';
+      pushAlert(w, `WARNING: TORRENTIAL BUBBLE WASH IMMINENT! HEADING ${dirText}`);
       w.shake = Math.max(w.shake, 3);
     }
   } else if (bw.state === 'warning') {
@@ -7387,7 +7387,7 @@ function updateBubbleWash(w: World, dt: number) {
     if (w.now >= bw.nextSurgeAt) {
       bw.state = 'surging';
       bw.surgeActiveUntil = w.now + 5000;
-      pushAlert(w, '🌊 SUDS SURGE ACTIVE! WASHOUT IN PROGRESS!');
+      pushAlert(w, 'SUDS SURGE ACTIVE! WASHOUT IN PROGRESS!');
       w.shake = Math.max(w.shake, 7);
     }
   } else if (bw.state === 'surging') {
@@ -9522,7 +9522,7 @@ function updateEnemies(w: World, dt: number) {
 
 function triggerDvdCornerStrike(w: World, proj: Projectile) {
   const isEvolved = proj.weaponId === 'dvd-screensaver';
-  pushAlert(w, isEvolved ? '★★ HYPER-EVOLVED DVD CORNER CRITICAL! SCREEN CLEARED! ★★' : '★ PERFECT DVD CORNER HIT! 100% KINETIC DETONATION! ★');
+  pushAlert(w, isEvolved ? 'HYPER-EVOLVED DVD CORNER CRITICAL! SCREEN CLEARED!' : 'PERFECT DVD CORNER HIT! 100% KINETIC DETONATION!');
   w.shake = 18;
   const radius = isEvolved ? 1200 : 450;
   const blastDmg = proj.damage * (isEvolved ? 6 : 4);
@@ -11705,7 +11705,7 @@ function updatePickups(w: World, dt: number) {
         }
         case 'prism-quartz': {
           w.craftingMaterialsCollected['prism-quartz'] = (w.craftingMaterialsCollected['prism-quartz'] ?? 0) + 1;
-          w.popups.push({ x: p.x, y: p.y - 20, text: '+1 PRISM QUARTZ 💎', color: '#f43f5e', bornAt: w.now, vy: 30 });
+          w.popups.push({ x: p.x, y: p.y - 20, text: '+1 PRISM QUARTZ', color: '#f43f5e', bornAt: w.now, vy: 30 });
           spawnParticles(w, p.x, p.y, '#f43f5e', 10, 90);
           pushSfx(w, 'pickupKey');
           break;

@@ -2,6 +2,17 @@
 
 import * as React from "react"
 
+// Lok Facet star (original art, scripts/build-lok-glyphs.py). Inlined so this shared component stays portable across Lok apps.
+const STAR_FILLED = "M11.27,12.36 8.65,8.76 1.73,9.26 7.03,13.74ZM14.62,8.23 12,1.8 9.38,8.23 12,11.83ZM11.55,17.68 11.55,13.22 7.31,14.6 5.65,21.34ZM12.45,13.22 12.45,17.68 18.35,21.34 16.69,14.6ZM16.97,13.74 22.27,9.26 15.35,8.76 12.73,12.36Z"
+const STAR_HOLLOW = "M9.18,8.72 1.73,9.26 7.43,14.08 5.65,21.34 12,17.4 18.35,21.34 16.57,14.08 22.27,9.26 14.82,8.72 12,1.8ZM13.37,10.72 16.98,10.98 14.21,13.32 15.08,16.84 12,14.93 8.92,16.84 9.79,13.32 7.02,10.98 10.63,10.72 12,7.36Z"
+function StarMark({ filled }: { filled: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" fillRule="evenodd" aria-hidden="true" style={{ display: "inline-block", marginRight: "0.2em" }}>
+      <path d={filled ? STAR_FILLED : STAR_HOLLOW} />
+    </svg>
+  )
+}
+
 /**
  * Disc Cascade Carousel — a film catalogue told in discs. Each title is a
  * printed disc on a slanted line that climbs out of the page toward you: the
@@ -1156,7 +1167,7 @@ export default function DiscCascadeCarousel({
             const stars = Math.max(0, Math.min(5, Math.round(q.stars ?? 5)))
             return (
               <figure className="dcc-rev dcc-in" key={k} style={{ margin: 0, ["--i" as string]: k + 3 } as React.CSSProperties}>
-                <div className="dcc-stars">{"★".repeat(stars) + "☆".repeat(5 - stars)}</div>
+                <div className="dcc-stars">{Array.from({ length: 5 }, (_, i) => <StarMark key={i} filled={i < stars} />)}</div>
                 <figcaption className="dcc-src">{q.source}</figcaption>
                 <blockquote className="dcc-quote" style={{ fontFamily: serif }}>
                   {"“" + q.quote + "”"}

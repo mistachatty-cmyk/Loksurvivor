@@ -133,14 +133,14 @@ export const FOIL_PACK_STYLES: Partial<Record<CardPackId, FoilPackStyle>> = {
   operative: { a: '#fb923c', b: '#7c2d12', glow: 'rgba(251,146,60,.45)', pattern: 'stripe', mark: '616', kicker: 'Operatives' },
   scenario: { a: '#a3e635', b: '#1a3d0c', glow: 'rgba(163,230,53,.4)', pattern: 'grid', mark: '∞', kicker: 'Scenario' },
   lokpet: { a: '#f0abfc', b: '#581c87', glow: 'rgba(240,171,252,.45)', pattern: 'dots', mark: 'LP', kicker: 'Spirit Beasts' },
-  'elemental-pack': { a: '#ffffff', b: '#111111', glow: 'rgba(255,255,255,.3)', pattern: 'quad', mark: '✦', kicker: 'Elements' },
+  'elemental-pack': { a: '#ffffff', b: '#111111', glow: 'rgba(255,255,255,.3)', pattern: 'quad', mark: 'spark', kicker: 'Elements' },
   collector: { a: '#fbbf24', b: '#44290a', glow: 'rgba(251,191,36,.4)', pattern: 'ticket', mark: 'C', kicker: 'Mixed' },
-  'prism-lokpack': { a: '#ffffff', b: '#222222', glow: 'rgba(167,139,250,.5)', pattern: 'prism', mark: '◆', kicker: 'Prism' },
+  'prism-lokpack': { a: '#ffffff', b: '#222222', glow: 'rgba(167,139,250,.5)', pattern: 'prism', mark: 'diamond', kicker: 'Prism' },
   cipher: { a: '#0f172a', b: '#0b0221', glow: 'rgba(0,255,220,.45)', pattern: 'code', mark: '01', kicker: 'Passives' },
   'apex-binder': { a: '#f5c451', b: '#241905', glow: 'rgba(245,196,81,.5)', pattern: 'crown', mark: 'A', kicker: 'Premium' },
   'quantum-vault': { a: '#818cf8', b: '#1b0b46', glow: 'rgba(129,140,248,.55)', pattern: 'rings', mark: 'Q', kicker: 'Singularity' },
-  'shinies-cache': { a: '#d9e2ee', b: '#7b869a', glow: 'rgba(255,255,255,.5)', pattern: 'chrome', mark: '★', kicker: 'Guaranteed finish' },
-  'apex-dominion': { a: '#ef4444', b: '#3b0505', glow: 'rgba(239,68,68,.55)', pattern: 'rays', mark: '♛', kicker: 'LokPet Apex' },
+  'shinies-cache': { a: '#d9e2ee', b: '#7b869a', glow: 'rgba(255,255,255,.5)', pattern: 'chrome', mark: 'star', kicker: 'Guaranteed finish' },
+  'apex-dominion': { a: '#ef4444', b: '#3b0505', glow: 'rgba(239,68,68,.55)', pattern: 'rays', mark: 'crown', kicker: 'LokPet Apex' },
   'mega-vault': { a: '#27272f', b: '#050507', glow: 'rgba(255,179,71,.5)', pattern: 'vault', mark: '7', kicker: 'Deepest pull' },
 };
 

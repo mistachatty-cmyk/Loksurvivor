@@ -1,6 +1,6 @@
 # Disc Cascade Carousel (shared Lok ecosystem component)
 
-Source: `artifacts/survivor-616/src/components/ui/disc-cascade-carousel.tsx` (from 23dev, unmodified). Tests: `disc-cascade-carousel.test.ts` next to it (pure motion and label helpers).
+Source: `artifacts/survivor-616/src/components/ui/disc-cascade-carousel.tsx` (from 23dev; one Lok change: the review stars use original Lok Facet star art inlined in the component instead of text characters). Tests: `disc-cascade-carousel.test.ts` next to it (pure motion and label helpers).
 
 Keep this file and the component identical across Lok apps. The ecosystem copy belongs in the `Lok-EcoSystsem` repo (not attached in the session that added this); copy the component, its test and this doc there when access exists.
 
@@ -13,6 +13,7 @@ A carousel of printed discs on a slanted line. Drag, flick, arrow keys, sideways
 - `"use client"` is a harmless string in Vite.
 
 ## Lok rules when using it
+- No emoji or system symbols (design standard, `docs/LOK_DESIGN_STANDARD.md`). The component draws its own star marks; carry that change when copying it to other apps.
 - No `fontHref` (cost discipline: no new web fonts). Pass the game's own font stacks through `serif`, `sans`, `display` if needed.
 - No `src` images unless the owner asks. Use generated labels (`pattern`, `palette`, `label`).
 - No stock photo demo. The original demo used Unsplash photos; do not ship that.

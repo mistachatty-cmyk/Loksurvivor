@@ -4,13 +4,14 @@
  * "Friends and crew" switch in Settings is off, or when the page has been hidden for a while.
  */
 import {
-  acceptCrewInvite, createCrew, openCrewChannel, declineCrewInvite, EMPTY_CREW_STATE, getCrewState, inviteToCrew, joinPresence, kickFromCrew, leaveCrew, listFriends,
+  acceptCrewInvite, createCrew, createCrewLink, joinCrewByLink, openCrewChannel, declineCrewInvite, EMPTY_CREW_STATE, getCrewState, inviteToCrew, joinPresence, kickFromCrew, leaveCrew, listFriends,
   listRecentPlayers, newFriendCode, recordRecentPlayers, removeFriend, requestFriend, respondToFriend, setCardSettings, subscribeSocial, syncPlayerCard,
-  type CrewAcceptResult, type CrewInviteResult, type FriendRequestResult, type LokCrewState, type LokFriend, type LokPlayerCard, type LokPresence, type LokRecentPlayer,
+  type CrewAcceptResult, type CrewLinkResult, type CrewInviteResult, type FriendRequestResult, type LokCrewState, type LokFriend, type LokPlayerCard, type LokPresence, type LokRecentPlayer,
 } from '@workspace/lok-client';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { lokClient } from '@/lib/lokClient';
+import { parseInvite, peekInvite, stashInvite, takeInvite } from '../../../../lib/lok-universe/src/invite';
 import { friendsPref } from '@/lib/powerSaver';
 import { crewmateIds } from '@/lib/social/crewRules';
 import { createBudget, loadNetConfig, useNetConfig } from '@/lib/social/netConfig';
@@ -68,6 +69,10 @@ interface SocialValue {
   acceptInvite: (crewId: string) => Promise<CrewAcceptResult | 'error'>;
   declineInvite: (crewId: string) => Promise<void>;
   leave: () => Promise<void>;
+  /** Leader: the code for this crew's invite link (24 hours, 8 uses). */
+  makeCrewLink: () => Promise<string | null>;
+  /** Result of the last crew link someone opened, shown once in the Crew tab. */
+  linkResult: CrewLinkResult | 'error' | null;
   kick: (userId: string) => Promise<void>;
   makeNewCode: () => Promise<void>;
   setShowOnline: (show: boolean) => Promise<void>;
@@ -237,6 +242,32 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     void recordRecentPlayers(lokClient, others, GAME_KEY);
   }, [crew, userId]);
 
+  const [linkResult, setLinkResult] = useState<CrewLinkResult | 'error' | null>(null);
+  // `?go=crew.CODE`: park the link (it must survive a sign-in round trip), then join once signed in.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const invite = parseInvite(window.location.search, 'survivor');
+    if (invite?.kind !== 'crew') return;
+    stashInvite(invite, window.sessionStorage);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('go');
+      window.history.replaceState(window.history.state, '', url.toString());
+    } catch { /* the link is already parked */ }
+  }, []);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !lokClient) return;
+    const parked = peekInvite(window.sessionStorage);
+    if (parked?.kind !== 'crew' || !parked.code) return;
+    if (!userId) { setTab('crew'); setOpen(true); return; }   // the Crew tab shows the sign-in choices
+    takeInvite(window.sessionStorage);
+    void joinCrewByLink(lokClient, parked.code).then((r) => {
+      setLinkResult(r.ok ? r.result : 'error');
+      setTab('crew'); setOpen(true);
+      void refresh();
+    });
+  }, [userId, refresh]);
+
   const openOverlay = useCallback((next?: CrewTab, code?: string | null) => {
     setTab(next ?? 'crew');
     setPrefillCode(code ?? null);
@@ -294,6 +325,12 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     },
     declineInvite: (crewId) => run(() => declineCrewInvite(lokClient!, crewId)),
     leave: () => run(() => leaveCrew(lokClient!)),
+    makeCrewLink: async () => {
+      if (!lokClient) return null;
+      const made = await createCrewLink(lokClient);
+      return made.ok ? made.code : null;
+    },
+    linkResult,
     kick: (id) => run(() => kickFromCrew(lokClient!, id)),
     makeNewCode: async () => {
       if (!lokClient) return;

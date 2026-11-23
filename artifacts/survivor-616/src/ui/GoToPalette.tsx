@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Lock } from 'lucide-react';
 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
@@ -121,7 +121,7 @@ export function GoToPalette({ unlockedFeatures, disabled, showButton = true, onG
                         data-testid={`go-to-${target.id}`}
                       >
                         {t(target.label)}
-                        {locked && <span className="ml-auto text-xs text-muted-foreground">🔒</span>}
+                        {locked && <span className="ml-auto text-xs text-muted-foreground"><Lock className="size-3" aria-hidden="true" /></span>}
                       </CommandItem>
                     );
                   })}

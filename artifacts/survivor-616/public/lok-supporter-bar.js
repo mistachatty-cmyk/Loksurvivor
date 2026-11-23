@@ -63,7 +63,20 @@
         item.className = 'lok-sb-item';
         item.setAttribute('data-tier', e.tier);
         if (pass === 1) item.setAttribute('aria-hidden', 'true');
-        item.textContent = (e.founder ? '★ ' : '◆ ') + e.display + (e.founder ? ' · FOUNDER' : '');
+        var mark = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        mark.setAttribute('viewBox', '0 0 24 24');
+        mark.setAttribute('width', '1em');
+        mark.setAttribute('height', '1em');
+        mark.setAttribute('fill', 'currentColor');
+        mark.setAttribute('fill-rule', 'evenodd');
+        mark.setAttribute('aria-hidden', 'true');
+        mark.style.verticalAlign = '-0.125em';
+        var markPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        // Lok Facet glyphs (scripts/build-lok-glyphs.py): star for founders, diamond for everyone else.
+        markPath.setAttribute('d', e.founder ? 'M11.27,12.36 8.65,8.76 1.73,9.26 7.03,13.74ZM14.62,8.23 12,1.8 9.38,8.23 12,11.83ZM11.55,17.68 11.55,13.22 7.31,14.6 5.65,21.34ZM12.45,13.22 12.45,17.68 18.35,21.34 16.69,14.6ZM16.97,13.74 22.27,9.26 15.35,8.76 12.73,12.36Z' : 'M12,1.5 3.47,11.45 20.53,11.45ZM12,22.5 20.53,12.55 3.47,12.55Z');
+        mark.appendChild(markPath);
+        item.appendChild(mark);
+        item.appendChild(document.createTextNode(' ' + e.display + (e.founder ? ' · FOUNDER' : '')));
         track.appendChild(item);
       }
     }

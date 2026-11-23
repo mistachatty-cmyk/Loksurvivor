@@ -1,5 +1,6 @@
 import { useState, useRef, type CSSProperties, type MouseEvent } from 'react';
 import { Sparkles, Lock, Crown, Info } from 'lucide-react';
+import { GameIcon, RankMarks } from './GameIcon';
 import type { LokAssetManifest } from '@/game/lok/types';
 import { CardArtwork, RARITY_STYLE, cardMetadata } from './LockDeckCollection';
 import { cardPackFor } from '@/game/data/cards';
@@ -125,13 +126,13 @@ export function LokDeckCardView({
 
   const sealIcon =
     companionSeal === 'seal-digi-wolf'
-      ? '🐺'
+      ? 'wolf'
       : companionSeal === 'seal-circuit-frog'
-      ? '🐸'
+      ? 'frog'
       : companionSeal === 'seal-dust-mite'
-      ? '⚙️'
+      ? 'mite'
       : companionSeal === 'seal-firefly-hive'
-      ? '🐝'
+      ? 'hive'
       : null;
 
   // -------------------------------------------------------------
@@ -194,9 +195,9 @@ export function LokDeckCardView({
         {/* Custom Overlay Effects (Glitter, Firefly, Matrix) */}
         {customOverlay === 'overlay-glitter-star' && (
           <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden opacity-60">
-            <div className="absolute top-2 left-4 text-xs animate-ping text-yellow-200">✦</div>
-            <div className="absolute top-10 right-6 text-sm animate-pulse text-amber-100">✧</div>
-            <div className="absolute bottom-6 left-6 text-xs animate-pulse text-yellow-300">✦</div>
+            <div className="absolute top-2 left-4 text-xs animate-ping text-yellow-200"><GameIcon name="spark" /></div>
+            <div className="absolute top-10 right-6 text-sm animate-pulse text-amber-100"><GameIcon name="sparkHollow" /></div>
+            <div className="absolute bottom-6 left-6 text-xs animate-pulse text-yellow-300"><GameIcon name="spark" /></div>
           </div>
         )}
         {customOverlay === 'overlay-firefly-swarm' && (
@@ -215,7 +216,7 @@ export function LokDeckCardView({
         {/* Companion Seal */}
         {sealIcon && (
           <span className="absolute top-1 right-8 z-20 rounded-full bg-black/80 px-1 py-0.2 text-[8px] border border-white/20" title={`Companion Seal: ${companionSeal}`}>
-            {sealIcon}
+            <GameIcon name={sealIcon} />
           </span>
         )}
         {/* Subtle radial inner glow */}
@@ -246,7 +247,7 @@ export function LokDeckCardView({
               style={{ backgroundColor: profile.elementColor, color: '#000' }}
               title={`Element: ${profile.elementLabel}`}
             >
-              {elemMeta.icon}
+              <GameIcon name={elemMeta.icon} />
             </span>
             {secondaryElemMeta && (
               <span
@@ -254,7 +255,7 @@ export function LokDeckCardView({
                 style={{ backgroundColor: secondaryElemMeta.color, color: '#000' }}
                 title={`Dual Element: ${secondaryElemMeta.label}`}
               >
-                {secondaryElemMeta.icon}
+                <GameIcon name={secondaryElemMeta.icon} />
               </span>
             )}
           </div>
@@ -314,7 +315,7 @@ export function LokDeckCardView({
 
           <div className="mt-0.5 flex items-center justify-between text-[7.5px] font-mono uppercase tracking-wider">
             <span className={`font-bold ${rarity.ink}`}>
-              {profile.stars}
+              <RankMarks rank={profile.rank} />
             </span>
             <span className="text-white/45 truncate">{profile.fightingStyleLabel}</span>
           </div>
@@ -405,14 +406,14 @@ export function LokDeckCardView({
               className="grid h-3.5 w-3.5 place-items-center rounded-full text-[7px] font-bold"
               style={{ backgroundColor: profile.elementColor, color: '#000' }}
             >
-              {elemMeta.icon}
+              <GameIcon name={elemMeta.icon} />
             </span>
             {secondaryElemMeta && (
               <span
                 className="grid h-3 w-3 place-items-center rounded-full text-[6.5px] font-bold"
                 style={{ backgroundColor: secondaryElemMeta.color, color: '#000' }}
               >
-                {secondaryElemMeta.icon}
+                <GameIcon name={secondaryElemMeta.icon} />
               </span>
             )}
           </div>
@@ -455,7 +456,7 @@ export function LokDeckCardView({
           <span>ATK: <strong className="text-amber-200">{owned ? profile.stats.attack : '??'}</strong></span>
           <span>DEF: <strong className="text-sky-200">{owned ? profile.stats.defense : '??'}</strong></span>
           <span className="truncate max-w-[65px]">{owned ? styleMeta.label : '???'}</span>
-          <span className={`font-bold ${rarity.ink}`}>{profile.stars}</span>
+          <span className={`font-bold ${rarity.ink}`}><RankMarks rank={profile.rank} /></span>
         </div>
       </div>
     </div>

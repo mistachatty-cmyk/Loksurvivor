@@ -31,3 +31,13 @@ When the user says **“Pullcheck,” read `docs/PULLCHECK.md` first**. It recor
 - Preserve the supplied pixel-art assets and follow `.agents/memory/survivor-616-art-assets.md`.
 - Keep endless-mode behavior consistent with `.agents/memory/endless-mode-engine.md`.
 - Do not invent real artists, names, likenesses, or licensed music. Player-selected local music is the supported soundtrack path.
+
+## Design standard: no emoji, no stock icons (Lok ecosystem rule, before MVP)
+
+Nothing that looks like it was grabbed off a phone or an icon pack: no emoji, no system symbol glyphs
+(arrows, stars, hearts, geometric shapes), no stock icon libraries for game or brand art.
+- Every icon is original Lok Facet art. Source: `scripts/build-lok-glyphs.py` (24x24 grid, straight edges, split shards). Run it after editing; it writes `artifacts/survivor-616/src/ui/lokGlyphs.generated.ts`.
+- UI: store a glyph KEY in data and render with `<GameIcon name="..." />`. Rank marks use `<RankMarks />`; "->" in strings renders as the Lok arrow via `<GlyphText />`.
+- Canvas: `drawGlyph(ctx, key, x, y, size)` from `ui/lokGlyphCanvas.ts` (same paths).
+- Plain text alerts and popups use words only.
+- Run `node scripts/check-no-emoji.mjs` before every commit; it fails on emoji and stock symbol glyphs.

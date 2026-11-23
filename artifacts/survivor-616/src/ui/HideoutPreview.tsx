@@ -22,6 +22,8 @@
  * decoration behind static menu content, not gameplay.
  */
 import { useEffect, useRef, useState } from 'react';
+import { drawGlyph } from './lokGlyphCanvas';
+import { isGlyphKey } from './GameIcon';
 
 import { useT } from '@/lib/i18n';
 
@@ -217,18 +219,25 @@ export interface HideoutPreviewProps {
   onPickup?: (kindId: string, seed: number) => boolean | void;
 }
 
+/** Emote art: Lok Facet glyph keys, or short ASCII text for the lettered emotes. */
 const EMOTE_GLYPHS: Record<HideoutEmote, string> = {
-  heart: '♥',
-  note: '♪',
+  heart: 'heart',
+  note: 'note',
   zzz: 'z',
-  spark: '✦',
+  spark: 'spark',
   bang: '!',
   drop: '•',
-  star: '★',
-  adore: '♡',
+  star: 'star',
+  adore: 'heartHollow',
   scared: '!?',
   laugh: '^^',
 };
+
+function drawEmote(ctx: CanvasRenderingContext2D, glyph: string, x: number, y: number): void {
+  if (isGlyphKey(glyph)) { drawGlyph(ctx, glyph, x, y - 5, 17, { color: 'rgba(0,0,0,0.65)', width: 2.4 }); return; }
+  ctx.strokeText(glyph, x, y);
+  ctx.fillText(glyph, x, y);
+}
 
 interface Spark { x: number; y: number; vx: number; vy: number; born: number; life: number; color: string }
 interface Ripple { x: number; born: number }
@@ -712,8 +721,7 @@ export function HideoutPreview({
             ctx.fillStyle = actor.emote.glyph === 'heart' ? '#ff6fa8' : prop.info.npc.palette.accent;
             const ex = actor.x + (actor.emote.glyph === 'zzz' ? 8 + Math.sin(now / 300) * 3 : 0);
             const ey = groundY - height - 6 - age * 10 - Math.max(0, pose.lift);
-            ctx.strokeText(EMOTE_GLYPHS[actor.emote.glyph], ex, ey);
-            ctx.fillText(EMOTE_GLYPHS[actor.emote.glyph], ex, ey);
+            drawEmote(ctx, EMOTE_GLYPHS[actor.emote.glyph], ex, ey);
             ctx.restore();
           }
         }
@@ -824,8 +832,7 @@ export function HideoutPreview({
           ctx.fillStyle = pose.emote === 'heart' ? '#ff6fa8' : info.palette.glow;
           const ex = drawX + (pose.emote === 'zzz' ? 8 + Math.sin(now / 300) * 3 : 0);
           const ey = groundY - look.height - 8 - pose.emoteAge * 10 - pose.lift;
-          ctx.strokeText(EMOTE_GLYPHS[pose.emote], ex, ey);
-          ctx.fillText(EMOTE_GLYPHS[pose.emote], ex, ey);
+          drawEmote(ctx, EMOTE_GLYPHS[pose.emote], ex, ey);
           ctx.restore();
         }
       });

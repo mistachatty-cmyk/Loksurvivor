@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { GameIcon } from './GameIcon';
 import {
   Activity,
   AlertTriangle,
@@ -65,11 +66,11 @@ const WEAPON_KINDS = [
 ] as const;
 
 const ANGLE_MODES: Array<{ id: ThreatAngleMode; name: string; desc: string; icon: string }> = [
-  { id: 'standard', name: 'Omni 360°', desc: 'Standard perimeter ring surrounding player', icon: '◎' },
-  { id: 'pincer', name: 'Pincer Flanks', desc: 'Opposing 180° dual fronts converging together', icon: '↔' },
-  { id: 'cardinal', name: 'Cardinal Cross', desc: 'Orthogonal incursion: North, East, South, West', icon: '┼' },
-  { id: 'corners', name: 'Corner Quads', desc: 'Diagonal incursion from map boundary corners', icon: '╳' },
-  { id: 'spiral', name: 'Vortex Spiral', desc: 'Continuous rotating angular sweep around player', icon: '↻' },
+  { id: 'standard', name: 'Omni 360°', desc: 'Standard perimeter ring surrounding player', icon: 'ringDouble' },
+  { id: 'pincer', name: 'Pincer Flanks', desc: 'Opposing 180° dual fronts converging together', icon: 'swap' },
+  { id: 'cardinal', name: 'Cardinal Cross', desc: 'Orthogonal incursion: North, East, South, West', icon: 'plusCross' },
+  { id: 'corners', name: 'Corner Quads', desc: 'Diagonal incursion from map boundary corners', icon: 'cross' },
+  { id: 'spiral', name: 'Vortex Spiral', desc: 'Continuous rotating angular sweep around player', icon: 'rotateR' },
 ];
 
 const ANOMALY_EVENTS: Array<{ id: ThreatEventId; name: string; tag: string; desc: string; color: string }> = [
@@ -1244,7 +1245,7 @@ export function ThreatMatrixScreen({ onBack }: ThreatMatrixScreenProps) {
                       >
                         <div>
                           <div className="flex items-center justify-between">
-                            <span className="text-lg font-mono">{mode.icon}</span>
+                            <span className="text-lg font-mono"><GameIcon name={mode.icon} /></span>
                             {isSelected && (
                               <span className="rounded bg-cyan-400/20 px-1.5 py-0.2 font-mono text-[9px] font-bold text-cyan-300">
                                 ACTIVE

@@ -1,5 +1,6 @@
 import { ViewportOverlay } from './ViewportOverlay';
 import { SupporterBar } from './SupporterBar';
+import { GameIcon, RankMarks } from './GameIcon';
 import { LokWalletStrip } from './LokWalletStrip';
 import { useState } from 'react';
 import {
@@ -481,7 +482,7 @@ export function CardShopPanel({ onBack, initialTab, onSignIn }: { onBack: () => 
                         style={{ backgroundColor: elemMeta.color, color: '#000' }}
                         title={elemMeta.label}
                       >
-                        {elemMeta.icon}
+                        <GameIcon name={elemMeta.icon} />
                       </span>
                     )}
                   </div>
@@ -966,27 +967,27 @@ export function CardShopPanel({ onBack, initialTab, onSignIn }: { onBack: () => 
                   <p className="font-bold uppercase text-white/50 mb-2">Subject Rarity Odds:</p>
                   <div className="space-y-1">
                     <div className="flex justify-between border-b border-white/5 py-0.5">
-                      <span className="text-slate-300">Common ●</span>
+                      <span className="text-slate-300">Common <RankMarks rank={1} /></span>
                       <span className="font-bold text-white">{Math.max(10, Math.round((0.58 - selectedPackDef.rarityBoost) * 100))}%</span>
                     </div>
                     <div className="flex justify-between border-b border-white/5 py-0.5">
-                      <span className="text-emerald-300">Uncommon ◆</span>
+                      <span className="text-emerald-300">Uncommon <RankMarks rank={2} /></span>
                       <span className="font-bold text-white">26%</span>
                     </div>
                     <div className="flex justify-between border-b border-white/5 py-0.5">
-                      <span className="text-sky-300">Rare ★</span>
+                      <span className="text-sky-300">Rare <RankMarks rank={3} /></span>
                       <span className="font-bold text-white">{Math.round((0.105 + selectedPackDef.rarityBoost * 0.4) * 100)}%</span>
                     </div>
                     <div className="flex justify-between border-b border-white/5 py-0.5">
-                      <span className="text-purple-300">Epic ★★</span>
+                      <span className="text-purple-300">Epic <RankMarks rank={4} /></span>
                       <span className="font-bold text-white">{Math.round((0.042 + selectedPackDef.rarityBoost * 0.3) * 100)}%</span>
                     </div>
                     <div className="flex justify-between border-b border-white/5 py-0.5">
-                      <span className="text-amber-300">Legendary ★★★</span>
+                      <span className="text-amber-300">Legendary <RankMarks rank={5} /></span>
                       <span className="font-bold text-white">{Math.round((0.01 + selectedPackDef.rarityBoost * 0.2) * 100)}%</span>
                     </div>
                     <div className="flex justify-between py-0.5">
-                      <span className="text-yellow-200">Mythic / Secret ★★★★</span>
+                      <span className="text-yellow-200">Mythic / Secret <RankMarks rank={6} /></span>
                       <span className="font-bold text-amber-300">{Math.round((0.003 + selectedPackDef.rarityBoost * 0.1) * 1000) / 10}%</span>
                     </div>
                   </div>

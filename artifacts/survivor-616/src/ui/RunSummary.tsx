@@ -3,6 +3,7 @@
  * props stable.
  */
 import { getArea } from '@/game/data/areas';
+import { GameIcon } from './GameIcon';
 import { getCharacter } from '@/game/data/characters';
 import { ENEMIES_BY_ID } from '@/game/data/enemies';
 import { ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
@@ -830,7 +831,7 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
               <div className="border border-pink-400/30 bg-card p-5 md:col-span-2" data-testid="section-lokpets">
                 <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg text-pink-300">✦</span>
+                    <span className="text-lg text-pink-300"><GameIcon name="spark" /></span>
                     <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                       LokPets — {lokPets.length} generated
                     </span>

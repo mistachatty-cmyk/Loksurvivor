@@ -1,5 +1,6 @@
 import { ViewportOverlay } from './ViewportOverlay';
 import { useEffect, useMemo, useState } from 'react';
+import { GameIcon } from './GameIcon';
 import {
   BarChart3,
   Check,
@@ -109,7 +110,7 @@ function PackTile({ pack, selected, owned, onSelect }: { pack: LokDeckSet; selec
       aria-pressed={selected}
       data-testid={`button-card-pack-${pack.id}`}
     >
-      <div className="absolute -right-2 -top-6 font-display text-8xl font-black text-white/[.055]">{theme.mark}</div>
+      <div className="absolute -right-2 -top-6 font-display text-8xl font-black text-white/[.055]"><GameIcon name={theme.mark} /></div>
       <div className="relative flex h-full flex-col">
         <span className="text-[9px] font-black uppercase tracking-[.24em]" style={{ color: theme.accent }}>{pack.kicker}</span>
         <span className="mt-8 max-w-36 font-display text-xl font-black uppercase leading-none text-white">{pack.name}</span>
@@ -202,7 +203,7 @@ export function CardDetail({ card, owned, onClose, frame, motion }: { card: LokA
               {dataMeta.label}
             </span>
             <span className="font-mono text-[8.5px] text-emerald-300 uppercase">
-              {styleMeta.icon} {styleMeta.label}
+              <GameIcon name={styleMeta.icon} /> {styleMeta.label}
               {profile.secondaryFightingStyleLabel ? ` / ${profile.secondaryFightingStyleLabel}` : ''}
             </span>
             <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[8px] uppercase font-bold text-amber-200">
@@ -220,7 +221,7 @@ export function CardDetail({ card, owned, onClose, frame, motion }: { card: LokA
             {owned ? card.name : 'Unknown Card'}
           </h3>
           <p className="mt-1 font-mono text-[8.5px] uppercase tracking-widest text-white/40">
-            {owned ? `${profile.collectorNumber} · ${profile.stars} · ${profile.bodySilhouette} · ${cardPackFor(card).name}` : `${profile.collectorNumber} · ${cardPackFor(card).name}`}
+            {owned ? `${profile.collectorNumber} · Rank ${profile.rank} · ${profile.bodySilhouette} · ${cardPackFor(card).name}` : `${profile.collectorNumber} · ${cardPackFor(card).name}`}
           </p>
 
           <p className="mt-2.5 text-xs leading-relaxed text-white/65">
@@ -469,7 +470,7 @@ export function LockDeckCollection({
           <option value="all">All Elements</option>
           {Object.entries(ELEMENT_METADATA).map(([key, data]) => (
             <option key={key} value={key}>
-              {data.icon} {data.label}
+              <GameIcon name={data.icon} /> {data.label}
             </option>
           ))}
         </select>
@@ -497,7 +498,7 @@ export function LockDeckCollection({
           <option value="all">All Fighting Styles</option>
           {Object.entries(FIGHTING_STYLE_METADATA).map(([key, data]) => (
             <option key={key} value={key}>
-              {data.icon} {data.label}
+              <GameIcon name={data.icon} /> {data.label}
             </option>
           ))}
         </select>

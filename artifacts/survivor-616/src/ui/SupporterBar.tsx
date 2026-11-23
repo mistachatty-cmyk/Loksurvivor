@@ -5,6 +5,7 @@
  * after a subscription ends. Renders nothing offline or while the list is empty.
  */
 import { useEffect, useState } from 'react';
+import { GameIcon } from './GameIcon';
 
 import { fetchSupporterFeed, SUPPORTER_BAR_LABEL, SUPPORTER_REFRESH_MS, supporterItemText, supporterScrollSeconds, type SupporterFeedEntry } from '@workspace/lok-client';
 
@@ -43,7 +44,7 @@ export function SupporterBar({ variant = 'strip' }: { variant?: 'strip' | 'inlin
   const row = (suffix: string) =>
     entries.map((entry, index) => (
       <span key={`${suffix}${index}`} className="supporter-bar__item" data-tier={entry.tier} data-founder={entry.founder}>
-        {supporterItemText(entry)}
+        <GameIcon name={entry.founder ? 'star' : 'diamond'} /> {supporterItemText(entry)}
       </span>
     ));
 

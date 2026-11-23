@@ -371,7 +371,7 @@ export const EVOLUTIONS: EvolutionDef[] = [
   {
     id: 'yggdrasil-null',
     name: 'Yggdrasil Null',
-    description: '★ FUSION EVOLUTION ★ Requires Binary Branch (MAX) + Solitaire Cascade (MAX). Summons ancient cyber-roots that cascade retro card windows into branching fractal storms.',
+    description: 'FUSION EVOLUTION: Requires Binary Branch (MAX) + Solitaire Cascade (MAX). Summons ancient cyber-roots that cascade retro card windows into branching fractal storms.',
     identity: 'Colossal digital world tree roots that bloom into cascading windows upon impact.',
     color: '#10b981',
     baseWeaponId: 'binary-branch',
@@ -400,7 +400,7 @@ export const EVOLUTIONS: EvolutionDef[] = [
   {
     id: 'solar-supernova',
     name: 'Solar Supernova',
-    description: '★ FUSION EVOLUTION ★ Requires Magma Coil (MAX) + Singularity Core (MAX). Collapses space into a burning singularity before detonating a full-screen solar flare.',
+    description: 'FUSION EVOLUTION: Requires Magma Coil (MAX) + Singularity Core (MAX). Collapses space into a burning singularity before detonating a full-screen solar flare.',
     identity: 'Thermonuclear fusion core that draws enemies inward before detonating outward.',
     color: '#f97316',
     baseWeaponId: 'magma-coil',
@@ -427,7 +427,7 @@ export const EVOLUTIONS: EvolutionDef[] = [
   {
     id: 'infinite-solitaire',
     name: 'Infinite Solitaire',
-    description: '★ FUSION EVOLUTION ★ Requires Solitaire Cascade (MAX) + V-Sync Slayer (MAX). Rips reality with unbuffered 120Hz cascading retro dialog windows that ricochet forever.',
+    description: 'FUSION EVOLUTION: Requires Solitaire Cascade (MAX) + V-Sync Slayer (MAX). Rips reality with unbuffered 120Hz cascading retro dialog windows that ricochet forever.',
     identity: 'Screen-shredding flood of cascading retro dialog cards with supersonic ricochet physics.',
     color: '#c084fc',
     baseWeaponId: 'solitaire-cascade',
@@ -456,7 +456,7 @@ export const EVOLUTIONS: EvolutionDef[] = [
   {
     id: 'turntable-cataclysm',
     name: 'Cataclysm Deck',
-    description: '★ FUSION EVOLUTION ★ Requires Turntable (MAX) + Hard-Light Stylus (MAX). Dual hard-light tonearms scratch ground-fissures and spin high-velocity razor vinyl discs.',
+    description: 'FUSION EVOLUTION: Requires Turntable (MAX) + Hard-Light Stylus (MAX). Dual hard-light tonearms scratch ground-fissures and spin high-velocity razor vinyl discs.',
     identity: 'Tears the floor with DJ scratch fissures while spinning hyper-speed vinyl disc shields.',
     color: '#ff2b4d',
     baseWeaponId: 'turntable',
@@ -480,7 +480,7 @@ export const EVOLUTIONS: EvolutionDef[] = [
   {
     id: 'twin-firefly-overdrive',
     name: 'Twin Firefly Overdrive',
-    description: '★ FUSION EVOLUTION ★ Requires Firefly Mortar (MAX) + Cinder Arc (MAX). Dual superheated firefly cannons launch torrential flame bursts that leave permanent burning pavement.',
+    description: 'FUSION EVOLUTION: Requires Firefly Mortar (MAX) + Cinder Arc (MAX). Dual superheated firefly cannons launch torrential flame bursts that leave permanent burning pavement.',
     identity: 'Dual-barrel incendiary firefly barrage that scorches the ground.',
     color: '#ef4444',
     baseWeaponId: 'firefly-cannon',
@@ -507,7 +507,7 @@ export const EVOLUTIONS: EvolutionDef[] = [
   {
     id: 'bioluminescent-nova',
     name: 'Bioluminescent Nova',
-    description: '★ FUSION EVOLUTION ★ Requires Phosphor Evoker Staff (MAX) + Singularity Core (MAX). Pulls entire hordes into a micro-singularity before detonating in a blinding firefly starburst.',
+    description: 'FUSION EVOLUTION: Requires Phosphor Evoker Staff (MAX) + Singularity Core (MAX). Pulls entire hordes into a micro-singularity before detonating in a blinding firefly starburst.',
     identity: 'A vortex of glowing fireflies that pulls enemies inward then explodes in a flash.',
     color: '#f59e0b',
     baseWeaponId: 'phosphor-evoker-staff',
@@ -532,7 +532,7 @@ export const EVOLUTIONS: EvolutionDef[] = [
   {
     id: 'subterra-seismic-drill',
     name: 'Sub-Terra Seismic Drill',
-    description: '★ FUSION EVOLUTION ★ Requires Seismic Spiker (MAX) + Dev Cursor (MAX). Cascades 14-stage subterranean spike waves in 4 diagonal directions simultaneously.',
+    description: 'FUSION EVOLUTION: Requires Seismic Spiker (MAX) + Dev Cursor (MAX). Cascades 14-stage subterranean spike waves in 4 diagonal directions simultaneously.',
     identity: 'Erupts 14-pulse subterranean crystalline spike fissures in all directions.',
     color: '#ea580c',
     baseWeaponId: 'subterra-spike-thrower',
@@ -557,7 +557,7 @@ export const EVOLUTIONS: EvolutionDef[] = [
   {
     id: 'prismatic-firefly-swarm',
     name: 'Prismatic Firefly Swarm',
-    description: '★ FUSION EVOLUTION ★ Requires Prism Burst (MAX) + Bee Line (MAX). Releases iridescent laser-refracted fireflies that bounce endlessly across surfaces and illuminate fog.',
+    description: 'FUSION EVOLUTION: Requires Prism Burst (MAX) + Bee Line (MAX). Releases iridescent laser-refracted fireflies that bounce endlessly across surfaces and illuminate fog.',
     identity: 'Releases iridescent laser-refracted fireflies that bounce endlessly and pierce darkness.',
     color: '#38bdf8',
     baseWeaponId: 'prism-burst',

@@ -7,8 +7,8 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
-      "number": 204,
-      "version": "0.42.65",
+      "number": 207,
+      "version": "0.42.68",
       "date": "2026-11-23",
       "publishedAt": "2026-11-23T05:30:00Z",
       "kind": "update",
@@ -22,10 +22,10 @@
       ]
     },
     {
-      "number": 203,
-      "version": "0.42.64",
+      "number": 206,
+      "version": "0.42.67",
       "date": "2026-11-23",
-      "publishedAt": "2026-11-23T04:30:00Z",
+      "publishedAt": "2026-11-23T04:40:00Z",
       "kind": "update",
       "categoryLabel": "Major Update",
       "categoryColor": "#22d3ee",
@@ -36,10 +36,10 @@
       ]
     },
     {
-      "number": 202,
-      "version": "0.42.63",
+      "number": 205,
+      "version": "0.42.66",
       "date": "2026-11-23",
-      "publishedAt": "2026-11-23T00:30:00Z",
+      "publishedAt": "2026-11-23T04:30:00Z",
       "kind": "bugfix",
       "categoryLabel": "Bugfix",
       "categoryColor": "#34d399",
@@ -51,10 +51,10 @@
       ]
     },
     {
-      "number": 201,
-      "version": "0.42.62",
-      "date": "2026-11-22",
-      "publishedAt": "2026-11-22T23:30:00Z",
+      "number": 204,
+      "version": "0.42.65",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T04:20:00Z",
       "kind": "bugfix",
       "categoryLabel": "Bugfix",
       "categoryColor": "#34d399",
@@ -66,10 +66,10 @@
       ]
     },
     {
-      "number": 200,
-      "version": "0.42.61",
-      "date": "2026-11-22",
-      "publishedAt": "2026-11-22T22:30:00Z",
+      "number": 203,
+      "version": "0.42.64",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T04:10:00Z",
       "kind": "bugfix",
       "categoryLabel": "Bugfix",
       "categoryColor": "#34d399",
@@ -77,6 +77,51 @@
       "title": "Dark maps show up again",
       "body": [
         "Underground, indoor and fog maps no longer open on a black screen. The darkness now dims the map outside your light instead of wiping it out, so you can see your character, enemies and pickups from the first second."
+      ]
+    },
+    {
+      "number": 202,
+      "version": "0.42.63",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T04:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Join a crew by link",
+      "body": [
+        "Crew leaders can make an invite link and QR code in the Crew tab. Anyone signed in who opens it joins your crew, up to four players. A link lasts 24 hours and a new one replaces the old.",
+        "If you are not signed in yet, you sign in first and then land in the crew."
+      ]
+    },
+    {
+      "number": 201,
+      "version": "0.42.62",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T03:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "One invite link, one QR",
+      "body": [
+        "Arena rooms now show a QR code next to the room link. Scan it or open the link and you land on the join screen with the code filled in.",
+        "Friend and room links use one shared format that Queens N Kings understands too. Links for modes only Queens N Kings has (matches, halls, watching) carry you across to that game. Older links keep working."
+      ]
+    },
+    {
+      "number": 200,
+      "version": "0.42.61",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T01:45:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "New icon art, nothing borrowed",
+      "body": [
+        "Every icon in the game is now original art drawn for 616: elements, fighting styles, relics, rarity marks, hats, celebrations, arrows, the minimap legend and the HUD. Emoji and stock symbols are gone from menus, popups and alerts.",
+        "Icons answer your touch: they lift when you hover or focus, snap down when you press, and dim when a control is locked. Reduced motion and power saver turn the movement off."
       ]
     },
     {

@@ -16,7 +16,7 @@ export const CRAFTING_MATERIALS: CraftingMaterialDef[] = [
     description: 'Bioluminescent crystalline ore harvested from Firefly Hollows and Firefly Miners.',
     color: '#f59e0b',
     source: 'Firefly Hollows & Firefly Miners',
-    icon: '⚡',
+    icon: 'shock',
   },
   {
     id: 'silicon-alloy',
@@ -24,7 +24,7 @@ export const CRAFTING_MATERIALS: CraftingMaterialDef[] = [
     description: 'Refined conductive metallurgy mined from Silicon Deep-Mines and robotic veterans.',
     color: '#38bdf8',
     source: 'Silicon Deep-Mines & Veteran Enemies',
-    icon: '⚙️',
+    icon: 'gear',
   },
   {
     id: 'cyber-resin',
@@ -32,7 +32,7 @@ export const CRAFTING_MATERIALS: CraftingMaterialDef[] = [
     description: 'Dense translucent resin salvaged from Glitch Caches and Data Goblins.',
     color: '#a855f7',
     source: 'Glitch Caches & Data Goblins',
-    icon: '🧪',
+    icon: 'vial',
   },
   {
     id: 'prism-quartz',
@@ -40,7 +40,7 @@ export const CRAFTING_MATERIALS: CraftingMaterialDef[] = [
     description: 'Ultra-rare refractive diamond quartz harvested from Relic Vaults and Veteran Bosses.',
     color: '#f43f5e',
     source: 'Relic Vaults & Veteran Bosses',
-    icon: '💎',
+    icon: 'gem',
   },
 ];
 

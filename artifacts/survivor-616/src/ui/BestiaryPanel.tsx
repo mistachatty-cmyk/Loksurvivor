@@ -1,4 +1,5 @@
 import { ViewportOverlay } from './ViewportOverlay';
+import { GameIcon } from './GameIcon';
 /**
  * Bestiary. Entries reveal themselves as the player defeats each enemy.
  * Owned by the design pass -- keep the export name and props stable.
@@ -665,9 +666,10 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
             <button
               type="button"
               onClick={() => setSearchQuery('')}
+              aria-label="Clear search"
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white text-xs font-mono px-1"
             >
-              ✕
+              <GameIcon name="cross" />
             </button>
           )}
         </div>

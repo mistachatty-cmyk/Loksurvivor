@@ -87,7 +87,7 @@ the background swarm looks slightly different.
 
 Room codes are 5-char client-generated strings (no server-side allocation
 — joining the same Realtime channel name *is* the room), shareable as
-`?room=CODE` (handled unconditionally in `App.tsx`'s `initialScreen`, not
+`?go=room.CODE` (and legacy `?room=CODE`, parsed by the shared invite module; arena setup also shows a QR of the link) (handled unconditionally in `App.tsx`'s `initialScreen`, not
 gated behind dev-only like the rest of that function, since a real player's
 invite link has to work in production). `ArenaSetupScreen.tsx`'s
 "Online — host a room" mode owns the whole lobby lifecycle (room creation,

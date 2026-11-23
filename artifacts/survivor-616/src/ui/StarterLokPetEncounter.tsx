@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { GlyphText } from './GameIcon';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Heart, PackageOpen, Shield, Sparkles, Swords, Zap } from 'lucide-react';
 
@@ -23,19 +24,19 @@ const STARTER_DETAILS: Record<StarterLokPetId, { role: string; active: string; p
     role: 'Crowd-control guardian',
     active: 'Cutify charms nearby enemies into a heart-eyed escort that blocks its old crew.',
     passive: 'Getaway blasts a crowded ring backward, scaling its reach and force as Lil Llamà grows.',
-    evolution: 'Cria → Street Llama → Heartguard Llama',
+    evolution: 'Cria -> Street Llama -> Heartguard Llama',
   },
   'static-null': {
     role: 'Growing data predator',
     active: 'Data Feast consumes hostile code in a damaging null burst that expands every level.',
     passive: 'Quiet Tithe strengthens the burst by borrowing a sliver of your energy, but can never finish you.',
-    evolution: 'Data Mote → Null Familiar → Nomad-Eater Echo',
+    evolution: 'Data Mote -> Null Familiar -> Nomad-Eater Echo',
   },
   'lil-buzbee': {
     role: 'Loot scout and field medic',
     active: 'Item Scout gathers more nearby drops as it grows, then sweeps the local field at level 99.',
     passive: 'Boost Pollen grants speed and 1.5× healing, lingering for 1.5 seconds after you leave it.',
-    evolution: 'Runt Bee → Courier Bee → Royal Buzbèè',
+    evolution: 'Runt Bee -> Courier Bee -> Royal Buzbèè',
   },
 };
 
@@ -247,7 +248,7 @@ export function StarterLokPetEncounter({ onEnterHideout, onStartTutorial }: { on
                                 <p className="mt-2 text-sm leading-relaxed text-white/72">{details.passive}</p>
                               </div>
                               <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-black/35 p-3">
-                                <p className="font-mono text-[10px] uppercase tracking-wider text-cyan-100"><Shield className="mr-2 inline h-4 w-4" />3 forms · level 99 max · {details.evolution}</p>
+                                <p className="font-mono text-[10px] uppercase tracking-wider text-cyan-100"><Shield className="mr-2 inline h-4 w-4" />3 forms · level 99 max · <GlyphText text={details.evolution} /></p>
                                 <button type="button" onClick={() => { setChosen(id); setPhase('partner'); }} className="min-h-12 bg-cyan-100 px-5 py-3 text-xs font-black uppercase tracking-[.18em] text-slate-950 active:scale-[.98]" data-testid="button-confirm-starter">Choose {variant.name}</button>
                               </div>
                             </div>

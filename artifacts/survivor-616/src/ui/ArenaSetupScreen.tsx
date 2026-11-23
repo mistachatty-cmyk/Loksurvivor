@@ -24,6 +24,8 @@ import type { AreaDef, CharacterDef } from '@/game/types';
 import { ARENA_MAX_PLAYERS, ARENA_MIN_PLAYERS, type ArenaSeat } from '@/game/arena/arenaWorld';
 import { createRoomCode, hostArenaRoom, type ArenaConnectionStatus, type ArenaNetRole, type HostArenaRoom } from '@/game/arena/arenaNet';
 import { lokClient } from '@/lib/lokClient';
+import { QrCode } from '@/ui/QrCode';
+import { buildInviteUrl } from '../../../../lib/lok-universe/src/invite';
 
 interface ArenaSetupScreenProps {
   onBack: () => void;
@@ -135,7 +137,7 @@ export function ArenaSetupScreen({ onBack, onLaunch, onJoinOnline }: ArenaSetupS
   }
 
   const totalOnlineSeats = 1 + remoteSeats.length;
-  const shareUrl = room && typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}?room=${room.code}` : '';
+  const shareUrl = room ? buildInviteUrl({ kind: 'room', code: room.code }, 'survivor') : '';
 
   return (
     <div className="min-h-dvh bg-[#0a0714] p-3 text-white" data-testid="screen-arena-setup">
@@ -341,6 +343,12 @@ export function ArenaSetupScreen({ onBack, onLaunch, onJoinOnline }: ArenaSetupS
                     </button>
                   </div>
                   <p className="mt-1 break-all font-mono text-[9px] text-white/40">{shareUrl}</p>
+                  {shareUrl ? (
+                    <div className="mt-2" data-testid="arena-room-qr">
+                      <QrCode value={shareUrl} label="QR code for this room link" />
+                      <p className="mt-1 font-mono text-[9px] text-white/45">Scan to join this room.</p>
+                    </div>
+                  ) : null}
 
                   <p className="mt-3 font-mono text-[9px] uppercase tracking-wider text-white/45">
                     Players ({totalOnlineSeats}/{ARENA_MAX_PLAYERS})

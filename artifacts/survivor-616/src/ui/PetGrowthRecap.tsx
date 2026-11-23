@@ -1,4 +1,5 @@
 import { ChevronDown } from 'lucide-react';
+import { GameIcon } from './GameIcon';
 
 import { BOND_RANK_BY_ID } from '@/game/engine/petGrowth';
 import type { PetGrowthEntry } from '@/game/types';
@@ -13,7 +14,7 @@ export function PetGrowthRecap({ entries }: { entries: PetGrowthEntry[] }) {
   return (
     <details open className="group border border-emerald-300/30 bg-card p-4 md:col-span-2" data-testid="section-growth-recap">
       <summary className="flex cursor-pointer list-none items-center gap-2">
-        <span className="text-lg text-emerald-300">✦</span>
+        <span className="text-lg text-emerald-300"><GameIcon name="spark" /></span>
         <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Growth recap</span>
         {levelUps > 0 ? <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-emerald-200">{levelUps} level-up{levelUps === 1 ? '' : 's'}</span> : null}
         <ChevronDown className="ml-auto h-4 w-4 text-white/40 transition-transform group-open:rotate-180" aria-hidden="true" />
@@ -27,7 +28,7 @@ export function PetGrowthRecap({ entries }: { entries: PetGrowthEntry[] }) {
               <span className="min-w-0 flex-1 truncate text-[11px] font-black uppercase tracking-wide text-white">{entry.name}</span>
               <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-200">+{entry.expGained.toLocaleString()} XP</span>
               <span className={`font-mono text-[10px] uppercase tracking-wider ${leveled ? 'font-bold text-amber-200' : 'text-white/55'}`}>
-                {leveled ? `Lv ${entry.oldLevel} → ${entry.newLevel}` : `Lv ${entry.newLevel}`}
+                {leveled ? <>Lv {entry.oldLevel} <GameIcon name="arrowR" /> {entry.newLevel}</> : `Lv ${entry.newLevel}`}
               </span>
               <span className={`font-mono text-[10px] uppercase tracking-wider ${rankUp ? 'font-bold text-pink-200' : 'text-white/55'}`}>
                 {entry.bondGained > 0 ? `+${entry.bondGained} bond · ` : ''}{BOND_RANK_BY_ID[entry.newBondRank].label}{rankUp ? ' (new)' : ''}
