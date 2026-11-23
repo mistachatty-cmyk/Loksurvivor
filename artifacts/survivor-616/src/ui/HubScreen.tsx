@@ -99,6 +99,8 @@ export interface HubScreenProps {
   onOpenTrainingArena?: () => void;
   /** Opens the LokSurvivorArena seat/area picker. */
   onOpenArena: () => void;
+  /** Opens the walkable bedroom. */
+  onOpenRooms?: () => void;
   /** Reopens the companion and visual setup screen without starting a run. */
   onOpenRunSetup: () => void;
   /** The ad slot: jump to a shop tab, an update, or a place in the player's account. */
@@ -179,7 +181,7 @@ const NPC_PROP_CAST: Record<string, NpcCastMember> = {
   'luvitnot-keeper': LUVITNOT_KEEPER,
 };
 
-export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenTrainingArena, onOpenArena, onOpenRunSetup, onPromo, onStartChoiceEvent, onBack }: HubScreenProps) {
+export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenTrainingArena, onOpenArena, onOpenRooms, onOpenRunSetup, onPromo, onStartChoiceEvent, onBack }: HubScreenProps) {
   const chromeLayout = useUiChromeLayout();
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet, lookThroughSpyglass, openLuckyChest, collectHideoutPickup, setHideoutSceneStyle, setHideoutSpeechBubbles } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
@@ -1336,6 +1338,19 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                     <ShieldCheck className="h-5 w-5 text-amber-200" />
                     <span><span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-sky-100">{stationFound ? t('hub.armory.relocatedEntrance') : t('hub.armory.hideoutEntrance')}</span><span className="block text-[10px] text-sky-100/70">{t('hub.armory.hideoutEntranceBlurb')}</span></span>
                     <ArrowRight className="h-3.5 w-3.5 text-sky-200/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && onOpenRooms && (
+                  <button
+                    type="button"
+                    onClick={onOpenRooms}
+                    data-testid="button-hideout-rooms"
+                    className="group flex items-center gap-3 border border-cyan-200/35 bg-cyan-950/30 px-3 py-2 text-left transition hover:border-cyan-200/80 hover:bg-cyan-950/60"
+                  >
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100">{t('room.view.open')}</span>
+                      <span className="block text-[10px] text-cyan-100/60">{t('room.view.sub')}</span>
+                    </span>
                   </button>
                 )}
                 {activeRoom.id === 'main-floor' && (

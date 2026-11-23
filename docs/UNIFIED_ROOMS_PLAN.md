@@ -105,3 +105,9 @@ Room presence at scale, room ownership and visitor lists, public hall instances 
 - Which game owns the avatar? One shared Lok avatar (Peon from Queens N Kings, or a 616 survivor) or one per game with a switch?
 - Should `hall.lok` show other people's skins as they are, or normalise avatars to one style?
 - Is the 616 room top-down like the Queens N Kings bedroom, or kept side-on like the hideout strip?
+
+## Status (v0.42.74)
+
+Built in 616: shared rooms contract (SDK 1.8.0), `rooms616.ts` layouts, `roomSkins.ts`, `RoomScreen.tsx` (walk, tap-to-walk, use button), `RoomWorld.tsx` (bedroom and Lok hall, lever, Queens N Kings doorway), and a "Your room" button in the hideout. The selected character is the avatar. 616 has no public hall, so the bedroom door always leads to the Lok hall.
+
+Still to do: Queens N Kings adopts the vendored `rooms.ts` and wires its bedroom lever and Lok hall door (see its TODO); furniture art pass; shared presence in the Lok hall (needs a backend).

@@ -52,6 +52,7 @@ import {
 import type { AreaDef, RunResult, VendorItemCategory } from '@/game/types';
 import type { ArenaSeat } from '@/game/arena/arenaWorld';
 import type { ArenaNetRole } from '@/game/arena/arenaNet';
+import { RoomWorld } from '@/ui/RoomWorld';
 import { HubScreen, requestHideoutArrival, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
 import { SupporterBar } from '@/ui/SupporterBar';
@@ -133,6 +134,7 @@ type Screen =
   | { name: 'photosensitivity-notice' }
   | { name: 'starter-lokpet-encounter' }
   | { name: 'hub' }
+  | { name: 'rooms' }
   | { name: 'roster' }
   | { name: 'areas' }
   | { name: 'bestiary' }
@@ -308,6 +310,9 @@ function Game() {
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const { earn: earnLokTokens } = useLokEconomy();
 
+  const fromRoomsRef = useRef(false);
+  const roomRef = useRef<'room.616' | 'hall.lok'>('room.616');
+
   const goHub = useCallback(() => {
     sfx.play('uiNav');
     enterHideout();
@@ -315,6 +320,7 @@ function Game() {
     // day a safe no-op server-side; the date-scoped idemKey below just keeps
     // the ledger's ref readable, it isn't what prevents double-crediting.
     earnLokTokens('daily_login', { refType: 'day', refId: new Date().toISOString().slice(0, 10) });
+    if (fromRoomsRef.current) { setScreen({ name: 'rooms' }); return; }
     setScreen({ name: 'hub' });
   }, [enterHideout, sfx, earnLokTokens]);
 
@@ -343,6 +349,7 @@ function Game() {
 
   const openPanel = useCallback((panel: HubPanel) => {
     sfx.play('uiNav');
+    fromRoomsRef.current = false;
     switch (panel) {
       case 'runs':
         setScreen({ name: 'areas' });
@@ -654,9 +661,21 @@ function Game() {
         />
       );
 
+    case 'rooms':
+      return (
+        <RoomWorld
+          character={selectedCharacter}
+          initialRoom={roomRef.current}
+          onRoomChange={(r) => { roomRef.current = r; }}
+          onOpenPanel={(p) => { openPanel(p as HubPanel); fromRoomsRef.current = true; }}
+          onExit={() => { fromRoomsRef.current = false; roomRef.current = 'room.616'; setScreen({ name: 'hub' }); }}
+        />
+      );
+
     case 'hub':
       return (
         <HubScreen
+          onOpenRooms={() => { fromRoomsRef.current = true; setScreen({ name: 'rooms' }); }}
           onPromo={(target) => {
             sfx.play('uiNav');
             switch (target.screen) {

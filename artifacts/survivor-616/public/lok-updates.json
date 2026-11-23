@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 213,
+      "version": "0.42.74",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T22:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Walk around your bedroom",
+      "body": [
+        "The hideout menu now has a Your room button. Walk your selected character around a bedroom and use things instead of menus: the wardrobe opens your roster, the map table opens runs, the shelf opens the bestiary, and so on. Tap to walk, or use WASD and E.",
+        "The door in your room leads to the Lok hall, the shared hall that connects every Lok game. Queens N Kings has a doorway there. A lever by the door will later switch between a public hall and the Lok hall; 616 has no public hall yet, so the door always goes to the Lok hall."
+      ]
+    },
+    {
       "number": 212,
       "version": "0.42.73",
       "date": "2026-11-23",
