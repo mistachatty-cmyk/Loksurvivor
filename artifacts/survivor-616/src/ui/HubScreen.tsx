@@ -59,6 +59,9 @@ import { Coins } from 'lucide-react';
 import { useStaggeredEntrance } from '@/anim/hooks/useAnime';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { useAuth } from '@/state/authStore';
+import { HIDEOUT_ONBOARDING_STEPS, type HideoutOnboardingStep } from '@/game/data/onboardingSteps';
+import { useOnboarding } from '@/lib/onboardingStore';
+import { nextOnboardingStep } from '../../../../lib/lok-universe/src/onboarding';
 import { useLokEconomy } from '@/state/lokEconomyStore';
 import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { useT, useLocale } from '@/lib/i18n';
@@ -181,7 +184,20 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const t = useT();
   const locale = useLocale();
-  const { session } = useAuth();
+  const { session, available: authAvailable } = useAuth();
+  // "What's next": one checklist chip on the hideout strip for a new player (never a pop-up; the standard lives in Lok-EcoSystsem docs).
+  const { state: onboardingState, mark: markStep } = useOnboarding();
+  const nextStep = nextOnboardingStep(HIDEOUT_ONBOARDING_STEPS, onboardingState, {
+    signedIn: Boolean(session), sessions: meta.totalRuns, canInterrupt: true, totalRuns: meta.totalRuns, authAvailable,
+  }) as HideoutOnboardingStep | null;
+  function goToNextStep(step: HideoutOnboardingStep) {
+    markStep(step, 'done');
+    if (step.goal === 'card-shop') onOpen('card-shop');
+    else if (step.goal === 'looks') onOpenRunSetup();
+    else if (step.goal === 'run') onOpen('runs');
+    else onPromo({ screen: 'account' });
+  }
+
   const { balance: lokBalance } = useLokEconomy();
   // Memoized so the palette object identity stays stable across re-renders
   // (HubScreen re-renders on its own 15s generator-income poll, unrelated to
@@ -797,6 +813,14 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             }}
           />
         )}
+        {nextStep ? (
+          <div className="mb-3 flex flex-wrap items-center gap-2 border border-cyan-300/35 bg-cyan-300/5 px-3 py-2" data-testid="hideout-next-step" role="status">
+            <span className="font-mono text-[10px] font-black uppercase tracking-[.2em] text-cyan-200">{t('hideout.next.label')}</span>
+            <span className="min-w-0 flex-1 text-sm font-semibold text-white">{t(`hideout.next.${nextStep.id}` as Parameters<typeof t>[0])}</span>
+            <button type="button" onClick={() => goToNextStep(nextStep)} className="min-h-11 bg-cyan-300 px-4 text-xs font-black uppercase tracking-widest text-black" data-testid="button-next-step-go">{t('hideout.next.go')}</button>
+            <button type="button" onClick={() => markStep(nextStep, 'skipped')} className="min-h-11 px-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55 hover:text-white" data-testid="button-next-step-later">{t('hideout.next.later')}</button>
+          </div>
+        ) : null}
         {meta.hideoutPreviewEnabled && meta.ownsBall && meta.hideoutInteractive ? (
           <div className="mb-3 -mt-3 flex items-center gap-3">
             <button
