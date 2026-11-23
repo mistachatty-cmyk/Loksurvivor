@@ -902,7 +902,7 @@
   "booster.title": "盗版助推器箱",
   "booster.intro": "熟悉面孔的幽灵副本。每个助推器都会为每次运行添加一个随机统计数据。结果可能会有所不同，卡片上的字符也可能会有所不同。",
   "booster.cardCount": "{count} 个幻影副本",
-  "booster.buy": "购买 · {成本} CR",
+  "booster.buy": "购买 · {cost} CR",
   "booster.need": "需要 {cost} 卡积分",
   "booster.ownedTitle": "你的幻影副本 · {count}",
   "booster.empty": "还没有助推器。垃圾箱里存货充足。诚实的。",
