@@ -96,3 +96,4 @@
 - [Friends, crew, listen together](friends-crew.md) — the Crew overlay, `lok_*` friend/crew functions (migration not applied until Eric approves), presence rules, listen-sync protocol, and the mocked-backend headless test pattern.
 - weapon-milestones.md — data-only weapon growth paths (Spoke Queen, Jackhammer Jean); how to add one
 - [Design standard: glyphs and feedback](design-standard-glyphs-and-feedback.md) — no emoji or stock symbols; original Lok Facet glyphs via GameIcon/drawGlyph; feedback baseline and Queens N Kings parity plan in docs/LOK_DESIGN_STANDARD.md.
+- `rescue-cage.md` - trapped-survivor cage art, freeing feedback and pointer.

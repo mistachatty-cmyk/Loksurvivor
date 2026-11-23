@@ -608,6 +608,8 @@ export interface RescueState {
   progress: number;
   appearAtSec: number;
   allyId?: string;
+  /** `w.now` when the survivor was freed; the renderer plays the bars-flying-apart burst from it. */
+  freedAt?: number;
 }
 
 export type RunOutcome = 'running' | 'cleared' | 'dead';
@@ -11918,6 +11920,7 @@ function updateRescue(w: World, dt: number) {
       }
     }
     rescue.status = 'available';
+    pushSfx(w, 'waveStart');
     const ally = rescue.allyId ? ALLIES_BY_ID[rescue.allyId] : undefined;
     pushAlert(w, ally ? `${ally.name} is trapped nearby` : 'Someone is trapped nearby');
     return;
@@ -11925,10 +11928,16 @@ function updateRescue(w: World, dt: number) {
 
   const distance = Math.hypot(w.player.x - rescue.x, w.player.y - rescue.y);
   if (distance < 46) {
+    if (rescue.status !== 'freeing') pushSfx(w, 'uiNav');   // the player stepped into the ring
     rescue.status = 'freeing';
     rescue.progress = clamp(rescue.progress + dt / 2.4, 0, 1);
     if (rescue.progress >= 1) {
       rescue.status = 'freed';
+      rescue.freedAt = w.now;
+      w.shake = Math.max(w.shake, 7);
+      pushSfx(w, 'obstacleBreak');
+      pushSfx(w, 'lootBox');
+      w.popups.push({ x: rescue.x, y: rescue.y - 30, text: 'FREED', color: ALLIES_BY_ID[rescue.allyId ?? '']?.palette.glow ?? '#ffe08a', bornAt: w.now, vy: 30 });
       const ally = rescue.allyId ? ALLIES_BY_ID[rescue.allyId] : undefined;
       pushAlert(w, ally ? `${ally.name} is rescued — get them home` : 'Rescued — get them home');
       spawnParticles(w, rescue.x, rescue.y + 12, ally?.palette.glow ?? '#ffe08a', 22, 130);

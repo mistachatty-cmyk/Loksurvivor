@@ -8,6 +8,7 @@
 
 import { BLOCK_FX_LINGER_MS, blockMaterialOf, drawBlockMaterial } from './blockBreak';
 import { drawGlyph } from '../../ui/lokGlyphCanvas';
+import { drawRescue, drawRescuePointer } from './rescueArt';
 import type { LokGlyphKey } from '../../ui/lokGlyphs.generated';
 import { shakeScale } from '@/anim/motion';
 import { ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
@@ -5389,48 +5390,6 @@ function drawProjectiles(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBo
   }
 }
 
-function drawRescue(ctx: CanvasRenderingContext2D, w: World) {
-  const rescue = w.rescue;
-  if (rescue.status === 'pending' || rescue.status === 'freed') return;
-
-  const ally = rescue.allyId ? ALLIES_BY_ID[rescue.allyId] : undefined;
-  const ringColor = ally?.palette.glow ?? '#ffe08a';
-  const bodyColor = ally?.palette.accent ?? '#c9a26a';
-
-  const pulse = 0.5 + Math.sin(w.now / 240) * 0.3;
-  ctx.save();
-  ctx.globalAlpha = 0.25 + pulse * 0.2;
-  ctx.strokeStyle = ringColor;
-  ctx.lineWidth = 3;
-  ctx.setLineDash([10, 8]);
-  ctx.lineDashOffset = -w.now / 40;
-  ctx.beginPath();
-  ctx.arc(rescue.x, rescue.y, 46, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.globalAlpha = 1;
-
-  // A hunched figure behind bars, tinted with the actual ally's palette so
-  // different allies visibly read as different people mid-rescue.
-  ctx.fillStyle = ally?.palette.bodyDark ?? '#141018';
-  ctx.fillRect(rescue.x - 14, rescue.y - 26, 28, 30);
-  ctx.fillStyle = bodyColor;
-  ctx.fillRect(rescue.x - 7, rescue.y - 18, 14, 16);
-  ctx.fillStyle = '#8a8f9c';
-  for (let i = -12; i <= 12; i += 6) {
-    ctx.fillRect(rescue.x + i, rescue.y - 26, 2, 30);
-  }
-  ctx.fillRect(rescue.x - 14, rescue.y - 28, 28, 3);
-
-  if (rescue.progress > 0) {
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(rescue.x - 24, rescue.y + 12, 48, 6);
-    ctx.fillStyle = ringColor;
-    ctx.fillRect(rescue.x - 23, rescue.y + 13, 46 * rescue.progress, 4);
-  }
-  ctx.restore();
-}
-
 /**
  * Civilians and cats. Drawn before the props so scenery occludes them --
  * they read as background life moving behind the cars rather than as
@@ -7188,6 +7147,8 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.fillRect(0, 0, width, height);
     ctx.globalAlpha = 1;
   }
+
+  if (!overlay) drawRescuePointer(ctx, w, width, height, zoom);
 
   // Damage flash.
   const sinceHit = w.now - w.player.lastDamageAt;
