@@ -111,3 +111,7 @@ Room presence at scale, room ownership and visitor lists, public hall instances 
 Built in 616: shared rooms contract (SDK 1.8.0), `rooms616.ts` layouts, `roomSkins.ts`, `RoomScreen.tsx` (walk, tap-to-walk, use button), `RoomWorld.tsx` (bedroom and Lok hall, lever, Queens N Kings doorway), and a "Your room" button in the hideout. The selected character is the avatar. 616 has no public hall, so the bedroom door always leads to the Lok hall.
 
 Still to do: Queens N Kings adopts the vendored `rooms.ts` and wires its bedroom lever and Lok hall door (see its TODO); furniture art pass; shared presence in the Lok hall (needs a backend).
+
+### v0.42.75 additions
+
+Live status on objects (`roomStatus.ts`: counts and a daily-stash alert), 616 skyline and furniture art, and a `?hall=lok` link that lands in the Lok hall. Queens N Kings reuses its existing bedroom door setting: a third choice, "Lok hall", opens `survivor.gsix.online/?hall=lok` (route in `apps/v2/lobby/hallRoute.ts`). Moving the hall itself into a shared module, so both games render the same room in place, is the next step.

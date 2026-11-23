@@ -218,7 +218,14 @@ function resumeScreen(): Screen | null {
   }
 }
 
+/** Set when a link (`?hall=lok`, used by the Queens N Kings door) asks to land in the Lok hall. */
+let deepLinkRoom: 'hall.lok' | null = null;
+
 function initialScreen(): Screen {
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('hall') === 'lok') {
+    deepLinkRoom = 'hall.lok';
+    return { name: 'rooms' };
+  }
   if (typeof window !== 'undefined') {
     const resumed = resumeScreen();
     if (resumed) return resumed;
@@ -311,7 +318,7 @@ function Game() {
   const { earn: earnLokTokens } = useLokEconomy();
 
   const fromRoomsRef = useRef(false);
-  const roomRef = useRef<'room.616' | 'hall.lok'>('room.616');
+  const roomRef = useRef<'room.616' | 'hall.lok'>(deepLinkRoom ?? 'room.616');
 
   const goHub = useCallback(() => {
     sfx.play('uiNav');

@@ -42,6 +42,7 @@ export const BEDROOM_616: RoomLayout = {
     panel('account', 'desk', 13, 6, 2, 1, 'account'),
     // Right wall: settings panel, the hall lever, and the door out.
     panel('settings', 'wallpanel', 16, 5, 1, 1, 'settings'),
+    { id: 'stash', kind: 'stash', col: 11, row: 7, w: 1, h: 1, action: { type: 'note', key: 'room.note.stash' } },
     { id: 'lever', kind: 'lever', col: 16, row: 7, w: 1, h: 1, action: { type: 'lever' } },
     { id: 'door', kind: 'door', col: 16, row: 8, w: 1, h: 2, action: { type: 'door', to: 'hall.lok' } },
   ],

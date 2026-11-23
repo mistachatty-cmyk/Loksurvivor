@@ -1525,5 +1525,8 @@
   "room.note.moreGames": "More halls are coming",
   "room.qnk.leaving": "Opening Queens N Kings in a new tab",
   "room.hall616.closed": "The 616 hall is not open yet",
-  "room.back.menu": "Menu view"
+  "room.back.menu": "Menu view",
+  "room.note.stash": "Your daily stash",
+  "room.stash.claimed": "Daily stash collected",
+  "room.stash.empty": "Already collected today. Come back tomorrow to keep the streak."
 }

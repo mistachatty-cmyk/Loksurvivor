@@ -28,10 +28,12 @@ export interface RoomScreenProps {
   leverPublic?: boolean;
   /** A short message to show (lever result, notes). Shown for a few seconds. */
   notice?: string;
+  /** Live save info drawn on objects. */
+  status?: Record<string, { count?: number; alert?: boolean }>;
   testId: string;
 }
 
-export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, title, leverPublic = false, notice, testId }: RoomScreenProps) {
+export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, title, leverPublic = false, notice, status, testId }: RoomScreenProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const posRef = useRef<RoomPos>(startPos(layout));
@@ -44,6 +46,8 @@ export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, t
   const reduceMotion = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches, []);
   const useRef2 = useRef(onUse);
   useRef2.current = onUse;
+  const statusRef = useRef(status);
+  statusRef.current = status;
   const leverRef = useRef(leverPublic);
   leverRef.current = leverPublic;
 
@@ -121,7 +125,7 @@ export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, t
       ctx.save();
       ctx.translate((cw - worldW * scale) / 2, (ch - worldH * scale) / 2);
       ctx.scale(scale, scale);
-      const state = { now: reduceMotion ? 0 : now, focusId: focusRef.current, leverPublic: leverRef.current };
+      const state = { now: reduceMotion ? 0 : now, focusId: focusRef.current, leverPublic: leverRef.current, status: statusRef.current };
       drawRoomBase(ctx, layout, skin, state);
       // Draw objects and the avatar sorted by their feet so the avatar walks behind and in front of furniture.
       const feetY = posRef.current.y;

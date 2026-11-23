@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 214,
+      "version": "0.42.75",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T23:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Your room reacts to your save",
+      "body": [
+        "Objects in your room now show what you have: how many fighters you own, pets in the kennel, creatures found in the bestiary, your cred on the shop counter, and a red alert on the daily stash when a login bonus is waiting. Walk up to the stash and use it to collect.",
+        "The room now has a 616 skyline and neon sign in the back wall, and furniture that looks like what it opens: wardrobe doors, shelves of books, a weapon rack, a cot, a desk with a screen.",
+        "Queens N Kings can now send its bedroom door to the Lok hall here (Settings, Online door leads to, Lok hall)."
+      ]
+    },
+    {
       "number": 213,
       "version": "0.42.74",
       "date": "2026-11-23",
