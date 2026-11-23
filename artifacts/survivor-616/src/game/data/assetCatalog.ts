@@ -86,7 +86,7 @@ ${['Counts', 'Objective and world art (rescue cage, dungeon doors, chest)', 'Cha
   out.push(section('Objective and world art (rescue cage, dungeon doors, chest)',
     'The pieces that tell the player what to do next. All procedural, all animated from the run clock.',
     table(['Piece', 'Drawn by', 'What it shows'], [
-      ['Rescue cage', 'src/game/render/rescueArt.ts `drawRescue`', 'Iron cage with the real ally inside, light beacon, rattle when you are near, quarter pips, dust, strobe, bars bowing open'],
+      ['Rescue hold (digitization relay)', 'src/game/render/rescueArt.ts `drawRescue`', 'ARCHON-616 digitization relay: hard-light bars, siphon mast and Soul Spark meter, the real ally inside glitching as they drain, beacon, rattle when you are near, quarter pips, strobe'],
       ['Rescue burst', 'src/game/render/rescueArt.ts `drawBurst`', 'Bars fly apart, shock ring, ground cracks, confetti, light pillar, the survivor hops out'],
       ['Rescue pointer and screen fx', 'src/game/render/rescueArt.ts `drawRescuePointer`', 'Edge arrow toward an off-screen cage, colour wash while freeing, white flash on release'],
       ['Dungeon doorway', 'src/game/render/objectiveArt.ts `drawDungeonEntrances`', 'Stone arch, steps going down, flickering torches, rising motes'],

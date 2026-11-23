@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 212,
+      "version": "0.42.73",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T20:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Held by ARCHON: rescues follow the lore",
+      "body": [
+        "Survivors are now held in ARCHON-616 digitization relays: hard-light bars and a siphon mast draining their Soul Sparks. A meter beside the relay shows how much is left, and they glitch harder the longer they are held.",
+        "Free them fast and keep their Soul Sparks: up to double cred. Standing in the ring sends the sparks back into them and the relay shatters. Nobody is ever lost, slow rescues just pay less."
+      ]
+    },
+    {
       "number": 211,
       "version": "0.42.72",
       "date": "2026-11-23",

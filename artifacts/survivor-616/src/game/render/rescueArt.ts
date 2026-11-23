@@ -1,5 +1,6 @@
 /**
- * The rescue objective: a trapped survivor in an iron cage, the beacon above it, the freeing sequence,
+ * The rescue objective: a survivor held in one of ARCHON-616's digitization relays (hard-light bars, a siphon
+ * mast pulling their Soul Sparks away, glitching as they drain; see docs LORE.md). Legacy name: the cage, the beacon above it, the freeing sequence,
  * the burst when the bars give way, and the edge pointer that shows where the cage is when it is off
  * screen. Everything here is procedural Canvas2D (the ally is drawn with its real rig), no bitmaps.
  *
@@ -7,12 +8,14 @@
  */
 import { drawGlyph } from '../../ui/lokGlyphCanvas';
 import { ALLIES_BY_ID, allyRig } from '@/game/data/progression';
-import type { World } from '@/game/engine/world';
+import { rescueSiphon, type World } from '@/game/engine/world';
 import { drawRig, drawShadow } from './sprite';
 
 const IRON_DARK = '#2a2d36';
 const IRON = '#7b8190';
 const IRON_LIGHT = '#c4cad6';
+/** ARCHON-616's colour: the hard-light bars of a digitization relay. */
+const ARCHON = '#38e1ff';
 /** How long the "bars fly apart" burst plays after the survivor is freed. */
 export const RESCUE_BURST_MS = 1500;
 /** The reach of the freeing ring, in world units (matches the engine's 46 trigger distance). */
@@ -40,6 +43,7 @@ export function drawRescue(ctx: CanvasRenderingContext2D, w: World): void {
   const ally = r.allyId ? ALLIES_BY_ID[r.allyId] : undefined;
   const glow = ally?.palette.glow ?? '#ffe08a';
   const p = r.progress;
+  const siphon = rescueSiphon(w);
   const freeing = r.status === 'freeing';
   const pulse = 0.5 + Math.sin(w.now / 240) * 0.5;
   const x = r.x, y = r.y;
@@ -132,7 +136,27 @@ export function drawRescue(ctx: CanvasRenderingContext2D, w: World): void {
     ctx.beginPath();
     ctx.rect(x - half + 1, top + 2, half * 2 - 2, bottom - top);
     ctx.clip();
-    drawRig(ctx, allyRig(ally), ally.palette, freeing ? 'hurt' : near > 0.35 ? 'walk' : 'idle', w.now, x, y + 4 + bob, facing, 2.3, { outline: true, flash: strobe === 1 });
+    const rig = allyRig(ally);
+    const anim = freeing ? 'hurt' : near > 0.35 ? 'walk' : 'idle';
+    if (siphon < 0.06) {
+      drawRig(ctx, rig, ally.palette, anim, w.now, x, y + 4 + bob, facing, 2.3, { outline: true, flash: strobe === 1 });
+    } else {
+      // Glitching as ARCHON drains them: horizontal slices tear sideways, harder the longer they are held,
+      // and a cyan ghost lags behind. Slice offsets step every 110 ms so it reads as stutter, not wobble.
+      const step = Math.floor(w.now / 110);
+      for (let band = 0; band < 4; band += 1) {
+        const off = (noise(step * 7 + band) - 0.5) * 9 * siphon * (freeing ? 0.4 : 1);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x - half, top + band * 11, half * 2, 11);
+        ctx.clip();
+        ctx.globalAlpha = 1 - siphon * 0.35;
+        drawRig(ctx, rig, ally.palette, anim, w.now, x + off, y + 4 + bob, facing, 2.3, { outline: true, flash: strobe === 1 });
+        ctx.globalAlpha = 0.25 * siphon;
+        drawRig(ctx, rig, ally.palette, anim, w.now, x + off - 3, y + 4 + bob, facing, 2.3, { tint: { color: ARCHON, alpha: 0.6 } });
+        ctx.restore();
+      }
+    }
     ctx.restore();
   } else {
     ctx.fillStyle = 'rgba(20,16,24,0.85)';
@@ -144,8 +168,15 @@ export function drawRescue(ctx: CanvasRenderingContext2D, w: World): void {
     const bx = x + i * 5.6 + Math.sign(i) * spread * (Math.abs(i) / 3);
     ctx.fillStyle = IRON_DARK;
     ctx.fillRect(bx - 1.6, top, 3.2, bottom - top);
-    ctx.fillStyle = p > 0.01 ? mix(IRON_LIGHT, glow, Math.min(1, p * 1.4)) : IRON_LIGHT;
+    const edge = p > 0.01 ? mix(ARCHON, glow, Math.min(1, p * 1.4)) : ARCHON;
+    ctx.fillStyle = edge;
+    ctx.globalAlpha = 0.85;
     ctx.fillRect(bx - 1.6, top, 1.4, bottom - top);
+    // A scanline runs up each bar, staggered, so the hold reads as live hard light.
+    const sy = bottom - ((w.now / 18 + i * 13) % (bottom - top + 12));
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(bx - 1.6, Math.max(top, sy), 3.2, 3);
+    ctx.globalAlpha = 1;
   }
   if (strobe) {   // last stretch: the whole cage flashes white-hot
     ctx.globalAlpha = 0.28;
@@ -176,6 +207,31 @@ export function drawRescue(ctx: CanvasRenderingContext2D, w: World): void {
   drawGlyph(ctx, 'lock', x, y - 11 + p * 4, 11 + Math.sin(w.now / 55) * p * 1.5);
 
   ctx.translate(-shakeX, 0);
+  // Siphon mast: Soul Sparks stream up it toward ARCHON. Freeing reverses the flow back into the survivor.
+  const mx = x + half + 9;
+  ctx.fillStyle = IRON_DARK;
+  ctx.fillRect(mx - 1.5, top - 26, 3, bottom - top + 26);
+  ctx.fillStyle = IRON;
+  ctx.fillRect(mx - 1.5, top - 26, 1, bottom - top + 26);
+  ctx.fillStyle = ARCHON;
+  ctx.fillRect(mx - 4, top - 30, 8, 3);
+  ctx.fillRect(mx - 1, top - 34, 2, 4);
+  const draining = !freeing;
+  const rate = 4 + Math.round(siphon * 6);
+  for (let i = 0; i < rate; i += 1) {
+    const life = ((w.now / (draining ? 26 : 20) + i * (100 / rate)) % 100) / 100;
+    const t = draining ? life : 1 - life;
+    ctx.globalAlpha = Math.sin(life * Math.PI) * 0.9;
+    ctx.fillStyle = i % 3 === 0 ? '#fff' : glow;
+    ctx.fillRect(mx - 1 - Math.sin(i * 2.3 + w.now / 300) * 2, bottom - 8 - t * (bottom - top + 22), 2, 2);
+  }
+  ctx.globalAlpha = 1;
+  // Soul Spark meter beside the mast: how much of them is left. Pulses red near deletion.
+  const left = 1 - siphon;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(mx + 5, top, 4, bottom - top);
+  ctx.fillStyle = siphon > 0.8 && Math.sin(w.now / 70) > 0 ? '#ff4d6d' : glow;
+  ctx.fillRect(mx + 5.5, top + (bottom - top) * siphon + 0.5, 3, Math.max(1, (bottom - top) * left - 1));
   // A pulsing warning mark over the cage until someone steps into the ring.
   if (!freeing) {
     ctx.globalAlpha = 0.5 + pulse * 0.5;
@@ -321,4 +377,10 @@ function parseHex(hex: string): number[] {
   const h = hex.replace('#', '');
   const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h.padEnd(6, '0');
   return [parseInt(full.slice(0, 2), 16) || 0, parseInt(full.slice(2, 4), 16) || 0, parseInt(full.slice(4, 6), 16) || 0];
+}
+
+/** Cheap deterministic 0..1 noise from an integer, so glitch slices stutter the same way for everyone. */
+function noise(n: number): number {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
 }

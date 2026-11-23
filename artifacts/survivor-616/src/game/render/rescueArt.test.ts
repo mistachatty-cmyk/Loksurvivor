@@ -77,3 +77,30 @@ test('standing in the ring frees the survivor, shakes the screen and queues the 
   assert.ok(cues.includes('uiNav') || cues.includes('obstacleBreak'));
   assert.ok(cues.includes('lootBox'));
 });
+
+import { RESCUE_SIPHON_MS, rescueSiphon } from '@/game/engine/world';
+
+test('ARCHON siphons the held survivor over time, and freeing early pays more', () => {
+  const w = rescueWorld();
+  w.rescue.appearedAt = w.now;
+  assert.equal(rescueSiphon(w), 0);
+  w.now += RESCUE_SIPHON_MS / 2;
+  assert.ok(Math.abs(rescueSiphon(w) - 0.5) < 0.001);
+  w.now += RESCUE_SIPHON_MS * 3;
+  assert.equal(rescueSiphon(w), 1);
+  w.rescue.status = 'freed';
+  assert.equal(rescueSiphon(w), 0);
+
+  const early = rescueWorld(); early.rescue.appearedAt = early.now;
+  early.player.x = early.rescue.x; early.player.y = early.rescue.y;
+  const credBefore = early.cred;
+  for (let i = 0; i < 120 && early.rescue.status !== 'freed'; i += 1) stepWorld(early, 1 / 30, NEUTRAL);
+  const earlyGain = early.cred - credBefore;
+
+  const late = rescueWorld(); late.rescue.appearedAt = late.now - RESCUE_SIPHON_MS;
+  late.player.x = late.rescue.x; late.player.y = late.rescue.y;
+  const lateBefore = late.cred;
+  for (let i = 0; i < 120 && late.rescue.status !== 'freed'; i += 1) stepWorld(late, 1 / 30, NEUTRAL);
+  assert.ok(earlyGain > late.cred - lateBefore, `early ${earlyGain} should beat late ${late.cred - lateBefore}`);
+  assert.ok(late.cred - lateBefore >= 25);
+});

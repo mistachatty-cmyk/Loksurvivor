@@ -62,7 +62,7 @@ The pieces that tell the player what to do next. All procedural, all animated fr
 
 | Piece | Drawn by | What it shows |
 | --- | --- | --- |
-| Rescue cage | src/game/render/rescueArt.ts `drawRescue` | Iron cage with the real ally inside, light beacon, rattle when you are near, quarter pips, dust, strobe, bars bowing open |
+| Rescue hold (digitization relay) | src/game/render/rescueArt.ts `drawRescue` | ARCHON-616 digitization relay: hard-light bars, siphon mast and Soul Spark meter, the real ally inside glitching as they drain, beacon, rattle when you are near, quarter pips, strobe |
 | Rescue burst | src/game/render/rescueArt.ts `drawBurst` | Bars fly apart, shock ring, ground cracks, confetti, light pillar, the survivor hops out |
 | Rescue pointer and screen fx | src/game/render/rescueArt.ts `drawRescuePointer` | Edge arrow toward an off-screen cage, colour wash while freeing, white flash on release |
 | Dungeon doorway | src/game/render/objectiveArt.ts `drawDungeonEntrances` | Stone arch, steps going down, flickering torches, rising motes |
@@ -963,7 +963,7 @@ Where each kind of picture is drawn.
 | src/game/render/propFracture.ts | cacheKey: string; |
 | src/game/render/propSurface.ts | Small, deterministic surface details. No textures, timers or simulation state. |
 | src/game/render/propTextureCache.ts | Keep hot entries when a crowd exceeds capacity, rather than evicting the next frame's first entry. |
-| src/game/render/rescueArt.ts | The rescue objective: a trapped survivor in an iron cage, the beacon above it, the freeing sequence, |
+| src/game/render/rescueArt.ts | The rescue objective: a survivor held in one of ARCHON-616's digitization relays (hard-light bars, a siphon |
 | src/game/render/sprite.ts | Draws a sprite rig to a 2D canvas, one pixel rectangle at a time. |
 | src/game/sprites/operatorDetail.ts | Operator detail layer. |
 | src/game/sprites/paletteStyles.ts | Shared procedural recolor engine, originally built for `characterSkins.ts`'s |

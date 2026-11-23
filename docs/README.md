@@ -9,6 +9,8 @@ Everything written down about the game, grouped by what you are trying to do. Th
 - Rescue cage and dungeon doors: [ASSETS.md objective art](./ASSETS.md#objective-and-world-art-rescue-cage-dungeon-doors-chest). Notes on why: `.agents/memory/rescue-cage.md`.
 
 ## Design and plans
+- [**UNIFIED_ROOMS_PLAN.md**](./UNIFIED_ROOMS_PLAN.md): how 616 menus become a room and how the 616, Queens N Kings and Lok rooms and halls become one universe.
+- Lore, including why survivors are held (digitization relays): `artifacts/survivor-616/docs/LORE.md`.
 - [survivor616-gameplay-roadmap-review.md](./survivor616-gameplay-roadmap-review.md): where the game is going next.
 - [EVENTS_AND_INTERACTIONS_PLAN.md](./EVENTS_AND_INTERACTIONS_PLAN.md), [experimental-maps-and-directors.md](./experimental-maps-and-directors.md), [survivor616-map-builder-breach.md](./survivor616-map-builder-breach.md), [endless-block-supplies-2026-10-04.md](./endless-block-supplies-2026-10-04.md)
 - [endgame-armory-weapons.md](./endgame-armory-weapons.md)

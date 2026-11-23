@@ -610,6 +610,18 @@ export interface RescueState {
   allyId?: string;
   /** `w.now` when the survivor was freed; the renderer plays the bars-flying-apart burst from it. */
   freedAt?: number;
+  /** `w.now` when the digitization hold appeared; ARCHON-616 siphons the survivor's Soul Sparks from then on. */
+  appearedAt?: number;
+}
+
+/** How long ARCHON-616 takes to siphon a held survivor down to a glitching silhouette (Zero-Sum Deletion risk). */
+export const RESCUE_SIPHON_MS = 90_000;
+
+/** 0 = the hold just appeared, 1 = the survivor is nearly drained. Pure function of the run clock. */
+export function rescueSiphon(w: Pick<World, 'now' | 'rescue'>): number {
+  const r = w.rescue;
+  if ((r.status !== 'available' && r.status !== 'freeing') || r.appearedAt === undefined) return 0;
+  return Math.min(1, Math.max(0, (w.now - r.appearedAt) / RESCUE_SIPHON_MS));
 }
 
 export type RunOutcome = 'running' | 'cleared' | 'dead';
@@ -11920,9 +11932,10 @@ function updateRescue(w: World, dt: number) {
       }
     }
     rescue.status = 'available';
+    rescue.appearedAt = w.now;
     pushSfx(w, 'waveStart');
     const ally = rescue.allyId ? ALLIES_BY_ID[rescue.allyId] : undefined;
-    pushAlert(w, ally ? `${ally.name} is trapped nearby` : 'Someone is trapped nearby');
+    pushAlert(w, ally ? `${ally.name} is held in a digitization relay` : 'Someone is held in a digitization relay');
     return;
   }
 
@@ -11935,6 +11948,9 @@ function updateRescue(w: World, dt: number) {
     w.shake = Math.max(w.shake, 1 + rescue.progress * 2.5);   // the cage works harder, the screen hums
     for (const q of [0.25, 0.5, 0.75]) if (before < q && rescue.progress >= q) pushSfx(w, 'uiClick');   // a tick per quarter
     if (rescue.progress >= 1) {
+      // Breaking the relay early saves more of their Soul Sparks: up to double cred when it is fast.
+      const siphon = rescueSiphon(w);
+      const earlyBonus = Math.round(25 * (1 - siphon));
       rescue.status = 'freed';
       rescue.freedAt = w.now;
       w.shake = Math.max(w.shake, 7);
@@ -11942,10 +11958,10 @@ function updateRescue(w: World, dt: number) {
       pushSfx(w, 'lootBox');
       w.popups.push({ x: rescue.x, y: rescue.y - 30, text: 'FREED', color: ALLIES_BY_ID[rescue.allyId ?? '']?.palette.glow ?? '#ffe08a', bornAt: w.now, vy: 30 });
       const ally = rescue.allyId ? ALLIES_BY_ID[rescue.allyId] : undefined;
-      pushAlert(w, ally ? `${ally.name} is rescued — get them home` : 'Rescued — get them home');
+      pushAlert(w, ally ? `${ally.name} is rescued — get them home${siphon < 0.34 ? ', Soul Sparks intact' : siphon > 0.66 ? ', barely out before deletion' : ''}` : 'Rescued — get them home');
       spawnParticles(w, rescue.x, rescue.y + 12, ally?.palette.glow ?? '#ffe08a', 22, 130);
-      w.cred += 25;
-      w.popups.push({ x: rescue.x, y: rescue.y - 12, text: '+25 CRED', color: '#fde68a', bornAt: w.now, vy: 22 });
+      w.cred += 25 + earlyBonus;
+      w.popups.push({ x: rescue.x, y: rescue.y - 12, text: `+${25 + earlyBonus} CRED`, color: '#fde68a', bornAt: w.now, vy: 22 });
     }
   } else {
     rescue.status = 'available';
