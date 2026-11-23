@@ -88,7 +88,7 @@ export interface CardVariableProfile {
   specialPower: CardSpecialPower;
   specialPowers: CardSpecialPower[];
   rarity: string;
-  stars: string;
+  rank: number;
   stats: CardCombatStats;
   weakness: CardElement;
   resistance: CardElement;
@@ -112,7 +112,7 @@ export const ELEMENT_METADATA: Record<
     label: 'Kinetic',
     color: '#e2e8f0',
     bgGradient: 'from-slate-700/60 to-slate-900/80',
-    icon: '●',
+    icon: 'dot',
     strongVs: [],
     weakVs: ['dark'],
   },
@@ -375,12 +375,12 @@ export function getCardVariableProfile(card: LokAssetManifest | { id: string; na
 
   // 4. Rarity & Stars
   const rarity = (card as LokAssetManifest).rarity || 'common';
-  let stars = '●';
-  if (rarity === 'uncommon') stars = '◆';
-  else if (rarity === 'rare') stars = '★';
-  else if (rarity === 'epic') stars = '★★';
-  else if (rarity === 'legendary') stars = '★★★';
-  else if (rarity === 'mythic' || rarity === 'secret') stars = 'Apex ★★★★';
+  let rank = 1;
+  if (rarity === 'uncommon') rank = 2;
+  else if (rarity === 'rare') rank = 3;
+  else if (rarity === 'epic') rank = 4;
+  else if (rarity === 'legendary') rank = 5;
+  else if (rarity === 'mythic' || rarity === 'secret') rank = 6;
 
   // 5. Special Powers (Ability & Passive Bursts)
   const powers: CardSpecialPower[] = [
@@ -516,7 +516,7 @@ export function getCardVariableProfile(card: LokAssetManifest | { id: string; na
     specialPower: primaryPower,
     specialPowers,
     rarity,
-    stars,
+    rank,
     stats,
     weakness,
     resistance,

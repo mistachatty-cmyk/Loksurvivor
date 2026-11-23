@@ -3,6 +3,7 @@
  * Owned by the design pass -- keep the export name and props stable.
  */
 import type { PromoTarget } from '@/game/data/promoSlides';
+import { GameIcon } from './GameIcon';
 import { LokPromoCycle } from './LokPromoCycle';
 import { ELIXIR_CAP, isPrimeTakeoverActive, spurShowing, useMeta, describeUnlock } from '@/game/state/metaStore';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
@@ -726,9 +727,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                  <div className="hideout-cloud hideout-cloud-one" />
                  <div className="hideout-cloud hideout-cloud-two" />
                  <div className={`hideout-fliers hideout-fliers-${scene.motionKind}`}>
-                   <span className="hideout-flier flier-one">{scene.motionKind === 'motes' ? '✦' : scene.motionKind === 'drones' ? '◆' : '⌁'}</span>
-                   <span className="hideout-flier flier-two">{scene.motionKind === 'motes' ? '·' : scene.motionKind === 'drones' ? '◇' : '⌁'}</span>
-                   <span className="hideout-flier flier-three">{scene.motionKind === 'motes' ? '✦' : scene.motionKind === 'drones' ? '◆' : '⌁'}</span>
+                   <span className="hideout-flier flier-one"><GameIcon name={scene.motionKind === 'motes' ? 'spark' : scene.motionKind === 'drones' ? 'diamond' : 'shock'} /></span>
+                   <span className="hideout-flier flier-two">{scene.motionKind === 'motes' ? '·' : <GameIcon name={scene.motionKind === 'drones' ? 'diamondHollow' : 'shock'} />}</span>
+                   <span className="hideout-flier flier-three"><GameIcon name={scene.motionKind === 'motes' ? 'spark' : scene.motionKind === 'drones' ? 'diamond' : 'shock'} /></span>
                  </div>
                  <div className="hideout-weather-particles" />
                </>

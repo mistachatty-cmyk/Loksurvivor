@@ -1,4 +1,5 @@
 import { REQUIRED_FRAMES } from '@/game/studio/v3Project';
+import { GameIcon } from './GameIcon';
 
 interface StudioJourneyProps {
   approvedFrames: number;
@@ -34,7 +35,7 @@ export function StudioJourney({ approvedFrames, emptyFrames, firstPoseHasArt, co
     </div>
     <ol className="mt-4 grid grid-cols-4 gap-1.5" aria-label="Creation milestones">
       {milestones.map((step, index) => <li key={step.label} className={`min-w-0 rounded-lg border px-1 py-2 text-center ${step.done ? 'border-emerald-300/45 bg-emerald-300/10 text-emerald-100' : 'border-white/10 bg-white/[0.04] text-slate-400'}`}>
-        <span className="block text-sm font-black" aria-hidden="true">{step.done ? '✓' : String(index + 1).padStart(2, '0')}</span>
+        <span className="block text-sm font-black" aria-hidden="true">{step.done ? <GameIcon name="check" /> : String(index + 1).padStart(2, '0')}</span>
         <span className="block text-[10px] font-bold sm:text-xs">{step.label}</span>
       </li>)}
     </ol>

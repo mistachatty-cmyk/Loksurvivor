@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { GameIcon } from './GameIcon';
 import { useAuth } from '@/state/authStore';
 import { lokClient } from '@/lib/lokClient';
 import { listStudioDrafts } from '@/game/studio/v3Store';
@@ -34,7 +35,7 @@ export function PersonalLockerV3({ onBack }: { onBack: () => void }) {
     });
   }, [session?.user.id]);
   return <main className="mx-auto max-w-5xl space-y-5 p-5" data-testid="personal-locker-v3">
-    <button type="button" className={BUTTON} onClick={onBack}>← Back to your Room</button>
+    <button type="button" className={BUTTON} onClick={onBack}><GameIcon name="arrowL" /> Back to your Room</button>
     <h1 className="text-3xl font-black">Personal Locker</h1>
     <p className="text-sm text-muted-foreground">Your device drafts, reviewed creations, and adopted characters.</p>
     <section><h2 className="font-bold">Drafts</h2>{drafts.length ? <div className="flex flex-wrap gap-2">{drafts.map((draft) => <span key={draft.id} className={BUTTON}>{draft.name} · {approvalCount(draft)}/{REQUIRED_FRAMES} frames</span>)}</div> : <p className="text-sm">No drafts on this device yet.</p>}</section>

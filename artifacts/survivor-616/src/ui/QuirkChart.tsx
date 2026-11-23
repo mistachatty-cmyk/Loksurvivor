@@ -1,4 +1,5 @@
 import { QUIRK_SURGE_LORE } from '@/game/data/quirkSurgeLore';
+import { GameIcon } from './GameIcon';
 import { QUIRK_SURGE_CHANCE, QUIRK_SURGE_UNLOCK_MAPS } from '@/game/data/enemyQuirks';
 import { ENEMY_QUIRKS, QUIRK_BASE_CHANCE, QUIRK_MAX_CHANCE, quirkChart } from '@/game/data/enemyQuirks';
 
@@ -42,7 +43,7 @@ export function QuirkChart({ mapsCleared = 0 }: { mapsCleared?: number }) {
                     <span className="text-white/80">{row.sharePct.toFixed(0)}%</span>
                   </div>
                 </td>
-                <td className="py-2 pr-3 text-right text-white/80">{row.startPct.toFixed(1)}% → {row.maxPct.toFixed(1)}%</td>
+                <td className="py-2 pr-3 text-right text-white/80">{row.startPct.toFixed(1)}% <GameIcon name="arrowR" /> {row.maxPct.toFixed(1)}%</td>
                 <td className="py-2 text-amber-200">{row.quirk.reward}</td>
               </tr>
             ))}

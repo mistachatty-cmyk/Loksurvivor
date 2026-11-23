@@ -3383,7 +3383,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
             ...state.meta.pendingNotifications,
             {
               id: `dvd-easter-egg-${Date.now()}`,
-              title: '★ SPECIAL EASTER EGG UNLOCKED! ★',
+              title: 'SPECIAL EASTER EGG UNLOCKED!',
               body: 'DVD Bouncing Logo weapon & DVD Corner Strike evolution unlocked! The iconic screensaver is now armed and bouncing in your arsenal.',
               createdAt: Date.now(),
             },
@@ -4602,7 +4602,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
           ...next.pendingNotifications,
           {
             id: `dvd-easter-egg-${Date.now()}`,
-            title: '★ SPECIAL EASTER EGG UNLOCKED! ★',
+            title: 'SPECIAL EASTER EGG UNLOCKED!',
             body: 'DVD Bouncing Logo & DVD Corner Strike unlocked! The legendary screensaver ricochets across the screen and detonates full-screen rainbow kinetic bursts on corner hits!',
             createdAt: Date.now(),
           },

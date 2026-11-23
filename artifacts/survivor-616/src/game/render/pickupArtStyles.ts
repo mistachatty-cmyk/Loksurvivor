@@ -5,6 +5,7 @@
  * bob, ground shadow and magnet streak so each style only draws the object.
  */
 import type { Pickup, PickupKind } from '../engine/world';
+import { drawGlyph } from '../../ui/lokGlyphCanvas';
 import type { DropStyle } from '../data/dropPacks';
 import { drawEnhancedPickup, PICKUP_COLOR } from './pickupArt';
 import { BODY_COLOR, shapesFor, type Shape } from './pickupArtShapes';
@@ -37,7 +38,7 @@ function real(ctx:CanvasRenderingContext2D,e:Entry,x:number,y:number,t:number){
  case 'plus':{const r=8;ctx.fillStyle=lg(ctx,x-r,y-r,x+r,y+r,[[0,'#d8dcd6'],[1,'#8a8f88']]);ctx.beginPath();ctx.roundRect(x-r,y-r,r*2,r*2,2.5);ctx.fill();ctx.strokeStyle='#3b3f3a';ctx.lineWidth=.7;ctx.stroke();
   ctx.fillStyle=lg(ctx,x,y-6,x,y+6,[[0,'#4ade80'],[1,'#15803d']]);ctx.fillRect(x-2,y-5.5,4,11);ctx.fillRect(x-5.5,y-2,11,4);glowA(ctx,x,y,9,'#4ade80',.3);ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(x-7,y-7,14,1.2);break}
  case 'coin':{const r=6.6;ctx.fillStyle=rg(ctx,x,y,r,[[0,lt(c,.35)],[.7,c],[1,dk(c,.5)]],-2,-2);ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fill();ctx.strokeStyle=dk(c,.65);ctx.lineWidth=.9;ctx.stroke();ctx.strokeStyle=A(lt(c,.6).replace(/rgb\(.*\)/,'#ffffff'),.35);ctx.lineWidth=.5;ctx.beginPath();ctx.arc(x,y,r-1.7,0,TAU);ctx.stroke();
-  ctx.fillStyle=dk(c,.6);ctx.font='bold 6px serif';ctx.textAlign='center';ctx.fillText(e.k==='coin'?'⚷':'¢',x,y+2.2);break}
+  ctx.fillStyle=dk(c,.6);drawGlyph(ctx,e.k==='coin'?'coin':'dot',x,y,8);break}
  case 'orb':{const r=7;ctx.fillStyle=rg(ctx,x,y,r,[[0,'#ffffff'],[.4,'#cfeaff'],[1,'rgba(120,180,230,.25)']]);ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fill();ctx.strokeStyle='rgba(190,230,255,.5)';ctx.lineWidth=.6;ctx.beginPath();ctx.arc(x,y,r+3,0,TAU);ctx.stroke();break}
  case 'drop':{ctx.fillStyle=rg(ctx,x,y,9,[[0,lt(c,.45)],[.5,c],[1,dk(c,.7)]],-2,-3);ctx.beginPath();ctx.moveTo(x,y-9);ctx.bezierCurveTo(x+8,y-1,x+7,y+7,x,y+7);ctx.bezierCurveTo(x-7,y+7,x-8,y-1,x,y-9);ctx.fill();ctx.strokeStyle=dk(c,.7);ctx.lineWidth=.6;ctx.stroke();ctx.fillStyle='rgba(255,255,255,.6)';ctx.beginPath();ctx.ellipse(x-2.6,y-1.5,1.2,3,.4,0,TAU);ctx.fill();break}
  case 'cell':{ctx.fillStyle=lg(ctx,x-7,y,x+7,y,[[0,'#16312f'],[.5,'#2c6a63'],[1,'#10211f']]);ctx.beginPath();ctx.roundRect(x-6.5,y-10,13,20,3);ctx.fill();ctx.strokeStyle='#0a1514';ctx.lineWidth=.7;ctx.stroke();ctx.fillStyle='#3b3f42';ctx.fillRect(x-5.5,y-11,11,3);ctx.fillRect(x-5.5,y+8,11,3);ctx.fillStyle=lg(ctx,x,y-6,x,y+6,[[0,'#ccfbf1'],[1,c]]);ctx.fillRect(x-2.2,y-6,4.4,12);glowA(ctx,x,y,10,c,.4);break}

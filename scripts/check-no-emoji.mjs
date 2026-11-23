@@ -14,12 +14,16 @@ const isEmoji = (line) => {
   }
   return false;
 };
+// Stock symbol glyphs (arrows, geometric shapes, dingbats, misc symbols) are banned in shipped code too:
+// they render as system glyphs and can turn into emoji on phones. Use Lok Facet glyphs (GameIcon / drawGlyph).
+const SYMBOL = /[\u2190-\u21FF\u2300-\u23FF\u2500-\u25FF\u2600-\u27BF\u2900-\u297F\u2B00-\u2BFF]/;
+const SYMBOL_SCOPE = /^artifacts\/[^/]+\/(src|public)\//;
 const files = execFileSync('git', ['ls-files', '-z']).toString().split('\0').filter(Boolean);
 let bad = 0;
 for (const f of files) {
   if (SKIP.test(f) || f === 'scripts/check-no-emoji.mjs') continue;
   let text; try { text = readFileSync(f, 'utf8'); } catch { continue; }
-  text.split('\n').forEach((l, i) => { if (isEmoji(l)) { bad++; console.error(`${f}:${i + 1}: emoji found`); } });
+  text.split('\n').forEach((l, i) => { const code = l.trim(); const isComment = /^(\/\/|\*|\/\*)/.test(code); if (isEmoji(l) || (SYMBOL_SCOPE.test(f) && !isComment && SYMBOL.test(l))) { bad++; console.error(`${f}:${i + 1}: emoji or stock symbol glyph found`); } });
 }
-if (bad) { console.error(`\n${bad} line(s) contain emoji. Lok standard: no emoji. Use GameIcon or plain text.`); process.exit(1); }
+if (bad) { console.error(`\n${bad} line(s) contain emoji or stock symbols. Lok standard: no emoji, no system glyphs. Use GameIcon / drawGlyph or plain text.`); process.exit(1); }
 console.log('no-emoji check passed');

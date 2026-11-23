@@ -1,4 +1,5 @@
 import { ViewportOverlay } from './ViewportOverlay';
+import { GameIcon } from './GameIcon';
 import { Check, ChevronDown, Lock, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -129,7 +130,7 @@ function EvolutionCinematic({ pet, before, after, onClose }: { pet: SavedLokPet;
           <div className="mt-2" aria-live="polite">
             <p className="font-mono text-[10px] font-black uppercase tracking-[0.3em] text-pink-200">{name} evolved</p>
             <h2 className="mt-1 text-2xl font-black uppercase text-white" data-testid="evolution-cinematic-title">{after.title}</h2>
-            <p className="mt-1 text-xs text-white/55">{before.title} → {after.title}</p>
+            <p className="mt-1 text-xs text-white/55">{before.title} <GameIcon name="arrowR" /> {after.title}</p>
             {changes.length > 0 ? (
               <ul className="mt-3 flex flex-wrap justify-center gap-1.5">
                 {changes.map((change) => (
@@ -245,7 +246,7 @@ export function PetEvolutionPanel({ pet }: { pet: SavedLokPet }) {
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs font-black uppercase text-white">{branch.label}</p>
                           <p className="truncate text-[10px] text-slate-400">
-                            {previewLook(pet, branch, 2).title} → {previewLook(pet, branch, 3).title}
+                            {previewLook(pet, branch, 2).title} <GameIcon name="arrowR" /> {previewLook(pet, branch, 3).title}
                           </p>
                         </div>
                         {chosen ? <span className="font-mono text-[9px] font-black uppercase tracking-widest text-cyan-200">Chosen</span> : null}

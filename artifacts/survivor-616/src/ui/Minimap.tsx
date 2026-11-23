@@ -1,4 +1,5 @@
 import { Maximize2, Minimize2, Move } from 'lucide-react';
+import { GameIcon } from './GameIcon';
 import { useEffect, useRef, type PointerEvent } from 'react';
 
 import type { HudSnapshot } from '@/game/types';
@@ -262,18 +263,18 @@ export function Minimap({
           <path d={`M ${MAP_W / 2} 8 v 7 M ${MAP_W / 2} ${MAP_H - 8} v -7 M 8 ${MAP_H / 2} h 7 M ${MAP_W - 8} ${MAP_H / 2} h -7`} stroke="#e2e8f0" opacity=".4" />
             </svg>
             <div className="mt-1 flex items-center justify-between gap-2 px-1 font-mono text-[8px] uppercase tracking-wider text-white/45">
-              <span>● you</span>
+              <span><GameIcon name="dot" /> you</span>
               <span>{map.inBuilding ? `inside · ${map.buildingLabel}` : map.inDungeon ? `room ${map.dungeonRoom}/3` : map.hazardLabel}</span>
             </div>
             <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 px-1 font-mono text-[7px] uppercase tracking-wide text-white/55">
-              <span className="text-amber-300">■ bridge</span>
-              <span className="text-rose-300">┄ river edge</span>
-              <span className="text-amber-100">□ building</span>
-              <span className="text-fuchsia-200">◆ landmark</span>
-              <span style={{ color: map.currentBandAccent }}>✦ beacon</span>
-              {map.nearbyEnemies.length > 0 ? <span className="text-red-400">● enemy</span> : null}
-              {map.nearbyPickups.length > 0 ? <span className="text-amber-300">◆ loot</span> : null}
-              {map.nearbyHazards.length > 0 ? <span className="text-fuchsia-400">○ hazard</span> : null}
+              <span className="text-amber-300"><GameIcon name="square" /> bridge</span>
+              <span className="text-rose-300"><GameIcon name="dashes" /> river edge</span>
+              <span className="text-amber-100"><GameIcon name="squareHollow" /> building</span>
+              <span className="text-fuchsia-200"><GameIcon name="diamond" /> landmark</span>
+              <span style={{ color: map.currentBandAccent }}><GameIcon name="spark" /> beacon</span>
+              {map.nearbyEnemies.length > 0 ? <span className="text-red-400"><GameIcon name="dot" /> enemy</span> : null}
+              {map.nearbyPickups.length > 0 ? <span className="text-amber-300"><GameIcon name="diamond" /> loot</span> : null}
+              {map.nearbyHazards.length > 0 ? <span className="text-fuchsia-400"><GameIcon name="ring" /> hazard</span> : null}
             </div>
           </>
         ) : (

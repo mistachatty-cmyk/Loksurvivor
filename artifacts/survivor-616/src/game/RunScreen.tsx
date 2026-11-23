@@ -1,4 +1,5 @@
 import { ViewportOverlay } from '@/ui/ViewportOverlay';
+import { GameIcon } from '@/ui/GameIcon';
 /**
  * A single run: canvas simulation, HUD, touch controls, level-up draft,
  * pause, reel overlay, and the hand-off back to the meta layer when it ends.
@@ -1595,12 +1596,12 @@ export function RunScreen({
   const hudIntelItems = runHudIntelCount(hud, challenges.length);
   const celebrationMarks = (() => {
     switch (getCelebrationStyle(meta.activeCelebrationId)) {
-      case 'coin-burst': return ['●', '◉', '●', '✦', '◉', '●', '✦'];
-      case 'signal-hearts': return ['♥', '♡', '♥', '✧', '♡', '♥', '✧'];
-      case 'confetti-rain': return ['▰', '◆', '▴', '●', '✦', '◆', '▰'];
-      case 'moth-swarm': return ['◇', '◈', '✧', '◇', '◈', '✧', '◇'];
-      case 'spark-shower': return ['╱', '╲', '✦', '╱', '╲', '✦', '╱'];
-      default: return ['✦', '✧', '★', '✦', '✧', '★', '✦'];
+      case 'coin-burst': return ['dot', 'dotCore', 'dot', 'spark', 'dotCore', 'dot', 'spark'];
+      case 'signal-hearts': return ['heart', 'heartHollow', 'heart', 'sparkHollow', 'heartHollow', 'heart', 'sparkHollow'];
+      case 'confetti-rain': return ['bar', 'diamond', 'rankUpSmall', 'dot', 'spark', 'diamond', 'bar'];
+      case 'moth-swarm': return ['diamondHollow', 'diamondCore', 'sparkHollow', 'diamondHollow', 'diamondCore', 'sparkHollow', 'diamondHollow'];
+      case 'spark-shower': return ['slashA', 'slashB', 'spark', 'slashA', 'slashB', 'spark', 'slashA'];
+      default: return ['spark', 'sparkHollow', 'star', 'spark', 'sparkHollow', 'star', 'spark'];
     }
   })();
 
@@ -1850,7 +1851,7 @@ export function RunScreen({
 
         {hud?.crewRumor ? (
           <div className="mx-auto flex w-fit max-w-full items-center gap-2 border border-[#fbbf24]/45 bg-black/75 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-[#fbbf24]" data-testid="indicator-crew-rumor">
-            <span className="text-sm" aria-hidden="true">◆</span>
+            <span className="text-sm" aria-hidden="true"><GameIcon name="diamond" /></span>
             <span className="truncate">
               Rumor · {hud.crewRumor.name} · {hud.crewRumor.triggered ? 'fired' : hud.crewRumor.effectLabel}
             </span>
@@ -2423,7 +2424,7 @@ export function RunScreen({
       <ChestTally count={hud?.lootBoxesOpened ?? 0} />
       <HazardImmuneBadge active={hud?.hazardImmune ?? false} />
       {chestFlight > 0 ? (
-        <span key={chestFlight} className="pointer-events-none absolute left-1/2 top-1/2 z-50 text-2xl" style={{ animation: 'chest-pocket-fly 700ms cubic-bezier(.2,.85,.25,1) forwards' }} aria-hidden="true">▣</span>
+        <span key={chestFlight} className="pointer-events-none absolute left-1/2 top-1/2 z-50 text-2xl" style={{ animation: 'chest-pocket-fly 700ms cubic-bezier(.2,.85,.25,1) forwards' }} aria-hidden="true"><GameIcon name="squareCore" /></span>
       ) : null}
       {/* The Intel drawer (run-hud-safe-zone, above) and the live tactical
           dashboard both occupy this same top-right footprint and can grow
@@ -2440,7 +2441,7 @@ export function RunScreen({
           data-testid="button-loot-tray"
           aria-label={`Open queued loot boxes, ${queuedPrizes.length} waiting`}
         >
-          ▣ {queuedPrizes.length} · Open
+          <GameIcon name="squareCore" /> {queuedPrizes.length} · Open
         </button>
         <button
           type="button"
@@ -2450,7 +2451,7 @@ export function RunScreen({
           aria-label="Loot pocket options"
           data-testid="button-loot-tray-options"
         >
-          {lootTrayOpen ? '⌃' : '⌄'}
+          <GameIcon name={lootTrayOpen ? 'chevUp' : 'chevDown'} />
         </button>
         {lootTrayOpen ? (
           <aside className="absolute bottom-9 right-0 w-48 border border-blue-300/45 bg-[#050b16]/95 p-2 shadow-[0_0_24px_rgba(96,165,250,.2)]" aria-label="Loot pocket">
@@ -2895,7 +2896,7 @@ export function RunScreen({
             <span key={`${chestFlight}-${index}`} className="absolute font-black" style={{
               left: `${12 + index * 13}%`, top: `${32 + (index % 3) * 16}%`, color: [character.palette.accentBright, '#fde68a', '#67e8f9'][index % 3],
               animation: `celebration-pop ${prefersReducedMotion ? 500 : 1050}ms ease-out ${index * 45}ms both`,
-            }}>{mark}</span>
+            }}><GameIcon name={mark} size="1.5rem" /></span>
           ))}
         </div>
       ) : null}

@@ -8,6 +8,8 @@
  */
 
 import type { PropArt } from '@/game/data/hideoutProps';
+import { drawGlyph } from './lokGlyphCanvas';
+import type { LokGlyphKey } from './lokGlyphs.generated';
 
 export interface PropDrawOptions {
   art: PropArt;
@@ -242,11 +244,9 @@ export function drawProp(ctx: CanvasRenderingContext2D, o: PropDrawOptions): voi
     ctx.stroke();
     ctx.globalAlpha = 1 - fx;
     ctx.fillStyle = accent;
-    ctx.font = `bold ${Math.round(9 * s)}px ui-monospace, monospace`;
-    ctx.textAlign = 'center';
-    const glyph = art === 'jukebox' || art === 'bell' ? '♪' : art === 'cat' ? '♥' : '✦';
+    const glyph: LokGlyphKey = art === 'jukebox' || art === 'bell' ? 'note' : art === 'cat' ? 'heart' : 'spark';
     for (let i = 0; i < 3; i += 1) {
-      ctx.fillText(glyph, (i - 1) * 9 * s + Math.sin(fx * 6 + i * 2) * 3 * s, -(PROP_HEIGHT_UNITS * 0.6 + fx * 22 + i * 4) * s);
+      drawGlyph(ctx, glyph, (i - 1) * 9 * s + Math.sin(fx * 6 + i * 2) * 3 * s, -(PROP_HEIGHT_UNITS * 0.6 + fx * 22 + i * 4) * s, 9 * s);
     }
     ctx.restore();
   }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { GameIcon } from './GameIcon';
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Crosshair, Plus, RotateCcw, Search, Sparkles, Star, Swords, Target, Trash2, Zap, Move, LockKeyhole } from 'lucide-react';
 
 import { createWorld, stepWorld, type EnemyActor, type World } from '@/game/engine/world';
@@ -1103,7 +1104,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
             {challengeResult && <div ref={challengeDialogRef} className="absolute inset-0 z-20 grid place-items-center bg-slate-950/75 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-label={t('training.challenge.celebration', { tier: t(challengeResult.tier as never), damage: challengeResult.damage.toLocaleString() })}>
               <div className="relative w-full max-w-sm overflow-hidden border border-amber-200/60 bg-gradient-to-b from-[#302517] via-slate-950 to-slate-950 p-5 text-center shadow-[0_24px_80px_rgba(0,0,0,.7)] sm:p-7">
                 <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-amber-200 to-transparent" />
-                <p className="text-4xl text-amber-200 drop-shadow-[0_0_18px_rgba(253,230,138,.6)]">✦</p>
+                <p className="text-4xl text-amber-200 drop-shadow-[0_0_18px_rgba(253,230,138,.6)]"><GameIcon name="spark" /></p>
                 <p className="mt-1 font-mono text-[9px] font-bold uppercase tracking-[.3em] text-amber-100/55">{t('training.challenge.result')}</p>
                 <p className="mt-1 font-mono text-xl font-black uppercase tracking-widest text-amber-100">{t(challengeResult.tier as never)}</p>
                 <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-white/75">{t('training.challenge.celebration', { tier: t(challengeResult.tier as never), damage: challengeResult.damage.toLocaleString() })}</p>

@@ -1,6 +1,6 @@
 import { useState, useRef, type CSSProperties, type MouseEvent } from 'react';
 import { Sparkles, Lock, Crown, Info } from 'lucide-react';
-import { GameIcon } from './GameIcon';
+import { GameIcon, RankMarks } from './GameIcon';
 import type { LokAssetManifest } from '@/game/lok/types';
 import { CardArtwork, RARITY_STYLE, cardMetadata } from './LockDeckCollection';
 import { cardPackFor } from '@/game/data/cards';
@@ -130,7 +130,7 @@ export function LokDeckCardView({
       : companionSeal === 'seal-circuit-frog'
       ? 'frog'
       : companionSeal === 'seal-dust-mite'
-      ? 'gear'
+      ? 'mite'
       : companionSeal === 'seal-firefly-hive'
       ? 'hive'
       : null;
@@ -195,9 +195,9 @@ export function LokDeckCardView({
         {/* Custom Overlay Effects (Glitter, Firefly, Matrix) */}
         {customOverlay === 'overlay-glitter-star' && (
           <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden opacity-60">
-            <div className="absolute top-2 left-4 text-xs animate-ping text-yellow-200">✦</div>
-            <div className="absolute top-10 right-6 text-sm animate-pulse text-amber-100">✧</div>
-            <div className="absolute bottom-6 left-6 text-xs animate-pulse text-yellow-300">✦</div>
+            <div className="absolute top-2 left-4 text-xs animate-ping text-yellow-200"><GameIcon name="spark" /></div>
+            <div className="absolute top-10 right-6 text-sm animate-pulse text-amber-100"><GameIcon name="sparkHollow" /></div>
+            <div className="absolute bottom-6 left-6 text-xs animate-pulse text-yellow-300"><GameIcon name="spark" /></div>
           </div>
         )}
         {customOverlay === 'overlay-firefly-swarm' && (
@@ -315,7 +315,7 @@ export function LokDeckCardView({
 
           <div className="mt-0.5 flex items-center justify-between text-[7.5px] font-mono uppercase tracking-wider">
             <span className={`font-bold ${rarity.ink}`}>
-              {profile.stars}
+              <RankMarks rank={profile.rank} />
             </span>
             <span className="text-white/45 truncate">{profile.fightingStyleLabel}</span>
           </div>
@@ -456,7 +456,7 @@ export function LokDeckCardView({
           <span>ATK: <strong className="text-amber-200">{owned ? profile.stats.attack : '??'}</strong></span>
           <span>DEF: <strong className="text-sky-200">{owned ? profile.stats.defense : '??'}</strong></span>
           <span className="truncate max-w-[65px]">{owned ? styleMeta.label : '???'}</span>
-          <span className={`font-bold ${rarity.ink}`}>{profile.stars}</span>
+          <span className={`font-bold ${rarity.ink}`}><RankMarks rank={profile.rank} /></span>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { GameIcon } from '@/ui/GameIcon'
 
 /**
  * Disc Cascade Carousel — a film catalogue told in discs. Each title is a
@@ -1156,7 +1157,7 @@ export default function DiscCascadeCarousel({
             const stars = Math.max(0, Math.min(5, Math.round(q.stars ?? 5)))
             return (
               <figure className="dcc-rev dcc-in" key={k} style={{ margin: 0, ["--i" as string]: k + 3 } as React.CSSProperties}>
-                <div className="dcc-stars">{"★".repeat(stars) + "☆".repeat(5 - stars)}</div>
+                <div className="dcc-stars">{Array.from({ length: 5 }, (_, i) => <GameIcon key={i} name={i < stars ? "star" : "starHollow"} />)}</div>
                 <figcaption className="dcc-src">{q.source}</figcaption>
                 <blockquote className="dcc-quote" style={{ fontFamily: serif }}>
                   {"“" + q.quote + "”"}

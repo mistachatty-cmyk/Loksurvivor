@@ -110,7 +110,7 @@ function PackTile({ pack, selected, owned, onSelect }: { pack: LokDeckSet; selec
       aria-pressed={selected}
       data-testid={`button-card-pack-${pack.id}`}
     >
-      <div className="absolute -right-2 -top-6 font-display text-8xl font-black text-white/[.055]">{theme.mark}</div>
+      <div className="absolute -right-2 -top-6 font-display text-8xl font-black text-white/[.055]"><GameIcon name={theme.mark} /></div>
       <div className="relative flex h-full flex-col">
         <span className="text-[9px] font-black uppercase tracking-[.24em]" style={{ color: theme.accent }}>{pack.kicker}</span>
         <span className="mt-8 max-w-36 font-display text-xl font-black uppercase leading-none text-white">{pack.name}</span>
@@ -221,7 +221,7 @@ export function CardDetail({ card, owned, onClose, frame, motion }: { card: LokA
             {owned ? card.name : 'Unknown Card'}
           </h3>
           <p className="mt-1 font-mono text-[8.5px] uppercase tracking-widest text-white/40">
-            {owned ? `${profile.collectorNumber} · ${profile.stars} · ${profile.bodySilhouette} · ${cardPackFor(card).name}` : `${profile.collectorNumber} · ${cardPackFor(card).name}`}
+            {owned ? `${profile.collectorNumber} · Rank ${profile.rank} · ${profile.bodySilhouette} · ${cardPackFor(card).name}` : `${profile.collectorNumber} · ${cardPackFor(card).name}`}
           </p>
 
           <p className="mt-2.5 text-xs leading-relaxed text-white/65">

@@ -53,7 +53,7 @@ export function sanitizeSupporterFeed(rows: unknown): SupporterEntry[] {
 
 /** The text of one ticker item. */
 export function supporterItemText(entry: SupporterEntry): string {
-  return `${entry.founder ? "★" : "◆"} ${entry.display}${entry.founder ? " · FOUNDER" : ""}`;
+  return `${entry.display}${entry.founder ? " · FOUNDER" : ""}`;
 }
 
 export function supporterScrollSeconds(count: number): number {

@@ -946,7 +946,7 @@ export function LokPetBattleScreen({
                             <div key={idx} className="flex flex-col gap-0.5 text-xs text-emerald-400 font-semibold">
                               <div className="flex items-center justify-between">
                                 <span>{lvl.petName} Leveled Up!</span>
-                                <span className="font-mono text-emerald-300">Lv.{lvl.oldLevel} → Lv.{lvl.newLevel}</span>
+                                <span className="font-mono text-emerald-300">Lv.{lvl.oldLevel} <GameIcon name="arrowR" /> Lv.{lvl.newLevel}</span>
                               </div>
                               {lvl.evolved && (
                                 <div className="mt-1 rounded border border-cyan-400/60 bg-cyan-950/60 p-1.5 text-[11px] text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.2)]">

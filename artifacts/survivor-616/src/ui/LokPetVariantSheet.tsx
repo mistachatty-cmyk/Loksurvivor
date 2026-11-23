@@ -1,4 +1,5 @@
 import { LOKPET_VARIANTS, lokPetSpritePalette } from '@/game/data/lokPets';
+import { GameIcon } from './GameIcon';
 import { evolvedRig } from '@/game/engine/petEvolution';
 import type { EvolutionOverlayId, LokPetPalette, LokPetSilhouette } from '@/game/types';
 import { RigPortrait } from './RigPortrait';
@@ -39,7 +40,7 @@ export function LokPetVariantSheet() {
     <section className="mb-5 border border-pink-400/30 bg-card/70 p-3 sm:p-4" data-testid="lokpet-variant-sheet">
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
         <div className="flex items-center gap-2">
-          <span className="text-lg text-pink-300">✦</span>
+          <span className="text-lg text-pink-300"><GameIcon name="spark" /></span>
           <h2 className="text-sm font-black uppercase tracking-widest text-white">LokPet field guide</h2>
         </div>
         <span className="text-[10px] uppercase tracking-widest text-pink-300">original companions + legendary partners</span>

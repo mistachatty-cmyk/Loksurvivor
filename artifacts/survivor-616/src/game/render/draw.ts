@@ -7,6 +7,8 @@
  */
 
 import { BLOCK_FX_LINGER_MS, blockMaterialOf, drawBlockMaterial } from './blockBreak';
+import { drawGlyph } from '../../ui/lokGlyphCanvas';
+import type { LokGlyphKey } from '../../ui/lokGlyphs.generated';
 import { shakeScale } from '@/anim/motion';
 import { ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
 import { drawStyledPickup } from './pickupArtStyles';
@@ -52,19 +54,6 @@ const SIZE_CLASS_SCALE: Record<NonNullable<import('@/game/types').EnemyDef['size
   boss: 1.8,
 };
 
-/** Vector lightning bolt (replaces the old emoji glyph). Fills with the current fillStyle, centered on x,y. */
-function drawBoltIcon(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-  const s = size / 10;
-  ctx.beginPath();
-  ctx.moveTo(x + 1.5 * s, y - 5 * s);
-  ctx.lineTo(x - 3.5 * s, y + 0.5 * s);
-  ctx.lineTo(x - 0.2 * s, y + 0.5 * s);
-  ctx.lineTo(x - 1.5 * s, y + 5 * s);
-  ctx.lineTo(x + 3.5 * s, y - 0.5 * s);
-  ctx.lineTo(x + 0.2 * s, y - 0.5 * s);
-  ctx.closePath();
-  ctx.fill();
-}
 
 function sizeClassScale(def: import('@/game/types').EnemyDef): number {
   if (def.sizeClass) return SIZE_CLASS_SCALE[def.sizeClass];
@@ -4120,7 +4109,7 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds
           }
           ctx.fillStyle = '#ffffff';
           ctx.font = 'bold 16px monospace';
-          ctx.fillText('♫', effect.x - 8, effect.y + 5);
+          drawGlyph(ctx, 'noteBeam', effect.x, effect.y, 18);
         } else if (effect.weaponId === 'emberback') {
           // An uneven firebreak with independently licking flame points.
           ctx.beginPath();
@@ -4440,7 +4429,7 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds
         }
 
         // Floating retro music notes
-        const notes = ['♪', '♫', '♬', '♩'];
+        const notes: LokGlyphKey[] = ['note', 'noteBeam', 'noteStem', 'note'];
         ctx.font = 'bold 16px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -4453,7 +4442,7 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds
           ctx.shadowColor = ctx.fillStyle;
           ctx.shadowBlur = 10;
           ctx.globalAlpha = 0.95 * fade;
-          ctx.fillText(notes[n % notes.length]!, nx, ny);
+          drawGlyph(ctx, notes[n % notes.length]!, nx, ny, 16);
         }
 
         // Center silhouette dancer (Rick's iconic trench coat rhythm groove)
@@ -4818,12 +4807,12 @@ function drawProjectiles(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBo
         ctx.fillStyle = '#c084fc';
         ctx.shadowColor = '#38bdf8';
         ctx.shadowBlur = 8;
-        drawBoltIcon(ctx, -14, -6 + heartOffset, 10);
+        drawGlyph(ctx, 'shock', -14, -6 + heartOffset, 10);
       } else {
         ctx.fillStyle = '#f43f5e';
         ctx.shadowColor = '#fb7185';
         ctx.shadowBlur = 6;
-        ctx.fillText('❤', -14, -6 + heartOffset);
+        drawGlyph(ctx, 'heart', -14, -6 + heartOffset, 10);
       }
 
       // Fluffy llama body
@@ -4982,7 +4971,7 @@ function drawProjectiles(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBo
       const starPhase = (w.now / 120) % (Math.PI * 2);
       ctx.fillStyle = '#ffffff';
       ctx.font = '9px monospace';
-      ctx.fillText('✦', -16 + Math.cos(starPhase) * 6, -10 + Math.sin(starPhase) * 6);
+      drawGlyph(ctx, 'spark', -16 + Math.cos(starPhase) * 6, -10 + Math.sin(starPhase) * 6, 9);
 
       ctx.restore();
       continue;
@@ -5043,12 +5032,12 @@ function drawProjectiles(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBo
       ctx.fillText('×', winW / 2 - 7.5, -winH / 2 + 8);
 
       // Window Body Icon & Text
-      const icon = proj.popupKind === 'warn' ? '⚠' : proj.popupKind === 'million' ? '★' : proj.popupKind === 'ipod' ? '♫' : '!';
+      const icon: LokGlyphKey = proj.popupKind === 'warn' ? 'warn' : proj.popupKind === 'million' ? 'star' : proj.popupKind === 'ipod' ? 'noteBeam' : 'rankUpSmall';
       const iconColor = proj.popupKind === 'warn' ? '#eab308' : proj.popupKind === 'million' ? '#ef4444' : '#2563eb';
       ctx.fillStyle = iconColor;
       ctx.font = 'bold 12px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(icon, -winW / 2 + 12, 4);
+      drawGlyph(ctx, icon, -winW / 2 + 12, 1, 12);
 
       ctx.fillStyle = '#000000';
       ctx.font = 'bold 6px monospace';
@@ -6300,7 +6289,7 @@ function drawActors(
       ctx.fillStyle = vColor;
       ctx.font = 'bold 7px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`★ ${enemy.veteranAffix?.toUpperCase() ?? 'VETERAN'}`, enemy.x, enemy.y - enemy.radius - 8);
+      ctx.fillText(`${enemy.veteranAffix?.toUpperCase() ?? 'VETERAN'}`, enemy.x, enemy.y - enemy.radius - 8);
       ctx.restore();
     }
     if (freeze && !enemy.dying) {
@@ -6445,8 +6434,8 @@ function drawActors(
       ctx.textAlign = 'center';
       ctx.shadowColor = '#fb7185';
       ctx.shadowBlur = 6;
-      ctx.fillText('❤', enemy.x - 7, enemy.y - enemy.radius - 10 + heartPulse);
-      ctx.fillText('❤', enemy.x + 7, enemy.y - enemy.radius - 14 - heartPulse);
+      drawGlyph(ctx, 'heart', enemy.x - 7, enemy.y - enemy.radius - 10 + heartPulse, 8);
+      drawGlyph(ctx, 'heart', enemy.x + 7, enemy.y - enemy.radius - 14 - heartPulse, 8);
 
       const bubblePhase = (w.now / 350 + enemy.uid) % (Math.PI * 2);
       ctx.strokeStyle = '#fbcfe8';
@@ -6819,7 +6808,7 @@ function drawMapSetPieces(ctx: CanvasRenderingContext2D, w: World) {
       ctx.save(); ctx.strokeStyle = entry.kind === 'plate' ? '#fbbf24' : entry.kind === 'arcade-box' ? '#ff2ec4' : '#67e8f9'; ctx.fillStyle = '#071116';
       ctx.lineWidth = 3; ctx.fillRect(entry.x - 17, entry.y - 17, 34, 34); ctx.strokeRect(entry.x - 17, entry.y - 17, 34, 34);
       ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#e0f2fe'; if (entry.kind === 'coil') { drawBoltIcon(ctx, entry.x, entry.y, 14); } else { ctx.fillText(entry.kind === 'plate' ? '616' : entry.kind === 'arcade-box' ? '♪' : '▣', entry.x, entry.y); }
+      ctx.fillStyle = '#e0f2fe'; if (entry.kind === 'plate') { ctx.fillText('616', entry.x, entry.y); } else { drawGlyph(ctx, entry.kind === 'coil' ? 'shock' : entry.kind === 'arcade-box' ? 'noteBeam' : 'squareCore', entry.x, entry.y, 15); }
       ctx.restore();
     }
   }

@@ -10,6 +10,7 @@
  * It only draws what it is given: the run owns the world, the choices and the handlers.
  */
 import { useRef, useState, type ReactNode } from 'react';
+import { GameIcon } from '@/ui/GameIcon';
 import { RefreshCw, SkipForward } from 'lucide-react';
 
 import { useT } from '@/lib/i18n';
@@ -63,11 +64,11 @@ const CHIP_TONE: Record<GameBarChip['tone'], string> = {
 };
 
 const KIND_MARK: Record<NonNullable<UpgradeDef['cardKind']>, string> = {
-  upgrade: '▲',
-  weapon: '✚',
-  passive: '◈',
-  evolution: '✦',
-  'relic-evolution': '✦',
+  upgrade: 'rankUp',
+  weapon: 'blade',
+  passive: 'diamondCore',
+  evolution: 'spark',
+  'relic-evolution': 'spark',
 };
 
 function SkillCard({ upgrade, ready, icon, onPick }: { upgrade: UpgradeDef; ready: boolean; icon: ReactNode; onPick: () => void }) {
@@ -87,7 +88,7 @@ function SkillCard({ upgrade, ready, icon, onPick }: { upgrade: UpgradeDef; read
       data-ready={ready ? 'true' : 'false'}
     >
       <span className="flex w-full items-center gap-1 [@media(max-height:430px)]:w-auto">
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[11px] text-primary">{icon ?? KIND_MARK[upgrade.cardKind ?? 'upgrade']}</span>
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-[11px] text-primary">{icon ?? <GameIcon name={KIND_MARK[upgrade.cardKind ?? 'upgrade']} />}</span>
         <span className="min-w-0 flex-1 truncate font-mono text-[7px] uppercase tracking-wider text-white/45 [@media(max-height:430px)]:hidden">{upgrade.cardKind ?? 'upgrade'}</span>
       </span>
       <span className="line-clamp-2 w-full text-[9px] font-black uppercase leading-[1.05] tracking-wide text-white">{upgrade.name}</span>
