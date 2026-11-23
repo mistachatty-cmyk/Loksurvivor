@@ -222,3 +222,21 @@ export function openCrewChannel(
     leave: () => void client.removeChannel(channel),
   };
 }
+
+export type CrewLinkResult = "joined" | "already" | "full" | "expired" | "invalid";
+
+/** Leader only: makes (or replaces) the crew's join code. Valid 24 hours, 8 uses. */
+export async function createCrewLink(client: SupabaseClient): Promise<{ ok: true; code: string } | Failure> {
+  const { data, error } = await client.rpc("lok_crew_link_create");
+  return error || typeof data !== "string" ? fail(error?.message ?? "No answer") : { ok: true, code: data };
+}
+
+export async function joinCrewByLink(client: SupabaseClient, code: string): Promise<{ ok: true; result: CrewLinkResult } | Failure> {
+  const { data, error } = await client.rpc("lok_crew_link_join", { p_code: code });
+  return error || typeof data !== "string" ? fail(error?.message ?? "No answer") : { ok: true, result: data as CrewLinkResult };
+}
+
+export async function revokeCrewLink(client: SupabaseClient): Promise<{ error: string | null }> {
+  const { error } = await client.rpc("lok_crew_link_revoke");
+  return { error: error?.message ?? null };
+}

@@ -10,9 +10,9 @@
  */
 
 export type InviteGame = "survivor" | "qnk";
-export type InviteKind = "friend" | "room" | "match" | "four" | "hall" | "watch";
+export type InviteKind = "friend" | "crew" | "room" | "match" | "four" | "hall" | "watch";
 /** What the receiving game should open. Each game maps these to its own screen. */
-export type InviteMode = "friend-add" | "room-join" | "match-join" | "four-join" | "hall-enter" | "watch-join";
+export type InviteMode = "friend-add" | "crew-join" | "room-join" | "match-join" | "four-join" | "hall-enter" | "watch-join";
 
 export interface Invite { kind: InviteKind; code: string | null }
 
@@ -37,6 +37,7 @@ interface KindInfo {
 
 export const INVITE_KINDS: Record<InviteKind, KindInfo> = {
   friend: { mode: "friend-add", games: ["survivor", "qnk"], identity: true, coded: true, legacy: { survivor: ["friend"], qnk: ["friend"] }, what: "a friend invite" },
+  crew: { mode: "crew-join", games: ["survivor", "qnk"], identity: true, coded: true, legacy: {}, what: "a crew invite" },
   room: { mode: "room-join", games: ["survivor", "qnk"], identity: false, coded: true, legacy: { survivor: ["room"], qnk: ["join"] }, what: "a private room" },
   match: { mode: "match-join", games: ["qnk"], identity: true, coded: true, legacy: { qnk: ["match"] }, what: "a match invite" },
   four: { mode: "four-join", games: ["qnk"], identity: true, coded: true, legacy: { qnk: ["four"] }, what: "a private four-player hall" },
@@ -58,7 +59,7 @@ export function normalizeInviteCode(kind: InviteKind, raw: string | null | undef
   }
   if (kind === "match") return /^[A-Za-z0-9-]{4,12}$/.test(text) ? text : null;
   const up = text.toUpperCase();
-  const re = kind === "four" ? /^[A-HJ-NP-Z2-9]{6}$/ : /^[A-HJ-NP-Z2-9]{4,8}$/;
+  const re = kind === "four" || kind === "crew" ? /^[A-HJ-NP-Z2-9]{6}$/ : /^[A-HJ-NP-Z2-9]{4,8}$/;
   return re.test(up) ? up : null;
 }
 
@@ -160,6 +161,18 @@ export const INVITE_TTL_MS = 10 * 60 * 1000;
 
 export function stashInvite(invite: Invite, storage: MiniStorage, now = Date.now()): void {
   try { storage.setItem(INVITE_STASH_KEY, JSON.stringify({ k: invite.kind, c: invite.code, at: now })); } catch { /* storage refused: the invite is simply lost */ }
+}
+
+/** Looks at the parked invite without forgetting it (for deciding whether to ask the player to sign in first). */
+export function peekInvite(storage: MiniStorage, now = Date.now()): Invite | null {
+  try {
+    const raw = storage.getItem(INVITE_STASH_KEY);
+    if (!raw) return null;
+    const j = JSON.parse(raw) as { k?: unknown; c?: unknown; at?: unknown };
+    if (typeof j.at !== "number" || now - j.at > INVITE_TTL_MS || now < j.at) return null;
+    if (typeof j.k !== "string" || !(KINDS as string[]).includes(j.k)) return null;
+    return make(j.k as InviteKind, typeof j.c === "string" ? j.c : null);
+  } catch { return null; }
 }
 
 /** Returns the parked invite once and forgets it. Expired or damaged entries are dropped. */

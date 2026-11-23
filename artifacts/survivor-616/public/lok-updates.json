@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 202,
+      "version": "0.42.63",
+      "date": "2026-11-23",
+      "publishedAt": "2026-11-23T04:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Join a crew by link",
+      "body": [
+        "Crew leaders can make an invite link and QR code in the Crew tab. Anyone signed in who opens it joins your crew, up to four players. A link lasts 24 hours and a new one replaces the old.",
+        "If you are not signed in yet, you sign in first and then land in the crew."
+      ]
+    },
+    {
       "number": 201,
       "version": "0.42.62",
       "date": "2026-11-23",

@@ -20,6 +20,7 @@ import { requestHostCrewRun } from './CrewRunSetup';
 import { ListenTogetherBar } from './ListenTogether';
 import { PlayerAvatar } from './PlayerAvatar';
 import { QrCode } from './QrCode';
+import { buildInviteUrl } from '../../../../lib/lok-universe/src/invite';
 
 const TAB_KEYS: CrewTab[] = ['crew', 'friends', 'recent', 'add'];
 const BTN = 'border border-border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white/80 hover:border-fuchsia-300/60 hover:text-white disabled:opacity-40';
@@ -75,6 +76,40 @@ function Row({ children, testId }: { children: ReactNode; testId?: string }) {
   return <li className="flex items-center gap-3 border border-border/70 bg-background/50 p-2.5" data-testid={testId}>{children}</li>;
 }
 
+/** Leader: one link (and QR) that puts anyone signed in straight into the crew. 24 hours, 8 uses. */
+function CrewLinkPanel() {
+  const t = useT();
+  const s = useSocial();
+  const [link, setLink] = useState('');
+  const [note, setNote] = useState('');
+  const [qr, setQr] = useState(false);
+  const make = async () => {
+    const code = await s.makeCrewLink();
+    if (!code) { setNote(t('social.crew.link.error')); return; }
+    setLink(buildInviteUrl({ kind: 'crew', code }, 'survivor'));
+    setNote(t('social.crew.link.ready'));
+  };
+  const share = async () => {
+    try {
+      if (navigator.share) await navigator.share({ title: t('social.title'), url: link });
+      else { await navigator.clipboard.writeText(link); setNote(t('social.add.copied')); }
+    } catch { /* cancelled */ }
+  };
+  return (
+    <section className="space-y-2 border border-border/70 bg-background/50 p-3" data-testid="crew-link">
+      <h3 className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-white/60">{t('social.crew.link.title')}</h3>
+      <p className="text-sm text-muted-foreground">{t('social.crew.link.body')}</p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={BTN_ON} onClick={() => void make()} data-testid="button-crew-link-make">{link ? t('social.crew.link.again') : t('social.crew.link.make')}</button>
+        {link ? <button type="button" className={BTN} onClick={() => void share()} data-testid="button-crew-link-share"><Share2 className="mr-1 inline h-3.5 w-3.5" />{t('social.add.share')}</button> : null}
+        {link ? <button type="button" className={qr ? BTN_ON : BTN} aria-pressed={qr} onClick={() => setQr(!qr)} data-testid="button-crew-link-qr">{qr ? t('social.add.hideQr') : t('social.add.showQr')}</button> : null}
+      </div>
+      {qr && link ? <QrCode value={link} label={t('social.crew.link.qrLabel')} /> : null}
+      {note ? <p className="text-sm text-fuchsia-100" role="status">{note}</p> : null}
+    </section>
+  );
+}
+
 function CrewTabView() {
   const t = useT();
   const s = useSocial();
@@ -88,6 +123,7 @@ function CrewTabView() {
 
   return (
     <div className="space-y-4 p-4">
+      {s.linkResult ? <p className="border border-fuchsia-300/40 bg-fuchsia-400/10 p-2 text-sm text-fuchsia-100" role="status" data-testid="crew-link-result">{t(`social.crew.link.result.${s.linkResult}` as never)}</p> : null}
       {s.crew.invites.length > 0 ? (
         <section aria-label={t('social.crew.invitesTitle')} className="space-y-2">
           <h3 className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-fuchsia-200">{t('social.crew.invitesTitle')}</h3>
@@ -145,6 +181,7 @@ function CrewTabView() {
               )}
             </div>
           ) : null}
+          {leader && slotsLeft(s.crew) > 0 ? <CrewLinkPanel /> : null}
           {net.crewRuns ? <section className="space-y-2 border border-border/70 bg-background/50 p-3" data-testid="crewrun-start">
             <h3 className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-200">{t('crewrun.title')}</h3>
             <p className="text-sm text-muted-foreground">{t('crewrun.startBody')}</p>
