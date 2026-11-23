@@ -1,7 +1,8 @@
 import { overlayContainer } from './ViewportOverlay';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { Repeat, Repeat1, Shuffle, Volume1, Volume2, VolumeX } from 'lucide-react';
+import { Repeat, Repeat1, Shuffle } from 'lucide-react';
+import { GameIcon } from './GameIcon';
 import { formatTime, useMusicPlayer } from '@/game/audio/musicPlayer';
 import { positionFromPointer, sliderToVolume, volumeToSlider } from '@/game/audio/volumeCurve';
 import { useT } from '@/lib/i18n';
@@ -80,7 +81,6 @@ export function SoundbarPanel({ anchorRef, onClose }: { anchorRef: RefObject<HTM
     if (box) player.setVolume(sliderToVolume(positionFromPointer(clientX, box.left, box.width)));
   };
   const nudge = (delta: number) => player.setVolume(sliderToVolume(Math.max(0, Math.min(1, slider + delta))));
-  const VolumeIcon = level === 0 ? VolumeX : level < 0.35 ? Volume1 : Volume2;
   const RepeatIcon = player.repeat === 'one' ? Repeat1 : Repeat;
   const speedIndex = Math.max(0, SPEEDS.indexOf(player.playbackRate));
   const duration = player.durationSec > 0 ? player.durationSec : 0;
@@ -107,7 +107,7 @@ export function SoundbarPanel({ anchorRef, onClose }: { anchorRef: RefObject<HTM
           aria-label={level === 0 ? t('soundbar.unmute') : t('soundbar.mute')}
           data-testid="button-global-music-mute"
         >
-          <VolumeIcon className="h-4 w-4" />
+          <GameIcon name={level === 0 ? 'mute' : 'sound'} className="h-4 w-4" />
         </button>
         <div
           ref={trackRef}
