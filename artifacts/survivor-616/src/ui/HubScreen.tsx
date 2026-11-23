@@ -746,7 +746,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
 
       <div className={`relative z-20 flex-1 flex flex-col p-6 pb-32 sm:pb-6 sm:pl-24`}>
         {chromeLayout === 'new' ? (
-    <div className="hub-dock mb-3 flex flex-col gap-2 border border-white/15 bg-black/90 p-3 shadow-xl backdrop-blur sm:p-4 lg:flex-row lg:items-center" data-testid="hub-control-dock">
+    <div className="hub-dock mb-3 flex flex-col gap-2 border border-white/15 bg-black/90 p-3 shadow-xl backdrop-blur sm:p-4 lg:flex-row lg:items-center lg:pr-56" data-testid="hub-control-dock">
       <div className="flex flex-wrap items-center gap-2">
         {onBack ? <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-white/40 hover:text-white" data-testid="button-hub-back-to-intro" aria-label="Back to title"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
         <button type="button" onClick={() => setShowLorePopup(true)} aria-haspopup="dialog" aria-expanded={showLorePopup} className="inline-flex min-h-10 items-center gap-2 border border-red-500/60 bg-red-950/40 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-red-100 hover:border-red-300" data-testid="button-hub-mission-briefing" title={t('hub.missionBriefingTitle')}><ShieldAlert className="h-4 w-4 text-red-400" />{t('hub.missionBriefing')}</button>

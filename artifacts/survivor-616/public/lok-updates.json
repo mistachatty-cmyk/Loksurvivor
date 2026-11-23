@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 202,
+      "version": "0.42.63",
+      "date": "2026-11-22",
+      "publishedAt": "2026-11-23T00:30:00Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "First arrival fits on a phone",
+      "body": [
+        "After your first win on a phone, the reward card and the Learn the ropes / Skip buttons now fit on screen without scrolling, character names no longer sit on top of the portraits, and the music button stays clear of the rewards.",
+        "On wide screens the hideout top bar leaves room for the Looks & LokPets button so the two no longer overlap."
+      ]
+    },
+    {
       "number": 201,
       "version": "0.42.62",
       "date": "2026-11-22",
