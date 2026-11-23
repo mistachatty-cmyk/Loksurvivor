@@ -5,7 +5,7 @@
  * Every hideout menu item that the room covers is an anchor whose action is the same `HubPanel` the menu button
  * opens, so no screen is rewritten. Panels not listed here stay reachable from the menu view.
  */
-import type { RoomAnchor, RoomLayout } from '../../../../../lib/lok-universe/src/rooms';
+import { LOK_HALL_LAYOUT, type RoomAnchor, type RoomLayout } from '../../../../../lib/lok-universe/src/rooms';
 
 const panel = (id: string, kind: string, col: number, row: number, w: number, h: number, p: string): RoomAnchor =>
   ({ id, kind, col, row, w, h, action: { type: 'panel', panel: p } });
@@ -51,21 +51,4 @@ export const BEDROOM_616: RoomLayout = {
 /** Hub panels that the bedroom covers. A test keeps this honest against the anchors. */
 export const BEDROOM_PANELS = BEDROOM_616.anchors.flatMap((a) => (a.action.type === 'panel' ? [a.action.panel] : []));
 
-export const UNIVERSAL_HALL: RoomLayout = {
-  id: 'hall.lok',
-  cols: 22,
-  rows: 12,
-  tile: 48,
-  start: { col: 10, row: 9 },
-  solids: [{ col: 0, row: 0, w: 22, h: 2 }],
-  anchors: [
-    // North wall: one doorway per game hall. 616 has no public hall yet, so its doorway is shown but shut.
-    { id: 'hall-616', kind: 'door', col: 4, row: 2, w: 2, h: 1, enabled: false, action: { type: 'door', to: 'hall.616' } },
-    { id: 'hall-qnk', kind: 'door', col: 10, row: 2, w: 2, h: 1, action: { type: 'external', game: 'qnk', note: 'hall.qnk' } },
-    { id: 'hall-soon', kind: 'door', col: 16, row: 2, w: 2, h: 1, enabled: false, action: { type: 'note', key: 'room.note.moreGames' } },
-    { id: 'board', kind: 'noticeboard', col: 1, row: 5, w: 1, h: 2, action: { type: 'note', key: 'room.note.hallBoard' } },
-    { id: 'beacon', kind: 'beacon', col: 10, row: 5, w: 2, h: 2, action: { type: 'note', key: 'room.note.beacon' } },
-    // South: the way home.
-    { id: 'home', kind: 'door', col: 10, row: 11, w: 2, h: 1, action: { type: 'door', to: 'room.616' } },
-  ],
-};
+export const UNIVERSAL_HALL: RoomLayout = LOK_HALL_LAYOUT;

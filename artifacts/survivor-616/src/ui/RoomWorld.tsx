@@ -60,7 +60,7 @@ export function RoomWorld({ character, onOpenPanel, onExit, initialRoom = 'room.
       const res = pullLever('survivor', choice);
       setChoice(res.choice);
       saveHallChoice('survivor', res.choice);
-      setNotice(t(res.blocked ? 'room.lever.held' : res.choice === 'public' ? 'room.lever.public' : 'room.lever.universal'));
+      setNotice(t(res.shut ? 'room.lever.held' : res.choice === 'public' ? 'room.lever.public' : 'room.lever.universal'));
     } else if (act.type === 'door') {
       if (act.to === 'room.616') go('room.616');
       else go(resolveBedroomDoor('survivor', choice) === 'hall.lok' ? 'hall.lok' : 'hall.lok');   // no public 616 hall yet
