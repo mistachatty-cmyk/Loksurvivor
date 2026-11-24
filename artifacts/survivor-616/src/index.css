@@ -1436,3 +1436,13 @@ html[data-power-save] .hideout-weather-heat .hideout-weather-particles {
   :is(button, a, [role='button'], [role='tab'], summary, label):is(:hover, :focus-visible, :active) .lok-glyph { transform: none; }
 }
 html[data-power-save] .lok-glyph { filter: none !important; transition: none; }
+
+/* Phones: iOS zooms the page when a field under 16px gets focus and never zooms back (Lok chat, loadout names, search). */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']), textarea, select { font-size: 16px !important; }
+}
+/* Phones: the training arena readout and loadout bar use 7 to 8 pixel labels on desktop; make them readable and tappable. */
+@media (max-width: 639px) {
+  .training-hud [class*='text-[7px]'], .training-hud [class*='text-[8px]'], .training-hud [class*='text-[9px]'] { font-size: 10px !important; line-height: 1.25; }
+  .training-hud button { min-height: 36px; }
+}

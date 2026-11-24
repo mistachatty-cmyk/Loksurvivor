@@ -983,7 +983,7 @@ function Game() {
       <CrewPresenceSync screenName={screen.name} />
       <CrewRunController screenName={screen.name} onLaunch={(launch) => setScreen({ name: 'crew-run', ...launch })} />
       <LokChatHost />
-      {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && screen.name !== 'photosensitivity-notice' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena', 'crew-run'].includes(screen.name) ? 'default' : 'menu'} />}
+      {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && screen.name !== 'photosensitivity-notice' && screen.name !== 'weapon-training-arena' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena', 'crew-run'].includes(screen.name) ? 'default' : 'menu'} />}
       <GoToPalette
         unlockedFeatures={unlockedFeatures}
         disabled={['jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena', 'crew-run'].includes(screen.name)}

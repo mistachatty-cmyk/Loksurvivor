@@ -1025,7 +1025,9 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
         </aside>
 
         <section data-testid="training-arena-stage" className={`relative min-h-0 overflow-hidden ${mainLayout ? 'p-1.5 sm:p-3' : 'p-2 sm:p-4'}`}>
-          <div className={`relative h-full min-h-0 overflow-hidden bg-[#111522] shadow-[inset_0_0_80px_rgba(9,20,42,.65)] ${mainLayout ? 'border-2 border-white/40' : 'border border-cyan-200/20'}`}>
+          <div className={`relative flex h-full min-h-0 flex-col overflow-hidden bg-[#111522] shadow-[inset_0_0_80px_rgba(9,20,42,.65)] sm:block ${mainLayout ? 'border-2 border-white/40' : 'border border-cyan-200/20'}`}>
+            {/* Phones: the arena keeps its own band and the readout sits below it instead of covering it. */}
+            <div className="relative h-[32dvh] min-h-[170px] shrink-0 sm:contents">
             <canvas
               ref={canvasRef}
               aria-label={`${t('training.header.title')} — ${selectedCharacter.name} facing ${t('training.stage.dustMite')}`}
@@ -1058,12 +1060,13 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
                 {targetMode !== 'infinite' && <div className="mt-1 h-1 w-20 bg-white/10 sm:ml-auto sm:w-32"><div className="h-full bg-amber-300 transition-[width] duration-150" style={{ width: `${Math.max(0, (dummyHp / dummyMaxHp) * 100)}%` }} /></div>}
               </div>
             </div>
-            <div className="pointer-events-none absolute left-1/2 top-14 z-10 w-44 -translate-x-1/2 border border-blue-200/30 bg-blue-950/75 px-2 py-1.5 text-center shadow-lg sm:top-16 sm:w-56">
+            <div className="pointer-events-none absolute left-1/2 top-14 z-10 w-44 -translate-x-1/2 max-sm:bottom-2 max-sm:left-auto max-sm:right-2 max-sm:top-auto max-sm:w-36 max-sm:translate-x-0 border border-blue-200/30 bg-blue-950/75 px-2 py-1.5 text-center shadow-lg sm:top-16 sm:w-56">
               <p className="font-mono text-[8px] font-bold uppercase tracking-wider text-blue-100">{t('training.stage.operatorXp', { level: operatorTrainingLevel })}</p>
               <div className="mt-1 h-1.5 bg-white/10"><div className="h-full bg-cyan-200" style={{ width: `${operatorTrainingProgress}%` }} /></div>
               <p className="mt-0.5 font-mono text-[7px] text-white/55">{t('training.stage.xp', { current: operatorTrainingProgress.toFixed(1), next: 100 })}</p>
             </div>
-            <div className="absolute inset-x-2 bottom-2 z-10 max-h-[62%] overflow-y-auto border border-white/15 bg-black/80 p-2 backdrop-blur-sm sm:inset-x-3 sm:bottom-3 sm:max-h-[50%] sm:p-3">
+            </div>
+            <div className="training-hud relative z-10 min-h-0 flex-1 overflow-y-auto border-t border-white/15 bg-black/80 p-2 sm:absolute sm:inset-x-3 sm:bottom-3 sm:max-h-[50%] sm:flex-none sm:border sm:p-3 sm:backdrop-blur-sm">
               <div className="flex items-center justify-between gap-2 text-[10px] text-white/65 sm:text-xs"><span className="flex min-w-0 items-center gap-2"><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${testRunning ? 'animate-pulse bg-amber-300' : 'bg-cyan-300'}`} /><span className="truncate">{statusText}</span></span><span className="shrink-0 font-mono text-[8px] text-white/40">{t('training.rack.level', { level: selectedWeaponLevel })}</span></div>
               <div className="mt-1.5 grid grid-cols-3 gap-1 border-t border-white/10 pt-1.5 sm:grid-cols-6 sm:gap-2 sm:pt-2">
                 {[
@@ -1087,12 +1090,12 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
                 <p className="font-mono text-[7px] font-bold uppercase tracking-wider text-cyan-100/70">{t('training.effects.title')}</p>
                 {shownHits === 0 && liveEffects.length === 0 ? <p className="mt-0.5 text-[8px] text-white/35">{t('training.effects.none')}</p> : <p className="mt-0.5 text-[8px] text-white/60">{t('training.effects.hit', { count: shownHits })} · {t('training.effects.critical', { count: shownCrits })}{liveEffects.length > 0 ? ` · ${t('training.effects.status', { effects: liveEffects.join(', ') })}` : ''}</p>}
               </div>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-2">
-                <div className="flex flex-wrap items-center gap-1" aria-label={t('training.stage.targetMode')}>
+              <div className="max-sm:contents sm:mt-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-2 sm:border-t sm:border-white/10 sm:pt-2">
+                <div className="flex flex-wrap items-center gap-1 max-sm:mt-2 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:border-t max-sm:border-white/10 max-sm:pt-2" aria-label={t('training.stage.targetMode')}>
                   {(['durability', 'nonlethal', 'infinite'] as const).map((mode) => <button key={mode} type="button" onClick={() => setTrainingTargetMode(mode)} aria-pressed={targetMode === mode} className={`min-h-7 border px-1.5 font-mono text-[7px] font-bold uppercase tracking-wider sm:px-2 sm:text-[8px] ${targetMode === mode ? 'border-slate-200/60 bg-slate-200/10 text-white' : 'border-white/10 text-white/45 hover:border-white/30'}`}>{t(`training.stage.${mode === 'nonlethal' ? 'nonlethal' : mode}` as never)}</button>)}
                   {targetMode === 'durability' && DUMMY_HP_PRESETS.map((hp) => <button key={hp} type="button" onClick={() => setDummyDurability(hp)} aria-pressed={dummyMaxHp === hp} className={`min-h-7 border px-1.5 font-mono text-[7px] sm:px-2 sm:text-[8px] ${dummyMaxHp === hp ? 'border-slate-300/60 bg-slate-300/10 text-slate-100' : 'border-white/10 text-white/50 hover:border-white/30'}`}>{hp.toLocaleString()}</button>)}
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5 max-sm:sticky max-sm:bottom-0 max-sm:z-10 max-sm:mt-2 max-sm:grid max-sm:grid-cols-3 max-sm:gap-1 max-sm:bg-black max-sm:py-1.5">
                   <button type="button" onClick={resetDummy} className="inline-flex min-h-8 items-center gap-1 border border-white/15 px-2 text-[8px] font-bold uppercase tracking-wider text-white/70 hover:bg-white/10"><RotateCcw size={12} /> {t('training.controls.reset')}</button>
                   <button ref={challengeTriggerRef} type="button" onClick={startChallenge} disabled={testRunning || (!multiUnlocked && multiWeaponIds.length > 1) || selectedWeapons.some((weapon) => !weaponIsUnlocked(weapon))} className="inline-flex min-h-8 items-center gap-1 border border-violet-200/40 px-2 font-mono text-[8px] font-black uppercase tracking-wider text-violet-100 hover:bg-violet-100/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-200 disabled:opacity-45">{challengeRunning ? t('training.controls.challengeRunning') : `${t('training.controls.challenge')} · ${challengeSeconds || 24}s`}</button>
                   {challengeRunning && <span className="font-mono text-[9px] font-black text-amber-200">{t('training.controls.remaining', { seconds: challengeSeconds })}</span>}
@@ -1118,7 +1121,7 @@ export function WeaponTrainingArenaScreen({ onBack }: { onBack: () => void }) {
           </div>
         </section>
       </div>
-      <footer data-testid="training-loadout-bar" className="shrink-0 border-t-2 border-lime-300/45 bg-[#0b100c] px-2 py-1.5 sm:px-4">
+      <footer data-testid="training-loadout-bar" className="training-hud max-h-[26dvh] shrink-0 overflow-y-auto border-t-2 border-lime-300/45 bg-[#0b100c] px-2 py-1.5 sm:px-4">
         <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-1">
           <span className="mr-1 shrink-0 font-mono text-[8px] font-black uppercase tracking-widest text-lime-100/80">{t('training.loadouts.groups')}</span>
           {meta.trainingArenaLoadoutGroups.map((group, index) => (
