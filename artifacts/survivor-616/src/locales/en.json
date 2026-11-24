@@ -910,10 +910,10 @@
   "booster.eyebrow": "Bootleg stock · Not affiliated with anyone",
   "booster.title": "Bootleg Booster Bin",
   "booster.intro": "Ghosted copies of familiar faces. Every booster adds a random stat for every run. Results may vary, and so may the character on the card.",
-  "booster.cardCount": "{count} ghosted copies",
-  "booster.buy": "Buy · {cost} CR",
-  "booster.need": "Need {cost} Card Credits",
-  "booster.ownedTitle": "Your ghosted copies · {count}",
+  "booster.cardCount": "{{count}} ghosted copies",
+  "booster.buy": "Buy · {{cost}} CR",
+  "booster.need": "Need {{cost}} Card Credits",
+  "booster.ownedTitle": "Your ghosted copies · {{count}}",
   "booster.empty": "No boosters yet. The bin is well stocked. Honest.",
   "booster.ghostLabel": "Ghost copy",
   "sleeve.locked.visualizer": "Needs the LokPack Visualizer (LOK Shop)",
@@ -1546,5 +1546,12 @@
   "lokjar.reason.cooldown": "Resting until {{time}}. It keeps filling meanwhile.",
   "lokjar.reason.boost_running": "A boost is running until {{time}}.",
   "lokjar.done": "Collected {{tokens}} LokTokens. You earn {{pct}} more for about {{mins}} minutes.",
-  "lokjar.failed": "Couldn't collect right now. Nothing was spent. Try again in a moment."
+  "lokjar.failed": "Couldn't collect right now. Nothing was spent. Try again in a moment.",
+  "music.previous": "Previous track",
+  "music.next": "Next track",
+  "music.play": "Play",
+  "music.pause": "Pause",
+  "music.mute": "Mute",
+  "music.unmute": "Unmute",
+  "feedback.rateStar": "Rate {{n}} out of 5"
 }
