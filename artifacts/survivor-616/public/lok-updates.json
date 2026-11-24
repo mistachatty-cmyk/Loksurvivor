@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 218,
+      "version": "0.42.79",
+      "date": "2026-11-24",
+      "publishedAt": "2026-11-24T20:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Boost Jar",
+      "body": [
+        "Finishing runs now fills a shared Boost Jar that sits next to the owl in the Lok Shop. Open it to collect a share of what you earned in the last day and earn extra for an hour or two. Plays in Queens N Kings fill the same jar. When the jar is worth a visit, your run summary says so once, and you can ignore it and keep playing. The Armory, Lok chat and the Training Arena also fit phone screens better."
+      ]
+    },
+    {
       "number": 217,
       "version": "0.42.78",
       "date": "2026-11-24",
