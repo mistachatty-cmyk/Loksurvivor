@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 217,
+      "version": "0.42.78",
+      "date": "2026-11-24",
+      "publishedAt": "2026-11-24T12:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Rewards fly to your cred",
+      "body": [
+        "When you finish a run with a daily contract answered, the reward now bursts out of the Broadcast Board, hangs for a beat, then flies into your cred total, which bumps as each piece lands. Reduced motion or a hidden tab just shows the total."
+      ]
+    },
+    {
       "number": 216,
       "version": "0.42.77",
       "date": "2026-11-23",

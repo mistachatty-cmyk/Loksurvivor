@@ -19,6 +19,7 @@ import { RigPortrait } from './RigPortrait';
 import { WeaponIcon } from './WeaponIcon';
 import { AccountNudge } from './AccountNudge';
 import { AnimatedNumber } from './AnimatedNumber';
+import { playCollectBurst } from './collectBurst';
 import { runShareText } from '@/lib/sharePlatforms';
 import { encodeChallenge } from '@/lib/challengeCode';
 import { AREAS_BY_ID } from '@/game/data/areas';
@@ -29,7 +30,7 @@ import { formatClock } from '@lok/recap';
 import { PetGrowthRecap } from './PetGrowthRecap';
 import type { GameRunSummaryLike } from '@lok/recap';
 import { loadMediaAssets } from '@/game/audio/localMediaStore';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Share2 } from 'lucide-react';
 import { useAuth } from '@/state/authStore';
 import { motion } from 'framer-motion';
@@ -136,6 +137,34 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
     };
   }, [result.highlights]);
   const prefersReducedMotion = prefersReducedMotionNow();
+  // Paid daily contract rewards fly into the run's cred total, bumping it as each piece lands.
+  const contractSectionRef = useRef<HTMLElement>(null);
+  const credStatRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    const paid = result.completedDailyContracts ?? [];
+    const amount = paid.reduce((sum, contract) => sum + contract.rewardCred, 0);
+    if (amount <= 0) return undefined;
+    let cancel = () => {};
+    const timer = window.setTimeout(() => {
+      cancel = playCollectBurst({
+        from: contractSectionRef.current,
+        to: credStatRef.current,
+        amount,
+        reducedMotion: prefersReducedMotionNow(),
+        onLand: () => {
+          const el = credStatRef.current;
+          if (!el) return;
+          el.classList.remove('lok-collect-bump');
+          void el.offsetWidth;
+          el.classList.add('lok-collect-bump');
+        },
+      });
+    }, 600);
+    return () => {
+      window.clearTimeout(timer);
+      cancel();
+    };
+  }, [result.completedDailyContracts]);
   const area = areaOverride ?? getArea(result.areaId);
   const character = getCharacter(result.characterId);
   const characterPalette = resolveCharacterCosmeticPalette(
@@ -255,7 +284,7 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
         ) : null}
 
         {result.completedDailyContracts && result.completedDailyContracts.length > 0 ? (
-          <section className="border border-cyan-200/40 bg-cyan-950/15 p-5" data-testid="section-daily-contract-rewards">
+          <section ref={contractSectionRef} className="border border-cyan-200/40 bg-cyan-950/15 p-5" data-testid="section-daily-contract-rewards">
             <div className="flex items-center gap-3">
               <Radio className="h-5 w-5 text-cyan-200" />
               <div>
@@ -462,7 +491,7 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
             </div>
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Coins className="w-3 h-3 text-primary" /> Cred</p>
-              <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-cred">
+              <p ref={credStatRef} className="text-2xl font-mono font-bold text-white" data-testid="text-run-cred">
                 <AnimatedNumber value={result.cred} durationMs={1400} disabled={prefersReducedMotion} />
               </p>
             </div>
