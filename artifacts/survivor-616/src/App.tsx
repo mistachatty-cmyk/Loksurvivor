@@ -948,6 +948,7 @@ function Game() {
           onReturnToHub={goHub}
           onOpenArchive={(variantId) => setScreen({ name: 'archive', variantId })}
           onOpenAccount={() => setScreen({ name: 'account' })}
+          onOpenLokShop={() => setScreen({ name: 'lok-shop' })}
           onRetry={() =>
             canRetry
               ? prepareRun({

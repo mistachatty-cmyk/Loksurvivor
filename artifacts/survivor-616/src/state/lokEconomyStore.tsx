@@ -40,6 +40,7 @@ import { lokClient } from '@/lib/lokClient';
 import { catalogSku } from '@/lib/lokStoreCatalog';
 import { useMeta } from '@/game/state/metaStore';
 import { setForgeSupporterTier } from '@/game/state/operatorForgeStore';
+import { fetchJarState, activateJar_server, newJarIdemKey, type ServerJarState, type JarActivateResult } from '../../../../lib/lok-universe/src/jarClient';
 
 /** This app's `lok_apps.app_key`. */
 const APP_KEY = 'survivor616';
@@ -70,6 +71,11 @@ interface LokEconomyContextValue {
   supporter: MySupporter | null;
   /** Opt in/out of the public supporter bar. Resolves true when saved. */
   setSupporterVisible: (show: boolean) => Promise<boolean>;
+  /** Shared Boost Jar state from the server (null when signed out or not loaded yet). */
+  jar: ServerJarState | null;
+  refreshJar: () => Promise<void>;
+  /** Activate the jar. Pays out and starts the boost; refreshes balance and jar on success. */
+  activateJar: () => Promise<JarActivateResult>;
 }
 
 const LokEconomyContext = createContext<LokEconomyContextValue>({
@@ -84,6 +90,9 @@ const LokEconomyContext = createContext<LokEconomyContextValue>({
   activeSupporterTier: null,
   supporter: null,
   setSupporterVisible: async () => false,
+  jar: null,
+  refreshJar: async () => {},
+  activateJar: async () => ({ ok: false, error: 'not_signed_in' }),
 });
 
 export function LokEconomyProvider({ children }: { children: ReactNode }) {
@@ -188,6 +197,24 @@ export function LokEconomyProvider({ children }: { children: ReactNode }) {
     if (ok) setSupporter((current) => (current ? { ...current, showPublic: show } : current));
     return ok;
   }, [session]);
+  const [jar, setJar] = useState<ServerJarState | null>(null);
+  const jarIdem = useRef<string | null>(null);
+  const refreshJar = useCallback(async () => {
+    if (!lokClient || !session) { setJar(null); return; }
+    const result = await fetchJarState(lokClient);
+    if (result.ok) setJar(result);
+  }, [session]);
+  const activateJar = useCallback(async (): Promise<JarActivateResult> => {
+    if (!lokClient || !session) return { ok: false, error: 'not_signed_in' };
+    // One key per tap intent; kept until the server answers so a retry after a dropped connection cannot pay twice.
+    jarIdem.current ??= newJarIdemKey();
+    const result = await activateJar_server(lokClient, jarIdem.current);
+    if (result.ok || result.error !== 'network') jarIdem.current = null;
+    if (result.ok) await refresh();
+    await refreshJar();
+    return result;
+  }, [session, refresh, refreshJar]);
+  useEffect(() => { void refreshJar(); }, [refreshJar]);
   const priceOf = useCallback((sku: string) => prices[sku], [prices]);
 
   const value: LokEconomyContextValue = {
@@ -202,6 +229,9 @@ export function LokEconomyProvider({ children }: { children: ReactNode }) {
     activeSupporterTier,
     supporter,
     setSupporterVisible,
+    jar,
+    refreshJar,
+    activateJar,
   };
   return <LokEconomyContext.Provider value={value}>{children}</LokEconomyContext.Provider>;
 }

@@ -4,6 +4,7 @@
  */
 import { getArea } from '@/game/data/areas';
 import { GameIcon } from './GameIcon';
+import { LokJarNudge } from './LokJarNudge';
 import { getCharacter } from '@/game/data/characters';
 import { ENEMIES_BY_ID } from '@/game/data/enemies';
 import { ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
@@ -50,6 +51,8 @@ export interface RunSummaryProps {
   onRetry: () => void;
   onOpenArchive?: (variantId: string) => void;
   onOpenAccount?: () => void;
+  /** Opens the Lok Shop (where the Boost Jar is collected). */
+  onOpenLokShop?: () => void;
   areaOverride?: AreaDef;
 }
 
@@ -79,7 +82,7 @@ const RUN_HIGHLIGHT_ICONS: Record<RunHighlightKind, typeof Zap> = {
   'run-ended': BatteryLow,
 };
 
-export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOpenAccount, areaOverride }: RunSummaryProps) {
+export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOpenAccount, onOpenLokShop, areaOverride }: RunSummaryProps) {
   const { meta } = useMeta();
   // meta.totalLevelUps already includes this run's contribution (completeRun
   // folds it in before RunSummary mounts) -- subtract it back out to find the
@@ -228,6 +231,7 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
       className={positive ? 'border-t-8 border-primary' : 'border-t-8 border-destructive'}
     >
       <div className="max-w-4xl mx-auto w-full space-y-8 mt-4">
+        <LokJarNudge onOpenShop={onOpenLokShop} />
 
         {fieldCreature ? (
           <section className="border border-violet-300/35 bg-violet-950/15 p-5" data-testid="section-field-creature-discovery">

@@ -35,6 +35,7 @@ import { useLokEconomy } from '@/state/lokEconomyStore';
 import { HoloOwl } from './HoloOwl';
 import { SupporterBar } from './SupporterBar';
 import { LokWalletStrip } from './LokWalletStrip';
+import { LokJarChip } from './LokJarChip';
 
 const RECENT_LINES = 8;
 /** Where Pass / Passport / Lifetime are managed (the Stripe checkout lives on the hub, not in the game). */
@@ -191,6 +192,7 @@ export function LokShopScreen({ onBack, onOpenCosmetics, onSignIn }: { onBack: (
             <p className="font-mono text-[10px] uppercase tracking-widest text-cyan-300">LokServer · {t('lokshop.rapport', { tier: t(`lokshop.tier.${tier.id}` as never) })}{fx.passport ? ` · ${t('lokshop.stamps', { n: meta.lokShopStamps })}` : ''}</p>
             <p className="mt-1 text-sm" data-testid="lokserver-line">{line}</p>
           </div>
+          <div className="ml-auto"><LokJarChip onNotice={setNotice} /></div>
         </section>
 
         <div className="mt-3 flex flex-wrap gap-2">
