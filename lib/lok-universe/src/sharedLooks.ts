@@ -1,7 +1,7 @@
 // VENDORED from Lok-EcoSystsem/universe-sdk -- DO NOT EDIT HERE. Edit the SDK and run sync-sdk.sh.
 // Shared Lok looks: one set of colour themes that exists in BOTH Queens N Kings and 616 Survivor under the same ids,
 // so a look a player owns can carry across games. Colours only; each game draws its own version (a Wardrobe theme in
-// Queens N Kings, a menu theme in 616). Placeholder art, tiers and unlock numbers are PROPOSED.
+// Queens N Kings, a menu theme in 616). Placeholder art, tiers and unlok numbers are PROPOSED.
 export type SharedLookTier = "rare" | "epic" | "legendary";
 export interface SharedLook {
   id: string;            // stable across games; each game prefixes it the same way ("lok-" + id)
