@@ -27,7 +27,7 @@ export interface RunTrace {
   inputs: RunInput[];
 }
 
-/** The game's deterministic rules. Must use only `seed` for randomness and must not read the clock. */
+/** The game's deterministic rules. Must use only `seed` for randomness and must not read the time. */
 export interface RunRules<S> {
   init(seed: number): S;
   apply(state: S, input: RunInput): S;
@@ -69,7 +69,7 @@ export function weekSeed(ms: number, gameKey: string): number {
 }
 
 export interface Recorder {
-  /** Add an input at time `now` (ms, same clock as `start`). */
+  /** Add an input at time `now` (ms, same timer as `start`). */
   push(input: Omit<RunInput, "t">, now: number): void;
   /** End the run and return the trace. */
   finish(): RunTrace;
@@ -77,7 +77,7 @@ export interface Recorder {
 
 /**
  * Create a recorder, or null when the player has not opted in.
- * `start` is the clock value when the run began.
+ * `start` is the timer value when the run began.
  */
 export function createRecorder(opts: { enabled: boolean; game: string; version: string; seed: number; start: number; durationMs: number }): Recorder | null {
   if (!opts.enabled) return null;

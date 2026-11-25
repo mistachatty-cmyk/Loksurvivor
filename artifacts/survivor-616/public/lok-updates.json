@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 219,
+      "version": "0.42.80",
+      "date": "2026-11-25",
+      "publishedAt": "2026-11-25T12:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Looks shared with Queens N Kings",
+      "body": [
+        "Eight new menu themes now exist in both 616 Survivor and Queens N Kings under the same names: Ember Court, Moss Cathedral, Tidepool Neon, Paper Moon, Copper Rain, Berry Static, Salt Flat and Sunken Crown. Pick them in your hideout themes. Looks only."
+      ]
+    },
+    {
       "number": 218,
       "version": "0.42.79",
       "date": "2026-11-24",

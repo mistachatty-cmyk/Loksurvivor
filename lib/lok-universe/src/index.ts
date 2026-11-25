@@ -20,5 +20,6 @@ export * from "./hallPresence";
 export * from "./activity";
 export * from "./boostJar";
 export * from "./jarNudge";
+export * from "./sharedLooks";
 export * from "./jarClient";
 export * from "./collect";
