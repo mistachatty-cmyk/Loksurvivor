@@ -22,5 +22,6 @@ export * from "./boostJar";
 export * from "./jarNudge";
 export * from "./sharedLooks";
 export * from "./lookKit";
+export * from "./customizationTable";
 export * from "./jarClient";
 export * from "./collect";
