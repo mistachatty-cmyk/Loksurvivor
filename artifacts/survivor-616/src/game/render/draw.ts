@@ -6,6 +6,7 @@
  * reads as pixel art without needing image atlases.
  */
 
+import { BURST_TOKENS_BY_KIND, RING_STYLES, RING_TRACK_GATE_RADIUS } from '@/game/data/ringRuns';
 import { BLOCK_FX_LINGER_MS, blockMaterialOf, drawBlockMaterial } from './blockBreak';
 import { drawGlyph } from '../../ui/lokGlyphCanvas';
 import { drawRescue, drawRescuePointer } from './rescueArt';
@@ -3589,6 +3590,195 @@ function drawRunEventMarker(ctx: CanvasRenderingContext2D, w: World) {
   ctx.restore();
 }
 
+/**
+ * Street Life: ring gates, Ring Run tracks with their laser rivals, and the victory-token explosion.
+ * All procedural. The next gate of a running track is the brightest thing on the track.
+ */
+function drawRingWorld(ctx: CanvasRenderingContext2D, w: World) {
+  const p = w.player;
+  const near = (x: number, y: number, pad = 700) => Math.abs(x - p.x) < pad && Math.abs(y - p.y) < pad;
+  const spin = w.effectMotionEnabled ? w.now / 700 : 0;
+
+  const drawRing = (x: number, y: number, r: number, color: string, glow: string, alpha: number, bright: boolean) => {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x, y);
+    if (bright && w.effectMotionEnabled) {
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 16;
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = bright ? 5 : 4;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r, r * 0.8, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = glow;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([7, 9]);
+    ctx.lineDashOffset = -spin * 30;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r - 7, (r - 7) * 0.8, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  for (const ring of w.rings) {
+    if (!near(ring.x, ring.y)) continue;
+    const style = RING_STYLES[ring.kind];
+    if (ring.taken) {
+      const t = Math.min(1, (w.now - ring.takenAt) / 900);
+      drawRing(ring.x, ring.y, ring.r * (1 + t * 0.7), style.color, style.glow, (1 - t) * 0.7, false);
+      continue;
+    }
+    drawRing(ring.x, ring.y, ring.r, style.color, style.glow, 0.85, true);
+  }
+
+  for (const t of w.ringTracks) {
+    if (!near(t.gates[0]!.x, t.gates[0]!.y, 900) && t.state !== 'running') continue;
+    if (t.state === 'done') {
+      // A finished track stays on the ground as a faded lane.
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.strokeStyle = '#8fa2c0';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      t.gates.forEach((g, i) => (i === 0 ? ctx.moveTo(g.x, g.y) : ctx.lineTo(g.x, g.y)));
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+    // Lane line.
+    ctx.save();
+    ctx.globalAlpha = t.state === 'running' ? 0.5 : 0.28;
+    ctx.strokeStyle = t.state === 'failed' ? '#ff6b6b' : '#7fe8ff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 12]);
+    ctx.lineDashOffset = -spin * 40;
+    ctx.beginPath();
+    t.gates.forEach((g, i) => (i === 0 ? ctx.moveTo(g.x, g.y) : ctx.lineTo(g.x, g.y)));
+    ctx.stroke();
+    ctx.restore();
+    // Coins.
+    for (const c of t.coins) {
+      if (c.taken || !near(c.x, c.y, 500)) continue;
+      const bob = w.effectMotionEnabled ? Math.sin(w.now / 240 + c.x * 0.05) * 2 : 0;
+      ctx.save();
+      ctx.fillStyle = '#ffc94d';
+      ctx.strokeStyle = '#fff0b0';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y + bob, 6, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+    // Gates.
+    t.gates.forEach((g, i) => {
+      const style = RING_STYLES[g.kind];
+      const isNext = t.state === 'running' ? i === t.next : i === 0;
+      const passed = t.state === 'running' && i < t.next && i > 0;
+      if (passed) {
+        drawRing(g.x, g.y, RING_TRACK_GATE_RADIUS, '#5c6a82', '#8fa2c0', 0.35, false);
+      } else {
+        const pulse = isNext && w.effectMotionEnabled ? 1 + Math.sin(w.now / 160) * 0.08 : 1;
+        drawRing(g.x, g.y, RING_TRACK_GATE_RADIUS * (isNext ? 1.12 * pulse : 1), isNext ? '#ffffff' : style.color, style.glow, isNext ? 1 : 0.7, isNext);
+      }
+    });
+    if (t.state === 'ready' || t.state === 'failed') {
+      const g = t.gates[0]!;
+      ctx.save();
+      ctx.font = '700 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.9;
+      ctx.fillText(t.state === 'failed' ? 'TRY AGAIN' : 'RING RUN', g.x, g.y - RING_TRACK_GATE_RADIUS - 14);
+      ctx.restore();
+    }
+    // Rivals: tiny lasers racing alongside.
+    if (t.state === 'running') {
+      for (const r of t.rivals) {
+        if (r.trail.length > 1) {
+          ctx.save();
+          ctx.strokeStyle = r.color;
+          ctx.lineWidth = 3;
+          ctx.lineCap = 'round';
+          ctx.globalAlpha = 0.85;
+          if (w.effectMotionEnabled) { ctx.shadowColor = r.color; ctx.shadowBlur = 10; }
+          ctx.beginPath();
+          r.trail.forEach((pt, i) => (i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)));
+          ctx.lineTo(r.x, r.y);
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(r.x, r.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+  }
+
+  // The token explosion.
+  for (const tk of w.burstTokens) {
+    const def = BURST_TOKENS_BY_KIND[tk.kind];
+    const flip = w.effectMotionEnabled ? Math.abs(Math.cos((w.now - tk.bornAt) / 150 + tk.uid)) : 1;
+    ctx.save();
+    ctx.translate(tk.x, tk.y);
+    if (w.effectMotionEnabled && tk.kind !== 'gold') { ctx.shadowColor = def.color; ctx.shadowBlur = 12; }
+    ctx.fillStyle = def.color;
+    ctx.strokeStyle = def.trim;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, Math.max(2, 9 * flip), 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = def.trim;
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(-1.5, -4, 3, 8);
+    ctx.restore();
+  }
+
+  // Chain counter and run status above the fighter.
+  const running = w.ringTracks.find((t) => t.state === 'running');
+  if (w.ringCombo >= 2 || running) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = '700 14px sans-serif';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#000000';
+    if (w.ringCombo >= 2) {
+      const text = `RING x${w.ringCombo}`;
+      ctx.strokeText(text, p.x, p.y - 46);
+      ctx.fillStyle = w.ringCombo >= 8 ? '#ffd36b' : '#7fe8ff';
+      ctx.fillText(text, p.x, p.y - 46);
+    }
+    if (running) {
+      const text = `GATE ${Math.min(running.next, running.gates.length - 1)}/${running.gates.length - 1}  x${running.mult.toFixed(2)}`;
+      ctx.strokeText(text, p.x, p.y - 62);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(text, p.x, p.y - 62);
+    }
+    ctx.restore();
+  }
+  // Overshield bubble.
+  if (w.overshield && w.now < w.overshield.until) {
+    const left = w.overshield.until - w.now;
+    ctx.save();
+    ctx.globalAlpha = left < 2500 && Math.floor(w.now / 120) % 2 === 0 ? 0.2 : 0.55;
+    ctx.strokeStyle = '#4d9bff';
+    ctx.fillStyle = 'rgba(77,155,255,0.12)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y - 6, p.radius + 12, p.radius + 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
   drawRunEventMarker(ctx, w);
   for (const pickup of w.pickups) {
@@ -7094,6 +7284,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawPersistentAura(ctx, w);
   drawRescue(ctx, w);
   drawPickups(ctx, w);
+  drawRingWorld(ctx, w);
   if (!overlay) {
     drawDungeonEntrances(ctx, w);
     drawDungeonExit(ctx, w);

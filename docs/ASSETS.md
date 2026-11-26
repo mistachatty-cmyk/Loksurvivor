@@ -54,7 +54,7 @@ How much of each there is right now.
 | Themed palettes | 69 |
 | Cards | 347 |
 | Lok glyph icons | 82 |
-| Sound cues | 33 |
+| Sound cues | 38 |
 
 ## Objective and world art (rescue cage, dungeon doors, chest)
 
@@ -912,7 +912,7 @@ Original 24 by 24 facet icons (`src/ui/lokGlyphs.generated.ts`, built by `script
 
 Gameplay sound cues made by the synth in `src/game/audio/sfxEngine.ts` (no audio files).
 
-`hit`, `stomp`, `gemPickup`, `heal`, `speedTally`, `meow`, `critHit`, `kill`, `bossKill`, `playerHurt`, `playerDown`, `extraLifeSave`, `levelUp`, `pickupXp`, `pickupCred`, `pickupHealth`, `pickupKey`, `lootBox`, `cardPack`, `lokPetEntrance`, `dash`, `ultimate`, `waveStart`, `bossWarning`, `obstacleBreak`, `blockCrack`, `glassShatter`, `iceShatter`, `uiClick`, `uiNav`, `purchase`, `purchaseFail`, `lowHealth`
+`hit`, `stomp`, `gemPickup`, `heal`, `speedTally`, `meow`, `critHit`, `kill`, `bossKill`, `playerHurt`, `playerDown`, `extraLifeSave`, `levelUp`, `pickupXp`, `pickupCred`, `pickupHealth`, `pickupKey`, `lootBox`, `cardPack`, `lokPetEntrance`, `dash`, `ultimate`, `waveStart`, `bossWarning`, `obstacleBreak`, `blockCrack`, `glassShatter`, `iceShatter`, `uiClick`, `uiNav`, `purchase`, `purchaseFail`, `ringPass`, `ringPassHigh`, `ringFinish`, `tokenBlast`, `tokenGet`, `lowHealth`
 
 ## Music
 
