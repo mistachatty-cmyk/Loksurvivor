@@ -517,6 +517,7 @@
   "hideout.prop.lok-shop-counter.line.1": "Un mostrador luminoso zumba. Dos ojos redondos parpadean desde la pantalla.",
   "hideout.prop.lok-shop-counter.line.2": "Siempre hay alguien detrás del mostrador, incluso cuando no hay nadie.",
   "wallet.balance": "{{n}} LokTokens",
+  "wallet.unlimited": "LokTokens ilimitado (modo de desarrollo)",
   "wallet.rank": "Rango {{rank}}",
   "wallet.loading": "Contando tu LokTokens…",
   "wallet.signedOut": "Inicia sesión para ver y gastar tu LokTokens.",

@@ -517,6 +517,7 @@
   "hideout.prop.lok-shop-counter.line.1": "빛나는 카운터가 윙윙거립니다. 두 개의 둥근 눈이 화면에서 당신을 향해 깜박입니다.",
   "hideout.prop.lok-shop-counter.line.2": "아무도 없을 때에도 카운터 뒤에는 항상 누군가가 있습니다.",
   "wallet.balance": "{{n}} LokTokens",
+  "wallet.unlimited": "무제한 LokTokens(개발자 모드)",
   "wallet.rank": "{{rank}} 랭크",
   "wallet.loading": "LokTokens 계산 중…",
   "wallet.signedOut": "로그인하여 LokTokens를 확인하고 사용하세요.",

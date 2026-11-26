@@ -517,6 +517,7 @@
   "hideout.prop.lok-shop-counter.line.1": "Un compteur lumineux bourdonne. Deux yeux ronds vous regardent depuis l'écran.",
   "hideout.prop.lok-shop-counter.line.2": "Il y a toujours quelqu'un derrière le comptoir, même si personne ne l'est.",
   "wallet.balance": "{{n}} LokTokens",
+  "wallet.unlimited": "LokTokens illimité (mode développement)",
   "wallet.rank": "Rang {{rank}}",
   "wallet.loading": "Compter votre LokTokens…",
   "wallet.signedOut": "Connectez-vous pour voir et dépenser votre LokTokens.",
