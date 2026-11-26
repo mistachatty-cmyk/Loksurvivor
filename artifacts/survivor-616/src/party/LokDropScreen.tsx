@@ -14,10 +14,12 @@ import { drawRig, drawShadow } from '@/game/render/sprite';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { useMeta } from '@/game/state/metaStore';
 import { useT } from '@/lib/i18n';
+import { CapsulePullOverlay } from './CapsulePullOverlay';
 import { Squash, createJuice, drawRefractionRings, impact, type Juice } from './juiceEngine';
 import {
   DROP,
   bankProgress,
+  botSkillsForTier,
   createLokDrop,
   dropPerformance,
   dropResults,
@@ -135,6 +137,7 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
   const [meta, setMeta] = useState<LokPartyMeta>(() => loadLokPartyMeta(storage()));
   const [report, setReport] = useState<{ report: MatchReport; placement: number; players: number; banked: number } | null>(null);
   const [shards, setShards] = useState<Shard[] | null>(null);
+  const [pulling, setPulling] = useState<Shard[] | null>(null);
   const [seed, setSeed] = useState(() => (Date.now() ^ 0x616) >>> 0);
 
   const startMatch = useCallback(() => {
@@ -169,21 +172,34 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
   const crack = useCallback(() => {
     const opened = openCapsule(meta, (Date.now() ^ meta.vault.nextUid) >>> 0);
     if (!opened) return;
+    ensureAudioContext();
     saveLokPartyMeta(storage(), opened.meta);
     setMeta(opened.meta);
-    setShards(opened.shards);
-  }, [meta]);
+    // Saved before the show starts, so closing the tab mid-crack never loses the reward.
+    setPulling(opened.shards);
+  }, [meta, ensureAudioContext]);
 
   return (
     <div className="fixed inset-0 select-none overflow-hidden bg-[#07061a] text-white" style={{ touchAction: 'none' }}>
       {phase === 'play' ? (
-        <DropArena key={seed} seed={seed} playerId={pick} onDone={finish} getAudioContext={getAudioContext} />
+        <DropArena key={seed} seed={seed} playerId={pick} onDone={finish} getAudioContext={getAudioContext} ladderTier={meta.ladders.solo.tier} />
       ) : null}
       {phase === 'lobby' ? (
         <Lobby pick={pick} setPick={setPick} meta={meta} onStart={startMatch} onBack={onBack} t={t} />
       ) : null}
       {phase === 'results' && report ? (
         <Results data={report} meta={meta} shards={shards} onCrack={crack} onAgain={startMatch} onBack={onBack} t={t} />
+      ) : null}
+      {pulling ? (
+        <CapsulePullOverlay
+          characterId={pick}
+          shards={pulling}
+          getAudioContext={getAudioContext}
+          onDone={() => {
+            setShards(pulling);
+            setPulling(null);
+          }}
+        />
       ) : null}
     </div>
   );
@@ -363,9 +379,11 @@ interface ArenaProps {
   playerId: string;
   onDone: (s: DropState) => void;
   getAudioContext: () => AudioContext | null;
+  /** Solo Blitz tier, so bots scale with the player's rank. */
+  ladderTier: number;
 }
 
-function DropArena({ seed, playerId, onDone, getAudioContext }: ArenaProps) {
+function DropArena({ seed, playerId, onDone, getAudioContext, ladderTier }: ArenaProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const inputRef = useRef<PlayerInput>({ mx: 0, my: 0, dashPressed: false });
@@ -418,7 +436,8 @@ function DropArena({ seed, playerId, onDone, getAudioContext }: ArenaProps) {
     const motion = prefersReducedMotion() ? 0 : 1;
     const juice: Juice = createJuice(getAudioContext, { motion, bpm: 118 });
     const labels = labelsRef.current;
-    const roster = [playerId, ...ROSTER_IDS.filter((id) => id !== playerId)].map((id, i) => ({ characterId: id, bot: i !== 0, botSkill: [0, 0.75, 0.55, 0.4][i] }));
+    const skills = [0, ...botSkillsForTier(ladderTier)];
+    const roster = [playerId, ...ROSTER_IDS.filter((id) => id !== playerId)].map((id, i) => ({ characterId: id, bot: i !== 0, botSkill: skills[i] }));
     const state = createLokDrop(seed, roster);
     const squash = state.players.map(() => new Squash());
     const sparks: Spark[] = [];
@@ -754,6 +773,7 @@ function DropArena({ seed, playerId, onDone, getAudioContext }: ArenaProps) {
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tier is read once per match
   }, [seed, playerId, getAudioContext]);
 
   return (

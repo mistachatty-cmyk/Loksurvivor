@@ -721,3 +721,19 @@ export function dropPerformance(s: DropState, r: DropResult) {
     stats: { knockouts: r.knockouts, 'air-cracks': r.airCracks, 'loot-banked': r.banked },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Solo Blitz bot tiers: bots get sharper as the player's ladder tier rises
+// ---------------------------------------------------------------------------
+
+/**
+ * Three bot skills for a Solo Blitz ladder tier (0 = Iron .. 8 = 616 Apex).
+ * Iron bots are slow to react and greedy; Apex bots re-plan fast, bank on time and hunt carriers.
+ * One bot always sits a little below the others so a match never feels like a wall.
+ */
+export function botSkillsForTier(tier: number): [number, number, number] {
+  const t = Math.min(8, Math.max(0, Math.floor(Number.isFinite(tier) ? tier : 0)));
+  const base = 0.3 + t * 0.075; // Iron 0.30 .. Apex 0.90
+  const clamp01 = (v: number) => Math.round(Math.min(0.95, Math.max(0.15, v)) * 100) / 100;
+  return [clamp01(base + 0.05), clamp01(base), clamp01(base - 0.12)];
+}

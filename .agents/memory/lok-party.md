@@ -10,3 +10,4 @@ Read before touching `artifacts/survivor-616/src/party/` or anything Lok Party p
 - `juiceEngine.ts` never creates an AudioContext; it takes `getAudioContext` from `useMusicPlayer()`. React on pointerdown/keydown only.
 - Online Crew ladder exists in the save but must not be fed until results are server-verified (same rule as 616 Arena).
 - Characters are always drawn with our procedural rigs (`drawRig`); reference images guide camera, lighting and HUD only.
+- Decided 2026-11-26: Lok Party stays in this repo for now, kept extractable. The four engine files must import only each other (test enforces it); host hooks live in the screens.

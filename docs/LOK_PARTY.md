@@ -4,6 +4,8 @@ Source of truth for the design: the Google Doc "GSix / Lok Party Mode: Cross-Gam
 
 Play it: `?screen=lok-party` (works in every build; it writes only its own save key).
 
+**Where it lives (decided 2026-11-26):** inside this repo for now, built so it can become its own game later. The four engine files (`juiceEngine.ts`, `lokPartyMeta.ts`, `lokDrop.ts`, `capsulePull.ts`) import nothing from the game; a test enforces it. Only the screens touch 616 (rigs, audio context, the capped bridge). Moving to its own repo later means copying `src/party/` and swapping those three host hooks.
+
 ## Built in Slice 1 (v0.42.88)
 
 | Piece | File | What it does |
@@ -28,9 +30,15 @@ Play it: `?screen=lok-party` (works in every build; it writes only its own save 
 9. **Reference images 10 and 11** (the two vertical maps) were not in the Drive folder or the session. The Drive reader also returns no content for images, so the build followed each image's written notes in section 13B.
 10. **Daily reset time zone.** Days and weeks reset on the player's local clock.
 
-## Next slices
+## Built in Slice 2 (v0.42.89)
 
-- **Slice 2: Tactile Gold L capsule pull.** A canvas crack sequence (hold, seam glow, refraction burst, confetti, rig wearing the new item) replaces the simple tap card. Wire bot tiers to Solo Blitz LP.
+| Piece | File | What it does |
+| --- | --- | --- |
+| Capsule pull logic | `artifacts/survivor-616/src/party/capsulePull.ts` | Pure crack state machine: tap (4 to open), swipe across the seam, or hold; crack leaks back if you stop; two seam stages, burst, one reveal per reward with a minimum beat so taps cannot skip it. |
+| Capsule pull screen | `artifacts/survivor-616/src/party/CapsulePullOverlay.tsx` | Vertical one-thumb layout: metallic Gold L capsule, widening glowing seam, stage punches and chimes, refraction burst, halves flying apart, confetti, the player's rig in a rarity pillar wearing palettes, hats and capes, cream reward card at thumb height. The capsule is saved as opened before the show starts. |
+| Ranked bots | `botSkillsForTier` in `lokDrop.ts` | Bots scale from Iron to 616 Apex with the Solo Blitz tier, one softer bot per match. |
+
+## Next slices
 - **Slice 3: Board engine.** Pure board state machine with elevation-aware nodes (`z`, `traversalKind`), the Monroe Loop board, Signature Dice, five core items and the Lok Drop as the first minigame cartridge.
 - **Slice 4: Cartridge contract.** `LokMinigameCartridge` (mount, getResults, unmount) so Ring Run Rush and Gem Vacuum Frenzy plug in, then iframe cartridges from other repos.
 - **Backend (noted, not built):** room codes over Supabase Realtime broadcast, async seeded score-attack, trusted results before any online LP.

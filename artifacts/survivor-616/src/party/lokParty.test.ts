@@ -332,3 +332,54 @@ test('the match result maps into the meta engine', () => {
   assert.equal(out.meta.matches, 1);
   assert.ok(GRADES.includes(out.report.grade));
 });
+
+// ---------------------------------------------------------------- Slice 2
+
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { PULL, createPull, pullHold, pullStep, pullSwipe, pullTap, seamGlow } from './capsulePull';
+import { botSkillsForTier } from './lokDrop';
+
+test('capsule: taps crack it through two stages, then burst and reveal each reward', () => {
+  const s = createPull(2);
+  const kinds: string[] = [];
+  let now = 0;
+  for (let i = 0; i < 5; i += 1) kinds.push(...pullTap(s, (now += 100)).map((e) => e.kind));
+  assert.deepEqual(kinds, ['stage', 'stage', 'burst']);
+  assert.equal(seamGlow(s, now), 1);
+  const reveal = pullStep(s, PULL.burstMs, (now += PULL.burstMs));
+  assert.deepEqual(reveal, [{ kind: 'reveal', index: 0 }]);
+  assert.deepEqual(pullTap(s, now + 10), [], 'a too-quick tap cannot skip a reveal');
+  assert.deepEqual(pullTap(s, (now += PULL.revealMinMs)), [{ kind: 'reveal', index: 1 }]);
+  assert.deepEqual(pullTap(s, (now += PULL.revealMinMs)), [{ kind: 'done' }]);
+});
+
+test('capsule: holding and swiping crack it; letting go leaks crack slowly', () => {
+  const s = createPull(1);
+  pullHold(s, true, 0);
+  for (let t = 16; t <= 1000; t += 16) pullStep(s, 16, t);
+  assert.ok(s.crack > 0.5 && s.crack < 0.6, `hold ${s.crack}`);
+  pullHold(s, false, 1000);
+  pullStep(s, 1000, 2500);
+  assert.ok(s.crack < 0.5, 'leaks after the delay');
+  const w = createPull(1);
+  pullSwipe(w, 400, 0);
+  assert.equal(w.phase, 'burst');
+});
+
+test('Solo Blitz bots sharpen with rank and stay beatable', () => {
+  const iron = botSkillsForTier(0);
+  const apex = botSkillsForTier(8);
+  assert.ok(iron.every((v, i) => v < apex[i]));
+  assert.ok(apex.every((v) => v <= 0.95));
+  assert.ok(Math.min(...apex) < Math.max(...apex), 'one softer bot per match');
+  assert.deepEqual(botSkillsForTier(NaN), botSkillsForTier(0));
+});
+
+test('Lok Party engines stay free of game imports (so the mode can become its own game)', () => {
+  for (const f of ['juiceEngine.ts', 'lokPartyMeta.ts', 'lokDrop.ts', 'capsulePull.ts']) {
+    const src = readFileSync(fileURLToPath(new URL(`./${f}`, import.meta.url)), 'utf8');
+    const imports = [...src.matchAll(/from '([^']+)'/g)].map((m) => m[1]);
+    assert.ok(imports.every((p) => p.startsWith('./')), `${f} imports ${imports.join(', ')}`);
+  }
+});
