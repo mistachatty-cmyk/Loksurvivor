@@ -60,6 +60,8 @@ interface SocialValue {
   setTab: (tab: CrewTab) => void;
   /** Tells friends what this player is doing; `room` marks an open crew run others can join. */
   setDoing: (doing: Doing, room?: string | null) => void;
+  /** True while a run is on screen (leaving the page would lose it). */
+  inRun: () => boolean;
   refresh: () => Promise<void>;
   addByCode: (code: string) => Promise<FriendRequestResult | 'error'>;
   answerRequest: (userId: string, accept: boolean) => Promise<void>;
@@ -308,7 +310,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   const value: SocialValue = {
     active, signedIn: Boolean(userId), setupNeeded, me, friends, recent, crew, online, bus,
     waiting: friends.filter((f) => f.status === 'pending' && f.incoming).length + crew.invites.length,
-    open, tab, prefillCode, openOverlay, closeOverlay, setTab, setDoing, refresh, addByCode,
+    open, tab, prefillCode, openOverlay, closeOverlay, setTab, setDoing, inRun: () => doingRef.current === 'run', refresh, addByCode,
     answerRequest: (id, accept) => run(() => respondToFriend(lokClient!, id, accept)),
     unfriend: (id) => run(() => removeFriend(lokClient!, id)),
     startCrew: () => run(() => createCrew(lokClient!, GAME_KEY)),

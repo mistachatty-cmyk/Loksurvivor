@@ -60,7 +60,9 @@ Play it: `?screen=lok-party` (works in every build; it writes only its own save 
 
 The relay is best-effort, so `partyNet.ts` resends until things land: guest pings carry `have` (the host resends the rest of its action log) and `waiting` (the host resends a minigame result); guests repeat `act` and `mini-report` until answered; a guest still in the lobby keeps sending `join-request` and gets `start` again. The host commits a guest choice only through `actVerdict`, so repeats are dropped. New online messages must follow the same rule.
 
-Still open: the crew invite card's Join button reloads the app, so tapping it mid-run loses that run; and a host who backgrounds the tab for more than 25 seconds ends the party for guests.
+Still open: a host who backgrounds the tab for more than 25 seconds ends the party for guests. Everything else outstanding is in [LOK_PARTY_NEXT.md](./LOK_PARTY_NEXT.md).
+
+v0.42.93: buttons go through `party/press.ts` (pointerdown plus keyboard), online results are unranked, friends are named on the board, and the invite card asks twice during a run.
 
 ## Next slices
 - **Next for the board:** Crewmate roving allies, Duel spaces, a second minigame (Ring Run Rush) so rounds vary, the Pawnford board, and a Party Lounge door in the hideout.

@@ -1595,6 +1595,7 @@
   "lokParty.results.crack": "Tap the capsule to crack it",
   "lokParty.results.shards": "New shards",
   "lokParty.results.again": "Play again",
+  "lokParty.results.unranked": "Online party: unranked",
   "lokParty.results.vault": "Vault: {{capsules}} capsules, {{keys}} keys, {{shards}} shards",
   "lokParty.ladder.solo": "Solo Blitz",
   "lokParty.ladder.crew": "Online Crew",
@@ -1680,6 +1681,8 @@
   "lokParty.online.unavailable": "Online parties are not switched on for this build yet. You can still play Turbo Crown Blitz against bots.",
   "lokParty.online.waiting": "Waiting for the other players to finish",
   "lokParty.online.hostLeft": "The host left the party.",
+  "lokParty.online.leaveRun": "Joining now ends your run.",
+  "lokParty.online.joinAnyway": "Join anyway",
   "lokParty.online.invited": "{{name}} invited you to a Lok Party",
   "lokParty.door.title": "Lok Party",
   "lokParty.door.sub": "Board game, minigames, play with friends"

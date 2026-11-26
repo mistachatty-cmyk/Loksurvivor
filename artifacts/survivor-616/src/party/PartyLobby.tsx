@@ -5,6 +5,7 @@
  * or a crew invite, and starts when ready. Guest: types or opens the code and takes a bot's seat.
  */
 
+import { press } from './press';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CHARACTERS_BY_ID } from '@/game/data/characters';
 import { lokClient } from '@/lib/lokClient';
@@ -270,7 +271,7 @@ function Shell({ children, onBack, t }: { children: React.ReactNode; onBack: () 
         <div className="w-full max-w-md rounded-2xl border-[3px] p-4" style={{ background: CREAM, borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 5px 0 ${ESPRESSO}` }}>
           {children}
         </div>
-        <button type="button" onPointerDown={onBack} className="rounded-lg border border-white/30 px-5 py-2 text-sm font-bold text-white">
+        <button type="button" {...press(onBack)} className="rounded-lg border border-white/30 px-5 py-2 text-sm font-bold text-white">
           {t('lokParty.drop.back')}
         </button>
       </div>
@@ -280,7 +281,7 @@ function Shell({ children, onBack, t }: { children: React.ReactNode; onBack: () 
 
 function Big({ children, onPress, tone }: { children: React.ReactNode; onPress: () => void; tone: string }) {
   return (
-    <button type="button" onPointerDown={onPress} className="mt-2 w-full rounded-xl border-[3px] px-3 py-3 text-lg font-black active:translate-y-[3px]" style={{ background: tone, borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
+    <button type="button" {...press(onPress)} className="mt-2 w-full rounded-xl border-[3px] px-3 py-3 text-lg font-black active:translate-y-[3px]" style={{ background: tone, borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
       {children}
     </button>
   );
@@ -288,7 +289,7 @@ function Big({ children, onPress, tone }: { children: React.ReactNode; onPress: 
 
 function Small({ children, onPress, disabled }: { children: React.ReactNode; onPress: () => void; disabled?: boolean }) {
   return (
-    <button type="button" disabled={disabled} onPointerDown={() => !disabled && onPress()} className="rounded-lg border-[3px] px-2 py-2 text-xs font-black disabled:opacity-40" style={{ borderColor: ESPRESSO, background: '#efe5d0', color: ESPRESSO }}>
+    <button type="button" disabled={disabled} {...press(() => !disabled && onPress())} className="rounded-lg border-[3px] px-2 py-2 text-xs font-black disabled:opacity-40" style={{ borderColor: ESPRESSO, background: '#efe5d0', color: ESPRESSO }}>
       {children}
     </button>
   );
@@ -310,6 +311,8 @@ export function PartyInviteToast() {
   const t = useT();
   const social = useSocialOptional();
   const [invite, setInvite] = useState<{ code: string; from: string } | null>(null);
+  const [warned, setWarned] = useState(false);
+  useEffect(() => setWarned(false), [invite]);
   useEffect(() => {
     if (!social?.bus.up) return;
     return social.bus.on('party-invite', (p) => {
@@ -326,11 +329,15 @@ export function PartyInviteToast() {
   return (
     <div className="fixed bottom-4 left-1/2 z-[80] w-[min(92vw,360px)] -translate-x-1/2 rounded-2xl border-[3px] p-3" style={{ background: CREAM, borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 5px 0 ${ESPRESSO}` }} data-testid="party-invite-toast">
       <div className="text-sm font-black">{t('lokParty.online.invited', { name: invite.from || t('lokParty.online.friend') })}</div>
+      {warned ? <p className="mt-1 text-xs font-bold text-red-700">{t('lokParty.online.leaveRun')}</p> : null}
       <div className="mt-2 flex gap-2">
-        <button type="button" onPointerDown={() => window.location.assign(`/?screen=lok-party&party=${invite.code}`)} className="flex-1 rounded-xl border-[3px] py-2 font-black" style={{ background: '#7cff6b', borderColor: ESPRESSO }}>
-          {t('lokParty.online.join')}
+        <button type="button" {...press(() => {
+            if (!warned && social?.inRun()) setWarned(true);
+            else window.location.assign(`/?screen=lok-party&party=${invite.code}`);
+          })} className="flex-1 rounded-xl border-[3px] py-2 font-black" style={{ background: '#7cff6b', borderColor: ESPRESSO }}>
+          {warned ? t('lokParty.online.joinAnyway') : t('lokParty.online.join')}
         </button>
-        <button type="button" onPointerDown={() => setInvite(null)} className="rounded-xl border-[3px] px-3 py-2 font-black" style={{ borderColor: ESPRESSO }}>
+        <button type="button" {...press(() => setInvite(null))} className="rounded-xl border-[3px] px-3 py-2 font-black" style={{ borderColor: ESPRESSO }}>
           {t('lokParty.board.skip')}
         </button>
       </div>

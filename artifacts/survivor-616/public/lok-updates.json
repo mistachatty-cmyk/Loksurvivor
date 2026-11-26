@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 232,
+      "version": "0.42.93",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T22:30:00Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "Lok Party: easier to play",
+      "body": [
+        "Lok Party menus and board choices now work from a keyboard.",
+        "In online parties your friends are named on the board, and those matches no longer move your Solo Blitz rank.",
+        "A party invite that arrives during a run asks again before leaving it."
+      ]
+    },
+    {
       "number": 231,
       "version": "0.42.92",
       "date": "2026-11-26",

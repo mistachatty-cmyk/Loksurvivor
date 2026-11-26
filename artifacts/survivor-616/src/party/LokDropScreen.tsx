@@ -8,6 +8,7 @@
  * only informed the camera tilt, wet-asphalt lighting, ring colors and the minimal top HUD.
  */
 
+import { press } from './press';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CHARACTERS_BY_ID } from '@/game/data/characters';
 import { drawRig, drawShadow } from '@/game/render/sprite';
@@ -184,8 +185,8 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
   }, [ensureAudioContext, getAudioContext, mode]);
 
   const settle = useCallback(
-    (perf: Parameters<typeof applyMatch>[1], seedUsed: number, extra: Omit<ReportData, 'report'>) => {
-      let { meta: next, report: rep } = applyMatch(meta, perf, { nowMs: Date.now(), seed: seedUsed, ladder: 'solo' });
+    (perf: Parameters<typeof applyMatch>[1], seedUsed: number, extra: Omit<ReportData, 'report'>, ranked = true) => {
+      let { meta: next, report: rep } = applyMatch(meta, perf, { nowMs: Date.now(), seed: seedUsed, ladder: 'solo', ranked });
       // One-way bridge: 616 pays through its own capped path; Party just marks it delivered.
       for (const g of pendingGrants(next, 'survivor616')) {
         claimLokPartyGrant(g.id, g.amount);
@@ -193,7 +194,7 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
       }
       saveLokPartyMeta(storage(), next);
       setMeta(next);
-      setReport({ report: rep, ...extra });
+      setReport({ report: rep, unranked: !ranked, ...extra });
       setPhase('results');
     },
     [meta, claimLokPartyGrant],
@@ -233,9 +234,11 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
           players: s.players.length,
           standings: standings.map((r) => ({ characterId: s.players[r.index].characterId, place: r.place, crowns: s.players[r.index].crowns, coins: s.players[r.index].coins, human: r.index === localSeat })),
         },
+        // Friends' results cannot be checked yet, so online parties never move a rank.
+        !online,
       );
     },
-    [settle],
+    [settle, online],
   );
 
   const crack = useCallback(() => {
@@ -364,7 +367,7 @@ function Lobby({ mode, rounds, setRounds, pick, setPick, meta, onStart, onBack, 
               <button
                 key={id}
                 type="button"
-                onPointerDown={() => setPick(id)}
+                {...press(() => setPick(id))}
                 className="flex flex-col items-center rounded-lg border-2 p-1 transition-transform active:scale-95"
                 style={{ borderColor: on ? ESPRESSO : 'transparent', background: on ? '#efe5d0' : 'transparent' }}
               >
@@ -380,7 +383,7 @@ function Lobby({ mode, rounds, setRounds, pick, setPick, meta, onStart, onBack, 
             <div className="mb-1 text-xs font-bold uppercase tracking-widest">{t('lokParty.board.length')}</div>
             <div className="grid grid-cols-3 gap-2">
               {[5, 10, 15].map((n) => (
-                <button key={n} type="button" onPointerDown={() => setRounds(n)} className="rounded-lg border-2 py-2 text-sm font-black" style={{ borderColor: ESPRESSO, background: rounds === n ? '#ffcf3c' : 'transparent' }}>
+                <button key={n} type="button" {...press(() => setRounds(n))} className="rounded-lg border-2 py-2 text-sm font-black" style={{ borderColor: ESPRESSO, background: rounds === n ? '#ffcf3c' : 'transparent' }}>
                   {t('lokParty.board.rounds', { count: n })}
                 </button>
               ))}
@@ -392,10 +395,10 @@ function Lobby({ mode, rounds, setRounds, pick, setPick, meta, onStart, onBack, 
       </CreamCard>
       <p className="text-xs text-white/60">{touch ? t('lokParty.drop.controlsTouch') : t('lokParty.drop.controlsKeys')}</p>
       <div className="flex gap-3">
-        <button type="button" onPointerDown={onBack} className="rounded-lg border border-white/30 px-5 py-3 text-sm font-bold">
+        <button type="button" {...press(onBack)} className="rounded-lg border border-white/30 px-5 py-3 text-sm font-bold">
           {t('lokParty.drop.back')}
         </button>
-        <button type="button" onPointerDown={onStart} className="rounded-lg px-8 py-3 text-base font-black text-black" style={{ background: '#7cff6b', boxShadow: '0 0 24px #7cff6b88' }}>
+        <button type="button" {...press(onStart)} className="rounded-lg px-8 py-3 text-base font-black text-black" style={{ background: '#7cff6b', boxShadow: '0 0 24px #7cff6b88' }}>
           {t('lokParty.drop.start')}
         </button>
       </div>
@@ -412,6 +415,7 @@ interface ReportData {
   players: number;
   banked?: number;
   standings?: Standing[];
+  unranked?: boolean;
 }
 
 function Results({
@@ -437,7 +441,7 @@ function Results({
   const lines: string[] = [
     t('lokParty.results.mastery', { level: r.masteryLevel }),
     ...r.masteryLevelUps.map((level) => t('lokParty.results.masteryUp', { level })),
-    `${t('lokParty.results.ladder', { ladder: t('lokParty.ladder.solo'), rank: ladderLabel(r.lpAfter) })} (${r.lpChange >= 0 ? '+' : ''}${t('lokParty.results.lp', { lp: r.lpChange })})`,
+    data.unranked ? t('lokParty.results.unranked') : `${t('lokParty.results.ladder', { ladder: t('lokParty.ladder.solo'), rank: ladderLabel(r.lpAfter) })} (${r.lpChange >= 0 ? '+' : ''}${t('lokParty.results.lp', { lp: r.lpChange })})`,
     `${t('lokParty.results.pass', { tier: r.passTierAfter })}  ${t('lokParty.results.xp', { xp: r.passXpGained })}`,
     ...(r.firstWinOfDay ? [t('lokParty.results.firstWin')] : []),
     ...r.bridgeGrants.filter((g) => g.game === 'survivor616').map((g) => t('lokParty.results.bridge', { cred: g.amount })),
@@ -489,7 +493,7 @@ function Results({
         </ul>
         <div className="mt-2 text-xs opacity-70">{t('lokParty.results.vault', { capsules: meta.vault.capsules, keys: meta.vault.keys, shards: meta.vault.shards.length })}</div>
         {canCrack && !shards ? (
-          <button type="button" onPointerDown={onCrack} className="mt-3 flex w-full flex-col items-center gap-1 rounded-xl border-2 p-3 active:scale-95" style={{ borderColor: ESPRESSO, background: '#1a1238' }}>
+          <button type="button" {...press(onCrack)} className="mt-3 flex w-full flex-col items-center gap-1 rounded-xl border-2 p-3 active:scale-95" style={{ borderColor: ESPRESSO, background: '#1a1238' }}>
             <CapsuleGlyph />
             <span className="text-xs font-bold text-amber-200">{t('lokParty.results.crack')}</span>
           </button>
@@ -507,10 +511,10 @@ function Results({
           </div>
         ) : null}
         <div className="mt-4 flex gap-3">
-          <button type="button" onPointerDown={onBack} className="flex-1 rounded-lg border-2 py-3 text-sm font-bold" style={{ borderColor: ESPRESSO }}>
+          <button type="button" {...press(onBack)} className="flex-1 rounded-lg border-2 py-3 text-sm font-bold" style={{ borderColor: ESPRESSO }}>
             {t('lokParty.drop.back')}
           </button>
-          <button type="button" onPointerDown={onAgain} className="flex-1 rounded-lg py-3 text-sm font-black text-black" style={{ background: '#7cff6b' }}>
+          <button type="button" {...press(onAgain)} className="flex-1 rounded-lg py-3 text-sm font-black text-black" style={{ background: '#7cff6b' }}>
             {t('lokParty.results.again')}
           </button>
         </div>
@@ -1583,13 +1587,13 @@ function Hub({ onPick, onBack, t }: { onPick: (m: Mode) => void; onBack: () => v
               <ModePreview mode={m} />
               <div className="mt-3 text-xl font-black">{m === 'blitz' ? t('lokParty.hub.blitzTitle') : m === 'friends' ? t('lokParty.hub.friendsTitle') : t('lokParty.drop.title')}</div>
               <p className="mt-1 text-sm opacity-80">{m === 'blitz' ? t('lokParty.hub.blitzPitch') : m === 'friends' ? t('lokParty.hub.friendsPitch') : t('lokParty.hub.dropPitch')}</p>
-              <button type="button" onPointerDown={() => onPick(m)} className="mt-3 w-full rounded-xl border-[3px] py-3 text-base font-black active:translate-y-[3px]" style={{ background: m === 'blitz' ? '#ffcf3c' : m === 'friends' ? '#38f2ff' : '#7cff6b', borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
+              <button type="button" {...press(() => onPick(m))} className="mt-3 w-full rounded-xl border-[3px] py-3 text-base font-black active:translate-y-[3px]" style={{ background: m === 'blitz' ? '#ffcf3c' : m === 'friends' ? '#38f2ff' : '#7cff6b', borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
                 {t('lokParty.hub.play')}
               </button>
             </CreamCard>
           ))}
         </div>
-        <button type="button" onPointerDown={onBack} className="rounded-lg border border-white/30 px-5 py-2 text-sm font-bold">
+        <button type="button" {...press(onBack)} className="rounded-lg border border-white/30 px-5 py-2 text-sm font-bold">
           {t('lokParty.drop.back')}
         </button>
       </div>
