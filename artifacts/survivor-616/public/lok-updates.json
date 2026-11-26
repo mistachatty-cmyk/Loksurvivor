@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 220,
+      "version": "0.42.81",
+      "date": "2026-11-25",
+      "publishedAt": "2026-11-25T20:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Saves stay exactly yours",
+      "body": [
+        "Behind-the-scenes test tools now only last for one session, so reloading the game always brings back exactly the progress you saved."
+      ]
+    },
+    {
       "number": 219,
       "version": "0.42.80",
       "date": "2026-11-25",
