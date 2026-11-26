@@ -38,7 +38,7 @@ How much of each there is right now.
 
 | Kind | Count |
 | --- | --- |
-| Characters | 79 |
+| Characters | 83 |
 | Enemies | 151 |
 | Factions | 28 |
 | Allies | 20 |
@@ -52,7 +52,7 @@ How much of each there is right now.
 | Hats | 18 |
 | Celebrations | 7 |
 | Themed palettes | 69 |
-| Cards | 336 |
+| Cards | 340 |
 | Lok glyph icons | 82 |
 | Sound cues | 33 |
 
@@ -154,6 +154,10 @@ Playable survivors. Each is a procedural rig plus a palette (`src/game/data/char
 | nightline-runner | Nightline Runner | Last Train Out | Sleeper-Line Comets |  |
 | spoke-queen | Spoke Queen | Critical Mass | Spoke Halo |  |
 | jackhammer-jean | Jackhammer Jean | Pothole Poet | Jackhammer Quake |  |
+| the-chairman | The Chairman | Furniture City Throne | Board of Directors |  |
+| lake-effect | Lake Effect | Whiteout Mother | Whiteout Field |  |
+| tollkeeper | Tollkeeper | Gate Is Down | Boom Gate |  |
+| dead-letter | Dead Letter | Return To Sender | Sealed Notice |  |
 
 ## Enemies
 
@@ -833,7 +837,7 @@ Collectible card manifests (`src/game/data/cards.ts`). Card art is the procedura
 
 | Kind | Count |
 | --- | --- |
-| card | 230 |
+| card | 234 |
 | companion-profile | 20 |
 | pet | 78 |
 | collectible | 8 |
