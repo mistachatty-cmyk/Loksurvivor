@@ -38,3 +38,17 @@ Edit `milestones.ts`. `MILESTONE_STATS` holds each stat and how much one step ad
 ## Reusing it in other games
 
 The kit has no game-specific imports beyond ring kinds. Another Lok game can copy `streetLife/` and `ringRuns.ts`, and supply its own `World` code for what a ring or token does. The deterministic hash (`ringHash`) means two games with the same seed can show the same street.
+
+## Add a street event (about 6 lines)
+
+Events live in `streetLife/events.ts`. Append one `defineStreetEvent`:
+
+```ts
+defineStreetEvent({
+  id: 'power-hour', name: 'Power hour', weight: 6, durationMs: 14000, color: '#ffd36b',
+  startText: 'POWER HOUR: everything hits harder', doneText: 'POWER HOUR OVER',
+  mods: { damageMult: 1.5 },
+}),
+```
+
+Effects you can mix: `mods` (player speed, damage, XP and cred multipliers while it runs), `freezeEnemiesMs`, `enemyHpMult`, `healFraction` at the start, and `endTokens` for a token burst at the end. A new kind of effect needs one small hook in `world.ts` (see `streetMod`). Scheduling is seeded and automatic: the first event comes about 70 seconds in, then one every 90 to 150 seconds, one at a time.

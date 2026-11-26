@@ -14,6 +14,8 @@ import { BURST_TOKENS_BY_KIND, RING_STYLES, RING_TRACK_GATE_RADIUS, burstTokenCo
 import { streetLifeForChunk } from '@/game/data/streetLife';
 import { MILESTONE_STATS, milestoneForBlockCount } from '@/game/data/streetLife/milestones';
 import { ringHash } from '@/game/data/ringRuns';
+import { STREET_EVENTS_BY_ID, streetEventDelayMs, streetEventFor } from '@/game/data/streetLife/events';
+import type { StreetEventDef, StreetEventMods } from '@/game/data/streetLife/events';
 import type { BurstTokenKind, RingKind } from '@/game/data/ringRuns';
 import { BLACKOUT_STALKERS, RELAY_STORM_DRIFT_PX_PER_SEC, RELAY_STORM_MAX_INSIDE_MS, RELAY_STORM_RADIUS, RELAY_STORM_SLOW, BLOCK_PARTY_NEEDED_MS, BLOCK_PARTY_RADIUS, RUN_EVENTS_BY_ID, scheduleRunEvents, type RunEventId, type ScheduledRunEvent } from '@/game/data/runEvents';
 import { QUIRK_SURGE_LORE } from '@/game/data/quirkSurgeLore';
@@ -1276,7 +1278,43 @@ function unloadRingsForChunk(w: World, key: string) {
 }
 
 function ringCredit(w: World, amount: number) {
-  w.cred += Math.max(1, Math.round(amount));
+  w.cred += Math.max(1, Math.round(amount * streetMod(w, 'credMult')));
+}
+
+/** The multiplier a running street event applies (1 when none is running). */
+export function streetMod(w: World, key: keyof StreetEventMods): number {
+  if (!w.streetEvent) return 1;
+  const def = STREET_EVENTS_BY_ID[w.streetEvent.id];
+  return def?.mods?.[key] ?? 1;
+}
+
+function startStreetEvent(w: World, def: StreetEventDef) {
+  w.streetEvent = { id: def.id, endsAt: w.now + def.durationMs };
+  pushAlert(w, def.startText);
+  pushSfx(w, 'ringFinish');
+  const p = w.player;
+  if (def.freezeEnemiesMs) for (const enemy of w.enemies) enemy.frozenUntil = Math.max(enemy.frozenUntil, w.now + def.freezeEnemiesMs);
+  if (def.enemyHpMult) for (const enemy of w.enemies) enemy.hp = Math.max(1, enemy.hp * def.enemyHpMult);
+  if (def.healFraction) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * def.healFraction);
+  spawnParticles(w, p.x, p.y, def.color, 16, 150);
+}
+
+function updateStreetEvents(w: World) {
+  if (w.outcome !== 'running' || !w.area.endless || !w.endless) return;
+  const seed = w.endless.rngSeed;
+  if (w.streetEvent) {
+    if (w.now < w.streetEvent.endsAt) return;
+    const def = STREET_EVENTS_BY_ID[w.streetEvent.id];
+    w.streetEvent = null;
+    w.streetEventIndex += 1;
+    w.nextStreetEventAt = w.now + streetEventDelayMs(seed, w.streetEventIndex);
+    if (def) {
+      pushAlert(w, def.doneText);
+      if (def.endTokens) burstTokens(w, w.player.x, w.player.y, def.endTokens.count, def.endTokens.luck);
+    }
+    return;
+  }
+  if (w.now >= w.nextStreetEventAt) startStreetEvent(w, streetEventFor(seed, w.streetEventIndex));
 }
 
 function comboStep(w: World, x: number, y: number) {
@@ -1716,6 +1754,10 @@ export interface World {
   ultActiveUntil: number;
   /** Street Life rings, Ring Run tracks and the token explosion after a win. */
   rings: LiveRing[];
+  /** Street event now running (Endless), and when the next one is due. */
+  streetEvent: { id: string; endsAt: number } | null;
+  streetEventIndex: number;
+  nextStreetEventAt: number;
   /** Endless blocks entered for the first time (the start block does not count), for block milestones. */
   blocksCrossed: number;
   visitedBlocks: Set<string>;
@@ -2370,6 +2412,9 @@ export function createWorld(
     ultActiveUntil: -1,
     powerState: null,
     rings: [],
+    streetEvent: null,
+    streetEventIndex: 0,
+    nextStreetEventAt: streetEventDelayMs(seed, 0),
     blocksCrossed: 0,
     visitedBlocks: new Set<string>(),
     ringTracks: [],
@@ -2832,7 +2877,7 @@ function damageMult(w: World): number {
   const ult = ultActive(w) ? (w.character.ultimate.effect.damageMult ?? 1) : 1;
   const isLlamaSovereign = w.character.id === 'llama-mama' || w.character.id === 'llama-overlord';
   const ego = (isLlamaSovereign && w.llamaEgoScore) ? (1 + Math.min(2.5, w.llamaEgoScore * 0.05)) : 1;
-  return w.stats.power * ult * ego * (powerStateActive(w, 'gilded') ? 1.35 : 1) * (w.now < w.damageBuffUntil ? 1.3 : 1);
+  return w.stats.power * ult * ego * (powerStateActive(w, 'gilded') ? 1.35 : 1) * (w.now < w.damageBuffUntil ? 1.3 : 1) * streetMod(w, 'damageMult');
 }
 
 function areaMult(w: World): number {
@@ -2845,7 +2890,7 @@ function speedMult(w: World): number {
   const ult = ultActive(w) ? (w.character.ultimate.effect.speedMult ?? 1) : 1;
   const isLlamaSovereign = w.character.id === 'llama-mama' || w.character.id === 'llama-overlord';
   const ego = (isLlamaSovereign && w.llamaEgoScore) ? (1 + Math.min(0.6, w.llamaEgoScore * 0.025)) : 1;
-  return ult * (w.modifiers.speedMode ? 1.35 : 1) * ego * (powerStateActive(w, 'supersonic') ? 1.6 : 1) * (w.now < w.ringBoostUntil ? RING_BOOST_MULT : 1);
+  return ult * (w.modifiers.speedMode ? 1.35 : 1) * ego * (powerStateActive(w, 'supersonic') ? 1.6 : 1) * (w.now < w.ringBoostUntil ? RING_BOOST_MULT : 1) * streetMod(w, 'playerSpeedMult');
 }
 
 /**
@@ -7163,7 +7208,7 @@ function applyEffect(w: World, effect: UpgradeDef['effects'][number]) {
 }
 
 function gainXp(w: World, amount: number) {
-  w.xp += amount * w.xpMult;
+  w.xp += amount * w.xpMult * streetMod(w, 'xpMult');
   while (w.xp >= w.xpToNext) {
     w.xp -= w.xpToNext;
     w.level += 1;
@@ -12070,7 +12115,7 @@ function updatePickups(w: World, dt: number) {
           pushSfx(w, 'pickupHealth');
           break;
         case 'cred':
-          w.cred += pickup.value;
+          w.cred += Math.round(pickup.value * streetMod(w, 'credMult'));
           pushSfx(w, 'pickupCred');
           break;
         case 'coin':
@@ -13418,6 +13463,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (w.area.endless && w.endless) {
     updateEndlessChunks(w);
     updateRings(w, dt);
+    updateStreetEvents(w);
     updateEndlessRoute(w);
     updateEndlessBandHazard(w);
     updateEndlessLandmarkCue(w);

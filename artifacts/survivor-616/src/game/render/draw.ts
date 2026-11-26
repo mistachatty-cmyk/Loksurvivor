@@ -7,6 +7,7 @@
  */
 
 import { BURST_TOKENS_BY_KIND, RING_STYLES, RING_TRACK_GATE_RADIUS } from '@/game/data/ringRuns';
+import { STREET_EVENTS_BY_ID } from '@/game/data/streetLife/events';
 import { BLOCK_FX_LINGER_MS, blockMaterialOf, drawBlockMaterial } from './blockBreak';
 import { drawGlyph } from '../../ui/lokGlyphCanvas';
 import { drawRescue, drawRescuePointer } from './rescueArt';
@@ -3762,6 +3763,23 @@ function drawRingWorld(ctx: CanvasRenderingContext2D, w: World) {
       ctx.fillText(text, p.x, p.y - 62);
     }
     ctx.restore();
+  }
+  // Street event label.
+  if (w.streetEvent) {
+    const def = STREET_EVENTS_BY_ID[w.streetEvent.id];
+    if (def) {
+      const secs = Math.max(0, Math.ceil((w.streetEvent.endsAt - w.now) / 1000));
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = '700 13px sans-serif';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#000000';
+      const text = `${def.name.toUpperCase()} ${secs}s`;
+      ctx.strokeText(text, p.x, p.y - 80);
+      ctx.fillStyle = def.color;
+      ctx.fillText(text, p.x, p.y - 80);
+      ctx.restore();
+    }
   }
   // Overshield bubble.
   if (w.overshield && w.now < w.overshield.until) {

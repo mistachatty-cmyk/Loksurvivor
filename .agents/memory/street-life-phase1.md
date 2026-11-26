@@ -15,3 +15,6 @@
 ## Build kit (branch claude/street-life-kit)
 - Street pieces are records built with `definePiece` and the builders in `data/streetLife/pieceKit.ts`; the engine calls only `streetLifeForChunk`. How-to: docs/STREET_LIFE_BUILD_KIT.md. New pieces go at the end of `STREET_PIECES` with a unique salt.
 - Block milestones: `data/streetLife/milestones.ts`, applied in `noteBlockEntered` (world.ts). Step sizes are the tuning knobs; the "0.5" in the request was read as small steps (half a percent for armor and crit), awaiting the owner's answer.
+
+## Street events (branch claude/street-events)
+- `data/streetLife/events.ts`: `defineStreetEvent` records (mods, freeze, enemy hp, heal, end tokens). World runs one at a time in Endless via `updateStreetEvents`; `streetMod(w, key)` is the read hook for multipliers. Seeded by `streetEventFor` and `streetEventDelayMs`.
