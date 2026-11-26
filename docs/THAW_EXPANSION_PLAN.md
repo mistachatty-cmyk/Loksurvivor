@@ -1,7 +1,7 @@
 # The Thaw: expansion and Street Life plan
 
 Status: plan only. Nothing here is built. Branch: `claude/thaw-expansion-plan`.
-Rules this plan follows: procedural art only, no runtime AI, no new network calls, never the word "signal", no emoji (docs/LOK_COST_DISCIPLINE.md, docs/LOK_DESIGN_STANDARD.md). Everything is data-driven: new records, not engine rewrites, except where a section says otherwise.
+Rules this plan follows: procedural art only, no runtime AI, no new network calls, no emoji (docs/LOK_COST_DISCIPLINE.md, docs/LOK_DESIGN_STANDARD.md). Everything is data-driven: new records, not engine rewrites, except where a section says otherwise.
 
 ## 1. The pitch
 
