@@ -1594,6 +1594,7 @@
   "lokParty.results.crack": "캡슐을 탭하여 깨세요.",
   "lokParty.results.shards": "새로운 샤드",
   "lokParty.results.again": "다시 플레이",
+  "lokParty.results.unranked": "온라인 파티: 순위 없음",
   "lokParty.results.vault": "금고: {{capsules}} 캡슐, {{keys}} 키, {{shards}} 샤드",
   "lokParty.ladder.solo": "Solo Blitz",
   "lokParty.ladder.crew": "Online Crew",
@@ -1679,6 +1680,8 @@
   "lokParty.online.unavailable": "이 빌드에서는 아직 온라인 파티가 활성화되지 않았습니다. 여전히 봇을 상대로 Turbo Crown Blitz를 플레이할 수 있습니다.",
   "lokParty.online.waiting": "다른 플레이어가 끝날 때까지 기다리는 중",
   "lokParty.online.hostLeft": "호스트가 파티를 떠났습니다.",
+  "lokParty.online.leaveRun": "이제 참여하면 달리기가 종료됩니다.",
+  "lokParty.online.joinAnyway": "어쨌든 가입하세요",
   "lokParty.online.invited": "{{name}}가 귀하를 Lok Party에 초대했습니다.",
   "lokParty.door.title": "Lok Party",
   "lokParty.door.sub": "보드게임, 미니게임, 친구들과 놀기"

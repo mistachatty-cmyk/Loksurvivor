@@ -1595,6 +1595,7 @@
   "lokParty.results.crack": "カプセルをタップして割ってください",
   "lokParty.results.shards": "新しいシャード",
   "lokParty.results.again": "もう一度プレイしてください",
+  "lokParty.results.unranked": "オンラインパーティー：ランクなし",
   "lokParty.results.vault": "保管庫: {{capsules}} カプセル、{{keys}} キー、{{shards}} シャード",
   "lokParty.ladder.solo": "Solo Blitz",
   "lokParty.ladder.crew": "Online Crew",
@@ -1680,6 +1681,8 @@
   "lokParty.online.unavailable": "このビルドではオンライン パーティーがまだ有効になっていません。ターボ クラウン ブリッツをボットと対戦することもできます。",
   "lokParty.online.waiting": "他のプレイヤーが終了するのを待っています",
   "lokParty.online.hostLeft": "主催者はパーティーから退席しました。",
+  "lokParty.online.leaveRun": "今すぐ参加すると実行が終了します。",
+  "lokParty.online.joinAnyway": "とにかく参加してください",
   "lokParty.online.invited": "{{name}} が Lok Party に招待しました",
   "lokParty.door.title": "Lok Party",
   "lokParty.door.sub": "ボードゲーム、ミニゲーム、友達と遊ぶ"
