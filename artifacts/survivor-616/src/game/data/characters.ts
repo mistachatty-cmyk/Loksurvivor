@@ -6,6 +6,7 @@ import { registerForgedOperators } from '@/game/data/forgedOperators';
 import { CHARACTER_CREATOR_OPERATORS } from '@/game/data/forgeFive';
 import { CREATOR_PAIR_OPERATORS } from '@/game/data/creatorPair';
 import { NEW_CAST_WAVE_1 } from '@/game/data/newCastWave1';
+import { NEW_CAST_WAVE_2 } from '@/game/data/newCastWave2';
 
 /** Static Nomad's rig: a cloud-afro head, metallic arms and a flared trouser stance, plus a floating electrified trail. */
 function staticNomadRig(): SpriteRig {
@@ -2398,6 +2399,7 @@ export const CHARACTERS: CharacterDef[] = [
   ...CHARACTER_CREATOR_OPERATORS,
   ...CREATOR_PAIR_OPERATORS,
   ...NEW_CAST_WAVE_1,
+  ...NEW_CAST_WAVE_2,
 ];
 
 export const CHARACTERS_BY_ID: Record<string, CharacterDef> = Object.fromEntries(

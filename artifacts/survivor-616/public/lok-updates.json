@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 222,
+      "version": "0.42.83",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T08:45:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Four more operators to earn",
+      "body": [
+        "Rink Rat, Upstream Fenn, Pier Beacon and Salvage Sal join the roster. Each is unlocked by kills or by clearing Back Alley, and each brings its own weapon and ultimate."
+      ]
+    },
+    {
       "number": 221,
       "version": "0.42.82",
       "date": "2026-11-26",

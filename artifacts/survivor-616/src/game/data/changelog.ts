@@ -2269,6 +2269,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   { version: '0.42.80', date: '2026-11-25', publishedAt: '2026-11-25T12:00:00Z', kind: 'update', title: 'Looks shared with Queens N Kings', body: ['Eight new menu themes now exist in both 616 Survivor and Queens N Kings under the same names: Ember Court, Moss Cathedral, Tidepool Neon, Paper Moon, Copper Rain, Berry Static, Salt Flat and Sunken Crown. Pick them in your hideout themes. Looks only.'] },
   { version: '0.42.81', date: '2026-11-25', publishedAt: '2026-11-25T20:00:00Z', kind: 'update', title: 'Saves stay exactly yours', body: ['Behind-the-scenes test tools now only last for one session, so reloading the game always brings back exactly the progress you saved.'] },
   { version: '0.42.82', date: '2026-11-26', publishedAt: '2026-11-26T08:30:00Z', kind: 'update', title: 'Four new operators', body: ['Four new operators join the roster: The Chairman, Lake Effect, Tollkeeper and Dead Letter. Each one has its own weapon, ultimate and silhouette, all drawn procedurally for 616.'] },
+  { version: '0.42.83', date: '2026-11-26', publishedAt: '2026-11-26T08:45:00Z', kind: 'update', title: 'Four more operators to earn', body: ['Rink Rat, Upstream Fenn, Pier Beacon and Salvage Sal join the roster. Each is unlocked by kills or by clearing Back Alley, and each brings its own weapon and ultimate.'] },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
