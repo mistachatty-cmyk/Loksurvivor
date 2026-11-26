@@ -517,6 +517,7 @@
   "hideout.prop.lok-shop-counter.line.1": "A glowing counter hums. Two round eyes blink back at you from the screen.",
   "hideout.prop.lok-shop-counter.line.2": "Someone is always behind the counter, even when nobody is.",
   "wallet.balance": "{{n}} LokTokens",
+  "wallet.unlimited": "Unlimited LokTokens (Dev Mode)",
   "wallet.rank": "{{rank}} rank",
   "wallet.loading": "Counting your LokTokens…",
   "wallet.signedOut": "Sign in to see and spend your LokTokens.",

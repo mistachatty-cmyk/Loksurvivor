@@ -108,6 +108,11 @@ export function LokShopScreen({ onBack, onOpenCosmetics, onSignIn }: { onBack: (
     u.id === 'field-guide' ? grantLokPetFieldGuide() : u.id === 'lokpack-visualizer' ? grantLokPackVisualizer() : u.id === 'weapon-rack' ? grantTrainingWeaponRack() : grantLokPetCollectorAccess();
 
   const purchase = (sku: string, name: string, fallbackPrice: number, grant: () => void) => {
+    if (meta.devModeAllUnlocks) {   // Dev Mode session: grant locally, no account spend, and the session never saves
+      grant();
+      setNotice(t('lokshop.bought', { name }));
+      return;
+    }
     if (!signedIn) {
       setNotice(t('lokshop.signInNotice'));
       return;

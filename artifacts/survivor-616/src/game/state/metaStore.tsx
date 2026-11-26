@@ -1377,8 +1377,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
 
   return {
     version: META_VERSION,
-    devModeAccessUnlocked: parsed.devModeAccessUnlocked === true,
-    devModeAllUnlocks: parsed.devModeAccessUnlocked === true && parsed.devModeAllUnlocks === true,
+    // Dev Mode is a per-session tool: it is never restored from a save, so a reload always returns to the real progress.
+    devModeAccessUnlocked: false,
+    devModeAllUnlocks: false,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
     levelUpPausesEnabled: !liveModeEnabled && parsed.levelUpPausesEnabled !== false,
     liveModeEnabled,
@@ -2162,6 +2163,8 @@ interface StoreState {
   lastRun: RunResult | null;
   /** Cards from the most recent pack purchase, for the pack-opening reveal UI; not persisted. */
   lastCardPackReveal: CardPackReveal | null;
+  /** While a Dev Mode session runs: the player's real save, set aside. Never persisted; restored when the session ends. */
+  devStash?: MetaState;
 }
 
 type Action =
@@ -2395,6 +2398,61 @@ function withAchievementToasts(before: StoreState, after: StoreState): StoreStat
       ],
     },
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Dev Mode session (the Lok ecosystem dev-mode standard)              */
+/* ------------------------------------------------------------------ */
+// While Dev Mode is on everything is open and every currency is topped up after each action. The real save is set aside in
+// `devStash` and is the only thing ever written to storage or the cloud, so turning Dev Mode off, or reloading, returns the
+// player to exactly where they were. See Lok-EcoSystsem docs/LOK_DEV_MODE_STANDARD.md.
+const DEV_TOP = 99_999_999;
+
+function devTopUp(m: MetaState): MetaState {
+  return {
+    ...m,
+    cred: DEV_TOP,
+    lootTokens: DEV_TOP,
+    cardCredits: DEV_TOP,
+    skeletonKeys: DEV_TOP,
+    lokPetTreats: DEV_TOP,
+    petElixirs: ELIXIR_CAP,
+    digiTower: { ...m.digiTower, tokens: 1_000_000 },
+  };
+}
+
+function startDevSession(state: StoreState): StoreState {
+  const real = state.devStash ?? state.meta;
+  const m = state.meta;
+  return {
+    ...state,
+    devStash: real,
+    meta: devTopUp({
+      ...m,
+      devModeAccessUnlocked: true,
+      devModeAllUnlocks: true,
+      ownedUiThemeIds: [...new Set([...m.ownedUiThemeIds, ...HIDDEN_UI_THEME_IDS])],
+    }),
+  };
+}
+
+function endDevSession(state: StoreState): StoreState {
+  if (!state.devStash) return { ...state, meta: { ...state.meta, devModeAccessUnlocked: false, devModeAllUnlocks: false } };
+  const { devStash, ...rest } = state;
+  return { ...rest, meta: { ...devStash, devModeAccessUnlocked: false, devModeAllUnlocks: false } };
+}
+
+/** The reducer the provider runs: the plain reducer, then the Dev Mode top-up. */
+export function devAwareReducer(state: StoreState, action: Action): StoreState {
+  const next = reducer(state, action);
+  if (!next.devStash) return next;
+  if (!next.meta.devModeAllUnlocks) { const { devStash: _gone, ...rest } = next; return rest; }
+  return { ...next, meta: devTopUp(next.meta) };
+}
+
+/** What is safe to write to storage: the real save, never the Dev Mode view of it. */
+export function persistableMeta(state: StoreState): MetaState {
+  return { ...(state.devStash ?? state.meta), devModeAccessUnlocked: false, devModeAllUnlocks: false };
 }
 
 export function reducer(state: StoreState, action: Action): StoreState {
@@ -3655,7 +3713,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     }
 
     case 'unlockDevModeAccess':
-      return { ...state, meta: { ...state.meta, devModeAccessUnlocked: true } };
+      return startDevSession(state);
 
     case 'cheatGrant': {
       // Cheat bar payouts: only after the master phrase opened dev access, never on a fresh save.
@@ -3679,22 +3737,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'setDevModeAllUnlocks':
       if (!state.meta.devModeAccessUnlocked) return state;
-      return {
-        ...state,
-        meta: {
-          ...state.meta,
-          devModeAllUnlocks: action.enabled,
-          ...(action.enabled ? { ownedUiThemeIds: [...new Set([...state.meta.ownedUiThemeIds, ...HIDDEN_UI_THEME_IDS])] } : {}),
-          ...(!action.enabled
-            ? {
-                uiTheme: state.meta.ownedUiThemeIds.includes(state.meta.uiTheme) ? state.meta.uiTheme : DEFAULT_UI_THEME_ID,
-                activePaletteId: state.meta.ownedPaletteIds.includes(state.meta.activePaletteId) ? state.meta.activePaletteId : DEFAULT_PALETTE_ID,
-                activeSoundPackId: state.meta.ownedSoundPackIds.includes(state.meta.activeSoundPackId) ? state.meta.activeSoundPackId : DEFAULT_SOUND_PACK_ID,
-                activeRunAuraId: state.meta.ownedRunAuraIds.includes(state.meta.activeRunAuraId) ? state.meta.activeRunAuraId : DEFAULT_RUN_AURA_ID,
-              }
-            : {}),
-        },
-      };
+      return action.enabled ? startDevSession(state) : endDevSession(state);
 
     case 'setPhysicsObjectClicks':
       return {
@@ -4888,15 +4931,15 @@ export interface MetaContextValue {
 const MetaContext = createContext<MetaContextValue | null>(null);
 
 export function MetaProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, null, () => ({
+  const [state, dispatch] = useReducer(devAwareReducer, null, () => ({
     meta: loadMeta(),
     lastRun: null,
     lastCardPackReveal: null,
   }));
 
   useEffect(() => {
-    saveMeta(state.meta);
-  }, [state.meta]);
+    saveMeta(persistableMeta(state));
+  }, [state.meta, state.devStash]);
 
   // Another tab wrote the save: stop overwriting it until the player picks a copy (see SaveGuardBanner).
   useEffect(() => {

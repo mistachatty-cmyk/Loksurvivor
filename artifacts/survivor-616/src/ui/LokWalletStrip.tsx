@@ -3,6 +3,7 @@
  * when signed out. Required on every Lok platform's shops (LOK_PLATFORMS.md). Reads state the
  * app already holds (`useLokEconomy`, `useAuth`), so it adds no network requests.
  */
+import { useMeta } from '@/game/state/metaStore';
 import { Coins } from 'lucide-react';
 
 import { walletStripState } from '@workspace/lok-client';
@@ -15,7 +16,9 @@ export function LokWalletStrip({ onSignIn }: { onSignIn?: () => void }) {
   const t = useT();
   const { signedIn, balance, rank } = useLokEconomy();
   const { available } = useAuth();
-  const state = walletStripState({ signedIn, balance, authAvailable: available });
+  const { meta } = useMeta();
+  const dev = meta.devModeAllUnlocks;   // Dev Mode session: show an unlimited balance (display only, the account is untouched)
+  const state = dev ? ({ kind: 'signed-in', balance: 0 } as const) : walletStripState({ signedIn, balance, authAvailable: available });
 
   return (
     <div className="lokshop-holo mb-3 flex items-center justify-between gap-3 px-3 py-2" data-testid="lok-wallet-strip" data-state={state.kind}>
@@ -23,7 +26,7 @@ export function LokWalletStrip({ onSignIn }: { onSignIn?: () => void }) {
         <Coins className="h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
         {state.kind === 'signed-in' ? (
           <span className="truncate">
-            <span className="font-mono font-black text-amber-200" data-testid="lok-wallet-balance">{t('wallet.balance', { n: state.balance.toLocaleString() })}</span>
+            <span className="font-mono font-black text-amber-200" data-testid="lok-wallet-balance">{dev ? t('wallet.unlimited') : t('wallet.balance', { n: state.balance.toLocaleString() })}</span>
             {rank?.label ? <span className="ml-2 text-muted-foreground">{t('wallet.rank', { rank: rank.label })}</span> : null}
           </span>
         ) : state.kind === 'loading' ? (
