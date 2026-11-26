@@ -38,7 +38,7 @@ test('a finished build holds no source maps and no readable dev phrase', { skip:
   for (const file of files.filter((f) => f.endsWith('.js'))) {
     const text = readFileSync(join(dir, file), 'utf8');
     assert.ok(!text.includes('sourceMappingURL'), `${file} points at a source map`);
-    assert.ok(!text.includes('iloveyour'), `${file} contains the dev phrase`);
+    assert.ok(!text.includes('iloveyou'), `${file} contains the dev phrase`);
     assert.ok(!text.includes('__world'), `${file} contains the dev world hook`);
   }
 });

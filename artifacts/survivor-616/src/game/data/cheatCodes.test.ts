@@ -6,19 +6,19 @@ import { readFileSync } from 'node:fs';
 import { hashPhrase } from '@/lib/phraseHash';
 import { CHEAT_CODES, findCheat, normalizeCheatInput, resolveCheat } from './cheatCodes';
 
-const MASTER_CHEAT_PHRASE = 'iloveyourmerci';
+const MASTER_CHEAT_PHRASE = 'iloveyoumerci';
 /** Every phrase that must keep working. They live here (tests never ship), not in the game data. */
-const ALL_PHRASES = ['iloveyourmerci', 'iloveyoumerci', 'showmethemoney', 'cred', 'lootrain', 'loot', 'cardshark', 'cardcredits', 'skeletonkey', 'keys', 'treatyourpet', 'treats', 'elixirtime', 'elixirs', 'bigspender', 'everything', 'unlockeverything', 'openseame', 'relockeverything', 'closeseame', 'upupdowndownleftrightleftrightba', 'konami', 'confetti', 'party', 'disco', 'discoinferno', '616', 'grandrapids'];
+const ALL_PHRASES = ['iloveyoumercy', 'iloveyoumerci', 'showmethemoney', 'cred', 'lootrain', 'loot', 'cardshark', 'cardcredits', 'skeletonkey', 'keys', 'treatyourpet', 'treats', 'elixirtime', 'elixirs', 'bigspender', 'everything', 'unlockeverything', 'openseame', 'relockeverything', 'closeseame', 'upupdowndownleftrightleftrightba', 'konami', 'confetti', 'party', 'disco', 'discoinferno', '616', 'grandrapids'];
 
 test('normalizeCheatInput ignores case, spaces and punctuation', () => {
-  assert.equal(normalizeCheatInput('  I Love Your Merci! '), 'iloveyourmerci');
+  assert.equal(normalizeCheatInput('  I Love You Merci! '), 'iloveyoumerci');
 });
 
 test('the master phrase is the only code that opens dev access', () => {
   const master = findCheat(MASTER_CHEAT_PHRASE);
   assert.equal(master?.effect.kind, 'devAccess');
   assert.equal(CHEAT_CODES.filter((code) => code.effect.kind === 'devAccess').length, 1);
-  assert.equal(resolveCheat('I love your merci', false).status, 'ready');
+  assert.equal(resolveCheat('I love you mercy!', false).status, 'ready');
 });
 
 test('resource and unlock cheats stay locked until dev access is on', () => {

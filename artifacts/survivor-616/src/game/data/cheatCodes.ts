@@ -36,7 +36,7 @@ export interface CheatCodeDef {
 }
 
 export const CHEAT_CODES: readonly CheatCodeDef[] = [
-  { id: 'master', hashes: ['2zeh61b8ql', '2tex7qarru'], group: 'master', requiresDevAccess: false, effect: { kind: 'devAccess' } },
+  { id: 'master', hashes: ['2tex7qarru', '1ho274hywl'], group: 'master', requiresDevAccess: false, effect: { kind: 'devAccess' } },
 
   // Resources: one per currency, plus a bundle.
   { id: 'cred', hashes: ['1ygdmgppbcw', '1eq01mn5atp'], group: 'resources', requiresDevAccess: true, effect: { kind: 'grant', amounts: { cred: 10000 } } },
@@ -64,7 +64,7 @@ export const CHEAT_CODES: readonly CheatCodeDef[] = [
   { id: 'six-sixteen', hashes: ['1rkjf1owxtq', '219lsrfvu8t'], group: 'fun', requiresDevAccess: false, effect: { kind: 'fx', fx: 'pulse616' } },
 ];
 
-/** Lower-cases and drops everything that is not a letter or digit, so "I love your Merci!" matches. */
+/** Lower-cases and drops everything that is not a letter or digit, so punctuation and capitals in a typed phrase never matter. */
 export function normalizeCheatInput(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
