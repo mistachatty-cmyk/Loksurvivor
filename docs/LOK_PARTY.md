@@ -38,7 +38,18 @@ Play it: `?screen=lok-party` (works in every build; it writes only its own save 
 | Capsule pull screen | `artifacts/survivor-616/src/party/CapsulePullOverlay.tsx` | Vertical one-thumb layout: metallic Gold L capsule, widening glowing seam, stage punches and chimes, refraction burst, halves flying apart, confetti, the player's rig in a rarity pillar wearing palettes, hats and capes, cream reward card at thumb height. The capsule is saved as opened before the show starts. |
 | Ranked bots | `botSkillsForTier` in `lokDrop.ts` | Bots scale from Iron to 616 Apex with the Solo Blitz tier, one softer bot per match. |
 
+## Built in Slice 3 (v0.42.90)
+
+| Piece | File | What it does |
+| --- | --- | --- |
+| Board engine | `artifacts/survivor-616/src/party/lokBoard.ts` | Pure seeded Turbo Crown Blitz: item phase, standard 1-10 or Signature Die (Zero Day freeze, Shade cred, Quarry Kid boulder ride, Golden Hour gilded), hops with junction choices, Lok the Owl crown vendor (20 coins, moves after a sale), seven space kinds, five items, glitch traps, ARCHON tax and traps, four board events, day and night every three rounds, three-round Overtime, minigame payouts, two Bonus Crowns, greedy bots. |
+| Monroe Loop | `artifacts/survivor-616/src/party/boards/monroeLoop.ts` | 37 spaces with elevation: fire-escape ladder to the rooftops, steel gantry over the Grand River, terrace stairs, boulder-chute slide. |
+| Board art | `artifacts/survivor-616/src/party/boardArt.ts` | Golden hour and midnight moods; brick, glass, tile and stucco facades with windows, awnings, water towers, a fire escape and neon signs; river with embankment and shimmer; truss gantry; terrace; chute; lamps, trees, crates, hydrants, promenade; spaces set in street sockets with light spill and original glyphs; Lok the Owl; spinning crown; coin; 3D dice block. |
+| Board screen | `artifacts/survivor-616/src/party/BoardScreen.tsx` | Depth-sorted city (buildings, gantry, chute, props, paths, spaces, players, owl), buildings fade see-through when they would hide a player, the owl or a path choice; camera follow with city bounds and a map overview; hop arcs per traversal; player cards with rig portraits; slam-in banners; thumb-height prompts; the Lok Drop as a 30 s minigame. |
+| Touchable city | same | Tap windows (lights on or off), signs (recolor), lamps (switch), trees (leaves), crates (wobble), benches and the bus shelter (jiggle), the river (ripples), the night sky (shooting star), spaces (bounce and note), players (hop) and the owl (hoot). Cosmetic only, never a reward. |
+| Hub | `LokDropScreen.tsx` | Lok Party opens on a mode picker with live drawn previews; lobby picks 5, 10 or 15 rounds. |
+
 ## Next slices
-- **Slice 3: Board engine.** Pure board state machine with elevation-aware nodes (`z`, `traversalKind`), the Monroe Loop board, Signature Dice, five core items and the Lok Drop as the first minigame cartridge.
+- **Next for the board:** Crewmate roving allies, Duel spaces, a second minigame (Ring Run Rush) so rounds vary, the Pawnford board, and a Party Lounge door in the hideout.
 - **Slice 4: Cartridge contract.** `LokMinigameCartridge` (mount, getResults, unmount) so Ring Run Rush and Gem Vacuum Frenzy plug in, then iframe cartridges from other repos.
 - **Backend (noted, not built):** room codes over Supabase Realtime broadcast, async seeded score-attack, trusted results before any online LP.

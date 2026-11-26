@@ -15,6 +15,9 @@ import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { useMeta } from '@/game/state/metaStore';
 import { useT } from '@/lib/i18n';
 import { CapsulePullOverlay } from './CapsulePullOverlay';
+import { BoardScreen } from './BoardScreen';
+import { boardStandings, type BoardState } from './lokBoard';
+import { drawCrown, drawDiceBlock, drawOwl, drawCoin } from './boardArt';
 import { Squash, createJuice, drawRefractionRings, impact, type Juice } from './juiceEngine';
 import {
   DROP,
@@ -44,7 +47,12 @@ import {
   type Shard,
 } from './lokPartyMeta';
 
-const ROSTER_IDS = ['zero-day', 'shade', 'quarry-kid', 'golden-hour'] as const;
+export const ROSTER_IDS = ['zero-day', 'shade', 'quarry-kid', 'golden-hour'] as const;
+
+/** The four seats for a match: the human first, then the rest of the launch roster. */
+export function seatOrder(humanId: string): string[] {
+  return [humanId, ...ROSTER_IDS.filter((id) => id !== humanId)];
+}
 const LANE_COLORS = ['#38f2ff', '#ff3fd2', '#ffd23f', '#7cff6b'];
 const VIEW_W = 1000;
 const VIEW_H = 700;
@@ -52,6 +60,7 @@ const FLOOR_TOP = 190;
 const FLOOR_H = 470;
 const STEP = 1000 / 60;
 const RIG_SCALE = 1.9;
+export { RigPreview };
 const CREAM = '#FAF6EE';
 const ESPRESSO = '#3b2a20';
 
@@ -126,16 +135,27 @@ function RigPreview({ id, size = 96 }: { id: string; size?: number }) {
 
 // ------------------------------------------------------------------ screen
 
-type Phase = 'lobby' | 'play' | 'results';
+type Phase = 'hub' | 'lobby' | 'play' | 'board' | 'results';
+type Mode = 'blitz' | 'drop';
+
+interface Standing {
+  characterId: string;
+  place: number;
+  crowns: number;
+  coins: number;
+  human: boolean;
+}
 
 export function LokDropScreen({ onBack }: { onBack: () => void }) {
   const t = useT();
   const { ensureAudioContext, getAudioContext } = useMusicPlayer();
   const { claimLokPartyGrant } = useMeta();
-  const [phase, setPhase] = useState<Phase>('lobby');
+  const [phase, setPhase] = useState<Phase>('hub');
+  const [mode, setMode] = useState<Mode>('blitz');
+  const [rounds, setRounds] = useState(10);
   const [pick, setPick] = useState<string>(ROSTER_IDS[0]);
   const [meta, setMeta] = useState<LokPartyMeta>(() => loadLokPartyMeta(storage()));
-  const [report, setReport] = useState<{ report: MatchReport; placement: number; players: number; banked: number } | null>(null);
+  const [report, setReport] = useState<ReportData | null>(null);
   const [shards, setShards] = useState<Shard[] | null>(null);
   const [pulling, setPulling] = useState<Shard[] | null>(null);
   const [seed, setSeed] = useState(() => (Date.now() ^ 0x616) >>> 0);
@@ -146,16 +166,12 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
     setSeed((s) => (s * 1664525 + 1013904223) >>> 0);
     setReport(null);
     setShards(null);
-    setPhase('play');
-  }, [ensureAudioContext, getAudioContext]);
+    setPhase(mode === 'blitz' ? 'board' : 'play');
+  }, [ensureAudioContext, getAudioContext, mode]);
 
-  const finish = useCallback(
-    (state: DropState) => {
-      const results = dropResults(state);
-      const mine = results.find((r) => !r.bot);
-      if (!mine) return;
-      const now = Date.now();
-      let { meta: next, report: rep } = applyMatch(meta, dropPerformance(state, mine), { nowMs: now, seed: state.seed, ladder: 'solo' });
+  const settle = useCallback(
+    (perf: Parameters<typeof applyMatch>[1], seedUsed: number, extra: Omit<ReportData, 'report'>) => {
+      let { meta: next, report: rep } = applyMatch(meta, perf, { nowMs: Date.now(), seed: seedUsed, ladder: 'solo' });
       // One-way bridge: 616 pays through its own capped path; Party just marks it delivered.
       for (const g of pendingGrants(next, 'survivor616')) {
         claimLokPartyGrant(g.id, g.amount);
@@ -163,10 +179,49 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
       }
       saveLokPartyMeta(storage(), next);
       setMeta(next);
-      setReport({ report: rep, placement: mine.placement, players: results.length, banked: mine.banked });
+      setReport({ report: rep, ...extra });
       setPhase('results');
     },
     [meta, claimLokPartyGrant],
+  );
+
+  const finish = useCallback(
+    (state: DropState) => {
+      const results = dropResults(state);
+      const mine = results.find((r) => !r.bot);
+      if (!mine) return;
+      settle(dropPerformance(state, mine), state.seed, { placement: mine.placement, players: results.length, banked: mine.banked });
+    },
+    [settle],
+  );
+
+  const finishBoard = useCallback(
+    (s: BoardState) => {
+      const standings = boardStandings(s);
+      const me = s.players[0];
+      const place = standings.find((r) => r.index === 0)?.place ?? 4;
+      const totalCrowns = s.players.reduce((n, p) => n + p.crowns, 0) || 1;
+      const rounds = Math.max(1, s.maxRounds);
+      settle(
+        {
+          characterId: me.characterId,
+          placement: place,
+          players: s.players.length,
+          objective: (me.crowns / totalCrowns) * 2,
+          skill: me.stats.minigameWins / rounds * 2.5,
+          clutch: me.stats.steals,
+          risk: Math.min(1, me.stats.coinsSpent / 80),
+          stats: { crowns: me.crowns, 'minigame-wins': me.stats.minigameWins, 'spaces-moved': me.stats.spacesMoved },
+        },
+        s.seed,
+        {
+          placement: place,
+          players: s.players.length,
+          standings: standings.map((r) => ({ characterId: s.players[r.index].characterId, place: r.place, crowns: s.players[r.index].crowns, coins: s.players[r.index].coins, human: r.index === 0 })),
+        },
+      );
+    },
+    [settle],
   );
 
   const crack = useCallback(() => {
@@ -184,11 +239,24 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
       {phase === 'play' ? (
         <DropArena key={seed} seed={seed} playerId={pick} onDone={finish} getAudioContext={getAudioContext} ladderTier={meta.ladders.solo.tier} />
       ) : null}
+      {phase === 'hub' ? (
+        <Hub
+          onPick={(m) => {
+            setMode(m);
+            setPhase('lobby');
+          }}
+          onBack={onBack}
+          t={t}
+        />
+      ) : null}
+      {phase === 'board' ? (
+        <BoardScreen key={seed} humanId={pick} rounds={rounds} seed={seed} ladderTier={meta.ladders.solo.tier} getAudioContext={getAudioContext} onFinish={finishBoard} onQuit={() => setPhase('hub')} />
+      ) : null}
       {phase === 'lobby' ? (
-        <Lobby pick={pick} setPick={setPick} meta={meta} onStart={startMatch} onBack={onBack} t={t} />
+        <Lobby mode={mode} rounds={rounds} setRounds={setRounds} pick={pick} setPick={setPick} meta={meta} onStart={startMatch} onBack={() => setPhase('hub')} t={t} />
       ) : null}
       {phase === 'results' && report ? (
-        <Results data={report} meta={meta} shards={shards} onCrack={crack} onAgain={startMatch} onBack={onBack} t={t} />
+        <Results data={report} meta={meta} shards={shards} onCrack={crack} onAgain={startMatch} onBack={() => setPhase('hub')} t={t} />
       ) : null}
       {pulling ? (
         <CapsulePullOverlay
@@ -215,15 +283,15 @@ function CreamCard({ children, className = '' }: { children: React.ReactNode; cl
   );
 }
 
-function Lobby({ pick, setPick, meta, onStart, onBack, t }: { pick: string; setPick: (id: string) => void; meta: LokPartyMeta; onStart: () => void; onBack: () => void; t: ReturnType<typeof useT> }) {
+function Lobby({ mode, rounds, setRounds, pick, setPick, meta, onStart, onBack, t }: { mode: Mode; rounds: number; setRounds: (n: number) => void; pick: string; setPick: (id: string) => void; meta: LokPartyMeta; onStart: () => void; onBack: () => void; t: ReturnType<typeof useT> }) {
   const touch = typeof window !== 'undefined' && 'ontouchstart' in window;
   return (
     <div className="absolute inset-0 overflow-y-auto" style={{ background: 'radial-gradient(ellipse at 50% 30%, #1d1450 0%, #07061a 70%)' }}>
      <div className="flex min-h-full flex-col items-center justify-center gap-4 p-4">
       <div className="text-center">
         <div className="font-mono text-xs uppercase tracking-[.3em] text-cyan-300">{t('lokParty.title')}</div>
-        <h1 className="mt-1 text-3xl font-black tracking-tight">{t('lokParty.drop.title')}</h1>
-        <p className="mx-auto mt-2 max-w-md text-sm text-white/75">{t('lokParty.drop.pitch')}</p>
+        <h1 className="mt-1 text-3xl font-black tracking-tight">{mode === 'blitz' ? t('lokParty.hub.blitzTitle') : t('lokParty.drop.title')}</h1>
+        <p className="mx-auto mt-2 max-w-md text-sm text-white/75">{mode === 'blitz' ? t('lokParty.hub.blitzPitch') : t('lokParty.drop.pitch')}</p>
       </div>
       <CreamCard className="w-full max-w-md">
         <div className="mb-2 text-xs font-bold uppercase tracking-widest">{t('lokParty.drop.pick')}</div>
@@ -247,6 +315,18 @@ function Lobby({ pick, setPick, meta, onStart, onBack, t }: { pick: string; setP
             );
           })}
         </div>
+        {mode === 'blitz' ? (
+          <div className="mt-3">
+            <div className="mb-1 text-xs font-bold uppercase tracking-widest">{t('lokParty.board.length')}</div>
+            <div className="grid grid-cols-3 gap-2">
+              {[5, 10, 15].map((n) => (
+                <button key={n} type="button" onPointerDown={() => setRounds(n)} className="rounded-lg border-2 py-2 text-sm font-black" style={{ borderColor: ESPRESSO, background: rounds === n ? '#ffcf3c' : 'transparent' }}>
+                  {t('lokParty.board.rounds', { count: n })}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="mt-3 text-xs opacity-80">{t('lokParty.results.ladder', { ladder: t('lokParty.ladder.solo'), rank: ladderLabel(meta.ladders.solo) })}</div>
         <div className="text-xs opacity-80">{t('lokParty.results.pass', { tier: passTier(meta.pass.xp) })}</div>
       </CreamCard>
@@ -266,6 +346,14 @@ function Lobby({ pick, setPick, meta, onStart, onBack, t }: { pick: string; setP
 
 // ------------------------------------------------------------------ results
 
+interface ReportData {
+  report: MatchReport;
+  placement: number;
+  players: number;
+  banked?: number;
+  standings?: Standing[];
+}
+
 function Results({
   data,
   meta,
@@ -275,7 +363,7 @@ function Results({
   onBack,
   t,
 }: {
-  data: { report: MatchReport; placement: number; players: number; banked: number };
+  data: ReportData;
   meta: LokPartyMeta;
   shards: Shard[] | null;
   onCrack: () => void;
@@ -310,11 +398,28 @@ function Results({
           <div>
             <div className="text-xs font-bold uppercase tracking-widest">{t('lokParty.results.title')}</div>
             <div className="text-xl font-black">{t('lokParty.results.place', { place: data.placement, players: data.players })}</div>
-            <div className="text-sm">
-              {t('lokParty.drop.banked')}: {data.banked}
-            </div>
+            {data.banked !== undefined ? (
+              <div className="text-sm">
+                {t('lokParty.drop.banked')}: {data.banked}
+              </div>
+            ) : null}
           </div>
         </div>
+        {data.standings ? (
+          <div className="mt-3">
+            <div className="text-xs font-black uppercase tracking-widest">{t('lokParty.board.final')}</div>
+            <div className="mt-1 grid grid-cols-4 gap-1">
+              {data.standings.map((st) => (
+                <div key={st.characterId} className="flex flex-col items-center rounded-lg border-2 p-1" style={{ borderColor: st.human ? ESPRESSO : '#3b2a2033', background: st.place === 1 ? '#fff1c2' : 'transparent' }}>
+                  <span className="text-xs font-black">{st.place}</span>
+                  <RigPreview id={st.characterId} size={56} />
+                  <span className="text-[10px] font-bold">{t('lokParty.board.crowns', { count: st.crowns })}</span>
+                  <span className="text-[10px] opacity-70">{t('lokParty.board.coins', { count: st.coins })}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <ul className="mt-3 space-y-1 text-sm">
           {lines.map((l, i) => (
             <li key={i} className="border-b border-dashed pb-1" style={{ borderColor: '#3b2a2033' }}>
@@ -374,7 +479,9 @@ function CapsuleGlyph() {
 
 // ------------------------------------------------------------------ arena
 
-interface ArenaProps {
+export interface ArenaProps {
+  /** Match length; default 60 s. */
+  durationMs?: number;
   seed: number;
   playerId: string;
   onDone: (s: DropState) => void;
@@ -383,7 +490,7 @@ interface ArenaProps {
   ladderTier: number;
 }
 
-function DropArena({ seed, playerId, onDone, getAudioContext, ladderTier }: ArenaProps) {
+export function DropArena({ seed, playerId, onDone, getAudioContext, ladderTier, durationMs = DROP.durationMs }: ArenaProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const inputRef = useRef<PlayerInput>({ mx: 0, my: 0, dashPressed: false });
@@ -437,8 +544,8 @@ function DropArena({ seed, playerId, onDone, getAudioContext, ladderTier }: Aren
     const juice: Juice = createJuice(getAudioContext, { motion, bpm: 118 });
     const labels = labelsRef.current;
     const skills = [0, ...botSkillsForTier(ladderTier)];
-    const roster = [playerId, ...ROSTER_IDS.filter((id) => id !== playerId)].map((id, i) => ({ characterId: id, bot: i !== 0, botSkill: skills[i] }));
-    const state = createLokDrop(seed, roster);
+    const roster = seatOrder(playerId).map((id, i) => ({ characterId: id, bot: i !== 0, botSkill: skills[i] }));
+    const state = createLokDrop(seed, roster, durationMs);
     const squash = state.players.map(() => new Squash());
     const sparks: Spark[] = [];
     const toasts: { x: number; y: number; text: string; born: number; color: string }[] = [];
@@ -541,7 +648,7 @@ function DropArena({ seed, playerId, onDone, getAudioContext, ladderTier }: Aren
           break;
         }
         case 'ring-move':
-          banner = { text: state.now < DROP.ringOpenMs + 100 ? labels.ringOpens : labels.ringMoved, until: realNow + 1400, color: '#7cff6b' };
+          banner = { text: state.now < Math.min(DROP.ringOpenMs, state.durationMs * 0.1) + 100 ? labels.ringOpens : labels.ringMoved, until: realNow + 1400, color: '#7cff6b' };
           break;
         case 'slam-warn':
           banner = { text: labels.slamWarn, until: realNow + 1800, color: '#ff3f5a' };
@@ -703,7 +810,7 @@ function DropArena({ seed, playerId, onDone, getAudioContext, ladderTier }: Aren
         acc -= STEP;
         steps += 1;
       }
-      if (!frenzyShown && state.now >= 40_000) {
+      if (!frenzyShown && state.now >= state.durationMs - 20_000) {
         frenzyShown = true;
         banner = { text: labels.frenzy, until: realNow + 1400, color: '#ffd23f' };
         juice.bus.bpm = 140;
@@ -798,41 +905,156 @@ function DropArena({ seed, playerId, onDone, getAudioContext, ladderTier }: Aren
 // ------------------------------------------------------------------ drawing helpers
 
 function drawVault(ctx: CanvasRenderingContext2D, s: DropState, now: number, pulse: number) {
-  // Back wall.
+  // Back wall: riveted steel panels, pipes, hazard trim.
   const wall = ctx.createLinearGradient(0, 0, 0, FLOOR_TOP);
   wall.addColorStop(0, '#0b0820');
-  wall.addColorStop(1, '#1a1240');
+  wall.addColorStop(1, '#1d1548');
   ctx.fillStyle = wall;
   ctx.fillRect(-200, -200, VIEW_W + 400, FLOOR_TOP + 200);
-  // Vault doors slide shut over the last five seconds.
+  for (let x = -40; x < VIEW_W + 40; x += 120) {
+    for (let y = 30; y < FLOOR_TOP - 20; y += 70) {
+      const g = ctx.createLinearGradient(x, y, x + 110, y + 62);
+      g.addColorStop(0, '#2a2160');
+      g.addColorStop(1, '#171238');
+      ctx.fillStyle = g;
+      ctx.fillRect(x + 4, y, 112, 62);
+      ctx.strokeStyle = 'rgba(140,130,255,0.22)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 4.5, y + 0.5, 111, 61);
+      ctx.fillStyle = 'rgba(200,190,255,0.35)';
+      for (const [rx, ry] of [
+        [8, 4],
+        [110, 4],
+        [8, 56],
+        [110, 56],
+      ])
+        ctx.fillRect(x + rx, y + ry, 2.5, 2.5);
+    }
+  }
+  // Pipes along the top with valve wheels.
+  for (const [py, col] of [
+    [18, '#3b3478'],
+    [30, '#2f2a62'],
+  ] as const) {
+    const pg = ctx.createLinearGradient(0, py - 5, 0, py + 5);
+    pg.addColorStop(0, '#6a62c8');
+    pg.addColorStop(0.5, col);
+    pg.addColorStop(1, '#120e2a');
+    ctx.fillStyle = pg;
+    ctx.fillRect(-200, py - 5, VIEW_W + 400, 10);
+    for (let x = 60; x < VIEW_W; x += 220) {
+      ctx.fillStyle = '#4b4396';
+      ctx.fillRect(x, py - 7, 8, 14);
+    }
+  }
+  // Warning beacons that spin faster as the vault closes.
   const left = timeLeftMs(s);
-  const close = left < DROP.slamWarnMs ? 1 - left / DROP.slamWarnMs : 0;
+  const urgent = left < DROP.slamWarnMs;
+  for (const bx of [140, VIEW_W - 140]) {
+    const a = now / (urgent ? 90 : 400);
+    ctx.fillStyle = '#2a1f2b';
+    ctx.fillRect(bx - 10, 44, 20, 10);
+    ctx.fillStyle = urgent ? '#ff3f5a' : '#ffb03c';
+    ctx.beginPath();
+    ctx.arc(bx, 42, 8, Math.PI, 0);
+    ctx.fill();
+    const beam = ctx.createRadialGradient(bx, 40, 2, bx, 40, 120);
+    beam.addColorStop(0, urgent ? 'rgba(255,63,90,0.45)' : 'rgba(255,176,60,0.25)');
+    beam.addColorStop(1, 'rgba(255,63,90,0)');
+    ctx.fillStyle = beam;
+    ctx.beginPath();
+    ctx.moveTo(bx, 40);
+    ctx.arc(bx, 40, 120, a, a + 0.5);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Vault doors slide shut over the last five seconds.
+  const close = urgent ? 1 - left / DROP.slamWarnMs : 0;
   const doorW = 220;
   const gap = 140 * (1 - close);
-  ctx.fillStyle = '#2a2350';
-  ctx.fillRect(VIEW_W / 2 - gap / 2 - doorW, 40, doorW, FLOOR_TOP - 40);
-  ctx.fillRect(VIEW_W / 2 + gap / 2, 40, doorW, FLOOR_TOP - 40);
-  ctx.strokeStyle = `rgba(56,242,255,${0.35 + 0.4 * pulse})`;
-  ctx.lineWidth = 3;
-  ctx.strokeRect(VIEW_W / 2 - gap / 2 - doorW, 40, doorW, FLOOR_TOP - 40);
-  ctx.strokeStyle = `rgba(255,63,210,${0.35 + 0.4 * pulse})`;
-  ctx.strokeRect(VIEW_W / 2 + gap / 2, 40, doorW, FLOOR_TOP - 40);
+  const doors: [number, string][] = [
+    [VIEW_W / 2 - gap / 2 - doorW, '#38f2ff'],
+    [VIEW_W / 2 + gap / 2, '#ff3fd2'],
+  ];
+  for (const [dx, neon] of doors) {
+    const dg = ctx.createLinearGradient(dx, 0, dx + doorW, 0);
+    dg.addColorStop(0, '#3a3270');
+    dg.addColorStop(0.5, '#4a4290');
+    dg.addColorStop(1, '#2a2356');
+    ctx.fillStyle = dg;
+    ctx.fillRect(dx, 40, doorW, FLOOR_TOP - 40);
+    // Bars and bolts.
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    for (let k = 0; k < 4; k += 1) ctx.fillRect(dx + 10, 58 + k * 32, doorW - 20, 6);
+    ctx.fillStyle = 'rgba(220,215,255,0.5)';
+    for (let k = 0; k < 9; k += 1) {
+      ctx.fillRect(dx + 8 + k * 25, 46, 3, 3);
+      ctx.fillRect(dx + 8 + k * 25, FLOOR_TOP - 10, 3, 3);
+    }
+    // Lock wheel (spins while the doors move).
+    const cx = dx + doorW / 2;
+    const cy = 40 + (FLOOR_TOP - 40) / 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(close * 6 + (dx < VIEW_W / 2 ? 0 : 0.4));
+    ctx.strokeStyle = '#c9c4ff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(0, 0, 26, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let k = 0; k < 6; k += 1) {
+      ctx.rotate(Math.PI / 3);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, 26);
+      ctx.stroke();
+      ctx.fillStyle = '#ffd23f';
+      ctx.beginPath();
+      ctx.arc(0, 30, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#1a1238';
+    ctx.beginPath();
+    ctx.arc(0, 0, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // Neon edge trim that breathes on the beat.
+    ctx.strokeStyle = neon;
+    ctx.globalAlpha = 0.45 + 0.45 * pulse;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = neon;
+    ctx.shadowBlur = 12;
+    ctx.strokeRect(dx, 40, doorW, FLOOR_TOP - 40);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
   if (gap > 4) {
     const glow = ctx.createLinearGradient(VIEW_W / 2 - gap / 2, 0, VIEW_W / 2 + gap / 2, 0);
     glow.addColorStop(0, 'rgba(255,210,63,0)');
-    glow.addColorStop(0.5, 'rgba(255,210,63,0.45)');
+    glow.addColorStop(0.5, 'rgba(255,210,63,0.55)');
     glow.addColorStop(1, 'rgba(255,210,63,0)');
     ctx.fillStyle = glow;
     ctx.fillRect(VIEW_W / 2 - gap / 2, 40, gap, FLOOR_TOP - 40);
   }
-  // Floor: wet indigo asphalt as a tilted trapezoid.
+  // Hazard stripe sill along the base of the wall.
+  for (let x = -40, i = 0; x < VIEW_W + 40; x += 18, i += 1) {
+    ctx.fillStyle = i % 2 ? '#1a1218' : '#ffcb3c';
+    ctx.beginPath();
+    ctx.moveTo(x, FLOOR_TOP - 8);
+    ctx.lineTo(x + 18, FLOOR_TOP - 8);
+    ctx.lineTo(x + 10, FLOOR_TOP);
+    ctx.lineTo(x - 8, FLOOR_TOP);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Floor: wet indigo plate steel as a tilted trapezoid.
   const tl = project(0, 0);
   const tr = project(DROP.width, 0);
   const br = project(DROP.width, DROP.height);
   const bl = project(0, DROP.height);
   const floor = ctx.createLinearGradient(0, tl.sy, 0, bl.sy);
   floor.addColorStop(0, '#141038');
-  floor.addColorStop(1, '#221a52');
+  floor.addColorStop(1, '#251c58');
   ctx.fillStyle = floor;
   ctx.beginPath();
   ctx.moveTo(tl.sx, tl.sy);
@@ -841,19 +1063,65 @@ function drawVault(ctx: CanvasRenderingContext2D, s: DropState, now: number, pul
   ctx.lineTo(bl.sx, bl.sy);
   ctx.closePath();
   ctx.fill();
-  // Reflections of the door neon on the wet floor.
-  for (const [x, col] of [
-    [VIEW_W / 2 - 160, 'rgba(56,242,255,0.10)'],
-    [VIEW_W / 2 + 160, 'rgba(255,63,210,0.10)'],
-  ] as const) {
-    const g = ctx.createRadialGradient(x, FLOOR_TOP + 60, 4, x, FLOOR_TOP + 60, 220);
-    g.addColorStop(0, col);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(x - 240, FLOOR_TOP, 480, 360);
+  // Beveled plates with a tread pattern on alternating squares.
+  for (let gy = 0; gy < DROP.height; gy += 62) {
+    for (let gx = 0; gx < DROP.width; gx += 100) {
+      const a = project(gx + 3, gy + 3);
+      const b = project(gx + 97, gy + 3);
+      const c = project(gx + 97, gy + 59);
+      const d = project(gx + 3, gy + 59);
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(d.sx, d.sy);
+      ctx.lineTo(a.sx, a.sy);
+      ctx.lineTo(b.sx, b.sy);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath();
+      ctx.moveTo(b.sx, b.sy);
+      ctx.lineTo(c.sx, c.sy);
+      ctx.lineTo(d.sx, d.sy);
+      ctx.stroke();
+      if (((gx / 100) + (gy / 62)) % 2 === 0) {
+        ctx.strokeStyle = 'rgba(160,150,255,0.07)';
+        for (let k = 1; k < 5; k += 1) {
+          const p = project(gx + 15 + k * 14, gy + 15);
+          const q = project(gx + 5 + k * 14, gy + 45);
+          ctx.beginPath();
+          ctx.moveTo(p.sx, p.sy);
+          ctx.lineTo(q.sx, q.sy);
+          ctx.stroke();
+        }
+      }
+    }
   }
-  // Grid.
-  ctx.strokeStyle = `rgba(120,110,255,${0.12 + 0.08 * pulse})`;
+  // Puddles that mirror the door neon.
+  for (const [px, py, r] of [
+    [260, 180, 70],
+    [720, 260, 90],
+    [430, 470, 80],
+    [860, 520, 60],
+  ]) {
+    const c = project(px, py);
+    ctx.fillStyle = 'rgba(10,8,30,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(c.sx, c.sy, r * c.k, r * 0.32 * c.k, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const rg = ctx.createLinearGradient(c.sx - r, 0, c.sx + r, 0);
+    rg.addColorStop(0, `rgba(56,242,255,${0.12 + 0.1 * pulse})`);
+    rg.addColorStop(1, `rgba(255,63,210,${0.12 + 0.1 * pulse})`);
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.ellipse(c.sx, c.sy, r * c.k * 0.8, r * 0.22 * c.k, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.beginPath();
+    ctx.ellipse(c.sx - r * 0.2, c.sy - 2, r * c.k * 0.35, r * 0.06 * c.k, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // Grid glow on the beat.
+  ctx.strokeStyle = `rgba(120,110,255,${0.08 + 0.08 * pulse})`;
   ctx.lineWidth = 1;
   for (let gx = 0; gx <= DROP.width; gx += 100) {
     const a = project(gx, 0);
@@ -863,20 +1131,40 @@ function drawVault(ctx: CanvasRenderingContext2D, s: DropState, now: number, pul
     ctx.lineTo(b.sx, b.sy);
     ctx.stroke();
   }
-  for (let gy = 0; gy <= DROP.height; gy += 62) {
-    const a = project(0, gy);
-    const b = project(DROP.width, gy);
+  // Side pillars with neon strips.
+  for (const side of [-1, 1]) {
+    const top = side < 0 ? tl : tr;
+    const bot = side < 0 ? bl : br;
+    const px = side < 0 ? top.sx - 30 : top.sx + 6;
+    const pg = ctx.createLinearGradient(px, 0, px + 24, 0);
+    pg.addColorStop(0, '#2a2356');
+    pg.addColorStop(1, '#14102e');
+    ctx.fillStyle = pg;
     ctx.beginPath();
-    ctx.moveTo(a.sx, a.sy);
-    ctx.lineTo(b.sx, b.sy);
+    ctx.moveTo(px, 40);
+    ctx.lineTo(px + 24, 40);
+    ctx.lineTo((side < 0 ? bot.sx - 50 : bot.sx + 26) + 24, bot.sy);
+    ctx.lineTo(side < 0 ? bot.sx - 50 : bot.sx + 26, bot.sy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = side < 0 ? '#38f2ff' : '#ff3fd2';
+    ctx.globalAlpha = 0.5 + 0.4 * pulse;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(px + 12, 50);
+    ctx.lineTo((side < 0 ? bot.sx - 50 : bot.sx + 26) + 12, bot.sy - 10);
     ctx.stroke();
+    ctx.globalAlpha = 1;
   }
   // Front lip.
   ctx.fillStyle = '#0b0820';
-  ctx.fillRect(bl.sx - 40, bl.sy, br.sx - bl.sx + 80, 60);
+  ctx.fillRect(bl.sx - 60, bl.sy, br.sx - bl.sx + 120, 70);
   ctx.fillStyle = `rgba(56,242,255,${0.5 + 0.4 * pulse})`;
   ctx.fillRect(bl.sx, bl.sy, br.sx - bl.sx, 3);
-  void now;
+  for (let x = bl.sx + 20; x < br.sx; x += 60) {
+    ctx.fillStyle = 'rgba(200,190,255,0.3)';
+    ctx.fillRect(x, bl.sy + 10, 3, 3);
+  }
 }
 
 function drawRing(ctx: CanvasRenderingContext2D, s: DropState, now: number, pulse: number) {
@@ -1097,4 +1385,120 @@ function drawHud(
     ctx.fillText(banner.text.toUpperCase(), midX, by);
   }
   ctx.restore();
+}
+
+// ------------------------------------------------------------------ hub
+
+function ModePreview({ mode }: { mode: Mode }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const c = ref.current;
+    const ctx = c?.getContext('2d');
+    if (!c || !ctx) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = 300;
+    const h = 150;
+    c.width = w * dpr;
+    c.height = h * dpr;
+    let raf = 0;
+    const t0 = performance.now();
+    const loop = (ts: number) => {
+      const t = ts - t0;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const bg = ctx.createLinearGradient(0, 0, 0, h);
+      if (mode === 'blitz') {
+        bg.addColorStop(0, '#f6b76b');
+        bg.addColorStop(1, '#5b3a6e');
+      } else {
+        bg.addColorStop(0, '#1d1450');
+        bg.addColorStop(1, '#07061a');
+      }
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, w, h);
+      if (mode === 'blitz') {
+        // Mini skyline.
+        for (let i = 0; i < 9; i += 1) {
+          const bh = 30 + ((i * 37) % 50);
+          ctx.fillStyle = i % 2 ? '#6e3a4c' : '#4b3a6e';
+          ctx.fillRect(i * 34, h - 40 - bh, 30, bh);
+          ctx.fillStyle = 'rgba(255,220,150,0.6)';
+          for (let y = h - 34 - bh; y < h - 46; y += 10) for (let x = i * 34 + 5; x < i * 34 + 26; x += 9) ctx.fillRect(x, y, 4, 5);
+        }
+        ctx.fillStyle = '#5b4a57';
+        ctx.fillRect(0, h - 40, w, 40);
+        // Path of spaces.
+        const cols = ['#38d5ff', '#38d5ff', '#ff3fa4', '#ffcb3c', '#38d5ff', '#5fe36f'];
+        cols.forEach((col, i) => {
+          const x = 30 + i * 44;
+          const y = h - 20;
+          ctx.fillStyle = 'rgba(0,0,0,0.4)';
+          ctx.beginPath();
+          ctx.ellipse(x, y + 5, 16, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.ellipse(x, y, 16, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        drawOwl(ctx, 235, h - 18, 0.5, t);
+        drawDiceBlock(ctx, 90, 52 + Math.sin(t / 200) * 5, 40, String(1 + (Math.floor(t / 400) % 10)), '#ffcb3c', t);
+        drawCoin(ctx, 150, 40, 10, t, true);
+      } else {
+        // Vault doors, ring and falling capsules.
+        ctx.strokeStyle = '#38f2ff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(40, 14, 100, 60);
+        ctx.strokeStyle = '#ff3fd2';
+        ctx.strokeRect(160, 14, 100, 60);
+        ctx.strokeStyle = '#7cff6b';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(150, 118, 60, 16, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        for (let i = 0; i < 4; i += 1) {
+          const x = 60 + i * 60;
+          const y = ((t / 6 + i * 60) % 150) - 10;
+          ctx.fillStyle = i === 2 ? '#ffc531' : '#38c8ff';
+          ctx.beginPath();
+          ctx.roundRect(x - 7, y - 10, 14, 20, 7);
+          ctx.fill();
+          ctx.strokeStyle = '#07061a';
+          ctx.stroke();
+        }
+        drawCrown(ctx, 150, 60, 26, t);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [mode]);
+  return <canvas ref={ref} className="w-full rounded-lg border-2" style={{ aspectRatio: '2 / 1', borderColor: ESPRESSO }} />;
+}
+
+function Hub({ onPick, onBack, t }: { onPick: (m: Mode) => void; onBack: () => void; t: ReturnType<typeof useT> }) {
+  return (
+    <div className="absolute inset-0 overflow-y-auto" style={{ background: 'radial-gradient(ellipse at 50% 20%, #2a1d5c 0%, #07061a 70%)' }}>
+      <div className="flex min-h-full flex-col items-center justify-center gap-4 p-4">
+        <div className="text-center">
+          <div className="font-mono text-xs uppercase tracking-[.3em] text-cyan-300">{t('lokParty.title')}</div>
+          <h1 className="mt-1 text-3xl font-black tracking-tight">{t('lokParty.hub.pick')}</h1>
+        </div>
+        <div className="grid w-full max-w-3xl gap-4 sm:grid-cols-2">
+          {(['blitz', 'drop'] as Mode[]).map((m) => (
+            <CreamCard key={m}>
+              <ModePreview mode={m} />
+              <div className="mt-3 text-xl font-black">{m === 'blitz' ? t('lokParty.hub.blitzTitle') : t('lokParty.drop.title')}</div>
+              <p className="mt-1 text-sm opacity-80">{m === 'blitz' ? t('lokParty.hub.blitzPitch') : t('lokParty.hub.dropPitch')}</p>
+              <button type="button" onPointerDown={() => onPick(m)} className="mt-3 w-full rounded-xl border-[3px] py-3 text-base font-black active:translate-y-[3px]" style={{ background: m === 'blitz' ? '#ffcf3c' : '#7cff6b', borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
+                {t('lokParty.hub.play')}
+              </button>
+            </CreamCard>
+          ))}
+        </div>
+        <button type="button" onPointerDown={onBack} className="rounded-lg border border-white/30 px-5 py-2 text-sm font-bold">
+          {t('lokParty.drop.back')}
+        </button>
+      </div>
+    </div>
+  );
 }

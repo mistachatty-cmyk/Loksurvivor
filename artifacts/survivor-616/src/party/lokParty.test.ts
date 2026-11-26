@@ -383,3 +383,89 @@ test('Lok Party engines stay free of game imports (so the mode can become its ow
     assert.ok(imports.every((p) => p.startsWith('./')), `${f} imports ${imports.join(', ')}`);
   }
 });
+
+// ---------------------------------------------------------------- Slice 3: board
+
+import { MONROE_LOOP } from './boards/monroeLoop';
+import { CROWN_COST, boardAct, boardAdvance, boardMinigameResult, boardStandings, botAction, createBoardGame, hopDistance, nodeMap, type BoardState } from './lokBoard';
+
+const BOARD_ROSTER = ['zero-day', 'shade', 'quarry-kid', 'golden-hour'].map((characterId) => ({ characterId, bot: true }));
+
+function playBoard(seed: number, rounds = 10) {
+  const s = createBoardGame(seed, MONROE_LOOP, BOARD_ROSTER, rounds);
+  const seen = new Set<string>();
+  let guard = 0;
+  while (s.phase !== 'over' && guard++ < 20000) {
+    if (s.phase === 'minigame') {
+      const order = [0, 1, 2, 3].sort(() => s.rng() - 0.5);
+      boardMinigameResult(s, order.map((_, i) => order.indexOf(i) + 1));
+    } else if (s.pending) boardAct(s, botAction(s)!);
+    else boardAdvance(s);
+    for (const e of s.events) seen.add(e.kind === 'hop' ? `hop:${e.via}` : e.kind);
+  }
+  return { s, seen };
+}
+
+test('board: every node links forward and the whole loop is reachable from start', () => {
+  const map = nodeMap(MONROE_LOOP);
+  for (const n of MONROE_LOOP.nodes) {
+    assert.ok(n.next.length > 0, `${n.id} is a dead end`);
+    for (const t of n.next) assert.ok(map[t], `${n.id} -> missing ${t}`);
+    assert.ok(Number.isFinite(hopDistance(MONROE_LOOP, MONROE_LOOP.start, n.id)), `${n.id} unreachable`);
+  }
+  for (const id of MONROE_LOOP.crownSpots) assert.ok(map[id], `crown spot ${id}`);
+});
+
+test('board: a 10-round bot game finishes with crowns, minigames, overtime and two bonus crowns', () => {
+  const { s, seen } = playBoard(616);
+  assert.equal(s.phase, 'over');
+  assert.equal(s.bonus.length, 2);
+  for (const k of ['roll', 'land', 'minigame', 'crown-bought', 'overtime', 'vendor-move', 'game-over']) assert.ok(seen.has(k), `missing ${k}`);
+  assert.ok(s.players.reduce((n, p) => n + p.crowns, 0) >= 2);
+  assert.deepEqual(boardStandings(s).map((r) => r.place), [1, 2, 3, 4]);
+});
+
+test('board: elevation traversals all get used across a few games', () => {
+  const all = new Set<string>();
+  for (const seed of [1, 2, 3, 4, 5, 6]) for (const k of playBoard(seed).seen) all.add(k);
+  for (const v of ['hop:walk', 'hop:ladder', 'hop:bridge-over', 'hop:stairs', 'hop:slide']) assert.ok(all.has(v), `never saw ${v}`);
+});
+
+test('board: is deterministic for a seed', () => {
+  const a = playBoard(42).s.players.map((p) => [p.coins, p.crowns]);
+  const b = playBoard(42).s.players.map((p) => [p.coins, p.crowns]);
+  assert.deepEqual(a, b);
+});
+
+test('board: passing Lok the Owl with 20 coins offers a crown; buying moves the owl', () => {
+  const s: BoardState = createBoardGame(3, MONROE_LOOP, BOARD_ROSTER, 10);
+  const p = s.players[0];
+  p.coins = 25;
+  p.node = 'T7';
+  s.vendor = 'T8';
+  s.pending = { type: 'roll', useSignature: false };
+  p.customValue = 3;
+  boardAct(s, { type: 'roll', signature: false });
+  boardAdvance(s);
+  assert.deepEqual(s.pending, { type: 'crown' });
+  boardAct(s, { type: 'crown', buy: true });
+  assert.equal(p.crowns, 1);
+  assert.equal(p.coins, 25 - CROWN_COST);
+  assert.notEqual(s.vendor, 'T8');
+  assert.equal(s.phase, 'move', 'keeps walking after buying');
+});
+
+test('board: the ladder junction offers a real choice', () => {
+  const s = createBoardGame(9, MONROE_LOOP, BOARD_ROSTER, 10);
+  const p = s.players[0];
+  p.node = 'B4';
+  p.customValue = 3;
+  s.pending = { type: 'roll', useSignature: false };
+  boardAct(s, { type: 'roll', signature: false });
+  boardAdvance(s);
+  boardAdvance(s);
+  assert.equal(s.pending?.type, 'junction');
+  boardAct(s, { type: 'junction', to: 'G0' });
+  assert.equal(p.node, 'G0');
+  assert.equal(s.events[0].kind === 'hop' && s.events[0].via, 'ladder');
+});

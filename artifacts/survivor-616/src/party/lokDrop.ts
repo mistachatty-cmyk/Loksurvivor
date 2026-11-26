@@ -149,6 +149,8 @@ export interface Boulder {
 
 export interface DropState {
   seed: number;
+  /** Match length; 60 s standalone, 30 s as a board minigame. */
+  durationMs: number;
   now: number;
   rng: () => number;
   players: DropPlayer[];
@@ -189,7 +191,7 @@ export function dropRng(seed: number): () => number {
 
 const between = (rng: () => number, [lo, hi]: readonly [number, number]) => lo + (hi - lo) * rng();
 
-export function createLokDrop(seed: number, roster: { characterId: string; bot: boolean; botSkill?: number }[]): DropState {
+export function createLokDrop(seed: number, roster: { characterId: string; bot: boolean; botSkill?: number }[], durationMs: number = DROP.durationMs): DropState {
   const rng = dropRng(seed);
   const corners = [
     [180, 160],
@@ -226,6 +228,7 @@ export function createLokDrop(seed: number, roster: { characterId: string; bot: 
   }));
   return {
     seed,
+    durationMs: Math.max(15_000, durationMs),
     now: 0,
     rng,
     players,
@@ -249,7 +252,7 @@ export function createLokDrop(seed: number, roster: { characterId: string; bot: 
 const dist2 = (ax: number, ay: number, bx: number, by: number) => (ax - bx) ** 2 + (ay - by) ** 2;
 
 export function timeLeftMs(s: DropState): number {
-  return Math.max(0, DROP.durationMs - s.now);
+  return Math.max(0, s.durationMs - s.now);
 }
 
 /**
@@ -282,7 +285,7 @@ export function stepLokDrop(s: DropState, inputs: (PlayerInput | null)[], dtMs: 
     s.slamWarned = true;
     s.events.push({ kind: 'slam-warn', x: s.ring.x, y: s.ring.y, weight: 0.3 });
   }
-  if (s.now >= DROP.durationMs) {
+  if (s.now >= s.durationMs) {
     s.over = true;
     for (const p of s.players) p.carried = 0;
     s.events.push({ kind: 'slam', x: DROP.width / 2, y: DROP.height / 2, weight: 1 });
@@ -290,7 +293,7 @@ export function stepLokDrop(s: DropState, inputs: (PlayerInput | null)[], dtMs: 
 }
 
 function spawnStuff(s: DropState): void {
-  if (s.now >= s.nextCapsuleAt && s.now < DROP.durationMs - 1500) {
+  if (s.now >= s.nextCapsuleAt && s.now < s.durationMs - 1500) {
     const gold = s.rng() < DROP.goldChance;
     s.capsules.push({
       id: s.nextId++,
@@ -301,10 +304,10 @@ function spawnStuff(s: DropState): void {
       gold,
       bounces: 0,
     });
-    const rate = s.now >= DROP.frenzyFromMs ? DROP.frenzyRate : 1;
+    const rate = s.now >= s.durationMs - (DROP.durationMs - DROP.frenzyFromMs) ? DROP.frenzyRate : 1;
     s.nextCapsuleAt = s.now + between(s.rng, DROP.capsuleEveryMs) / rate;
   }
-  if (s.now >= s.nextBoulderAt && s.now < DROP.durationMs - 3000) {
+  if (s.now >= s.nextBoulderAt && s.now < s.durationMs - 3000) {
     const fromLeft = s.rng() < 0.5;
     const y = 90 + s.rng() * (DROP.height - 180);
     const angle = (s.rng() - 0.5) * 0.5;
@@ -323,13 +326,14 @@ function spawnStuff(s: DropState): void {
 
 function updateRing(s: DropState): void {
   const r = s.ring;
-  if (!r.open && s.now >= DROP.ringOpenMs) {
+  const openAt = Math.min(DROP.ringOpenMs, s.durationMs * 0.1);
+  if (!r.open && s.now >= openAt) {
     r.open = true;
     r.movedAt = s.now;
     s.events.push({ kind: 'ring-move', x: r.x, y: r.y, weight: 0.2 });
     return;
   }
-  if (r.open && s.now - r.movedAt >= DROP.ringMoveEveryMs && timeLeftMs(s) > DROP.slamWarnMs) {
+  if (r.open && s.now - r.movedAt >= Math.min(DROP.ringMoveEveryMs, s.durationMs / 4) && timeLeftMs(s) > DROP.slamWarnMs) {
     // Pick a spot away from the old one and away from the walls.
     let best = { x: r.x, y: r.y, d: -1 };
     for (let i = 0; i < 6; i += 1) {

@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 229,
+      "version": "0.42.90",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T18:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party: Turbo Crown Blitz on the Monroe Loop",
+      "body": [
+        "A full party board game for you and three bots: roll the dice block or your Signature Die, race to Lok the Owl, buy Crowns for 20 coins, and climb fire escapes, cross the river gantry or ride the boulder chute. Five items, hack terminals, ARCHON taxes, glitch traps, night shifts every three rounds, three-round Overtime, a Lok Drop minigame every round and two surprise Bonus Crowns at the end. Pick 5, 10 or 15 rounds.",
+        "The city is alive to the touch: tap windows to switch their lights, recolor neon signs, switch street lamps, rustle trees, ripple the river, and tap the night sky for a shooting star. Buildings now sit in proper depth and turn see-through when they would hide you.",
+        "The Lok Drop vault got a full art pass with riveted walls, lock-wheel doors, warning beacons and puddle reflections."
+      ]
+    },
+    {
       "number": 228,
       "version": "0.42.89",
       "date": "2026-11-26",
