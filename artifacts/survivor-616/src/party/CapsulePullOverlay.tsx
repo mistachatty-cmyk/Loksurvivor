@@ -147,6 +147,8 @@ export function CapsulePullOverlay({ characterId, shards, getAudioContext, onDon
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
+    // A button left focused under the overlay must not be pressed again by Enter or Space.
+    (document.activeElement as HTMLElement | null)?.blur?.();
     window.addEventListener('keydown', onKey);
 
     const frame = (ts: number) => {

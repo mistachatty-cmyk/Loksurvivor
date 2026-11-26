@@ -1595,6 +1595,7 @@
   "lokParty.results.crack": "Tippen Sie auf die Kapsel, um sie zu knacken",
   "lokParty.results.shards": "Neue Scherben",
   "lokParty.results.again": "Spielen Sie noch einmal",
+  "lokParty.results.unranked": "Online-Party: ohne Rang",
   "lokParty.results.vault": "Tresor: {{capsules}}-Kapseln, {{keys}}-Schlüssel, {{shards}}-Scherben",
   "lokParty.ladder.solo": "Solo Blitz",
   "lokParty.ladder.crew": "Online Crew",
@@ -1680,6 +1681,8 @@
   "lokParty.online.unavailable": "Online-Partys sind für diesen Build noch nicht aktiviert. Sie können Turbo Crown Blitz weiterhin gegen Bots spielen.",
   "lokParty.online.waiting": "Warten, bis die anderen Spieler fertig sind",
   "lokParty.online.hostLeft": "Der Gastgeber verließ die Party.",
+  "lokParty.online.leaveRun": "Wenn Sie jetzt beitreten, ist Ihr Lauf beendet.",
+  "lokParty.online.joinAnyway": "Machen Sie trotzdem mit",
   "lokParty.online.invited": "{{name}} hat Sie zu einem Lok Party eingeladen",
   "lokParty.door.title": "Lok Party",
   "lokParty.door.sub": "Brettspiel, Minispiele, mit Freunden spielen"

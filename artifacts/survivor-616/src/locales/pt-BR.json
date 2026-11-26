@@ -1595,6 +1595,7 @@
   "lokParty.results.crack": "Toque na cápsula para quebrá-la",
   "lokParty.results.shards": "Novos fragmentos",
   "lokParty.results.again": "Jogue novamente",
+  "lokParty.results.unranked": "Grupo online: sem classificação",
   "lokParty.results.vault": "Cofre: cápsulas {{capsules}}, chaves {{keys}}, fragmentos {{shards}}",
   "lokParty.ladder.solo": "Solo Blitz",
   "lokParty.ladder.crew": "Online Crew",
@@ -1680,6 +1681,8 @@
   "lokParty.online.unavailable": "As festas online ainda não estão ativadas para esta versão. Você ainda pode jogar Turbo Crown Blitz contra bots.",
   "lokParty.online.waiting": "Esperando os outros jogadores terminarem",
   "lokParty.online.hostLeft": "O anfitrião saiu da festa.",
+  "lokParty.online.leaveRun": "A adesão agora encerra sua corrida.",
+  "lokParty.online.joinAnyway": "Junte-se mesmo assim",
   "lokParty.online.invited": "{{name}} convidou você para um Lok Party",
   "lokParty.door.title": "Lok Party",
   "lokParty.door.sub": "Jogo de tabuleiro, minijogos, brincar com amigos"

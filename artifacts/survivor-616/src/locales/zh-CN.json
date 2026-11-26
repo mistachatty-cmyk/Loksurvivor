@@ -1595,6 +1595,7 @@
   "lokParty.results.crack": "点击胶囊将其破裂",
   "lokParty.results.shards": "新碎片",
   "lokParty.results.again": "再玩一次",
+  "lokParty.results.unranked": "在线派对：未排名",
   "lokParty.results.vault": "Vault：{{capsules}} 胶囊、{{keys}} 密钥、{{shards}} 碎片",
   "lokParty.ladder.solo": "Solo Blitz",
   "lokParty.ladder.crew": "Online Crew",
@@ -1680,6 +1681,8 @@
   "lokParty.online.unavailable": "此版本尚未开启在线派对。您仍然可以与机器人玩 Turbo Crown Blitz。",
   "lokParty.online.waiting": "等待其他玩家完成",
   "lokParty.online.hostLeft": "主持人离开了聚会。",
+  "lokParty.online.leaveRun": "现在加入即可结束您的跑步。",
+  "lokParty.online.joinAnyway": "无论如何加入",
   "lokParty.online.invited": "{{name}}邀请您参加Lok Party",
   "lokParty.door.title": "Lok Party",
   "lokParty.door.sub": "桌游、小游戏、与朋友一起玩"

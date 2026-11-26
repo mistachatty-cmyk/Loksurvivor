@@ -293,7 +293,9 @@ test('switching is refused for the active pet, a fainted pet, or after the fight
   assert.equal(switchQuickFight(over, 1), over);
 });
 
-test('a fainted lead sends in a teammate and the fight goes on until the whole team is down', () => {
+test('a fainted lead sends in a teammate and the fight goes on until the whole team is down', (t) => {
+  // The battle engine rolls accuracy with Math.random: pin it so the enemy's hit cannot miss.
+  t.mock.method(Math, 'random', () => 0);
   const pets = [savedPet('a', 0.1), savedPet('b', 0.4)];
   const qf = createQuickFight({ opponent: enemyOpponent(), playerPets: pets, maxTeam: 2, depth: 'deep', rand: () => 0.5 });
   qf.battle.playerTeam[0]!.hp = 1;

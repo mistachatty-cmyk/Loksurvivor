@@ -6,6 +6,7 @@
  * The Lok Drop runs as the 30-second minigame between rounds.
  */
 
+import { press } from './press';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CHARACTERS_BY_ID } from '@/game/data/characters';
 import { drawRig, drawShadow } from '@/game/render/sprite';
@@ -174,6 +175,11 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
     if (!ctx) return;
     const s = stateRef.current;
     const L = labelsRef.current;
+    // A friend is shown by name; bots (and a friend who dropped) by their character.
+    const nameOf = (i: number): string => {
+      const st = seatsRef.current?.[i];
+      return (st && st.kind !== 'bot' && st.name) || CHARACTERS_BY_ID[s.players[i].characterId]?.name || '';
+    };
     const motion = prefersReducedMotion() ? 0 : 1;
     const juice: Juice = createJuice(getAudioContext, { motion, bpm: 104 });
     const ensureAudio = () => void getAudioContext()?.resume?.();
@@ -287,7 +293,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       for (const e of events) {
         switch (e.kind) {
           case 'turn-start': {
-            const name = CHARACTERS_BY_ID[s.players[e.who].characterId]?.name ?? '';
+            const name = nameOf(e.who);
             pushBanner(e.who === localSeat ? L.yourTurn : L.turn(name), LANE[e.who], 900, e.who === localSeat && e.round === 1 ? L.round(s.round, s.maxRounds) : undefined);
             break;
           }
@@ -586,7 +592,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       if (s.phase === 'bonus') {
         if (bonusShown < s.bonus.length) {
           const b = s.bonus[bonusShown];
-          const names = b.winners.map((w) => CHARACTERS_BY_ID[s.players[w].characterId]?.name ?? '').join(' + ');
+          const names = b.winners.map(nameOf).join(' + ');
           pushBanner(`${L.bonusTitle}: ${L.bonus(b.name)}`, '#ffcf3c', 2200, names || L.nobody);
           for (const w of b.winners) confetti(disp[w].x, disp[w].y - 80, 50, ['#ffcf3c', '#fff6c4']);
           juice.chimes.accent('bank');
@@ -1157,7 +1163,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
         ctx.textBaseline = 'alphabetic';
         ctx.fillStyle = ESPRESSO;
         ctx.font = '800 12px ui-sans-serif, system-ui';
-        ctx.fillText((def?.name ?? '').slice(0, 13), x + 68, y + 20);
+        ctx.fillText(nameOf(i).slice(0, 13), x + 68, y + 20);
         drawCrown(ctx, x + 78, y + 39, 16, now, true);
         ctx.font = '900 17px ui-sans-serif, system-ui';
         ctx.fillText(String(p.crowns), x + 90, y + 45);
@@ -1365,10 +1371,10 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
         </div>
       ) : null}
       <div className="absolute bottom-4 left-4 flex gap-2" style={{ bottom: pend ? undefined : 16, top: pend ? undefined : undefined }}>
-        <button type="button" onPointerDown={() => setOverview((v) => !v)} className="rounded-full border-[3px] px-4 py-2 text-xs font-black uppercase" style={{ background: CREAM, borderColor: ESPRESSO, color: ESPRESSO, display: pend ? 'none' : undefined }}>
+        <button type="button" {...press(() => setOverview((v) => !v))} className="rounded-full border-[3px] px-4 py-2 text-xs font-black uppercase" style={{ background: CREAM, borderColor: ESPRESSO, color: ESPRESSO, display: pend ? 'none' : undefined }}>
           {overview ? t('lokParty.board.follow') : t('lokParty.board.map')}
         </button>
-        <button type="button" onPointerDown={onQuit} className="rounded-full border-[3px] px-4 py-2 text-xs font-black uppercase" style={{ background: 'transparent', borderColor: CREAM, color: CREAM, display: pend ? 'none' : undefined }}>
+        <button type="button" {...press(onQuit)} className="rounded-full border-[3px] px-4 py-2 text-xs font-black uppercase" style={{ background: 'transparent', borderColor: CREAM, color: CREAM, display: pend ? 'none' : undefined }}>
           {t('lokParty.drop.back')}
         </button>
       </div>
@@ -1383,7 +1389,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="max-w-sm rounded-2xl border-[3px] p-4 text-center" style={{ background: CREAM, borderColor: ESPRESSO, color: ESPRESSO }}>
             <div className="text-lg font-black">{t('lokParty.online.hostLeft')}</div>
-            <button type="button" onPointerDown={onQuit} className="mt-3 w-full rounded-xl border-[3px] py-3 font-black" style={{ background: '#ffcf3c', borderColor: ESPRESSO }}>
+            <button type="button" {...press(onQuit)} className="mt-3 w-full rounded-xl border-[3px] py-3 font-black" style={{ background: '#ffcf3c', borderColor: ESPRESSO }}>
               {t('lokParty.drop.back')}
             </button>
           </div>
@@ -1413,10 +1419,7 @@ function PartyButton({ children, onPress, tone = 'cream', big = false }: { child
   return (
     <button
       type="button"
-      onPointerDown={(e) => {
-        e.preventDefault();
-        onPress();
-      }}
+      {...press(onPress)}
       className={`flex flex-1 flex-col items-center justify-center rounded-xl border-[3px] font-black transition-transform active:translate-y-[3px] ${big ? 'min-h-[64px] text-lg' : 'min-h-[44px] text-sm'}`}
       style={{ background: bg, borderColor: ESPRESSO, color: ESPRESSO, boxShadow: tone === 'plain' ? 'none' : `0 3px 0 ${ESPRESSO}` }}
     >
