@@ -15,12 +15,12 @@ export function CrashRecoveryPrompt() {
     <div
       role="alert"
       data-testid="crash-recovery-prompt"
-      className="fixed inset-x-3 bottom-3 z-[300] mx-auto max-w-sm border border-sky-300/60 bg-[#0a2540]/95 px-4 py-3 text-sky-100 shadow-[0_0_24px_rgba(56,189,248,0.25)]"
+      className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[300] mx-auto max-h-[45dvh] max-w-sm overflow-y-auto border border-sky-300/60 bg-[#0a2540]/95 px-4 py-3 text-sky-100 shadow-[0_0_24px_rgba(56,189,248,0.25)]"
     >
       <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-sky-300">{t('crash.recovered.title')}</p>
       <p className="mt-1.5 text-sm leading-snug">{t('crash.recovered.body')}</p>
       <p className="mt-1 font-mono text-[10px] text-sky-300/70">{report.fingerprint}</p>
-      <div className="mt-2 flex gap-4 font-mono text-[10px] font-bold uppercase tracking-widest">
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10px] font-bold uppercase tracking-widest">
         <button
           type="button"
           className="text-sky-300 hover:text-white"

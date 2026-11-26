@@ -143,7 +143,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
   // Pushes local changes to the cloud once signed in, debounced so a burst
   // of dispatches (e.g. a run's rewards landing) fires one request, not many.
   useEffect(() => {
-    if (!session || !syncReady.current) return;
+    if (!session || !syncReady.current || meta.devModeAllUnlocks) return; // Dev Mode never reaches the cloud save
     if (pushTimer.current) clearTimeout(pushTimer.current);
     pushTimer.current = setTimeout(() => {
       setStatus('syncing');

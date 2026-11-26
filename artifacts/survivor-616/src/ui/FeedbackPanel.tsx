@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScreenLayout } from './ScreenLayout';
+import { useT } from '@/lib/i18n';
 
 export interface FeedbackPanelProps {
   onBack: () => void;
@@ -22,6 +23,7 @@ const CATEGORY_OPTIONS: { value: FeedbackCategory; label: string }[] = [
 ];
 
 export function FeedbackPanel({ onBack }: FeedbackPanelProps) {
+  const t = useT();
   const { available, submitFeedback } = useAuth();
   const [message, setMessage] = useState('');
   const [category, setCategory] = useState<FeedbackCategory>('idea');
@@ -107,6 +109,7 @@ export function FeedbackPanel({ onBack }: FeedbackPanelProps) {
                       type="button"
                       onClick={() => setRating(rating === value ? undefined : value)}
                       aria-pressed={rating !== undefined && value <= rating}
+                      aria-label={t('feedback.rateStar', { n: value })}
                       className="p-1"
                       data-testid={`button-rating-${value}`}
                     >

@@ -41,14 +41,14 @@ export function GrpdArmoryScreen({ onBack }: { onBack: () => void }) {
           <div className="grid h-36 w-36 shrink-0 place-items-center border border-amber-200/50 bg-sky-950/70 shadow-[0_0_28px_rgba(125,211,252,.2)]" data-testid="portrait-luvitnot-keeper">
             <RigPortrait rig={LUVITNOT_KEEPER.rig} palette={LUVITNOT_KEEPER.palette} size={132} />
           </div>
-          <div className="min-w-0 flex-1 space-y-2">
+          <div className="min-w-0 basis-full space-y-2 sm:basis-0 sm:flex-1">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Eclipse-born · Keeper of the sealed shelves</p>
             <h2 className="text-2xl font-black text-white">The Luvitnot Keeper</h2>
             <p className="max-w-2xl text-sm leading-relaxed text-sky-100/75">Water, spirit, data, and energy hold a humanlike shape inside a white suit trimmed in gold. Its glass helmet and sealed suit protect visitors from the raw current. The keeper guards the archive and hums with its Luvitnot kin when the whole Armory must move.</p>
             <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-200" aria-live="polite" data-testid="grpd-armory-anchor">Current anchor: {anchor === 'station' ? 'GRPD Station' : 'Hideout main floor'}</p>
             {!stationFound && <p className="text-xs text-sky-100/60" data-testid="grpd-armory-station-unfound">{t('hub.armory.stationUnfound')}</p>}
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto">
             {stationFound && <button type="button" onClick={() => setGrpdArmoryAnchor(anchor === 'station' ? 'hideout' : 'station')} className="flex min-h-10 items-center justify-center gap-2 border border-emerald-200/60 bg-emerald-900/30 px-3 font-mono text-xs font-bold uppercase text-emerald-100 hover:bg-emerald-900/50" data-testid="button-shift-grpd-armory"><Waves size={16} /> {anchor === 'station' ? 'Hum shift to hideout' : 'Return to station'}</button>}
             <button type="button" onClick={() => setLoreId(LUVITNOT_KEEPER.loreId)} className="flex min-h-10 items-center justify-center gap-2 border border-amber-200/40 px-3 font-mono text-xs font-bold uppercase text-amber-100 hover:bg-amber-200/10" data-testid="button-luvitnot-lore"><BookOpen size={16} /> Keeper lore</button>
           </div>

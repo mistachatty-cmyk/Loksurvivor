@@ -4,7 +4,7 @@
  * the back room. Payouts here are collectibles and rapport only, never currency, so nothing
  * needs a `hideoutRewards` cap. LokToken prices are the live shared catalog's (`priceOf`).
  */
-import { ArrowLeft, Check, Lock, Palette, Stamp } from 'lucide-react';
+import { GameIcon } from './GameIcon';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -35,6 +35,7 @@ import { useLokEconomy } from '@/state/lokEconomyStore';
 import { HoloOwl } from './HoloOwl';
 import { SupporterBar } from './SupporterBar';
 import { LokWalletStrip } from './LokWalletStrip';
+import { LokJarChip } from './LokJarChip';
 
 const RECENT_LINES = 8;
 /** Where Pass / Passport / Lifetime are managed (the Stripe checkout lives on the hub, not in the game). */
@@ -107,6 +108,11 @@ export function LokShopScreen({ onBack, onOpenCosmetics, onSignIn }: { onBack: (
     u.id === 'field-guide' ? grantLokPetFieldGuide() : u.id === 'lokpack-visualizer' ? grantLokPackVisualizer() : u.id === 'weapon-rack' ? grantTrainingWeaponRack() : grantLokPetCollectorAccess();
 
   const purchase = (sku: string, name: string, fallbackPrice: number, grant: () => void) => {
+    if (meta.devModeAllUnlocks) {   // Dev Mode session: grant locally, no account spend, and the session never saves
+      grant();
+      setNotice(t('lokshop.bought', { name }));
+      return;
+    }
     if (!signedIn) {
       setNotice(t('lokshop.signInNotice'));
       return;
@@ -162,7 +168,7 @@ export function LokShopScreen({ onBack, onOpenCosmetics, onSignIn }: { onBack: (
         </div>
         <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         {have ? (
-          <p className="mt-2 flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-300"><Check className="h-3 w-3" />{t('lokshop.owned')}</p>
+          <p className="mt-2 flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-300"><GameIcon name="check" className="h-3 w-3" />{t('lokshop.owned')}</p>
         ) : (
           <button type="button" onClick={() => purchase(sku, name, price, grant)} disabled={cannot} className="mt-2 w-full border border-cyan-300/70 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-200 hover:bg-cyan-300 hover:text-black disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground/50 disabled:hover:bg-transparent" data-testid={`button-lokshop-buy-${id}`}>
             {buyLabel(price)}
@@ -178,7 +184,7 @@ export function LokShopScreen({ onBack, onOpenCosmetics, onSignIn }: { onBack: (
     <main className="lokshop-room min-h-screen px-4 py-6" data-testid="screen-lok-shop">
       <div className="mx-auto max-w-2xl">
         <button type="button" onClick={onBack} className="mb-4 flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground hover:text-foreground" data-testid="button-lok-shop-back">
-          <ArrowLeft className="h-3 w-3" />{t('lokshop.back')}
+          <GameIcon name="arrowL" className="h-3 w-3" />{t('lokshop.back')}
         </button>
         <SupporterBar variant="inline" />
         <LokWalletStrip onSignIn={onSignIn} />
@@ -191,6 +197,7 @@ export function LokShopScreen({ onBack, onOpenCosmetics, onSignIn }: { onBack: (
             <p className="font-mono text-[10px] uppercase tracking-widest text-cyan-300">LokServer · {t('lokshop.rapport', { tier: t(`lokshop.tier.${tier.id}` as never) })}{fx.passport ? ` · ${t('lokshop.stamps', { n: meta.lokShopStamps })}` : ''}</p>
             <p className="mt-1 text-sm" data-testid="lokserver-line">{line}</p>
           </div>
+          <div className="ml-auto"><LokJarChip onNotice={setNotice} /></div>
         </section>
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -206,7 +213,7 @@ export function LokShopScreen({ onBack, onOpenCosmetics, onSignIn }: { onBack: (
         <div className="mt-5 flex border-b border-violet-300/30" role="tablist">
           {tabs.map((entry) => (
             <button key={entry.id} type="button" role="tab" aria-selected={tab === entry.id} onClick={() => setTab(entry.id)} className={`flex-1 px-2 py-2 font-mono text-[10px] font-bold uppercase tracking-widest ${tab === entry.id ? 'border-b-2 border-cyan-300 text-cyan-200' : 'text-muted-foreground hover:text-foreground'}`} data-testid={`tab-lokshop-${entry.id}`}>
-              {entry.id === 'backroom' && !backOpen ? <Lock className="mr-1 inline h-3 w-3" /> : null}{entry.label}
+              {entry.id === 'backroom' && !backOpen ? <GameIcon name="lock" className="mr-1 inline h-3 w-3" /> : null}{entry.label}
             </button>
           ))}
         </div>
@@ -217,7 +224,7 @@ export function LokShopScreen({ onBack, onOpenCosmetics, onSignIn }: { onBack: (
             {onOpenCosmetics ? (
               <li>
                 <button type="button" onClick={onOpenCosmetics} className="lokshop-card flex w-full items-center gap-3 p-3 text-left" data-testid="button-lokshop-cosmetics">
-                  <Palette className="h-5 w-5 shrink-0 text-cyan-300" />
+                  <GameIcon name="gem" className="h-5 w-5 shrink-0 text-cyan-300" />
                   <span><span className="block text-sm font-black">{t('lokshop.cosmetics')}</span><span className="block text-xs text-muted-foreground">{t('lokshop.cosmeticsBlurb')}</span></span>
                 </button>
               </li>
@@ -269,7 +276,7 @@ export function LokShopScreen({ onBack, onOpenCosmetics, onSignIn }: { onBack: (
               </div>
             </section>
             <section>
-              <h2 className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground"><Stamp className="h-3 w-3" />{t('lokshop.charms.title')} · {t('lokshop.charms.count', { n: meta.lokShopCharms.length, total: FEATHER_CHARMS.length })}</h2>
+              <h2 className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground"><GameIcon name="star" className="h-3 w-3" />{t('lokshop.charms.title')} · {t('lokshop.charms.count', { n: meta.lokShopCharms.length, total: FEATHER_CHARMS.length })}</h2>
               <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {FEATHER_CHARMS.map((c) => {
                   const have = meta.lokShopCharms.includes(c.id);

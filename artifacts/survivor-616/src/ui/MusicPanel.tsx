@@ -680,6 +680,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                 <button
                   type="button"
                   onClick={player.previous}
+                  aria-label={t('music.previous')}
                   className="text-white hover:text-primary transition-colors p-2"
                   data-testid="button-previous"
                 >
@@ -688,6 +689,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                 <button
                   type="button"
                   onClick={player.togglePlay}
+                  aria-label={player.isPlaying ? t('music.pause') : t('music.play')}
                   className="w-16 h-16 flex items-center justify-center bg-primary text-primary-foreground rounded-full hover:bg-white transition-colors hover:scale-105 active:scale-95"
                   data-testid="button-play-pause"
                 >
@@ -696,6 +698,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                 <button
                   type="button"
                   onClick={player.next}
+                  aria-label={t('music.next')}
                   className="text-white hover:text-primary transition-colors p-2"
                   data-testid="button-next"
                 >
@@ -735,6 +738,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                     <button
                       type="button"
                       onClick={player.toggleMute}
+                      aria-label={player.muted || player.volume === 0 ? t('music.unmute') : t('music.mute')}
                       className="text-muted-foreground hover:text-white transition-colors"
                       data-testid="button-mute"
                     >
