@@ -11,3 +11,7 @@
 - Live state is in World: `rings`, `ringTracks`, `claimedRingIds`, `ringCombo`, `burstTokens`, `overshield`, `damageBuffUntil`. `updateRings` runs after `updateEndlessChunks`. Taken rings and finished tracks stay claimed after their chunk unloads.
 - Rivals are timed along the track polyline at fractions of the player's base speed; their trails damage enemies, never the player.
 - Token burst is `burstTokens(w, x, y, count, luck)` and can be called from any win. Not yet hooked to the whole-run victory screen because the world stops stepping on victory.
+
+## Build kit (branch claude/street-life-kit)
+- Street pieces are records built with `definePiece` and the builders in `data/streetLife/pieceKit.ts`; the engine calls only `streetLifeForChunk`. How-to: docs/STREET_LIFE_BUILD_KIT.md. New pieces go at the end of `STREET_PIECES` with a unique salt.
+- Block milestones: `data/streetLife/milestones.ts`, applied in `noteBlockEntered` (world.ts). Step sizes are the tuning knobs; the "0.5" in the request was read as small steps (half a percent for armor and crit), awaiting the owner's answer.

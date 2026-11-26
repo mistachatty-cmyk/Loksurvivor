@@ -10,7 +10,10 @@
  */
 
 import { CALL_INS, CALL_IN_COOLDOWN_MS, CALL_IN_FIRST_READY_MS } from '@/game/data/crewCallIns';
-import { BURST_TOKENS_BY_KIND, RING_STYLES, RING_TRACK_GATE_RADIUS, burstTokenCount, ringLayoutForChunk, rollBurstToken } from '@/game/data/ringRuns';
+import { BURST_TOKENS_BY_KIND, RING_STYLES, RING_TRACK_GATE_RADIUS, burstTokenCount, rollBurstToken } from '@/game/data/ringRuns';
+import { streetLifeForChunk } from '@/game/data/streetLife';
+import { MILESTONE_STATS, milestoneForBlockCount } from '@/game/data/streetLife/milestones';
+import { ringHash } from '@/game/data/ringRuns';
 import type { BurstTokenKind, RingKind } from '@/game/data/ringRuns';
 import { BLACKOUT_STALKERS, RELAY_STORM_DRIFT_PX_PER_SEC, RELAY_STORM_MAX_INSIDE_MS, RELAY_STORM_RADIUS, RELAY_STORM_SLOW, BLOCK_PARTY_NEEDED_MS, BLOCK_PARTY_RADIUS, RUN_EVENTS_BY_ID, scheduleRunEvents, type RunEventId, type ScheduledRunEvent } from '@/game/data/runEvents';
 import { QUIRK_SURGE_LORE } from '@/game/data/quirkSurgeLore';
@@ -1211,10 +1214,40 @@ function trackPoint(track: LiveTrack, dist: number): { x: number; y: number; dx:
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, dx: (b.x - a.x) / segLen, dy: (b.y - a.y) / segLen };
 }
 
+/** Count a newly entered block and hand out a block milestone when it lands on one. */
+function noteBlockEntered(w: World, key: string) {
+  if (w.visitedBlocks.size === 0) {
+    w.visitedBlocks.add(key);
+    return;
+  }
+  if (w.visitedBlocks.has(key)) return;
+  w.visitedBlocks.add(key);
+  w.blocksCrossed += 1;
+  const milestone = milestoneForBlockCount(w.blocksCrossed);
+  if (!milestone) return;
+  const seed = w.endless?.rngSeed ?? w.rngSeed;
+  const pick = MILESTONE_STATS[Math.floor(ringHash(seed, w.blocksCrossed, 0, 77) * MILESTONE_STATS.length)]!;
+  const add = pick.add * milestone.stepMult;
+  const p = w.player;
+  if (pick.stat === 'maxHp') {
+    w.stats.maxHp += add;
+    p.maxHp += add;
+    p.hp = Math.min(p.maxHp, p.hp + add);
+  } else if (pick.stat === 'armor') {
+    w.stats.armor = Math.min(0.6, w.stats.armor + add);
+  } else {
+    w.stats[pick.stat] += add;
+  }
+  pushAlert(w, `BLOCK ${w.blocksCrossed}: ${pick.label} UP`);
+  pushSfx(w, 'ringPassHigh');
+  spawnParticles(w, p.x, p.y, '#7fe8ff', 10, 120);
+  if (milestone.tokens) burstTokens(w, p.x, p.y, milestone.tokens, 0.1);
+}
+
 function loadRingsForChunk(w: World, key: string, cx: number, cy: number, originX: number, originY: number, axis: 'horizontal' | 'vertical') {
   const e = w.endless;
   if (!e) return;
-  const layout = ringLayoutForChunk(cx, cy, e.rngSeed, axis);
+  const layout = streetLifeForChunk(cx, cy, e.rngSeed, axis);
   layout.free.forEach((g, i) => {
     const id = `${key}:r${i}`;
     if (w.claimedRingIds.has(id)) return;
@@ -1683,6 +1716,9 @@ export interface World {
   ultActiveUntil: number;
   /** Street Life rings, Ring Run tracks and the token explosion after a win. */
   rings: LiveRing[];
+  /** Endless blocks entered for the first time (the start block does not count), for block milestones. */
+  blocksCrossed: number;
+  visitedBlocks: Set<string>;
   ringTracks: LiveTrack[];
   claimedRingIds: Set<string>;
   ringCombo: number;
@@ -2334,6 +2370,8 @@ export function createWorld(
     ultActiveUntil: -1,
     powerState: null,
     rings: [],
+    blocksCrossed: 0,
+    visitedBlocks: new Set<string>(),
     ringTracks: [],
     claimedRingIds: new Set<string>(),
     ringCombo: 0,
@@ -12539,6 +12577,7 @@ function updateEndlessChunks(w: World) {
 
   const VIEW_RADIUS = 2;
   const { cx: playerCx, cy: playerCy } = worldToChunkCoords(px, py);
+  noteBlockEntered(w, chunkKey(playerCx, playerCy));
 
   const needed = new Set<string>();
   for (let dx = -VIEW_RADIUS; dx <= VIEW_RADIUS; dx += 1) {

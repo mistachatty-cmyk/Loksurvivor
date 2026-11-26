@@ -53,69 +53,6 @@ export function ringHash(seed: number, cx: number, cy: number, salt: number): nu
 export const RING_GATE_RADIUS = 34;
 export const RING_TRACK_GATE_RADIUS = 38;
 
-/**
- * What rings (if any) a chunk carries. About a fifth of chunks have a lone speed ring or a short line,
- * one in ten a ring field (an arc of mixed rings), and one in twenty a full Ring Run track.
- * The origin chunk stays clear so a run never starts inside a track.
- */
-export function ringLayoutForChunk(cx: number, cy: number, seed: number, axis: 'horizontal' | 'vertical'): ChunkRingLayout {
-  const empty: ChunkRingLayout = { free: [], track: null };
-  if (cx === 0 && cy === 0) return empty;
-  const pick = ringHash(seed, cx, cy, 1);
-  const horizontal = axis === 'horizontal';
-  // Positions run along the street spine through the chunk centre (the spine is the open lane).
-  const at = (along: number, across: number) => (horizontal ? { x: along, y: across } : { x: across, y: along });
-
-  if (pick < 0.05) {
-    const gates: RingTrackLayout['gates'] = [];
-    const coins: RingTrackLayout['coins'] = [];
-    const count = 8 + Math.floor(ringHash(seed, cx, cy, 2) * 4); // 8..11 gates
-    const length = 520;
-    const phase = ringHash(seed, cx, cy, 3) * Math.PI * 2;
-    const sway = 34 + ringHash(seed, cx, cy, 4) * 26;
-    const pointAtT = (t: number) => at(-length / 2 + t * length, Math.sin(phase + t * Math.PI * 3) * sway);
-    for (let i = 0; i < count; i += 1) {
-      const t = i / (count - 1);
-      const p = pointAtT(t);
-      const kind: RingKind = i === 0 ? 'coin' : i % 3 === 2 ? 'speed' : i === count - 1 ? 'surge' : 'coin';
-      gates.push({ x: p.x, y: p.y, kind });
-      if (i < count - 1) {
-        for (let c = 1; c <= 3; c += 1) {
-          const q = pointAtT((i + c / 4) / (count - 1));
-          coins.push({ x: q.x, y: q.y });
-        }
-      }
-    }
-    return { free: [], track: { gates, coins } };
-  }
-
-  if (pick < 0.15) {
-    // Ring field: an arc of five to eight rings of mixed kinds.
-    const count = 5 + Math.floor(ringHash(seed, cx, cy, 5) * 4);
-    const free: RingGateLayout[] = [];
-    const arc = 0.9 + ringHash(seed, cx, cy, 6) * 0.8;
-    for (let i = 0; i < count; i += 1) {
-      const t = count === 1 ? 0.5 : i / (count - 1);
-      const p = at(-230 + t * 460, Math.sin(t * Math.PI * arc) * 70 - 30);
-      const roll = ringHash(seed, cx, cy, 10 + i);
-      free.push({ x: p.x, y: p.y, r: RING_GATE_RADIUS, kind: roll < 0.45 ? 'speed' : roll < 0.85 ? 'coin' : 'surge' });
-    }
-    return { free, track: null };
-  }
-
-  if (pick < 0.30) {
-    const count = 1 + Math.floor(ringHash(seed, cx, cy, 7) * 3);
-    const free: RingGateLayout[] = [];
-    const start = -120 + ringHash(seed, cx, cy, 8) * 120;
-    for (let i = 0; i < count; i += 1) {
-      const p = at(start + i * 130, (ringHash(seed, cx, cy, 20 + i) - 0.5) * 36);
-      free.push({ x: p.x, y: p.y, r: RING_GATE_RADIUS, kind: 'speed' });
-    }
-    return { free, track: null };
-  }
-  return empty;
-}
-
 /* ------------------------------------------------------------------ */
 /* Victory tokens: the explosion after a Ring Run win                   */
 /* ------------------------------------------------------------------ */

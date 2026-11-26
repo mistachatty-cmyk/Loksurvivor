@@ -3,31 +3,32 @@ import test from 'node:test';
 
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
-import { BURST_TOKENS, ringLayoutForChunk, rollBurstToken, burstTokenCount } from '@/game/data/ringRuns';
+import { BURST_TOKENS, rollBurstToken, burstTokenCount } from '@/game/data/ringRuns';
+import { streetLifeForChunk } from '@/game/data/streetLife';
 import { createWorld, stepWorld, type LiveTrack } from '@/game/engine/world';
 
 const idle = { moveX: 0, moveY: 0, ultimate: false };
 
 test('ring layouts are deterministic, rare and leave the origin clear', () => {
-  assert.deepEqual(ringLayoutForChunk(0, 0, 77, 'horizontal'), { free: [], track: null });
+  assert.deepEqual(streetLifeForChunk(0, 0, 77, 'horizontal'), { free: [], track: null, pieceId: null });
   let tracks = 0;
   let fields = 0;
   let chunks = 0;
   for (let cx = -12; cx <= 12; cx += 1) {
     for (let cy = -12; cy <= 12; cy += 1) {
-      const a = ringLayoutForChunk(cx, cy, 99, 'vertical');
-      const b = ringLayoutForChunk(cx, cy, 99, 'vertical');
+      const a = streetLifeForChunk(cx, cy, 99, 'vertical');
+      const b = streetLifeForChunk(cx, cy, 99, 'vertical');
       assert.deepEqual(a, b);
       chunks += 1;
       if (a.track) {
         tracks += 1;
-        assert.ok(a.track.gates.length >= 8 && a.track.gates.length <= 11);
+        assert.ok(a.track.gates.length >= 5 && a.track.gates.length <= 14);
         assert.ok(a.track.coins.length > a.track.gates.length);
       }
       if (a.free.length >= 5) fields += 1;
     }
   }
-  assert.ok(tracks > 0 && tracks / chunks < 0.1, 'tracks exist but stay rare');
+  assert.ok(tracks > 0 && tracks / chunks < 0.14, 'tracks exist but stay rare');
   assert.ok(fields > 0, 'ring fields exist');
 });
 
