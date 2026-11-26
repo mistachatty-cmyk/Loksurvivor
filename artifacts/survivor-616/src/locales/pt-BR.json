@@ -517,6 +517,7 @@
   "hideout.prop.lok-shop-counter.line.1": "Um contador brilhante zumbe. Dois olhos redondos piscam para você na tela.",
   "hideout.prop.lok-shop-counter.line.2": "Alguém está sempre atrás do balcão, mesmo quando não há ninguém.",
   "wallet.balance": "{{n}} LokTokens",
+  "wallet.unlimited": "LokTokens ilimitado (modo de desenvolvimento)",
   "wallet.rank": "Classificação {{rank}}",
   "wallet.loading": "Contando seu LokTokens…",
   "wallet.signedOut": "Faça login para ver e gastar seu LokTokens.",

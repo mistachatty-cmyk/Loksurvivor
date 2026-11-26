@@ -517,6 +517,7 @@
   "hideout.prop.lok-shop-counter.line.1": "Eine leuchtende Theke summt. Zwei runde Augen blinzeln dich vom Bildschirm aus an.",
   "hideout.prop.lok-shop-counter.line.2": "Es ist immer jemand hinter der Theke, auch wenn niemand da ist.",
   "wallet.balance": "{{n}} LokTokens",
+  "wallet.unlimited": "Unbegrenztes LokTokens (Dev-Modus)",
   "wallet.rank": "{{rank}}-Rang",
   "wallet.loading": "Zählen Sie Ihre LokTokens…",
   "wallet.signedOut": "Melden Sie sich an, um Ihr LokTokens anzuzeigen und auszugeben.",
