@@ -10,6 +10,10 @@
  * order. Minigames are async score-attack: everyone plays the same seed on their own screen and
  * reports what they banked; the host combines the scores into placements.
  *
+ * The relay is best-effort (nothing is replayed), so everything that matters is sent again until it
+ * lands: guests say how far they got in each ping and the host resends the rest; a guest repeats its
+ * choice or minigame score until the host has answered.
+ *
  * The pure helpers at the bottom (seat assignment, placements) are what the tests cover.
  */
 
@@ -117,16 +121,94 @@ export interface ApplyPayload {
   action: BoardAction;
 }
 
+/** A guest's choice. `after` is how many actions it had applied when it chose. */
+export interface ActPayload {
+  seat: number;
+  after: number;
+  action: BoardAction;
+}
+
+export interface PingPayload {
+  seat: number;
+  host: boolean;
+  /** Guest: highest action number held with no gap. */
+  have?: number;
+  /** Guest: the minigame round it is still waiting on a result for. */
+  waiting?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Ordering and recovery (pure; used by both sides)
+// ---------------------------------------------------------------------------
+
+export function createActionSync() {
+  const log: BoardAction[] = [];
+  const inbox = new Map<number, BoardAction>();
+  let applied = 0;
+  return {
+    /** Actions handed to the engine so far. */
+    get applied(): number {
+      return applied;
+    },
+    /** Host: actions numbered so far. */
+    get committed(): number {
+      return log.length;
+    },
+    /** Host: number an action, keep it for resends and queue it locally. */
+    commit(action: BoardAction): number {
+      const seq = log.push(action);
+      inbox.set(seq, action);
+      return seq;
+    },
+    /** Guest: store a numbered action. Repeats are harmless. */
+    receive(seq: number, action: BoardAction): void {
+      if (Number.isInteger(seq) && seq > applied) inbox.set(seq, action);
+    },
+    /** The next action in order, or null while it has not arrived. */
+    take(): BoardAction | null {
+      const next = inbox.get(applied + 1);
+      if (!next) return null;
+      applied += 1;
+      inbox.delete(applied);
+      return next;
+    },
+    /** Highest number held with no gap. */
+    have(): number {
+      let n = applied;
+      while (inbox.has(n + 1)) n += 1;
+      return n;
+    },
+    /** Host: what a guest holding `have` actions still needs, oldest first. */
+    missing(have: number, limit = 40): ApplyPayload[] {
+      const from = Math.max(0, Math.floor(have) || 0);
+      return log.slice(from, from + limit).map((action, i) => ({ seq: from + i + 1, action }));
+    },
+  };
+}
+
+/**
+ * What the host does with a guest's choice: `commit` it, `hold` it until the host's own board
+ * reaches that moment, or `drop` it because the game has already moved past it (a repeat).
+ */
+export function actVerdict(
+  act: { seat: number; after: number },
+  now: { turnOf: number; waiting: boolean; applied: number; committed: number },
+): 'commit' | 'hold' | 'drop' {
+  if (!(act.after >= now.committed)) return 'drop';
+  if (act.after !== now.applied || now.applied !== now.committed) return 'hold';
+  return now.waiting && now.turnOf === act.seat ? 'commit' : 'hold';
+}
+
 export interface PartyHandlers {
   onJoinRequest?(m: { clientId: string; characterId: string; name: string }): void;
   onLobby?(m: { seats: Seat[]; rounds: number }): void;
   onStart?(m: StartPayload): void;
-  onAct?(m: { seat: number; action: BoardAction }): void;
+  onAct?(m: ActPayload): void;
   onApply?(m: ApplyPayload): void;
   onMiniReport?(m: { round: number; seat: number; banked: number }): void;
   onMiniResult?(m: { round: number; placements: number[] }): void;
   onSeatBot?(m: { seat: number }): void;
-  onPing?(m: { seat: number; host: boolean }): void;
+  onPing?(m: PingPayload): void;
   onLeave?(m: { seat: number; host: boolean }): void;
   onStatus?(s: PartyStatus): void;
 }

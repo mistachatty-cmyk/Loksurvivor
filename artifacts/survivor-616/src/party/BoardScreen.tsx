@@ -62,7 +62,7 @@ import {
 } from './boardArt';
 import { DropArena, seatOrder } from './LokDropScreen';
 import { dropResults, type DropState } from './lokDrop';
-import { minigamePlacements, seatToBot, type OnlineSession, type Seat } from './partyNet';
+import { actVerdict, createActionSync, type ActPayload, minigamePlacements, seatToBot, type OnlineSession, type Seat } from './partyNet';
 
 const LANE = ['#38f2ff', '#ff3fd2', '#ffd23f', '#7cff6b'];
 const CREAM = '#FAF6EE';
@@ -413,15 +413,15 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
     // ---- Online ordering: the host numbers every action; everyone applies them in order.
     const room = online?.room;
     const isHost = !!online?.host;
-    let seq = 0;
-    let nextApply = 1;
-    const inbox = new Map<number, BoardAction>();
+    const sync = createActionSync();
+    const held = new Map<number, ActPayload>(); // host: guest choices waiting for their moment
+    let outbox: ActPayload | null = null; // guest: my choice until the host numbers it
     const commit = (a: BoardAction) => {
-      seq += 1;
+      const seq = sync.commit(a);
       room?.send('apply', { seq, action: a });
-      inbox.set(seq, a);
     };
     const applyNow = (a: BoardAction) => {
+      if (outbox && sync.applied > outbox.after) outbox = null;
       boardAct(s, a);
       handleEvents(s.events);
       setSent(false);
@@ -429,14 +429,23 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
     };
     actRef.current = (a: BoardAction) => {
       if (!online) return applyNow(a);
-      if (isHost) return commit(a);
-      room?.send('act', { seat: localSeat, action: a });
+      // One choice at a time: a second tap before the first lands would be spent on a later turn.
+      if (isHost) {
+        if (sync.applied < sync.committed) return;
+        commit(a);
+      } else {
+        if (outbox) return;
+        outbox = { seat: localSeat, after: sync.applied, action: a };
+        room?.send('act', { ...outbox });
+      }
       setSent(true);
     };
     // Minigames online: everyone plays the same seed; the host combines the scores.
     let miniRound = 0;
     let hostBanked: Record<string, number> | null = null;
-    const reports = new Map<number, number>();
+    const reports = new Map<number, { round: number; banked: number }>();
+    let lastResult: { round: number; placements: number[] } | null = null; // host: for resends
+    let myBanked = 0;
     let miniDeadline = 0;
     let pendingResult: number[] | null = null;
     let localMiniDone = false;
@@ -452,10 +461,12 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
     const tryFinishMini = (force = false) => {
       if (!isHost || !hostBanked || s.phase !== 'minigame') return;
       const guests = (seatsRef.current ?? []).filter((st) => st.kind === 'guest').map((st) => st.index);
-      if (!force && guests.some((g) => !reports.has(g))) return;
-      const banked = s.players.map((p, i) => (roleOf(i) === 'remote' ? reports.get(i) ?? 0 : hostBanked![p.characterId] ?? 0));
+      const scoreOf = (i: number) => (reports.get(i)?.round === miniRound ? reports.get(i)!.banked : undefined);
+      if (!force && guests.some((g) => scoreOf(g) === undefined)) return;
+      const banked = s.players.map((p, i) => (roleOf(i) === 'remote' ? scoreOf(i) ?? 0 : hostBanked![p.characterId] ?? 0));
       const placements = minigamePlacements(banked);
-      room?.send('mini-result', { round: miniRound, placements });
+      lastResult = { round: miniRound, placements };
+      room?.send('mini-result', lastResult);
       hostBanked = null;
       reports.clear();
       applyMini(placements);
@@ -475,7 +486,8 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
         setWaitingOthers(true);
         tryFinishMini();
       } else {
-        room?.send('mini-report', { round: miniRound, seat: localSeat, banked: mine?.banked ?? 0 });
+        myBanked = mine?.banked ?? 0;
+        room?.send('mini-report', { round: miniRound, seat: localSeat, banked: myBanked });
         if (pendingResult) applyMini(pendingResult);
         else setWaitingOthers(true);
       }
@@ -486,14 +498,21 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
     if (room) {
       room.setHandlers({
         onApply: (m) => {
-          if (!isHost) inbox.set(m.seq, m.action);
+          if (!isHost) sync.receive(m.seq, m.action);
         },
         onAct: (m) => {
-          if (isHost && roleOf(m.seat) === 'remote') commit(m.action);
+          if (isHost && roleOf(m.seat) === 'remote') held.set(m.seat, m);
+        },
+        onJoinRequest: (m) => {
+          // A guest still in the lobby missed the start: send it again.
+          const seat = online?.seats.find((st) => st.kind === 'guest' && st.clientId === m.clientId);
+          if (!isHost || !online || !seat) return;
+          lastSeen.set(seat.index, now);
+          room.send('start', { seed: online.seed, rounds: online.rounds, seats: online.seats });
         },
         onMiniReport: (m) => {
           if (!isHost) return;
-          reports.set(m.seat, m.banked);
+          reports.set(m.seat, { round: m.round, banked: m.banked });
           tryFinishMini();
         },
         onMiniResult: (m) => {
@@ -506,8 +525,14 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
           setUi((v) => v + 1);
         },
         onPing: (m) => {
-          if (m.host) lastHost = now;
-          else lastSeen.set(m.seat, now);
+          if (m.host) {
+            lastHost = now;
+            return;
+          }
+          lastSeen.set(m.seat, now);
+          if (!isHost) return;
+          for (const again of sync.missing(m.have ?? sync.committed)) room.send('apply', { ...again });
+          if (lastResult && m.waiting === lastResult.round) room.send('mini-result', lastResult);
         },
         onLeave: (m) => {
           if (m.host && !isHost) setHostGone(true);
@@ -528,7 +553,10 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       if (!room) return;
       if (now >= pingAt) {
         pingAt = now + 4000;
-        room.send('ping', { seat: localSeat, host: isHost });
+        const waiting = !isHost && localMiniDone ? miniRound : undefined;
+        room.send('ping', { seat: localSeat, host: isHost, have: sync.have(), waiting });
+        if (!isHost && outbox && sync.have() <= outbox.after) room.send('act', { ...outbox });
+        if (waiting !== undefined) room.send('mini-report', { round: waiting, seat: localSeat, banked: myBanked });
       }
       if (isHost) {
         for (const st of seatsRef.current ?? []) {
@@ -571,7 +599,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       }
       if (s.phase === 'over') {
         cancelAnimationFrame(raf);
-        room?.send('leave', { seat: localSeat, host: isHost });
+        if (!isHost) room?.send('leave', { seat: localSeat, host: false });
         finishRef.current(s, localSeat);
         return;
       }
@@ -579,10 +607,8 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
         const role = roleOf(s.turnOf);
         // Online: ordered actions arrive in the inbox; apply the next one once we reach its turn.
         if (online) {
-          const next = inbox.get(nextApply);
+          const next = sync.take();
           if (next) {
-            inbox.delete(nextApply);
-            nextApply += 1;
             if (role !== 'local' && next.type === 'roll' && dice?.spinning) waitUntil = now + 120;
             applyNow(next);
             waitUntil = Math.max(waitUntil, now + (role === 'local' ? 60 : 380));
@@ -595,7 +621,15 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
           waitUntil = now + 650;
           return;
         }
-        if (role === 'remote' || (online && !isHost)) return;
+        if (role === 'remote') {
+          const act = isHost ? held.get(s.turnOf) : undefined;
+          if (!act) return;
+          const verdict = actVerdict(act, { turnOf: s.turnOf, waiting: true, applied: sync.applied, committed: sync.committed });
+          if (verdict !== 'hold') held.delete(s.turnOf);
+          if (verdict === 'commit') commit(act.action);
+          return;
+        }
+        if (online && (!isHost || sync.applied < sync.committed)) return;
         const a = botAction(s);
         if (a) {
           if (online) commit(a);

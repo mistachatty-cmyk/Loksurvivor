@@ -43,6 +43,9 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
   const t = useT();
   const social = useSocialOptional();
   const myName = social?.me?.displayName || CHARACTERS_BY_ID[characterId]?.name || 'Player';
+  // Read through a ref: a profile that loads late must not close the room and make a new code.
+  const nameRef = useRef(myName);
+  nameRef.current = myName;
   const [mode, setMode] = useState<'choose' | 'host' | 'join'>(joinCode ? 'join' : 'choose');
   const [code, setCode] = useState(joinCode ?? '');
   const [typed, setTyped] = useState(joinCode ?? '');
@@ -68,10 +71,13 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
     setCode(c);
     const room = openPartyRoom(lokClient as never, c);
     roomRef.current = room;
-    const initial = initialSeats(characterId, myName, ROSTER_IDS);
+    const initial = initialSeats(characterId, nameRef.current, ROSTER_IDS);
     seatsRef.current = initial;
     setSeats(initial);
-    const broadcast = () => room.send('lobby', { seats: seatsRef.current, rounds });
+    const broadcast = () => {
+      seatsRef.current = seatsRef.current.map((st) => (st.kind === 'host' ? { ...st, name: nameRef.current } : st));
+      room.send('lobby', { seats: seatsRef.current, rounds });
+    };
     room.setHandlers({
       onStatus: setStatus,
       onJoinRequest: (m) => {
@@ -96,21 +102,19 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
         room.close();
       }
     };
-  }, [mode, characterId, myName, rounds]);
+  }, [mode, characterId, rounds]);
 
   // Join a room.
   useEffect(() => {
     if (mode !== 'join' || !lokClient || code.length !== 5) return;
     const room = openPartyRoom(lokClient as never, code);
     roomRef.current = room;
-    let seated = false;
     room.setHandlers({
       onStatus: setStatus,
       onLobby: (m) => {
         seatsRef.current = m.seats;
         setSeats(m.seats);
         const mine = m.seats.find((st) => st.clientId === me);
-        seated = !!mine;
         setFull(!mine && m.seats.every((st) => st.kind !== 'bot'));
       },
       onStart: (m) => {
@@ -123,9 +127,8 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
         if (m.host) setStatus('disconnected');
       },
     });
-    const ask = () => {
-      if (!seated) room.send('join-request', { clientId: me, characterId, name: myName });
-    };
+    // Keep asking until the game starts: if the start message is lost, the host sends it again.
+    const ask = () => room.send('join-request', { clientId: me, characterId, name: nameRef.current });
     ask();
     const id = window.setInterval(ask, 2000);
     return () => {
@@ -136,7 +139,7 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
         room.close();
       }
     };
-  }, [mode, code, characterId, myName, me]);
+  }, [mode, code, characterId, me]);
 
   const start = () => {
     const room = roomRef.current;

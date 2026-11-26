@@ -56,6 +56,12 @@ Play it: `?screen=lok-party` (works in every build; it writes only its own save 
 - **Rule:** bot decisions must never draw from `s.rng` (the host alone runs bots online). A lockstep test replays the host's log on a second engine and requires an identical game.
 - **Backend notes:** nothing is stored; results stay unranked online until a server can verify them.
 
+## Online recovery (v0.42.92)
+
+The relay is best-effort, so `partyNet.ts` resends until things land: guest pings carry `have` (the host resends the rest of its action log) and `waiting` (the host resends a minigame result); guests repeat `act` and `mini-report` until answered; a guest still in the lobby keeps sending `join-request` and gets `start` again. The host commits a guest choice only through `actVerdict`, so repeats are dropped. New online messages must follow the same rule.
+
+Still open: the crew invite card's Join button reloads the app, so tapping it mid-run loses that run; and a host who backgrounds the tab for more than 25 seconds ends the party for guests.
+
 ## Next slices
 - **Next for the board:** Crewmate roving allies, Duel spaces, a second minigame (Ring Run Rush) so rounds vary, the Pawnford board, and a Party Lounge door in the hideout.
 - **Slice 4: Cartridge contract.** `LokMinigameCartridge` (mount, getResults, unmount) so Ring Run Rush and Gem Vacuum Frenzy plug in, then iframe cartridges from other repos.

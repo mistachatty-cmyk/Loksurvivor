@@ -7,10 +7,25 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 231,
+      "version": "0.42.92",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T18:35:00Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "Lok Party: friends stay in step",
+      "body": [
+        "Online parties now recover from a weak connection: a missed turn, choice, minigame score or start message is sent again instead of freezing the game.",
+        "A double tap can no longer spend your choice on someone else's turn, and your room code stays the same while your profile loads."
+      ]
+    },
+    {
       "number": 230,
       "version": "0.42.91",
       "date": "2026-11-26",
-      "publishedAt": "2026-11-26T17:15:00Z",
+      "publishedAt": "2026-11-26T18:15:00Z",
       "kind": "update",
       "categoryLabel": "Major Update",
       "categoryColor": "#22d3ee",

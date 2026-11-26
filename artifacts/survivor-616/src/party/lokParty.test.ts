@@ -472,7 +472,7 @@ test('board: the ladder junction offers a real choice', () => {
 
 // ---------------------------------------------------------------- Slice 4: online parties
 
-import { assignSeat, createPartyCode, initialSeats, minigamePlacements, normalizePartyCode, openPartyRoom, seatToBot, type BroadcastClient } from './partyNet';
+import { actVerdict, assignSeat, createActionSync, createPartyCode, initialSeats, minigamePlacements, normalizePartyCode, openPartyRoom, seatToBot, type BroadcastClient } from './partyNet';
 import type { BoardAction } from './lokBoard';
 
 const ROSTER4 = ['zero-day', 'shade', 'quarry-kid', 'golden-hour'];
@@ -582,4 +582,61 @@ test('lockstep: a guest replaying the host action log ends in the identical game
     host.players.map((p) => [p.node, p.coins, p.crowns, p.items.join()]),
   );
   assert.equal(ai, log.length);
+});
+
+test('online recovery: a guest that loses messages still ends in the identical game', () => {
+  const roster = ROSTER4.map((characterId, i) => ({ characterId, bot: i !== 0 }));
+  const host = createBoardGame(616, MONROE_LOOP, roster, 4);
+  const guest = createBoardGame(616, MONROE_LOOP, roster, 4);
+  const hostSync = createActionSync();
+  const guestSync = createActionSync();
+  let sentCount = 0;
+  const deliver = (seq: number, action: BoardAction) => {
+    sentCount += 1;
+    if (sentCount % 3 !== 0) guestSync.receive(seq, action); // every third message is lost
+  };
+  const step = (s: BoardState, sync: ReturnType<typeof createActionSync>, choose?: () => void) => {
+    if (s.phase === 'over') return;
+    if (s.phase === 'minigame') boardMinigameResult(s, [1, 2, 3, 4]);
+    else if (s.pending) {
+      choose?.();
+      const a = sync.take();
+      if (a) boardAct(s, a);
+    } else boardAdvance(s);
+  };
+  for (let i = 0; i < 40000 && (host.phase !== 'over' || guest.phase !== 'over'); i += 1) {
+    step(host, hostSync, () => {
+      if (hostSync.applied < hostSync.committed) return;
+      const a = botAction(host)!;
+      deliver(hostSync.commit(a), a);
+    });
+    step(guest, guestSync);
+    if (i % 25 === 0) for (const m of hostSync.missing(guestSync.have())) deliver(m.seq, m.action);
+  }
+  assert.equal(host.phase, 'over');
+  assert.equal(guest.phase, 'over');
+  assert.equal(guestSync.applied, hostSync.committed);
+  assert.deepEqual(
+    guest.players.map((p) => [p.node, p.coins, p.crowns, p.items.join()]),
+    host.players.map((p) => [p.node, p.coins, p.crowns, p.items.join()]),
+  );
+});
+
+test('online recovery: repeats and early choices are never spent on the wrong turn', () => {
+  const now = { turnOf: 2, waiting: true, applied: 5, committed: 5 };
+  assert.equal(actVerdict({ seat: 2, after: 5 }, now), 'commit');
+  assert.equal(actVerdict({ seat: 2, after: 4 }, now), 'drop'); // already numbered: a resend
+  assert.equal(actVerdict({ seat: 2, after: 6 }, now), 'hold'); // the guest is ahead of the host's animations
+  assert.equal(actVerdict({ seat: 1, after: 5 }, now), 'hold'); // not that seat's turn
+  assert.equal(actVerdict({ seat: 2, after: 5 }, { ...now, waiting: false }), 'hold');
+  assert.equal(actVerdict({ seat: 2, after: NaN }, now), 'drop');
+  const sync = createActionSync();
+  sync.receive(2, { type: 'roll', signature: false });
+  assert.equal(sync.take(), null);
+  assert.equal(sync.have(), 0);
+  sync.receive(1, { type: 'roll', signature: true });
+  assert.equal(sync.have(), 2);
+  sync.take();
+  sync.receive(1, { type: 'roll', signature: true });
+  assert.equal(sync.have(), 2);
 });

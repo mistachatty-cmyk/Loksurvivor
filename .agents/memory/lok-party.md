@@ -10,5 +10,6 @@ Read before touching `artifacts/survivor-616/src/party/` or anything Lok Party p
 - `juiceEngine.ts` never creates an AudioContext; it takes `getAudioContext` from `useMusicPlayer()`. React on pointerdown/keydown only.
 - Online Crew ladder exists in the save but must not be fed until results are server-verified (same rule as 616 Arena).
 - Characters are always drawn with our procedural rigs (`drawRig`); reference images guide camera, lighting and HUD only.
+- Online (v0.42.92): the relay loses messages. Anything that matters is resent until answered (`createActionSync`, `actVerdict` in partyNet.ts); the host never commits a guest choice directly from the message handler.
 - Decided 2026-11-26: Lok Party stays in this repo for now, kept extractable. The four engine files must import only each other (test enforces it); host hooks live in the screens.
 - Board depth (Slice 3): never bake buildings, gantry, chute or props into the ground layer; they are sprites sorted with spaces and players by `nodeSortY`/`propSortY`/`y1`. Elevated spaces sort at y + z*100 so they draw above their own roof. City taps are cosmetic only and must never pay out.
