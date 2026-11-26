@@ -2292,6 +2292,7 @@ type Action =
   | { type: 'openLuckyChest'; now: number; seed: number }
   | { type: 'grantBall' }
   | { type: 'collectHideoutPickup'; kindId: string; now: number }
+  | { type: 'claimLokPartyGrant'; grantId: string; cred: number; now: number }
   | { type: 'resolveChoiceEvent'; eventId: string; choiceId: string; seed: number; now: number; petId?: string; propId?: string }
   | { type: 'playWithLokPet'; petId: string; verbId: string; seed: number; now: number; musicPlaying: boolean }
   | { type: 'careForLokPet'; id: string; now: number }
@@ -3973,6 +3974,16 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return paid.paid ? { ...state, meta: paid.meta } : state;
     }
 
+    case 'claimLokPartyGrant': {
+      // Lok Party's once-a-day bridge. One-way, idempotent by id, and paid through the same
+      // capped choke point as every hideout reward, so Party can never inflate 616's economy.
+      const key = `lokparty:${action.grantId}`;
+      if (state.meta.hideoutClaims[key] !== undefined) return state;
+      const paid = grantWithFallback(state.meta, { cred: action.cred }, undefined, { now: action.now, elixirCap: ELIXIR_CAP });
+      if (!paid.paid) return state;
+      return { ...state, meta: { ...paid.meta, hideoutClaims: trimClaims({ ...paid.meta.hideoutClaims, [key]: action.now }) } };
+    }
+
     case 'grantBall':
       return state.meta.ownsBall ? state : { ...state, meta: { ...state.meta, ownsBall: true } };
 
@@ -4855,6 +4866,8 @@ export interface MetaContextValue {
   /** Gives the player the Ball. The LokShop purchase will call this. */
   grantBall: () => void;
   collectHideoutPickup: (kindId: string) => void;
+  /** Lok Party first-win bridge: pays capped cred once per grant id. */
+  claimLokPartyGrant: (grantId: string, cred: number) => void;
   playWithLokPet: (petId: string, verbId: string, seed: number, musicPlaying: boolean) => void;
   resolveChoiceEvent: (eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => void;
   careForLokPet: (id: string) => void;
@@ -5133,6 +5146,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const resolveChoiceEvent = useCallback((eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => dispatch({ type: 'resolveChoiceEvent', eventId, choiceId, seed, now: Date.now(), petId, propId }), []);
   const playWithLokPet = useCallback((petId: string, verbId: string, seed: number, musicPlaying: boolean) => dispatch({ type: 'playWithLokPet', petId, verbId, seed, now: Date.now(), musicPlaying }), []);
   const collectHideoutPickup = useCallback((kindId: string) => dispatch({ type: 'collectHideoutPickup', kindId, now: Date.now() }), []);
+  const claimLokPartyGrant = useCallback((grantId: string, cred: number) => dispatch({ type: 'claimLokPartyGrant', grantId, cred, now: Date.now() }), []);
   const grantBall = useCallback(() => dispatch({ type: 'grantBall' }), []);
   const openLuckyChestAction = useCallback((seed: number) => dispatch({ type: 'openLuckyChest', now: Date.now(), seed }), []);
   const lookThroughSpyglass = useCallback(() => dispatch({ type: 'lookThroughSpyglass', now: Date.now() }), []);
@@ -5440,6 +5454,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       openLuckyChest: openLuckyChestAction,
       grantBall,
       collectHideoutPickup,
+      claimLokPartyGrant,
       playWithLokPet,
       resolveChoiceEvent,
       careForLokPet,

@@ -1,0 +1,36 @@
+# Lok Party: build notes (Slice 1)
+
+Source of truth for the design: the Google Doc "GSix / Lok Party Mode: Cross-Game Mario Party Mechanics & Minigame Blueprint" (sections 1 to 13) and the Drive folder "Lok Party Visual References". This file records what is built in this repo, the gaps the blueprint left open and how they were filled, and what comes next.
+
+Play it: `?screen=lok-party` (works in every build; it writes only its own save key).
+
+## Built in Slice 1 (v0.42.88)
+
+| Piece | File | What it does |
+| --- | --- | --- |
+| Juice engine | `artifacts/survivor-616/src/party/juiceEngine.ts` | Spring camera zoom punch (8 to 14 percent, peaks in about 4 frames), trauma shake, 45 to 75 ms hit-stop, Canvas2D refraction ring (annulus clip, 1.06x lens, 2 px cyan/magenta split, 180 ms), squash and stretch (land 1.25 x 0.78, launch 0.85 x 1.2), 100 ms input buffer, 80 ms coyote grace, beat bus and pentatonic pickup chimes on the app's one shared AudioContext. Reduced motion scales shake, zoom and rings to zero. |
+| Progression | `artifacts/survivor-616/src/party/lokPartyMeta.ts` | Save key `lokparty.meta.v1`. Grades C to S+, Character Mastery (levels 1 to 10 then infinite, Marks of Mastery gates at 5, 7 and 10, signature stat milestones), Vault Capsules (S- or better, once per character per split), Beacon Keys (3 fragments make a key), shards with forge, disenchant and the 3-to-1 reroll into a guaranteed new unlock, two ranked LP ladders (Solo Blitz and Online Crew, Iron to 616 Apex), 50-tier Split Pass plus a bonus shard every 500 XP past tier 50, first win of the day, three seeded weekly missions, split soft reset, one-way bridge outbox. |
+| The Lok Drop | `artifacts/survivor-616/src/party/lokDrop.ts` | Pure seeded 60 s simulation: falling Loot Capsules (mid-air crack bonus, rare Gold L capsules), Crumbler Boulders, dash knockback that spills loot, a moving Extraction Ring with a hold-to-bank timer, vault slam at 60 s, frenzy spawn rate from 40 s, greedy bots with a skill dial. |
+| Screen | `artifacts/survivor-616/src/party/LokDropScreen.tsx` | Lobby (pick one of four rigs), 2.5D front-facing vault floor, cream and espresso HUD, floating touch stick plus DASH button (fires on pointerdown), keyboard, landscape and portrait layouts, results card, tap-to-crack capsule. |
+| Bridge into 616 | `metaStore.tsx` action `claimLokPartyGrant` | Pays the daily Party grant through the hideout reward choke point (daily caps), idempotent by grant id. |
+| Tests | `artifacts/survivor-616/src/party/lokParty.test.ts` | 24 cases: juice timings, every meta rule, a full four-bot match, determinism, dash spill, meta hand-off. |
+
+## Gaps in the blueprint, and how they were filled
+
+1. **Naming rule.** The blueprint names its key item and one swap item with the word CLAUDE.md bans. Shipped as **Beacon Keys**; the item should become **Swap Relay**. Please update the Google Doc so other AIs do not reintroduce it.
+2. **The cross-game daily valve broke 616's cap.** The doc asks for +150 Cred, but the hideout pays at most 60 Cred a day and 15 per grant. The bridge now asks for 15 Cred and pays through that same choke point, so the cap always wins. Queens N Kings gets a matching 15 Gold grant in the outbox for its own path to pay.
+3. **Accessibility was missing.** Gold capsules carry an L shape, the ring has rotating dashes, and lane colors repeat as text in the HUD, so nothing relies on color alone. Reduced motion is honored.
+4. **Portrait phones.** The doc only specified 9:16 for the loot pull. The arena now crops and follows on portrait and reflows the HUD into a 2 x 2 block.
+5. **Determinism.** The sim uses seeded hashes only, so the same seed replays exactly. This is what async online score-attack and ghosts need (blueprint section 6, phase 2).
+6. **Online ranked needs trust.** The Online Crew ladder exists in the save, but nothing should feed it until results can be verified, the same rule 616's Arena follows.
+7. **Bot tiers for Solo Blitz.** The doc says solo LP is earned against escalating bot tiers. Bots have a skill dial now; tying it to the player's LP tier is Slice 2.
+8. **Cross-game rigs.** Queens N Kings, Kinetic Souls and DJ Shoey rigs are not in this repo, so the launch four are 616 rigs (Zero Day, Shade, Quarry Kid, Golden Hour). The `renderAdapter` contract in section 2 is the way to bring the others in.
+9. **Reference images 10 and 11** (the two vertical maps) were not in the Drive folder or the session. The Drive reader also returns no content for images, so the build followed each image's written notes in section 13B.
+10. **Daily reset time zone.** Days and weeks reset on the player's local clock.
+
+## Next slices
+
+- **Slice 2: Tactile Gold L capsule pull.** A canvas crack sequence (hold, seam glow, refraction burst, confetti, rig wearing the new item) replaces the simple tap card. Wire bot tiers to Solo Blitz LP.
+- **Slice 3: Board engine.** Pure board state machine with elevation-aware nodes (`z`, `traversalKind`), the Monroe Loop board, Signature Dice, five core items and the Lok Drop as the first minigame cartridge.
+- **Slice 4: Cartridge contract.** `LokMinigameCartridge` (mount, getResults, unmount) so Ring Run Rush and Gem Vacuum Frenzy plug in, then iframe cartridges from other repos.
+- **Backend (noted, not built):** room codes over Supabase Realtime broadcast, async seeded score-attack, trusted results before any online LP.

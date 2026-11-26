@@ -9,6 +9,7 @@ Everything written down about the game, grouped by what you are trying to do. Th
 - Rescue cage and dungeon doors: [ASSETS.md objective art](./ASSETS.md#objective-and-world-art-rescue-cage-dungeon-doors-chest). Notes on why: `.agents/memory/rescue-cage.md`.
 
 ## Design and plans
+- [LOK_PARTY.md](./LOK_PARTY.md): Lok Party Slice 1 (juice engine, party progression, The Lok Drop), the blueprint gaps that were filled, and the next slices.
 - [**UNIFIED_ROOMS_PLAN.md**](./UNIFIED_ROOMS_PLAN.md): how 616 menus become a room and how the 616, Queens N Kings and Lok rooms and halls become one universe.
 - Lore, including why survivors are held (digitization relays): `artifacts/survivor-616/docs/LORE.md`.
 - [survivor616-gameplay-roadmap-review.md](./survivor616-gameplay-roadmap-review.md): where the game is going next.
