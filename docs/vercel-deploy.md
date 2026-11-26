@@ -31,4 +31,4 @@ Vercel project's Environment Variables:
 Both come from the Supabase project's API settings. Leave them unset to
 ship the game with account features quietly disabled.
 ## Builds are tag-gated (2026-11-24)
-`vercel.json` has an `ignoreCommand`: a push builds only when the latest commit message contains `[deploy]`. Other pushes are skipped, so the free Vercel usage is safe. Add `[deploy]` to the last commit only when Eric says to deploy.
+`vercel.json` has an `ignoreCommand`: a push builds only when the latest commit message contains `[deploy]`. It reads Vercel's `VERCEL_GIT_COMMIT_MESSAGE`, not `git log`: `.vercelignore` removes `.git` before the command runs, so a `git log` check always failed and skipped every build (fixed 2026-11-26). Other pushes are skipped, so the free Vercel usage is safe. Add `[deploy]` to the last commit only when Eric says to deploy.
