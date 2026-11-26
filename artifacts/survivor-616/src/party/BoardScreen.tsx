@@ -62,6 +62,7 @@ import {
 } from './boardArt';
 import { DropArena, seatOrder } from './LokDropScreen';
 import { dropResults, type DropState } from './lokDrop';
+import { minigamePlacements, seatToBot, type OnlineSession, type Seat } from './partyNet';
 
 const LANE = ['#38f2ff', '#ff3fd2', '#ffd23f', '#7cff6b'];
 const CREAM = '#FAF6EE';
@@ -75,7 +76,9 @@ interface Props {
   seed: number;
   ladderTier: number;
   getAudioContext: () => AudioContext | null;
-  onFinish: (s: BoardState) => void;
+  onFinish: (s: BoardState, localSeat: number) => void;
+  /** Present when this is an online party. */
+  online?: OnlineSession;
   onQuit: () => void;
 }
 
@@ -111,11 +114,27 @@ function faceLabel(f: DieFace): string {
   return { 'freeze-rival': 'FREEZE', 'plus-cred': '+3', 'boulder-ride': 'BOULDER', gilded: 'GILDED' }[f];
 }
 
-export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioContext, onFinish, onQuit }: Props) {
+export type SeatRole = 'local' | 'bot' | 'remote';
+
+export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioContext, onFinish, onQuit, online }: Props) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const seats = useMemo(() => seatOrder(humanId), [humanId]);
-  const stateRef = useRef<BoardState>(createBoardGame(seed, MONROE_LOOP, seats.map((id, i) => ({ characterId: id, bot: i !== 0 })), rounds));
+  const seats = useMemo(() => (online ? online.seats.map((st) => st.characterId) : seatOrder(humanId)), [humanId, online]);
+  const localSeat = online ? online.mySeat : 0;
+  const seatsRef = useRef<Seat[] | null>(online ? online.seats : null);
+  const roleOf = useCallback((i: number): SeatRole => {
+    if (i === localSeat) return 'local';
+    if (!seatsRef.current) return 'bot';
+    return seatsRef.current[i]?.kind === 'bot' ? 'bot' : 'remote';
+  }, [localSeat]);
+  const stateRef = useRef<BoardState>(
+    createBoardGame(online ? online.seed : seed, MONROE_LOOP, seats.map((id, i) => ({ characterId: id, bot: i !== localSeat })), online ? online.rounds : rounds),
+  );
+  const [waitingOthers, setWaitingOthers] = useState(false);
+  const [hostGone, setHostGone] = useState(false);
+  const [sent, setSent] = useState(false);
+  const sentRef = useRef(false);
+  sentRef.current = sent;
   const [ui, setUi] = useState(0); // bump to re-render DOM prompts
   const [minigame, setMinigame] = useState<number | null>(null);
   const [overview, setOverview] = useState(false);
@@ -269,7 +288,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
         switch (e.kind) {
           case 'turn-start': {
             const name = CHARACTERS_BY_ID[s.players[e.who].characterId]?.name ?? '';
-            pushBanner(e.who === 0 ? L.yourTurn : L.turn(name), LANE[e.who], 900, e.who === 0 && e.round === 1 ? L.round(s.round, s.maxRounds) : undefined);
+            pushBanner(e.who === localSeat ? L.yourTurn : L.turn(name), LANE[e.who], 900, e.who === localSeat && e.round === 1 ? L.round(s.round, s.maxRounds) : undefined);
             break;
           }
           case 'roll': {
@@ -391,25 +410,147 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       return [W / 2 + (wx - cam.x) * z, H / 2 + (wy - cam.y) * z];
     };
 
-    actRef.current = (a: BoardAction) => {
+    // ---- Online ordering: the host numbers every action; everyone applies them in order.
+    const room = online?.room;
+    const isHost = !!online?.host;
+    let seq = 0;
+    let nextApply = 1;
+    const inbox = new Map<number, BoardAction>();
+    const commit = (a: BoardAction) => {
+      seq += 1;
+      room?.send('apply', { seq, action: a });
+      inbox.set(seq, a);
+    };
+    const applyNow = (a: BoardAction) => {
       boardAct(s, a);
       handleEvents(s.events);
+      setSent(false);
       setUi((v) => v + 1);
     };
-    minigameDoneRef.current = (d: DropState) => {
-      const res = dropResults(d);
-      const placements = s.players.map((_, i) => res.find((r) => r.index === i)?.placement ?? 4);
+    actRef.current = (a: BoardAction) => {
+      if (!online) return applyNow(a);
+      if (isHost) return commit(a);
+      room?.send('act', { seat: localSeat, action: a });
+      setSent(true);
+    };
+    // Minigames online: everyone plays the same seed; the host combines the scores.
+    let miniRound = 0;
+    let hostBanked: Record<string, number> | null = null;
+    const reports = new Map<number, number>();
+    let miniDeadline = 0;
+    let pendingResult: number[] | null = null;
+    let localMiniDone = false;
+    const applyMini = (placements: number[]) => {
       boardMinigameResult(s, placements);
       handleEvents(s.events);
       waitUntil = now + 500;
+      pendingResult = null;
+      localMiniDone = false;
+      setWaitingOthers(false);
       setUi((v) => v + 1);
+    };
+    const tryFinishMini = (force = false) => {
+      if (!isHost || !hostBanked || s.phase !== 'minigame') return;
+      const guests = (seatsRef.current ?? []).filter((st) => st.kind === 'guest').map((st) => st.index);
+      if (!force && guests.some((g) => !reports.has(g))) return;
+      const banked = s.players.map((p, i) => (roleOf(i) === 'remote' ? reports.get(i) ?? 0 : hostBanked![p.characterId] ?? 0));
+      const placements = minigamePlacements(banked);
+      room?.send('mini-result', { round: miniRound, placements });
+      hostBanked = null;
+      reports.clear();
+      applyMini(placements);
+    };
+    minigameDoneRef.current = (d: DropState) => {
+      const res = dropResults(d);
+      if (!online) {
+        const placements = s.players.map((p) => res.find((r) => r.characterId === p.characterId)?.placement ?? 4);
+        applyMini(placements);
+        return;
+      }
+      const mine = res.find((r) => r.characterId === s.players[localSeat].characterId);
+      localMiniDone = true;
+      if (isHost) {
+        hostBanked = Object.fromEntries(res.map((r) => [r.characterId, r.banked]));
+        miniDeadline = now + 30_000;
+        setWaitingOthers(true);
+        tryFinishMini();
+      } else {
+        room?.send('mini-report', { round: miniRound, seat: localSeat, banked: mine?.banked ?? 0 });
+        if (pendingResult) applyMini(pendingResult);
+        else setWaitingOthers(true);
+      }
+    };
+    // Presence: pings both ways; quiet guests become bots, a quiet host ends the party.
+    const lastSeen = new Map<number, number>();
+    let lastHost = 0;
+    if (room) {
+      room.setHandlers({
+        onApply: (m) => {
+          if (!isHost) inbox.set(m.seq, m.action);
+        },
+        onAct: (m) => {
+          if (isHost && roleOf(m.seat) === 'remote') commit(m.action);
+        },
+        onMiniReport: (m) => {
+          if (!isHost) return;
+          reports.set(m.seat, m.banked);
+          tryFinishMini();
+        },
+        onMiniResult: (m) => {
+          if (isHost || m.round !== miniRound) return;
+          if (localMiniDone) applyMini(m.placements);
+          else pendingResult = m.placements;
+        },
+        onSeatBot: (m) => {
+          if (seatsRef.current) seatsRef.current = seatToBot(seatsRef.current, m.seat);
+          setUi((v) => v + 1);
+        },
+        onPing: (m) => {
+          if (m.host) lastHost = now;
+          else lastSeen.set(m.seat, now);
+        },
+        onLeave: (m) => {
+          if (m.host && !isHost) setHostGone(true);
+          else if (isHost) dropSeat(m.seat);
+        },
+      });
+    }
+    const dropSeat = (seat: number) => {
+      if (!seatsRef.current || seatsRef.current[seat]?.kind !== 'guest') return;
+      seatsRef.current = seatToBot(seatsRef.current, seat);
+      room?.send('seat-bot', { seat });
+      reports.delete(seat);
+      tryFinishMini();
+      setUi((v) => v + 1);
+    };
+    let pingAt = 0;
+    const presence = () => {
+      if (!room) return;
+      if (now >= pingAt) {
+        pingAt = now + 4000;
+        room.send('ping', { seat: localSeat, host: isHost });
+      }
+      if (isHost) {
+        for (const st of seatsRef.current ?? []) {
+          if (st.kind !== 'guest') continue;
+          const seen = lastSeen.get(st.index) ?? 0;
+          if (!lastSeen.has(st.index)) lastSeen.set(st.index, now);
+          else if (now - seen > 20_000) dropSeat(st.index);
+        }
+        if (hostBanked && now > miniDeadline) tryFinishMini(true);
+      } else {
+        if (!lastHost) lastHost = now;
+        if (now - lastHost > 25_000) setHostGone(true);
+      }
     };
 
     // Pace the game.
     const tick = () => {
+      presence();
       if (now < waitUntil || banner) return;
       if (minigameQueued) {
         minigameQueued = false;
+        miniRound = s.round;
         setMinigame((s.seed ^ (s.round * 7919)) >>> 0);
         return;
       }
@@ -430,22 +571,35 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       }
       if (s.phase === 'over') {
         cancelAnimationFrame(raf);
-        finishRef.current(s);
+        room?.send('leave', { seat: localSeat, host: isHost });
+        finishRef.current(s, localSeat);
         return;
       }
-      const p = s.players[s.turnOf];
       if (s.pending) {
-        if (!p.bot) return;
+        const role = roleOf(s.turnOf);
+        // Online: ordered actions arrive in the inbox; apply the next one once we reach its turn.
+        if (online) {
+          const next = inbox.get(nextApply);
+          if (next) {
+            inbox.delete(nextApply);
+            nextApply += 1;
+            if (role !== 'local' && next.type === 'roll' && dice?.spinning) waitUntil = now + 120;
+            applyNow(next);
+            waitUntil = Math.max(waitUntil, now + (role === 'local' ? 60 : 380));
+            return;
+          }
+        }
+        if (role === 'local') return;
         if (s.pending.type === 'roll' && !dice) {
           dice = { label: '?', color: '#ffcb3c', spinning: true, until: now + 99999, sq: new Squash() };
           waitUntil = now + 650;
           return;
         }
+        if (role === 'remote' || (online && !isHost)) return;
         const a = botAction(s);
         if (a) {
-          boardAct(s, a);
-          handleEvents(s.events);
-          setUi((v) => v + 1);
+          if (online) commit(a);
+          else applyNow(a);
           waitUntil = Math.max(waitUntil, now + 380);
         }
         return;
@@ -567,7 +721,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       last = ts;
       now += dt;
       // Human roll: spinning block while waiting for the hit.
-      if (s.pending?.type === 'roll' && !s.players[s.turnOf].bot && !dice) dice = { label: '?', color: '#ffcb3c', spinning: true, until: now + 99999, sq: new Squash() };
+      if (s.pending?.type === 'roll' && roleOf(s.turnOf) === 'local' && !dice) dice = { label: '?', color: '#ffcb3c', spinning: true, until: now + 99999, sq: new Squash() };
       if (!banner && banners.length) {
         const b = banners.shift()!;
         banner = { ...b, until: now + b.ms, born: now };
@@ -863,7 +1017,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       ctx.restore();
       // Junction arrows in screen space (big, tappable).
       arrows = [];
-      if (options.length && !s.players[s.turnOf].bot) {
+      if (options.length && roleOf(s.turnOf) === 'local' && !sentRef.current) {
         const here = s.map[s.players[s.turnOf].node];
         const hp = P(here.x, here.y, here.z);
         for (const id of options) {
@@ -1090,16 +1244,20 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
 
     handleEvents(s.events);
     raf = requestAnimationFrame(frame);
+    const onUnload = () => room?.send('leave', { seat: localSeat, host: isHost });
+    window.addEventListener('pagehide', onUnload);
     return () => {
+      window.removeEventListener('pagehide', onUnload);
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('pointerdown', onDown);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one game per mount
   }, [getAudioContext]);
 
   const s = stateRef.current;
-  const me = s.players[0];
-  const myTurn = s.turnOf === 0 && !!s.pending && s.phase !== 'minigame';
+  const me = s.players[localSeat];
+  const myTurn = s.turnOf === localSeat && !!s.pending && s.phase !== 'minigame' && !sent;
   const pend = myTurn ? s.pending : null;
   const act = useCallback((a: BoardAction) => actRef.current(a), []);
   const sigFaces = SIGNATURE_DICE[me.characterId];
@@ -1180,11 +1338,28 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
           {t('lokParty.drop.back')}
         </button>
       </div>
+      {waitingOthers && minigame === null ? (
+        <div className="absolute inset-x-0 top-1/3 flex justify-center">
+          <div className="rounded-2xl border-[3px] px-5 py-3 text-sm font-black" style={{ background: CREAM, borderColor: ESPRESSO, color: ESPRESSO }}>
+            {t('lokParty.online.waiting')}
+          </div>
+        </div>
+      ) : null}
+      {hostGone ? (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="max-w-sm rounded-2xl border-[3px] p-4 text-center" style={{ background: CREAM, borderColor: ESPRESSO, color: ESPRESSO }}>
+            <div className="text-lg font-black">{t('lokParty.online.hostLeft')}</div>
+            <button type="button" onPointerDown={onQuit} className="mt-3 w-full rounded-xl border-[3px] py-3 font-black" style={{ background: '#ffcf3c', borderColor: ESPRESSO }}>
+              {t('lokParty.drop.back')}
+            </button>
+          </div>
+        </div>
+      ) : null}
       {minigame !== null ? (
         <div className="fixed inset-0 z-40 bg-[#07061a]">
           <DropArena
             seed={minigame}
-            playerId={humanId}
+            playerId={s.players[localSeat].characterId}
             durationMs={30_000}
             ladderTier={ladderTier}
             getAudioContext={getAudioContext}

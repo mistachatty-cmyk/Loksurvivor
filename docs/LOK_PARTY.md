@@ -49,6 +49,13 @@ Play it: `?screen=lok-party` (works in every build; it writes only its own save 
 | Touchable city | same | Tap windows (lights on or off), signs (recolor), lamps (switch), trees (leaves), crates (wobble), benches and the bus shelter (jiggle), the river (ripples), the night sky (shooting star), spaces (bounce and note), players (hop) and the owl (hoot). Cosmetic only, never a reward. |
 | Hub | `LokDropScreen.tsx` | Lok Party opens on a mode picker with live drawn previews; lobby picks 5, 10 or 15 rounds. |
 
+## Built in Slice 4 (v0.42.91): entrance and online
+
+- **Entrance:** a Lok Party door on the hideout main floor (custom crown-and-owl glyph), the hub's third card "Play with friends", and links `?screen=lok-party&party=CODE`.
+- **Online (`partyNet.ts`, `PartyLobby.tsx`):** Supabase Realtime broadcast on channel `lokparty:<code>`, the same free relay as the Arena. Host-ordered action log (`apply` with sequence numbers); guests send `act`; bots are decided on the host only. Minigames are async score-attack (`mini-report` to the host, `mini-result` back). Pings every 4 s; a guest quiet for 20 s becomes a bot; a host quiet for 25 s ends the party for guests. Crew invites ride the crew bus (`party-invite`) and show `PartyInviteToast` anywhere in the app.
+- **Rule:** bot decisions must never draw from `s.rng` (the host alone runs bots online). A lockstep test replays the host's log on a second engine and requires an identical game.
+- **Backend notes:** nothing is stored; results stay unranked online until a server can verify them.
+
 ## Next slices
 - **Next for the board:** Crewmate roving allies, Duel spaces, a second minigame (Ring Run Rush) so rounds vary, the Pawnford board, and a Party Lounge door in the hideout.
 - **Slice 4: Cartridge contract.** `LokMinigameCartridge` (mount, getResults, unmount) so Ring Run Rush and Gem Vacuum Frenzy plug in, then iframe cartridges from other repos.

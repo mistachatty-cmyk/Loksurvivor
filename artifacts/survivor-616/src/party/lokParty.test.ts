@@ -469,3 +469,117 @@ test('board: the ladder junction offers a real choice', () => {
   assert.equal(p.node, 'G0');
   assert.equal(s.events[0].kind === 'hop' && s.events[0].via, 'ladder');
 });
+
+// ---------------------------------------------------------------- Slice 4: online parties
+
+import { assignSeat, createPartyCode, initialSeats, minigamePlacements, normalizePartyCode, openPartyRoom, seatToBot, type BroadcastClient } from './partyNet';
+import type { BoardAction } from './lokBoard';
+
+const ROSTER4 = ['zero-day', 'shade', 'quarry-kid', 'golden-hour'];
+
+test('party codes are 5 readable letters and normalize typed input', () => {
+  const c = createPartyCode();
+  assert.match(c, /^[A-HJ-NP-Z2-9]{5}$/);
+  assert.equal(normalizePartyCode(' ab-c0d1ef '), 'ABCDE');
+});
+
+test('guests take bot seats, keep a free character, rejoin their own seat, and the party fills', () => {
+  let seats = initialSeats('shade', 'Host', ROSTER4);
+  assert.deepEqual(seats.map((s) => s.kind), ['host', 'bot', 'bot', 'bot']);
+  const a = assignSeat(seats, { clientId: 'a', characterId: 'golden-hour', name: 'Ann' })!;
+  seats = a.seats;
+  assert.equal(seats[a.seat].characterId, 'golden-hour');
+  assert.equal(new Set(seats.map((s) => s.characterId)).size, 4, 'characters stay unique');
+  const b = assignSeat(seats, { clientId: 'b', characterId: 'shade', name: 'Bo' })!;
+  assert.notEqual(b.seats[b.seat].characterId, 'shade', 'the host keeps its character');
+  seats = b.seats;
+  assert.equal(assignSeat(seats, { clientId: 'a', characterId: 'x', name: 'Ann' })!.seat, a.seat);
+  seats = assignSeat(seats, { clientId: 'c', characterId: 'zero-day', name: 'Cy' })!.seats;
+  assert.equal(assignSeat(seats, { clientId: 'd', characterId: 'zero-day', name: 'Di' }), null);
+  seats = seatToBot(seats, a.seat);
+  assert.equal(seats[a.seat].kind, 'bot');
+  assert.equal(seats[0].kind, 'host', 'the host seat never turns into a bot');
+});
+
+test('minigame scores merge into placements with stable ties', () => {
+  assert.deepEqual(minigamePlacements([10, 40, 40, 0]), [3, 1, 2, 4]);
+  assert.deepEqual(minigamePlacements([NaN, 5, 5, 5]), [4, 1, 2, 3]);
+});
+
+test('the relay routes each event to its handler on a fake channel', () => {
+  const sent: { event: string; payload: unknown }[] = [];
+  const listeners: Record<string, (m: { payload: unknown }) => void> = {};
+  const fake: BroadcastClient = {
+    channel: () => ({
+      on: (_t, f, cb) => {
+        listeners[f.event] = cb;
+        return null;
+      },
+      subscribe: (cb) => {
+        cb('SUBSCRIBED');
+        return null;
+      },
+      send: (m) => {
+        sent.push({ event: m.event, payload: m.payload });
+      },
+      unsubscribe: () => null,
+    }),
+  };
+  const room = openPartyRoom(fake, 'ABCDE');
+  const got: string[] = [];
+  room.setHandlers({ onApply: (m) => got.push(`apply ${m.seq}`), onStatus: (st) => got.push(st) });
+  listeners.apply({ payload: { seq: 3, action: { type: 'roll', signature: false } } });
+  room.send('ping', { seat: 1, host: false });
+  assert.deepEqual(got, ['connected', 'apply 3']);
+  assert.equal(sent[0].event, 'ping');
+});
+
+test('lockstep: a guest replaying the host action log ends in the identical game', () => {
+  const roster = ROSTER4.map((characterId, i) => ({ characterId, bot: i !== 0 }));
+  const host = createBoardGame(2026, MONROE_LOOP, roster, 5);
+  const guest = createBoardGame(2026, MONROE_LOOP, roster, 5);
+  const log: BoardAction[] = [];
+  const minis: number[][] = [];
+  const drive = (s: BoardState, take: () => BoardAction | undefined, mini: () => number[] | undefined) => {
+    let guard = 0;
+    while (s.phase !== 'over' && guard++ < 20000) {
+      if (s.phase === 'minigame') {
+        const p = mini();
+        if (!p) return;
+        boardMinigameResult(s, p);
+      } else if (s.pending) {
+        const a = take();
+        if (!a) return;
+        boardAct(s, a);
+      } else boardAdvance(s);
+    }
+  };
+  // Host decides every action (bots included) and records the order.
+  drive(
+    host,
+    () => {
+      const a = botAction(host)!;
+      log.push(a);
+      return a;
+    },
+    () => {
+      const p = minigamePlacements([0, 1, 2, 3].map((i) => (i * 7 + host.round * 3) % 11));
+      minis.push(p);
+      return p;
+    },
+  );
+  let ai = 0;
+  let mi = 0;
+  drive(
+    guest,
+    () => log[ai++],
+    () => minis[mi++],
+  );
+  assert.equal(host.phase, 'over');
+  assert.equal(guest.phase, 'over');
+  assert.deepEqual(
+    guest.players.map((p) => [p.node, p.coins, p.crowns, p.items.join()]),
+    host.players.map((p) => [p.node, p.coins, p.crowns, p.items.join()]),
+  );
+  assert.equal(ai, log.length);
+});

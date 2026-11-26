@@ -97,6 +97,8 @@ export interface HubScreenProps {
   onOpenLokPetBattle?: () => void;
   /** Opens the unlockable weapon test chamber. */
   onOpenTrainingArena?: () => void;
+  /** Opens Lok Party (board game, minigames, online with friends). */
+  onOpenLokParty?: () => void;
   /** Opens the LokSurvivorArena seat/area picker. */
   onOpenArena: () => void;
   /** Opens the walkable bedroom. */
@@ -181,7 +183,7 @@ const NPC_PROP_CAST: Record<string, NpcCastMember> = {
   'luvitnot-keeper': LUVITNOT_KEEPER,
 };
 
-export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenTrainingArena, onOpenArena, onOpenRooms, onOpenRunSetup, onPromo, onStartChoiceEvent, onBack }: HubScreenProps) {
+export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenTrainingArena, onOpenLokParty, onOpenArena, onOpenRooms, onOpenRunSetup, onPromo, onStartChoiceEvent, onBack }: HubScreenProps) {
   const chromeLayout = useUiChromeLayout();
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet, lookThroughSpyglass, openLuckyChest, collectHideoutPickup, setHideoutSceneStyle, setHideoutSpeechBubbles } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
@@ -1263,6 +1265,21 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                     <ArrowRight className="h-3.5 w-3.5 text-amber-200/70" />
                   </button>
                 )}
+                {activeRoom.id === 'main-floor' && onOpenLokParty && (
+                  <button
+                    type="button"
+                    onClick={onOpenLokParty}
+                    data-testid="button-hideout-lok-party"
+                    className="group relative flex items-center gap-3 overflow-hidden border-2 border-amber-300/70 bg-gradient-to-r from-[#3b2a20] via-[#5a3a6e] to-[#1d1450] px-3 py-2 text-left shadow-[0_0_18px_rgba(255,207,60,0.25)] transition hover:border-amber-200 hover:shadow-[0_0_26px_rgba(255,207,60,0.45)]"
+                  >
+                    <PartyDoorGlyph />
+                    <span>
+                      <span className="block font-mono text-[11px] font-black uppercase tracking-widest text-amber-200">{t('lokParty.door.title')}</span>
+                      <span className="block text-[10px] text-amber-100/80">{t('lokParty.door.sub')}</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-amber-200/80" />
+                  </button>
+                )}
                 {activeRoom.id === 'main-floor' && onOpenLokPetBattle && (
                   <button
                     type="button"
@@ -1554,3 +1571,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
 }
 
 export default HubScreen;
+
+/** Original Lok Party door glyph: a crown over two owl eyes (no stock icon). */
+function PartyDoorGlyph() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true" className="shrink-0 transition group-hover:scale-110">
+      <path d="M5 13 L5 6 L10 10 L15 3 L20 10 L25 6 L25 13 Z" fill="#ffcf3c" stroke="#3b2a20" strokeWidth="1.5" strokeLinejoin="round" />
+      <rect x="5" y="11" width="20" height="3" fill="#d98f12" stroke="#3b2a20" strokeWidth="1" />
+      <circle cx="10.5" cy="21" r="5" fill="#ffcf3c" stroke="#3b2a20" strokeWidth="1.5" />
+      <circle cx="19.5" cy="21" r="5" fill="#ffcf3c" stroke="#3b2a20" strokeWidth="1.5" />
+      <circle cx="11" cy="21" r="2.2" fill="#120a06" />
+      <circle cx="20" cy="21" r="2.2" fill="#120a06" />
+      <path d="M13.5 25 L15 28 L16.5 25 Z" fill="#ffb03c" />
+    </svg>
+  );
+}

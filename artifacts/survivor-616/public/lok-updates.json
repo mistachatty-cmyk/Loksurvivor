@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 230,
+      "version": "0.42.91",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T17:15:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party: play with friends",
+      "body": [
+        "A Lok Party door now sits on the hideout main floor.",
+        "Host a Turbo Crown Blitz room, then invite friends with a link, the share sheet or a crew invite that pops up wherever they are in the game. Bots take any open seat, and if someone drops, a bot finishes for them. Minigames are played on each screen with the same seed and the scores are combined."
+      ]
+    },
+    {
       "number": 229,
       "version": "0.42.90",
       "date": "2026-11-26",

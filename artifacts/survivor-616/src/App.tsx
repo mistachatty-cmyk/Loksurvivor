@@ -14,6 +14,7 @@ import { AuthProvider } from '@/state/authStore';
 import { ListenTogetherProvider } from '@/state/listenTogether';
 import { SocialProvider, useSocial, type Doing } from '@/state/socialStore';
 import { CrewOverlay } from '@/ui/CrewOverlay';
+import { PartyInviteToast } from '@/party/PartyLobby';
 import { ListenInviteBanner } from '@/ui/ListenTogether';
 import { CloudSyncProvider } from '@/state/cloudSyncStore';
 import { PlaylistCloudSync } from '@/ui/PlaylistCloudSync';
@@ -728,6 +729,7 @@ function Game() {
           onOpenSectorCommand={() => setScreen({ name: 'sector-command' })}
           onOpenLokPetBattle={() => setScreen({ name: 'lokpet-battle' })}
           onOpenTrainingArena={() => setScreen({ name: 'weapon-training-arena' })}
+          onOpenLokParty={() => setScreen({ name: 'lok-party' })}
           onOpenArena={() => setScreen({ name: 'arena-setup' })}
           onOpenRunSetup={openLooks}
           onStartChoiceEvent={(eventId, propId) => {
@@ -1079,6 +1081,7 @@ function Providers({ children }: { children: ReactNode }) {
                     <CrewChatProvider>
                       {children}
                       <CrewOverlay />
+                      <PartyInviteToast />
                       <ListenInviteBanner />
                       <CrewToasts />
                     </CrewChatProvider>

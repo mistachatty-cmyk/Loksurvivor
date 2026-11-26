@@ -622,7 +622,8 @@ export function botAction(s: BoardState): BoardAction | null {
       let best = pend.options[0];
       let bd = Infinity;
       for (const o of pend.options) {
-        const d = want ? hopDistance(s.board, o, s.vendor) : s.rng();
+        // Never draw from s.rng here: only the host runs bots online, so a draw would desync guests.
+        const d = want ? hopDistance(s.board, o, s.vendor) : ((o.length * 131 + s.round * 17 + s.turnOf * 7 + o.charCodeAt(o.length - 1)) % 97) / 97;
         if (d < bd) {
           bd = d;
           best = o;

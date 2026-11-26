@@ -16,6 +16,8 @@ import { useMeta } from '@/game/state/metaStore';
 import { useT } from '@/lib/i18n';
 import { CapsulePullOverlay } from './CapsulePullOverlay';
 import { BoardScreen } from './BoardScreen';
+import { PartyLobby } from './PartyLobby';
+import type { OnlineSession } from './partyNet';
 import { boardStandings, type BoardState } from './lokBoard';
 import { drawCrown, drawDiceBlock, drawOwl, drawCoin } from './boardArt';
 import { Squash, createJuice, drawRefractionRings, impact, type Juice } from './juiceEngine';
@@ -135,8 +137,17 @@ function RigPreview({ id, size = 96 }: { id: string; size?: number }) {
 
 // ------------------------------------------------------------------ screen
 
-type Phase = 'hub' | 'lobby' | 'play' | 'board' | 'results';
-type Mode = 'blitz' | 'drop';
+type Phase = 'hub' | 'lobby' | 'online' | 'play' | 'board' | 'results';
+type Mode = 'blitz' | 'drop' | 'friends';
+
+function inviteCode(): string | null {
+  try {
+    const c = new URLSearchParams(window.location.search).get('party');
+    return c && /^[A-Z0-9]{5}$/i.test(c) ? c.toUpperCase() : null;
+  } catch {
+    return null;
+  }
+}
 
 interface Standing {
   characterId: string;
@@ -150,8 +161,10 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
   const t = useT();
   const { ensureAudioContext, getAudioContext } = useMusicPlayer();
   const { claimLokPartyGrant } = useMeta();
-  const [phase, setPhase] = useState<Phase>('hub');
-  const [mode, setMode] = useState<Mode>('blitz');
+  const [joinCode] = useState(inviteCode);
+  const [phase, setPhase] = useState<Phase>(() => (inviteCode() ? 'online' : 'hub'));
+  const [mode, setMode] = useState<Mode>(() => (inviteCode() ? 'friends' : 'blitz'));
+  const [online, setOnline] = useState<OnlineSession | null>(null);
   const [rounds, setRounds] = useState(10);
   const [pick, setPick] = useState<string>(ROSTER_IDS[0]);
   const [meta, setMeta] = useState<LokPartyMeta>(() => loadLokPartyMeta(storage()));
@@ -166,7 +179,8 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
     setSeed((s) => (s * 1664525 + 1013904223) >>> 0);
     setReport(null);
     setShards(null);
-    setPhase(mode === 'blitz' ? 'board' : 'play');
+    setOnline(null);
+    setPhase(mode === 'drop' ? 'play' : 'board');
   }, [ensureAudioContext, getAudioContext, mode]);
 
   const settle = useCallback(
@@ -196,10 +210,10 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
   );
 
   const finishBoard = useCallback(
-    (s: BoardState) => {
+    (s: BoardState, localSeat: number) => {
       const standings = boardStandings(s);
-      const me = s.players[0];
-      const place = standings.find((r) => r.index === 0)?.place ?? 4;
+      const me = s.players[localSeat];
+      const place = standings.find((r) => r.index === localSeat)?.place ?? 4;
       const totalCrowns = s.players.reduce((n, p) => n + p.crowns, 0) || 1;
       const rounds = Math.max(1, s.maxRounds);
       settle(
@@ -217,7 +231,7 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
         {
           placement: place,
           players: s.players.length,
-          standings: standings.map((r) => ({ characterId: s.players[r.index].characterId, place: r.place, crowns: s.players[r.index].crowns, coins: s.players[r.index].coins, human: r.index === 0 })),
+          standings: standings.map((r) => ({ characterId: s.players[r.index].characterId, place: r.place, crowns: s.players[r.index].crowns, coins: s.players[r.index].coins, human: r.index === localSeat })),
         },
       );
     },
@@ -243,20 +257,66 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
         <Hub
           onPick={(m) => {
             setMode(m);
-            setPhase('lobby');
+            setPhase(m === 'friends' ? 'online' : 'lobby');
           }}
           onBack={onBack}
           t={t}
         />
       ) : null}
+      {phase === 'online' ? (
+        <PartyLobby
+          characterId={pick}
+          rounds={rounds}
+          joinCode={joinCode}
+          onStart={(session) => {
+            ensureAudioContext();
+            setOnline(session);
+            setPhase('board');
+          }}
+          onBack={() => setPhase('hub')}
+        />
+      ) : null}
       {phase === 'board' ? (
-        <BoardScreen key={seed} humanId={pick} rounds={rounds} seed={seed} ladderTier={meta.ladders.solo.tier} getAudioContext={getAudioContext} onFinish={finishBoard} onQuit={() => setPhase('hub')} />
+        <BoardScreen
+          key={online ? `${online.room.code}-${online.seed}` : seed}
+          humanId={pick}
+          rounds={rounds}
+          seed={seed}
+          online={online ?? undefined}
+          ladderTier={meta.ladders.solo.tier}
+          getAudioContext={getAudioContext}
+          onFinish={finishBoard}
+          onQuit={() => {
+            online?.room.send('leave', { seat: online.mySeat, host: online.host });
+            online?.room.close();
+            setOnline(null);
+            setPhase('hub');
+          }}
+        />
       ) : null}
       {phase === 'lobby' ? (
         <Lobby mode={mode} rounds={rounds} setRounds={setRounds} pick={pick} setPick={setPick} meta={meta} onStart={startMatch} onBack={() => setPhase('hub')} t={t} />
       ) : null}
       {phase === 'results' && report ? (
-        <Results data={report} meta={meta} shards={shards} onCrack={crack} onAgain={startMatch} onBack={() => setPhase('hub')} t={t} />
+        <Results
+          data={report}
+          meta={meta}
+          shards={shards}
+          onCrack={crack}
+          onAgain={() => {
+            if (online) {
+              online.room.close();
+              setOnline(null);
+              setPhase('online');
+            } else startMatch();
+          }}
+          onBack={() => {
+            online?.room.close();
+            setOnline(null);
+            setPhase('hub');
+          }}
+          t={t}
+        />
       ) : null}
       {pulling ? (
         <CapsulePullOverlay
@@ -1409,6 +1469,9 @@ function ModePreview({ mode }: { mode: Mode }) {
       if (mode === 'blitz') {
         bg.addColorStop(0, '#f6b76b');
         bg.addColorStop(1, '#5b3a6e');
+      } else if (mode === 'friends') {
+        bg.addColorStop(0, '#2a7bb8');
+        bg.addColorStop(1, '#1d1450');
       } else {
         bg.addColorStop(0, '#1d1450');
         bg.addColorStop(1, '#07061a');
@@ -1443,6 +1506,37 @@ function ModePreview({ mode }: { mode: Mode }) {
         drawOwl(ctx, 235, h - 18, 0.5, t);
         drawDiceBlock(ctx, 90, 52 + Math.sin(t / 200) * 5, 40, String(1 + (Math.floor(t / 400) % 10)), '#ffcb3c', t);
         drawCoin(ctx, 150, 40, 10, t, true);
+      } else if (mode === 'friends') {
+        // Four seats linked by a pulsing relay line.
+        const lanes = ['#38f2ff', '#ff3fd2', '#ffd23f', '#7cff6b'];
+        const pts = [
+          [60, 95],
+          [125, 60],
+          [180, 100],
+          [245, 65],
+        ];
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 8]);
+        ctx.lineDashOffset = -t / 30;
+        ctx.beginPath();
+        pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+        ctx.stroke();
+        ctx.setLineDash([]);
+        pts.forEach(([x, y], i) => {
+          const bob = Math.sin(t / 300 + i) * 3;
+          ctx.fillStyle = '#07061a';
+          ctx.beginPath();
+          ctx.arc(x, y + bob, 20, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = lanes[i];
+          ctx.lineWidth = 4;
+          ctx.stroke();
+          ctx.fillStyle = lanes[i];
+          ctx.fillRect(x - 6, y + bob - 10, 12, 10);
+          ctx.fillRect(x - 9, y + bob + 1, 18, 9);
+        });
+        drawCrown(ctx, 150, 28, 22, t);
       } else {
         // Vault doors, ring and falling capsules.
         ctx.strokeStyle = '#38f2ff';
@@ -1483,13 +1577,13 @@ function Hub({ onPick, onBack, t }: { onPick: (m: Mode) => void; onBack: () => v
           <div className="font-mono text-xs uppercase tracking-[.3em] text-cyan-300">{t('lokParty.title')}</div>
           <h1 className="mt-1 text-3xl font-black tracking-tight">{t('lokParty.hub.pick')}</h1>
         </div>
-        <div className="grid w-full max-w-3xl gap-4 sm:grid-cols-2">
-          {(['blitz', 'drop'] as Mode[]).map((m) => (
+        <div className="grid w-full max-w-5xl gap-4 sm:grid-cols-3">
+          {(['blitz', 'friends', 'drop'] as Mode[]).map((m) => (
             <CreamCard key={m}>
               <ModePreview mode={m} />
-              <div className="mt-3 text-xl font-black">{m === 'blitz' ? t('lokParty.hub.blitzTitle') : t('lokParty.drop.title')}</div>
-              <p className="mt-1 text-sm opacity-80">{m === 'blitz' ? t('lokParty.hub.blitzPitch') : t('lokParty.hub.dropPitch')}</p>
-              <button type="button" onPointerDown={() => onPick(m)} className="mt-3 w-full rounded-xl border-[3px] py-3 text-base font-black active:translate-y-[3px]" style={{ background: m === 'blitz' ? '#ffcf3c' : '#7cff6b', borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
+              <div className="mt-3 text-xl font-black">{m === 'blitz' ? t('lokParty.hub.blitzTitle') : m === 'friends' ? t('lokParty.hub.friendsTitle') : t('lokParty.drop.title')}</div>
+              <p className="mt-1 text-sm opacity-80">{m === 'blitz' ? t('lokParty.hub.blitzPitch') : m === 'friends' ? t('lokParty.hub.friendsPitch') : t('lokParty.hub.dropPitch')}</p>
+              <button type="button" onPointerDown={() => onPick(m)} className="mt-3 w-full rounded-xl border-[3px] py-3 text-base font-black active:translate-y-[3px]" style={{ background: m === 'blitz' ? '#ffcf3c' : m === 'friends' ? '#38f2ff' : '#7cff6b', borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
                 {t('lokParty.hub.play')}
               </button>
             </CreamCard>
