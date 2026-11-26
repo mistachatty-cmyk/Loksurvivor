@@ -1937,6 +1937,8 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   // Glass and ice are drawn by render/blockBreak.ts; these only feed code that reads a flat colour.
   'glass-block': { top: '#78d6ee', side: '#1d6d8a', trim: '#ebfcff' },
   'ice-block': { top: '#eefbff', side: '#6cb4dc', trim: '#ffffff' },
+  boulder: { top: '#8a8173', side: '#4d463d', trim: '#c9c0b0' },
+  'boulder-crumbler': { top: '#b98a4a', side: '#6b4a22', trim: '#ffd36b' },
   'tree-digital': { top: '#064e3b', side: '#022c22', trim: '#10b981' },
   'tree-fake': { top: '#083344', side: '#051b24', trim: '#06b6d4' },
   skyscraper: { top: '#1e293b', side: '#0f172a', trim: '#38bdf8' },
@@ -2121,7 +2123,92 @@ type SceneObstacle = {
     marks?: readonly number[]; sliding?: boolean;
   };
 
+/**
+ * A procedural boulder: a lit rock disc with rotating facets. It turns as it rolls (angle follows its
+ * position), and the crumbler wears down with visible gold seams. No bitmaps.
+ */
+function drawBoulderBody(ctx: CanvasRenderingContext2D, w: World, obstacle: SceneObstacle) {
+  const crumbler = obstacle.kind === 'boulder-crumbler';
+  const wear = crumbler ? Math.min(1, Math.max(0, obstacle.damage ?? 0)) : 0;
+  const r = Math.min(obstacle.w, obstacle.h) / 2 * 1.08;
+  const cx = obstacle.x;
+  const cy = obstacle.y - 10;
+  const turn = (obstacle.x + obstacle.y) / Math.max(20, r);
+  ctx.save();
+  ctx.globalAlpha = 0.34;
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.ellipse(cx + 6, obstacle.y + r * 0.62, r * 0.95, r * 0.34, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  const base = crumbler ? '#b98a4a' : '#8a8173';
+  const dark = crumbler ? '#5a3c1a' : '#3f392f';
+  const light = crumbler ? '#f0c27a' : '#cfc6b4';
+  const lit = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r * 1.05);
+  lit.addColorStop(0, light);
+  lit.addColorStop(0.55, base);
+  lit.addColorStop(1, dark);
+  ctx.fillStyle = lit;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // Facets that turn with the roll.
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 1, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.translate(cx, cy);
+  ctx.rotate(turn);
+  ctx.strokeStyle = dark;
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.7, -r * 0.1); ctx.lineTo(-r * 0.15, r * 0.25); ctx.lineTo(r * 0.55, -r * 0.2);
+  ctx.moveTo(-r * 0.15, r * 0.25); ctx.lineTo(-r * 0.05, r * 0.85);
+  ctx.moveTo(r * 0.1, -r * 0.9); ctx.lineTo(r * 0.2, -r * 0.45); ctx.lineTo(r * 0.7, -r * 0.5);
+  ctx.stroke();
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.5, -r * 0.55); ctx.lineTo(-r * 0.05, -r * 0.8); ctx.lineTo(r * 0.12, -r * 0.4); ctx.lineTo(-r * 0.4, -r * 0.3);
+  ctx.closePath();
+  ctx.fill();
+  if (!crumbler) {
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#5f7f45';
+    ctx.beginPath();
+    ctx.ellipse(r * 0.2, r * 0.55, r * 0.5, r * 0.18, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Gold seams get brighter as the stone wears down.
+    ctx.globalAlpha = 0.45 + wear * 0.55;
+    ctx.strokeStyle = '#ffd36b';
+    ctx.lineWidth = 1.5 + wear * 2;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.6, r * 0.35); ctx.lineTo(-r * 0.1, -r * 0.05); ctx.lineTo(r * 0.45, r * 0.3); ctx.lineTo(r * 0.7, -r * 0.1);
+    ctx.moveTo(-r * 0.1, -r * 0.05); ctx.lineTo(0, -r * 0.7);
+    ctx.stroke();
+  }
+  ctx.restore();
+  if (crumbler && w.effectMotionEnabled) {
+    ctx.globalAlpha = 0.18 + 0.12 * Math.sin(w.now / 220);
+    ctx.strokeStyle = '#ffd36b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 4 + wear * 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawOrdinaryPropBody(ctx: CanvasRenderingContext2D, w: World, obstacle: SceneObstacle, colors: { top: string; side: string; trim: string }, snapshot = false) {
+  if (obstacle.kind === 'boulder' || obstacle.kind === 'boulder-crumbler') {
+    drawBoulderBody(ctx, w, obstacle);
+    return;
+  }
   const height = 16;
   const x = obstacle.x - obstacle.w / 2, y = obstacle.y - obstacle.h / 2;
   const breakFade = 1;
@@ -5707,6 +5794,45 @@ function drawActors(
       }
     }
     ctx.restore();
+
+    // Power states: Gilded gets rising gold rings and sparkles, Supersonic gets speed streaks behind.
+    if (w.powerState && w.now < w.powerState.until) {
+      const left = w.powerState.until - w.now;
+      const fading = left < 1800 && Math.floor(w.now / 110) % 2 === 0;
+      ctx.save();
+      ctx.globalAlpha = fading ? 0.25 : 0.8;
+      if (w.powerState.id === 'gilded') {
+        ctx.strokeStyle = '#ffd36b';
+        ctx.fillStyle = '#fff2b8';
+        ctx.lineWidth = 2;
+        for (let k = 0; k < 3; k += 1) {
+          const t = ((w.now / 900) + k / 3) % 1;
+          ctx.globalAlpha = (1 - t) * (fading ? 0.2 : 0.7);
+          ctx.beginPath();
+          ctx.ellipse(p.x, p.y - t * 26, p.radius + 6 + t * 10, (p.radius + 6 + t * 10) * 0.42, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        if (w.effectMotionEnabled) {
+          for (let k = 0; k < 5; k += 1) {
+            const a = w.now / 420 + k * 1.256;
+            ctx.globalAlpha = fading ? 0.25 : 0.85;
+            ctx.fillRect(p.x + Math.cos(a) * (p.radius + 8) - 1, p.y - 8 + Math.sin(a * 1.3) * 14 - 1, 3, 3);
+          }
+        }
+      } else {
+        ctx.strokeStyle = '#7ff5ff';
+        ctx.lineWidth = 2;
+        const back = -(p.facing ?? 1);
+        for (let k = 0; k < 4; k += 1) {
+          ctx.globalAlpha = (fading ? 0.2 : 0.65) * (1 - k * 0.2);
+          ctx.beginPath();
+          ctx.moveTo(p.x + back * (p.radius + 4), p.y - 4 + (k - 1.5) * 6);
+          ctx.lineTo(p.x + back * (p.radius + 26 + k * 6), p.y - 4 + (k - 1.5) * 6);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
 
     const invuln = w.now < p.invulnUntil && w.outcome === 'running';
     const blink = invuln && Math.floor(w.now / 70) % 2 === 0;

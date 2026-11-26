@@ -38,7 +38,7 @@ How much of each there is right now.
 
 | Kind | Count |
 | --- | --- |
-| Characters | 87 |
+| Characters | 90 |
 | Enemies | 151 |
 | Factions | 28 |
 | Allies | 20 |
@@ -52,7 +52,7 @@ How much of each there is right now.
 | Hats | 18 |
 | Celebrations | 7 |
 | Themed palettes | 69 |
-| Cards | 344 |
+| Cards | 347 |
 | Lok glyph icons | 82 |
 | Sound cues | 33 |
 
@@ -162,6 +162,9 @@ Playable survivors. Each is a procedural rig plus a palette (`src/game/data/char
 | upstream-fenn | Upstream Fenn | Against The Current | Leap Line |  |
 | pier-beacon | Pier Beacon | Last Light Out | Harbor Sweep |  |
 | salvage-sal | Salvage Sal | Scrap Cathedral | Scrap Swing |  |
+| golden-hour | Golden Hour | Last Light Wins | Sun Ring |  |
+| quarry-kid | Quarry Kid | Rolls With It | Pocket Rock |  |
+| lost-and-found-lou | Lost-and-Found Lou | Finders Keepers | Claim Ticket |  |
 
 ## Enemies
 
@@ -841,7 +844,7 @@ Collectible card manifests (`src/game/data/cards.ts`). Card art is the procedura
 
 | Kind | Count |
 | --- | --- |
-| card | 238 |
+| card | 241 |
 | companion-profile | 20 |
 | pet | 78 |
 | collectible | 8 |

@@ -798,6 +798,13 @@ export function generateChunk(cx: number, cy: number, runSeed: number, themeId: 
     if (band.id === 'industrial-fringe' && i % 3 === 0) kind = 'metal-box';
     if (band.id === 'outer-threshold' && i % 2 === 0) kind = 'reflective-surface';
 
+    // Street Life: now and then an open-ground prop becomes a boulder. Chosen from the
+    // chunk coordinates and prop index, not rng(), so existing generation does not shift.
+    if ((kind === 'flora' || kind === 'planter' || kind === 'bench' || kind === 'barrier') &&
+        (i + Math.abs(cx) * 3 + Math.abs(cy) * 5) % 13 === 0) {
+      kind = (Math.abs(cx) + Math.abs(cy) + i) % 2 === 0 ? 'boulder' : 'boulder-crumbler';
+    }
+
     // Sizes by kind.
     const sizes: Record<ObstacleDef['kind'], [number, number, number, number]> = {
       'map-prop': [40, 80, 40, 80],
@@ -842,6 +849,8 @@ export function generateChunk(cx: number, cy: number, runSeed: number, themeId: 
       'pressure-door': [90, 132, 26, 40],
       'glass-block': [50, 76, 40, 60],
       'ice-block': [48, 66, 44, 60],
+      boulder: [64, 88, 60, 84],
+      'boulder-crumbler': [58, 76, 54, 72],
     };
     const [minW, maxW, minH, maxH] = sizes[kind];
     const w = minW + rng() * (maxW - minW);

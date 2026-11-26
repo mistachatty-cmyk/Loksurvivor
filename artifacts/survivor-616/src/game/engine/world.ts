@@ -57,6 +57,7 @@ import { CellGrid } from '@/game/engine/cellGrid';
 import { millionHordeActorCap, millionHordePopulationCap, millionHordeSweepBudget } from '@/game/performanceProfile';
 import { HordeField } from '@/game/engine/hordeField';
 import type {
+  PowerStateId,
   ActiveCrewRumor,
   AreaDef,
   BaseStats,
@@ -978,10 +979,13 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'glass-block': { variant: 'fixed-breakable', hp: 70 },
   /** A block of ice: shoved across the floor it slides far and leaves a slick trail. */
   'ice-block': { variant: 'medium-movable', hp: 150 },
+  /** Street Life: a roller that never breaks, and a crumbler that wears away into a reward. */
+  boulder: { variant: 'medium-movable' },
+  'boulder-crumbler': { variant: 'medium-movable', hp: 260 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench', 'server-rack', 'tree-digital',
-  'data-pipe', 'digi-arch', 'pressure-door', 'page-block', 'glass-block', 'ice-block',
+  'data-pipe', 'digi-arch', 'pressure-door', 'page-block', 'glass-block', 'ice-block', 'boulder', 'boulder-crumbler',
 ]);
 
 /** Small street-flavor breakables: bonus drops and rare-currency odds are scoped to just these four. */
@@ -1040,6 +1044,10 @@ function propProfile(obstacle: Pick<ObstacleDef, 'kind' | 'propVariant' | 'hp'>)
   if (variant === 'light-breakable') {
     return { variant, mass: 0.8, friction: 0.82, breakable, movable: true };
   }
+  if (obstacle.kind === 'boulder' || obstacle.kind === 'boulder-crumbler') {
+    // Round and heavy, but it rolls: one good shove carries it a long way through a crowd.
+    return { variant, mass: obstacle.kind === 'boulder' ? 1.7 : 1.4, friction: BOULDER_FRICTION, breakable, movable: true };
+  }
   if (obstacle.kind === 'ice-block') {
     // Heavy enough to plough through a crowd, slick enough to coast a long way.
     return { variant, mass: 2.2, friction: ICE_PROP_FRICTION, breakable, movable: true };
@@ -1054,6 +1062,71 @@ function propProfile(obstacle: Pick<ObstacleDef, 'kind' | 'propVariant' | 'hp'>)
     return { variant, mass: Number.POSITIVE_INFINITY, friction: 1, breakable, movable: false };
   }
   return { variant, mass: Number.POSITIVE_INFINITY, friction: 1, breakable: false, movable: false };
+}
+
+const BOULDER_FRICTION = 0.972;
+const BOULDER_DUST_MIN_SPEED = 70;
+const CRUMBLER_BASE_SIZE = new WeakMap<object, { w: number; h: number }>();
+const POWER_STATE_MS: Record<PowerStateId, number> = { gilded: 12000, supersonic: 10000 };
+
+/** Start (or refresh) a power state. States never stack: a new one replaces the old. */
+export function grantPowerState(w: World, id: PowerStateId, durationMs = POWER_STATE_MS[id]) {
+  w.powerState = { id, until: w.now + durationMs };
+  pushAlert(w, id === 'gilded' ? 'GILDED' : 'SUPERSONIC');
+  pushSfx(w, 'ultimate');
+  spawnParticles(w, w.player.x, w.player.y, id === 'gilded' ? '#ffd36b' : '#7ff5ff', 22, 190);
+  spawnParticles(w, w.player.x, w.player.y, '#ffffff', 8, 120);
+}
+
+function powerStateActive(w: World, id: PowerStateId): boolean {
+  return !!w.powerState && w.powerState.id === id && w.now < w.powerState.until;
+}
+
+/** Wear a crumbler down a step: it shrinks with its health and sheds dust and chips. */
+function shrinkCrumbler(w: World, b: BreakableObstacle) {
+  let base = CRUMBLER_BASE_SIZE.get(b);
+  if (!base) {
+    base = { w: b.w, h: b.h };
+    CRUMBLER_BASE_SIZE.set(b, base);
+  }
+  const ratio = clamp(b.hp / b.maxHp, 0, 1);
+  const scale = 0.5 + 0.5 * ratio;
+  b.w = base.w * scale;
+  b.h = base.h * scale;
+  b.mass = 1.4 * (0.55 + 0.45 * ratio);
+  spawnParticles(w, b.x, b.y, '#d9b27a', 5, 90);
+  spawnParticles(w, b.x, b.y, '#ffd36b', 2, 120);
+}
+
+/** The crumbler's payout when it finally breaks. */
+function crumblerReward(w: World, b: BreakableObstacle) {
+  const roll = w.rng();
+  const spread = () => randRange(w.rng, -16, 16);
+  const drop = (kind: 'cred' | 'health' | 'xp', value: number) => w.pickups.push({ uid: uid(w), kind, x: b.x + spread(), y: b.y + spread(), vx: 0, vy: 0, value, bornAt: w.now });
+  spawnParticles(w, b.x, b.y, '#ffd36b', 18, 170);
+  spawnParticles(w, b.x, b.y, '#fff2b8', 8, 130);
+  if (roll < 0.04) {
+    // Jackpot: a gilded boulder core.
+    grantPowerState(w, 'gilded', 16000);
+    for (let i = 0; i < 6; i += 1) drop('cred', 20);
+    pushAlert(w, 'GOLDEN CORE');
+  } else if (roll < 0.30) {
+    grantPowerState(w, 'supersonic');
+  } else if (roll < 0.52) {
+    grantPowerState(w, 'gilded');
+  } else if (roll < 0.74) {
+    drop('health', 24);
+    for (let i = 0; i < 4; i += 1) drop('xp', 10);
+  } else {
+    for (let i = 0; i < 5; i += 1) drop('cred', 14);
+    for (let i = 0; i < 3; i += 1) drop('xp', 10);
+  }
+  // LokPet Collectors get a little extra from every boulder: a chance at a floor Lock Pack.
+  const collector = w.character.lokPetCollector;
+  if (collector && w.rng() < 0.12 + collector.floorPackChance * 12) {
+    w.pickups.push({ uid: uid(w), kind: 'card-pack', x: b.x, y: b.y, vx: 0, vy: 0, value: 1, bornAt: w.now });
+    pushAlert(w, collector.rank + ' cracked a Lock Pack out of the rock');
+  }
 }
 
 export const LANDED_HEAT_RADIUS = 116;
@@ -1263,6 +1336,8 @@ export interface World {
   weaponReadyAt: number;
   ultReadyAt: number;
   ultActiveUntil: number;
+  /** Street Life power state (Gilded or Supersonic), or null. Replaced, never stacked. */
+  powerState: { id: PowerStateId; until: number } | null;
 
   kills: number;
   killsByEnemy: Record<string, number>;
@@ -1902,6 +1977,7 @@ export function createWorld(
     weaponReadyAt: 400,
     ultReadyAt: 4000,
     ultActiveUntil: -1,
+    powerState: null,
     kills: 0,
     killsByEnemy: {},
     weaponKills: {},
@@ -2354,7 +2430,7 @@ function damageMult(w: World): number {
   const ult = ultActive(w) ? (w.character.ultimate.effect.damageMult ?? 1) : 1;
   const isLlamaSovereign = w.character.id === 'llama-mama' || w.character.id === 'llama-overlord';
   const ego = (isLlamaSovereign && w.llamaEgoScore) ? (1 + Math.min(2.5, w.llamaEgoScore * 0.05)) : 1;
-  return w.stats.power * ult * ego;
+  return w.stats.power * ult * ego * (powerStateActive(w, 'gilded') ? 1.35 : 1);
 }
 
 function areaMult(w: World): number {
@@ -2367,7 +2443,7 @@ function speedMult(w: World): number {
   const ult = ultActive(w) ? (w.character.ultimate.effect.speedMult ?? 1) : 1;
   const isLlamaSovereign = w.character.id === 'llama-mama' || w.character.id === 'llama-overlord';
   const ego = (isLlamaSovereign && w.llamaEgoScore) ? (1 + Math.min(0.6, w.llamaEgoScore * 0.025)) : 1;
-  return ult * (w.modifiers.speedMode ? 1.35 : 1) * ego;
+  return ult * (w.modifiers.speedMode ? 1.35 : 1) * ego * (powerStateActive(w, 'supersonic') ? 1.6 : 1);
 }
 
 /**
@@ -4884,6 +4960,7 @@ function damagePlayer(
   if (w.now < p.invulnUntil) return;
   if (w.stealthConfig?.fullInvisible && w.now < w.stealthUntil) return;
   if (ultActive(w) && w.character.ultimate.effect.invulnerable) return;
+  if (powerStateActive(w, 'gilded')) return;
   const taken = w.enemyQuirks.taken;
   if (taken.size > 0) {
     if (taken.has('flicker') && (w.now / 1000) % 4 < 0.5) return;
@@ -6178,6 +6255,7 @@ export function activateUltimate(w: World): boolean {
   const ult = w.character.ultimate;
   w.ultActiveUntil = w.now + ult.durationMs;
   w.ultReadyAt = w.now + ult.cooldownMs * w.ultCooldownMult;
+  if (w.character.ultimatePowerState) grantPowerState(w, w.character.ultimatePowerState, ult.durationMs);
 
   if (ult.effect.novaDamage && ult.effect.novaRadius) {
     const radius = ult.effect.novaRadius * areaMult(w);
@@ -6965,6 +7043,7 @@ function damageBreakable(
     b.lastHitX = x;
     b.lastHitY = y;
     b.lastDamage = dealt;
+    if (b.kind === 'boulder-crumbler') shrinkCrumbler(w, b);
     if (b.kind === 'glass-block' || b.kind === 'ice-block') {
       // Cracks grow from where the block was really hit.
       const marks = b.hitMarks ?? (b.hitMarks = []);
@@ -7003,6 +7082,10 @@ function damageBreakable(
       forEachNearby(w, b.x, b.y, 80, (enemy) => {
         if (dist2(enemy.x, enemy.y, b.x, b.y) <= (62 + enemy.radius) ** 2) damageEnemy(w, enemy, 8 * w.stats.power, 2, b.x, b.y);
       });
+    }
+    if (b.kind === 'boulder-crumbler') {
+      crumblerReward(w, b);
+      pushSfx(w, 'obstacleBreak');
     }
     if (b.kind === 'ice-block') {
       // The block bursts into a slick puddle of ice shards.
@@ -7777,6 +7860,14 @@ function updateBreakables(w: World, dt: number) {
       damageEnemiesFromMovingProp(w, b, previousX, previousY);
       let friction = b.chainActive ? Math.max(b.friction, PROP_CHAIN_FRICTION) : b.friction;
       if (w.fluids.length > 0 && friction < ICE_PROP_FRICTION && onIceAt(w, b.x, b.y)) friction = ICE_PROP_FRICTION;
+      if (b.kind === 'boulder' || b.kind === 'boulder-crumbler') {
+        const speedNow = Math.hypot(b.vx, b.vy);
+        if (speedNow >= BOULDER_DUST_MIN_SPEED && w.now >= (b.nextTrailAt ?? 0)) {
+          b.nextTrailAt = w.now + 60;
+          spawnParticles(w, b.x, b.y + b.h * 0.3, '#b9a58a', 2, 45);
+          if (speedNow > 220) spawnParticles(w, b.x, b.y, '#ffe9bd', 1, 70);
+        }
+      }
       if (b.kind === 'ice-block') {
         const speedNow = Math.hypot(b.vx, b.vy);
         if (speedNow >= ICE_TRAIL_MIN_SPEED && w.now >= (b.nextTrailAt ?? 0)) {

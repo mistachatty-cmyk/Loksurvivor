@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 223,
+      "version": "0.42.84",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T09:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Street Life: boulders and power states",
+      "body": [
+        "Boulders now sit on open ground in Endless. Shove one and it rolls through the crowd. A crumbling boulder wears down with every hit and breaks into a random reward, including two new power states: Gilded (hard to hurt, hits harder) and Supersonic (very fast).",
+        "New operators: Golden Hour, Quarry Kid and Lost-and-Found Lou, who can crack Lock Packs out of boulders.",
+        "New effects: rolling dust, crumble chips, golden seams on a wearing boulder, and power-state rings and speed streaks on your fighter."
+      ]
+    },
+    {
       "number": 222,
       "version": "0.42.83",
       "date": "2026-11-26",
