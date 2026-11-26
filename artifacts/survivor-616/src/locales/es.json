@@ -1597,5 +1597,8 @@
   "lokParty.results.again": "jugar de nuevo",
   "lokParty.results.vault": "Bóveda: cápsulas {{capsules}}, claves {{keys}}, fragmentos {{shards}}",
   "lokParty.ladder.solo": "Solo Blitz",
-  "lokParty.ladder.crew": "Online Crew"
+  "lokParty.ladder.crew": "Online Crew",
+  "lokParty.pull.prompt": "Toque, deslice el dedo por la costura o manténgala presionada para abrirla",
+  "lokParty.pull.next": "Toca para ver la siguiente recompensa",
+  "lokParty.pull.done": "Toca para terminar"
 }

@@ -1597,5 +1597,8 @@
   "lokParty.results.again": "再玩一次",
   "lokParty.results.vault": "Vault：{{capsules}} 胶囊、{{keys}} 密钥、{{shards}} 碎片",
   "lokParty.ladder.solo": "Solo Blitz",
-  "lokParty.ladder.crew": "Online Crew"
+  "lokParty.ladder.crew": "Online Crew",
+  "lokParty.pull.prompt": "点击、滑动接缝或按住以将其裂开",
+  "lokParty.pull.next": "点击以获得下一个奖励",
+  "lokParty.pull.done": "点击完成"
 }

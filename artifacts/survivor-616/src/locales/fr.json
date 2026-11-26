@@ -1597,5 +1597,8 @@
   "lokParty.results.again": "Rejouer",
   "lokParty.results.vault": "Coffre : capsules {{capsules}}, clés {{keys}}, fragments {{shards}}",
   "lokParty.ladder.solo": "Solo Blitz",
-  "lokParty.ladder.crew": "Online Crew"
+  "lokParty.ladder.crew": "Online Crew",
+  "lokParty.pull.prompt": "Appuyez, faites glisser votre doigt sur la couture ou maintenez enfoncé pour la casser",
+  "lokParty.pull.next": "Appuyez pour la prochaine récompense",
+  "lokParty.pull.done": "Appuyez pour terminer"
 }

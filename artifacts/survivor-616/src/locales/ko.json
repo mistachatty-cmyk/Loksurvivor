@@ -1596,5 +1596,8 @@
   "lokParty.results.again": "다시 플레이",
   "lokParty.results.vault": "금고: {{capsules}} 캡슐, {{keys}} 키, {{shards}} 샤드",
   "lokParty.ladder.solo": "Solo Blitz",
-  "lokParty.ladder.crew": "Online Crew"
+  "lokParty.ladder.crew": "Online Crew",
+  "lokParty.pull.prompt": "이음매 부분을 탭하거나 스와이프하거나 길게 눌러 끊어보세요.",
+  "lokParty.pull.next": "다음 보상을 받으려면 탭하세요.",
+  "lokParty.pull.done": "완료하려면 탭하세요."
 }

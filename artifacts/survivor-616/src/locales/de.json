@@ -1597,5 +1597,8 @@
   "lokParty.results.again": "Spielen Sie noch einmal",
   "lokParty.results.vault": "Tresor: {{capsules}}-Kapseln, {{keys}}-Schlüssel, {{shards}}-Scherben",
   "lokParty.ladder.solo": "Solo Blitz",
-  "lokParty.ladder.crew": "Online Crew"
+  "lokParty.ladder.crew": "Online Crew",
+  "lokParty.pull.prompt": "Tippen Sie auf die Naht, streichen Sie darüber oder halten Sie sie gedrückt, um sie zu knacken",
+  "lokParty.pull.next": "Tippen Sie für die nächste Belohnung",
+  "lokParty.pull.done": "Tippen Sie, um den Vorgang abzuschließen"
 }

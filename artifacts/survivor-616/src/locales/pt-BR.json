@@ -1597,5 +1597,8 @@
   "lokParty.results.again": "Jogue novamente",
   "lokParty.results.vault": "Cofre: cápsulas {{capsules}}, chaves {{keys}}, fragmentos {{shards}}",
   "lokParty.ladder.solo": "Solo Blitz",
-  "lokParty.ladder.crew": "Online Crew"
+  "lokParty.ladder.crew": "Online Crew",
+  "lokParty.pull.prompt": "Toque, deslize pela costura ou segure para quebrá-la",
+  "lokParty.pull.next": "Toque para a próxima recompensa",
+  "lokParty.pull.done": "Toque para finalizar"
 }
