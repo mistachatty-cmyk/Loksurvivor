@@ -860,6 +860,9 @@ export interface LokPetCollectorConfig {
   bonusCardCreditsPerLootBox: number;
 }
 
+/** A short run-time power state: Gilded (hard to hurt, hits harder) or Supersonic (very fast). */
+export type PowerStateId = 'gilded' | 'supersonic';
+
 export interface CharacterDef {
   id: string;
   name: string;
@@ -879,6 +882,8 @@ export interface CharacterDef {
   crew?: CharacterCrewIdentity;
   /** Marks this operative as part of the separately-listed LokPet Collector class. */
   lokPetCollector?: LokPetCollectorConfig;
+  /** Power state this character's ultimate also grants for its duration. */
+  ultimatePowerState?: PowerStateId;
   /** Optional always-on ability the dash button also triggers or empowers. */
   dashSkill?: DashSkillDef;
   /** Path to the reference art the rig was built from, if any. */
@@ -1301,6 +1306,10 @@ export interface ObstacleDef {
      | 'glass-block'
      /** A slick, heavy block of ice: slides far when shoved, leaves an icy trail that makes walkers slide, and shatters into frost. */
      | 'ice-block'
+     /** A big boulder on open ground: shove it and it rolls a long way, flattening whatever it meets. Never breaks. */
+     | 'boulder'
+     /** A boulder that wears away with every hit and every enemy it rolls through, then breaks into a random reward. */
+     | 'boulder-crumbler'
      /** Page overlay only: a DOM element on a live web page, standing in as a fixed, breakable block. */
      | 'page-block' | 'map-prop';
   /** Detailed map-pack artwork shared by the editor and live renderer. */

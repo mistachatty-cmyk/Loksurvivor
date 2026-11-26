@@ -7,6 +7,170 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 231,
+      "version": "0.42.92",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T18:35:00Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "Lok Party: friends stay in step",
+      "body": [
+        "Online parties now recover from a weak connection: a missed turn, choice, minigame score or start message is sent again instead of freezing the game.",
+        "A double tap can no longer spend your choice on someone else's turn, and your room code stays the same while your profile loads."
+      ]
+    },
+    {
+      "number": 230,
+      "version": "0.42.91",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T18:15:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party: play with friends",
+      "body": [
+        "A Lok Party door now sits on the hideout main floor.",
+        "Host a Turbo Crown Blitz room, then invite friends with a link, the share sheet or a crew invite that pops up wherever they are in the game. Bots take any open seat, and if someone drops, a bot finishes for them. Minigames are played on each screen with the same seed and the scores are combined."
+      ]
+    },
+    {
+      "number": 229,
+      "version": "0.42.90",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T18:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party: Turbo Crown Blitz on the Monroe Loop",
+      "body": [
+        "A full party board game for you and three bots: roll the dice block or your Signature Die, race to Lok the Owl, buy Crowns for 20 coins, and climb fire escapes, cross the river gantry or ride the boulder chute. Five items, hack terminals, ARCHON taxes, glitch traps, night shifts every three rounds, three-round Overtime, a Lok Drop minigame every round and two surprise Bonus Crowns at the end. Pick 5, 10 or 15 rounds.",
+        "The city is alive to the touch: tap windows to switch their lights, recolor neon signs, switch street lamps, rustle trees, ripple the river, and tap the night sky for a shooting star. Buildings now sit in proper depth and turn see-through when they would hide you.",
+        "The Lok Drop vault got a full art pass with riveted walls, lock-wheel doors, warning beacons and puddle reflections."
+      ]
+    },
+    {
+      "number": 228,
+      "version": "0.42.89",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T16:45:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party: crack the Gold L capsule",
+      "body": [
+        "Vault Capsules now open with a hands-on crack: tap, swipe across the seam or hold, watch it split in a burst of confetti, then see your survivor wear each reward.",
+        "The Lok Drop bots now get sharper as your Solo Blitz rank climbs, with one softer bot in every match."
+      ]
+    },
+    {
+      "number": 227,
+      "version": "0.42.88",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T16:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party preview: The Lok Drop",
+      "body": [
+        "A first playable look at Lok Party. The Lok Drop is a 60-second vault scramble for you and three bots: crack falling capsules, dash into rivals to knock their loot loose, and bank it in the Extraction Ring before the vault slams shut.",
+        "Every match gets a grade from C to S+ and feeds its own progress: character mastery, a Solo Blitz rank, a 50-tier Split Pass, Vault Capsules and Beacon Keys. Your first win each day also sends a little Cred to your hideout. Party progress never changes your fighters in the main game."
+      ]
+    },
+    {
+      "number": 226,
+      "version": "0.42.87",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T12:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Street events",
+      "body": [
+        "Endless now throws short surprise events at you every minute or two: Free trial (weapons at full power), Loading screen (everything else freezes), Sugar rush, Jackpot hour (all cred pays double), Patch notes, Reskin and Half time. A label above your fighter shows what is running and for how long."
+      ]
+    },
+    {
+      "number": 225,
+      "version": "0.42.86",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T11:15:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Block milestones and three new ring layouts",
+      "body": [
+        "Every 5 new city blocks you cross in Endless now gives a small bonus to a random stat, and every 25 gives a bigger one with a burst of tokens. Going back over blocks you already crossed pays nothing.",
+        "Three new street layouts: a short Sprint lane, a long Gauntlet and a Jackpot arc packed with coin rings."
+      ]
+    },
+    {
+      "number": 224,
+      "version": "0.42.85",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T10:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Ring Runs",
+      "body": [
+        "Rings now float over the streets of Endless. Run through speed rings for a boost, coin rings for cred and surge rings for a lift, and chain them for pitch-climbing dings and bonuses.",
+        "Some streets hide a full Ring Run: dash through every gate in order, grab coins and a rising multiplier, and race two laser rivals whose trails burn enemies. Win and the whole screen bursts into tokens: gold, red, purple, teal, green, blue and white, each with its own effect, including an overshield."
+      ]
+    },
+    {
+      "number": 223,
+      "version": "0.42.84",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T09:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Street Life: boulders and power states",
+      "body": [
+        "Boulders now sit on open ground in Endless. Shove one and it rolls through the crowd. A crumbling boulder wears down with every hit and breaks into a random reward, including two new power states: Gilded (hard to hurt, hits harder) and Supersonic (very fast).",
+        "New operators: Golden Hour, Quarry Kid and Lost-and-Found Lou, who can crack Lock Packs out of boulders.",
+        "New effects: rolling dust, crumble chips, golden seams on a wearing boulder, and power-state rings and speed streaks on your fighter."
+      ]
+    },
+    {
+      "number": 222,
+      "version": "0.42.83",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T08:45:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Four more operators to earn",
+      "body": [
+        "Rink Rat, Upstream Fenn, Pier Beacon and Salvage Sal join the roster. Each is unlocked by kills or by clearing Back Alley, and each brings its own weapon and ultimate."
+      ]
+    },
+    {
+      "number": 221,
+      "version": "0.42.82",
+      "date": "2026-11-26",
+      "publishedAt": "2026-11-26T08:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Four new operators",
+      "body": [
+        "Four new operators join the roster: The Chairman, Lake Effect, Tollkeeper and Dead Letter. Each one has its own weapon, ultimate and silhouette, all drawn procedurally for 616."
+      ]
+    },
+    {
       "number": 220,
       "version": "0.42.81",
       "date": "2026-11-25",

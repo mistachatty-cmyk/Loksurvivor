@@ -6,6 +6,8 @@
  * reads as pixel art without needing image atlases.
  */
 
+import { BURST_TOKENS_BY_KIND, RING_STYLES, RING_TRACK_GATE_RADIUS } from '@/game/data/ringRuns';
+import { STREET_EVENTS_BY_ID } from '@/game/data/streetLife/events';
 import { BLOCK_FX_LINGER_MS, blockMaterialOf, drawBlockMaterial } from './blockBreak';
 import { drawGlyph } from '../../ui/lokGlyphCanvas';
 import { drawRescue, drawRescuePointer } from './rescueArt';
@@ -1937,6 +1939,8 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   // Glass and ice are drawn by render/blockBreak.ts; these only feed code that reads a flat colour.
   'glass-block': { top: '#78d6ee', side: '#1d6d8a', trim: '#ebfcff' },
   'ice-block': { top: '#eefbff', side: '#6cb4dc', trim: '#ffffff' },
+  boulder: { top: '#8a8173', side: '#4d463d', trim: '#c9c0b0' },
+  'boulder-crumbler': { top: '#b98a4a', side: '#6b4a22', trim: '#ffd36b' },
   'tree-digital': { top: '#064e3b', side: '#022c22', trim: '#10b981' },
   'tree-fake': { top: '#083344', side: '#051b24', trim: '#06b6d4' },
   skyscraper: { top: '#1e293b', side: '#0f172a', trim: '#38bdf8' },
@@ -2121,7 +2125,92 @@ type SceneObstacle = {
     marks?: readonly number[]; sliding?: boolean;
   };
 
+/**
+ * A procedural boulder: a lit rock disc with rotating facets. It turns as it rolls (angle follows its
+ * position), and the crumbler wears down with visible gold seams. No bitmaps.
+ */
+function drawBoulderBody(ctx: CanvasRenderingContext2D, w: World, obstacle: SceneObstacle) {
+  const crumbler = obstacle.kind === 'boulder-crumbler';
+  const wear = crumbler ? Math.min(1, Math.max(0, obstacle.damage ?? 0)) : 0;
+  const r = Math.min(obstacle.w, obstacle.h) / 2 * 1.08;
+  const cx = obstacle.x;
+  const cy = obstacle.y - 10;
+  const turn = (obstacle.x + obstacle.y) / Math.max(20, r);
+  ctx.save();
+  ctx.globalAlpha = 0.34;
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.ellipse(cx + 6, obstacle.y + r * 0.62, r * 0.95, r * 0.34, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  const base = crumbler ? '#b98a4a' : '#8a8173';
+  const dark = crumbler ? '#5a3c1a' : '#3f392f';
+  const light = crumbler ? '#f0c27a' : '#cfc6b4';
+  const lit = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r * 1.05);
+  lit.addColorStop(0, light);
+  lit.addColorStop(0.55, base);
+  lit.addColorStop(1, dark);
+  ctx.fillStyle = lit;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // Facets that turn with the roll.
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 1, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.translate(cx, cy);
+  ctx.rotate(turn);
+  ctx.strokeStyle = dark;
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.7, -r * 0.1); ctx.lineTo(-r * 0.15, r * 0.25); ctx.lineTo(r * 0.55, -r * 0.2);
+  ctx.moveTo(-r * 0.15, r * 0.25); ctx.lineTo(-r * 0.05, r * 0.85);
+  ctx.moveTo(r * 0.1, -r * 0.9); ctx.lineTo(r * 0.2, -r * 0.45); ctx.lineTo(r * 0.7, -r * 0.5);
+  ctx.stroke();
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.5, -r * 0.55); ctx.lineTo(-r * 0.05, -r * 0.8); ctx.lineTo(r * 0.12, -r * 0.4); ctx.lineTo(-r * 0.4, -r * 0.3);
+  ctx.closePath();
+  ctx.fill();
+  if (!crumbler) {
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#5f7f45';
+    ctx.beginPath();
+    ctx.ellipse(r * 0.2, r * 0.55, r * 0.5, r * 0.18, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Gold seams get brighter as the stone wears down.
+    ctx.globalAlpha = 0.45 + wear * 0.55;
+    ctx.strokeStyle = '#ffd36b';
+    ctx.lineWidth = 1.5 + wear * 2;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.6, r * 0.35); ctx.lineTo(-r * 0.1, -r * 0.05); ctx.lineTo(r * 0.45, r * 0.3); ctx.lineTo(r * 0.7, -r * 0.1);
+    ctx.moveTo(-r * 0.1, -r * 0.05); ctx.lineTo(0, -r * 0.7);
+    ctx.stroke();
+  }
+  ctx.restore();
+  if (crumbler && w.effectMotionEnabled) {
+    ctx.globalAlpha = 0.18 + 0.12 * Math.sin(w.now / 220);
+    ctx.strokeStyle = '#ffd36b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 4 + wear * 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawOrdinaryPropBody(ctx: CanvasRenderingContext2D, w: World, obstacle: SceneObstacle, colors: { top: string; side: string; trim: string }, snapshot = false) {
+  if (obstacle.kind === 'boulder' || obstacle.kind === 'boulder-crumbler') {
+    drawBoulderBody(ctx, w, obstacle);
+    return;
+  }
   const height = 16;
   const x = obstacle.x - obstacle.w / 2, y = obstacle.y - obstacle.h / 2;
   const breakFade = 1;
@@ -3500,6 +3589,212 @@ function drawRunEventMarker(ctx: CanvasRenderingContext2D, w: World) {
     ctx.fill();
   }
   ctx.restore();
+}
+
+/**
+ * Street Life: ring gates, Ring Run tracks with their laser rivals, and the victory-token explosion.
+ * All procedural. The next gate of a running track is the brightest thing on the track.
+ */
+function drawRingWorld(ctx: CanvasRenderingContext2D, w: World) {
+  const p = w.player;
+  const near = (x: number, y: number, pad = 700) => Math.abs(x - p.x) < pad && Math.abs(y - p.y) < pad;
+  const spin = w.effectMotionEnabled ? w.now / 700 : 0;
+
+  const drawRing = (x: number, y: number, r: number, color: string, glow: string, alpha: number, bright: boolean) => {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x, y);
+    if (bright && w.effectMotionEnabled) {
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 16;
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = bright ? 5 : 4;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r, r * 0.8, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = glow;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([7, 9]);
+    ctx.lineDashOffset = -spin * 30;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r - 7, (r - 7) * 0.8, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  for (const ring of w.rings) {
+    if (!near(ring.x, ring.y)) continue;
+    const style = RING_STYLES[ring.kind];
+    if (ring.taken) {
+      const t = Math.min(1, (w.now - ring.takenAt) / 900);
+      drawRing(ring.x, ring.y, ring.r * (1 + t * 0.7), style.color, style.glow, (1 - t) * 0.7, false);
+      continue;
+    }
+    drawRing(ring.x, ring.y, ring.r, style.color, style.glow, 0.85, true);
+  }
+
+  for (const t of w.ringTracks) {
+    if (!near(t.gates[0]!.x, t.gates[0]!.y, 900) && t.state !== 'running') continue;
+    if (t.state === 'done') {
+      // A finished track stays on the ground as a faded lane.
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.strokeStyle = '#8fa2c0';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      t.gates.forEach((g, i) => (i === 0 ? ctx.moveTo(g.x, g.y) : ctx.lineTo(g.x, g.y)));
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+    // Lane line.
+    ctx.save();
+    ctx.globalAlpha = t.state === 'running' ? 0.5 : 0.28;
+    ctx.strokeStyle = t.state === 'failed' ? '#ff6b6b' : '#7fe8ff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 12]);
+    ctx.lineDashOffset = -spin * 40;
+    ctx.beginPath();
+    t.gates.forEach((g, i) => (i === 0 ? ctx.moveTo(g.x, g.y) : ctx.lineTo(g.x, g.y)));
+    ctx.stroke();
+    ctx.restore();
+    // Coins.
+    for (const c of t.coins) {
+      if (c.taken || !near(c.x, c.y, 500)) continue;
+      const bob = w.effectMotionEnabled ? Math.sin(w.now / 240 + c.x * 0.05) * 2 : 0;
+      ctx.save();
+      ctx.fillStyle = '#ffc94d';
+      ctx.strokeStyle = '#fff0b0';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y + bob, 6, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+    // Gates.
+    t.gates.forEach((g, i) => {
+      const style = RING_STYLES[g.kind];
+      const isNext = t.state === 'running' ? i === t.next : i === 0;
+      const passed = t.state === 'running' && i < t.next && i > 0;
+      if (passed) {
+        drawRing(g.x, g.y, RING_TRACK_GATE_RADIUS, '#5c6a82', '#8fa2c0', 0.35, false);
+      } else {
+        const pulse = isNext && w.effectMotionEnabled ? 1 + Math.sin(w.now / 160) * 0.08 : 1;
+        drawRing(g.x, g.y, RING_TRACK_GATE_RADIUS * (isNext ? 1.12 * pulse : 1), isNext ? '#ffffff' : style.color, style.glow, isNext ? 1 : 0.7, isNext);
+      }
+    });
+    if (t.state === 'ready' || t.state === 'failed') {
+      const g = t.gates[0]!;
+      ctx.save();
+      ctx.font = '700 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.9;
+      ctx.fillText(t.state === 'failed' ? 'TRY AGAIN' : 'RING RUN', g.x, g.y - RING_TRACK_GATE_RADIUS - 14);
+      ctx.restore();
+    }
+    // Rivals: tiny lasers racing alongside.
+    if (t.state === 'running') {
+      for (const r of t.rivals) {
+        if (r.trail.length > 1) {
+          ctx.save();
+          ctx.strokeStyle = r.color;
+          ctx.lineWidth = 3;
+          ctx.lineCap = 'round';
+          ctx.globalAlpha = 0.85;
+          if (w.effectMotionEnabled) { ctx.shadowColor = r.color; ctx.shadowBlur = 10; }
+          ctx.beginPath();
+          r.trail.forEach((pt, i) => (i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)));
+          ctx.lineTo(r.x, r.y);
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(r.x, r.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+  }
+
+  // The token explosion.
+  for (const tk of w.burstTokens) {
+    const def = BURST_TOKENS_BY_KIND[tk.kind];
+    const flip = w.effectMotionEnabled ? Math.abs(Math.cos((w.now - tk.bornAt) / 150 + tk.uid)) : 1;
+    ctx.save();
+    ctx.translate(tk.x, tk.y);
+    if (w.effectMotionEnabled && tk.kind !== 'gold') { ctx.shadowColor = def.color; ctx.shadowBlur = 12; }
+    ctx.fillStyle = def.color;
+    ctx.strokeStyle = def.trim;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, Math.max(2, 9 * flip), 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = def.trim;
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(-1.5, -4, 3, 8);
+    ctx.restore();
+  }
+
+  // Chain counter and run status above the fighter.
+  const running = w.ringTracks.find((t) => t.state === 'running');
+  if (w.ringCombo >= 2 || running) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = '700 14px sans-serif';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#000000';
+    if (w.ringCombo >= 2) {
+      const text = `RING x${w.ringCombo}`;
+      ctx.strokeText(text, p.x, p.y - 46);
+      ctx.fillStyle = w.ringCombo >= 8 ? '#ffd36b' : '#7fe8ff';
+      ctx.fillText(text, p.x, p.y - 46);
+    }
+    if (running) {
+      const text = `GATE ${Math.min(running.next, running.gates.length - 1)}/${running.gates.length - 1}  x${running.mult.toFixed(2)}`;
+      ctx.strokeText(text, p.x, p.y - 62);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(text, p.x, p.y - 62);
+    }
+    ctx.restore();
+  }
+  // Street event label.
+  if (w.streetEvent) {
+    const def = STREET_EVENTS_BY_ID[w.streetEvent.id];
+    if (def) {
+      const secs = Math.max(0, Math.ceil((w.streetEvent.endsAt - w.now) / 1000));
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = '700 13px sans-serif';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#000000';
+      const text = `${def.name.toUpperCase()} ${secs}s`;
+      ctx.strokeText(text, p.x, p.y - 80);
+      ctx.fillStyle = def.color;
+      ctx.fillText(text, p.x, p.y - 80);
+      ctx.restore();
+    }
+  }
+  // Overshield bubble.
+  if (w.overshield && w.now < w.overshield.until) {
+    const left = w.overshield.until - w.now;
+    ctx.save();
+    ctx.globalAlpha = left < 2500 && Math.floor(w.now / 120) % 2 === 0 ? 0.2 : 0.55;
+    ctx.strokeStyle = '#4d9bff';
+    ctx.fillStyle = 'rgba(77,155,255,0.12)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y - 6, p.radius + 12, p.radius + 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
@@ -5708,6 +6003,45 @@ function drawActors(
     }
     ctx.restore();
 
+    // Power states: Gilded gets rising gold rings and sparkles, Supersonic gets speed streaks behind.
+    if (w.powerState && w.now < w.powerState.until) {
+      const left = w.powerState.until - w.now;
+      const fading = left < 1800 && Math.floor(w.now / 110) % 2 === 0;
+      ctx.save();
+      ctx.globalAlpha = fading ? 0.25 : 0.8;
+      if (w.powerState.id === 'gilded') {
+        ctx.strokeStyle = '#ffd36b';
+        ctx.fillStyle = '#fff2b8';
+        ctx.lineWidth = 2;
+        for (let k = 0; k < 3; k += 1) {
+          const t = ((w.now / 900) + k / 3) % 1;
+          ctx.globalAlpha = (1 - t) * (fading ? 0.2 : 0.7);
+          ctx.beginPath();
+          ctx.ellipse(p.x, p.y - t * 26, p.radius + 6 + t * 10, (p.radius + 6 + t * 10) * 0.42, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        if (w.effectMotionEnabled) {
+          for (let k = 0; k < 5; k += 1) {
+            const a = w.now / 420 + k * 1.256;
+            ctx.globalAlpha = fading ? 0.25 : 0.85;
+            ctx.fillRect(p.x + Math.cos(a) * (p.radius + 8) - 1, p.y - 8 + Math.sin(a * 1.3) * 14 - 1, 3, 3);
+          }
+        }
+      } else {
+        ctx.strokeStyle = '#7ff5ff';
+        ctx.lineWidth = 2;
+        const back = -(p.facing ?? 1);
+        for (let k = 0; k < 4; k += 1) {
+          ctx.globalAlpha = (fading ? 0.2 : 0.65) * (1 - k * 0.2);
+          ctx.beginPath();
+          ctx.moveTo(p.x + back * (p.radius + 4), p.y - 4 + (k - 1.5) * 6);
+          ctx.lineTo(p.x + back * (p.radius + 26 + k * 6), p.y - 4 + (k - 1.5) * 6);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
     const invuln = w.now < p.invulnUntil && w.outcome === 'running';
     const blink = invuln && Math.floor(w.now / 70) % 2 === 0;
     const stealthed = w.now < w.stealthUntil;
@@ -6968,6 +7302,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawPersistentAura(ctx, w);
   drawRescue(ctx, w);
   drawPickups(ctx, w);
+  drawRingWorld(ctx, w);
   if (!overlay) {
     drawDungeonEntrances(ctx, w);
     drawDungeonExit(ctx, w);

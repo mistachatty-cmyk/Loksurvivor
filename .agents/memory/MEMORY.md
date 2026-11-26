@@ -97,3 +97,4 @@
 - weapon-milestones.md — data-only weapon growth paths (Spoke Queen, Jackhammer Jean); how to add one
 - [Design standard: glyphs and feedback](design-standard-glyphs-and-feedback.md) — no emoji or stock symbols; original Lok Facet glyphs via GameIcon/drawGlyph; feedback baseline and Queens N Kings parity plan in docs/LOK_DESIGN_STANDARD.md.
 - `rescue-cage.md` - trapped-survivor cage art, freeing feedback and pointer.
+- [Lok Party](lok-party.md) — Lok Party Slice 1: own save key, capped one-way bridge into 616, Beacon Keys naming, pure seeded Lok Drop sim, shared AudioContext rule.

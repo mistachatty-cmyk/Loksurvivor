@@ -21,7 +21,7 @@ export function propDamageStage(damageRatio: number): DamageStage {
 export function propMaterial(kind: ObstacleDef['kind'], artAssetId?: string): PropMaterial {
   const id = `${kind}:${artAssetId ?? ''}`.toLowerCase();
   if (/glass|mirror|reflect|neon-sign|window|kiosk|shelter/.test(id)) return 'glass';
-  if (/crystal|concrete|stone|pothole|barricade|barrier/.test(id)) return 'stone';
+  if (/crystal|concrete|stone|pothole|barricade|barrier|boulder/.test(id)) return 'stone';
   if (/root|spore|resin|flora|tree|sapling|stump|living-cable|holographic/.test(id)) return 'organic';
   if (/crate|planter|bench|wood|cache-cart/.test(id)) return 'wood';
   if (/server-rack|metal-box|barrel|fuse-box|street-lamp|security-camera/.test(id)) return 'metal';

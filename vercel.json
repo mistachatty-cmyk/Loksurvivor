@@ -77,5 +77,5 @@
       ]
     }
   ],
-  "ignoreCommand": "! git log -1 --pretty=%B | grep -qi '\\[deploy\\]'"
+  "ignoreCommand": "! printf '%s' \"$VERCEL_GIT_COMMIT_MESSAGE\" | grep -qi '\\[deploy\\]'"
 }

@@ -48,6 +48,11 @@ export type SfxCueId =
   | 'uiNav'
   | 'purchase'
   | 'purchaseFail'
+  | 'ringPass'
+  | 'ringPassHigh'
+  | 'ringFinish'
+  | 'tokenBlast'
+  | 'tokenGet'
   | 'lowHealth';
 
 /** One `sfxEvents` entry the sim pushes; drained and played once per rendered frame. */
@@ -86,6 +91,11 @@ export const SFX_CUE_BASE: Record<SfxCueId, SfxCueBaseParams> = {
   levelUp: { wave: 'triangle', freqStart: 440, freqEnd: 990, durationMs: 320, gain: 0.24 },
   pickupXp: { wave: 'sine', freqStart: 660, freqEnd: 880, durationMs: 70, gain: 0.12 },
   pickupCred: { wave: 'sine', freqStart: 520, freqEnd: 780, durationMs: 90, gain: 0.14 },
+  ringPass: { wave: 'sine', freqStart: 700, freqEnd: 1050, durationMs: 140, gain: 0.16 },
+  ringPassHigh: { wave: 'triangle', freqStart: 1000, freqEnd: 1560, durationMs: 160, gain: 0.17 },
+  ringFinish: { wave: 'triangle', freqStart: 520, freqEnd: 1320, durationMs: 380, gain: 0.24 },
+  tokenBlast: { wave: 'sawtooth', freqStart: 160, freqEnd: 620, durationMs: 420, gain: 0.26, noiseMix: 0.25 },
+  tokenGet: { wave: 'sine', freqStart: 880, freqEnd: 1320, durationMs: 90, gain: 0.13 },
   pickupHealth: { wave: 'sine', freqStart: 392, freqEnd: 523, durationMs: 130, gain: 0.16 },
   pickupKey: { wave: 'triangle', freqStart: 587, freqEnd: 880, durationMs: 160, gain: 0.18 },
   lootBox: { wave: 'sawtooth', freqStart: 300, freqEnd: 700, durationMs: 260, gain: 0.22 },
@@ -172,6 +182,9 @@ export const MIN_RETRIGGER_MS: Partial<Record<SfxCueId, number>> = {
   iceShatter: 90,
   pickupXp: 120,
   pickupCred: 120,
+  ringPass: 60,
+  ringPassHigh: 60,
+  tokenGet: 40,
   pickupHealth: 150,
   pickupKey: 150,
   dash: 150,

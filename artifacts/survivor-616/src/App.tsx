@@ -14,6 +14,7 @@ import { AuthProvider } from '@/state/authStore';
 import { ListenTogetherProvider } from '@/state/listenTogether';
 import { SocialProvider, useSocial, type Doing } from '@/state/socialStore';
 import { CrewOverlay } from '@/ui/CrewOverlay';
+import { PartyInviteToast } from '@/party/PartyLobby';
 import { ListenInviteBanner } from '@/ui/ListenTogether';
 import { CloudSyncProvider } from '@/state/cloudSyncStore';
 import { PlaylistCloudSync } from '@/ui/PlaylistCloudSync';
@@ -119,12 +120,13 @@ const AreaSelect = lazy(() => import('@/ui/AreaSelect').then((m) => ({ default: 
 const JukeboxRoom = lazy(() => import('@/ui/JukeboxRoom'));
 const StudioScreen = lazy(() => import('@/ui/StudioScreen').then(m => ({ default: m.StudioScreen })));
 const RunScreen = lazy(() => import('@/game/RunScreen').then(m => ({ default: m.RunScreen })));
+const LokDropScreen = lazy(() => import('@/party/LokDropScreen').then((m) => ({ default: m.LokDropScreen })));
 const WeaponTrainingArenaScreen = lazy(() => import('@/ui/WeaponTrainingArenaScreen').then(m => ({ default: m.WeaponTrainingArenaScreen })));
 
 const queryClient = new QueryClient();
 
 /** Full-screen moments where a persistent menu would intrude. */
-const DOCK_HIDDEN_SCREENS = ['jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena', 'crew-run', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle', 'weapon-training-arena'];
+const DOCK_HIDDEN_SCREENS = ['lok-party', 'jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena', 'crew-run', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle', 'weapon-training-arena'];
 
 /** Screens with no payload that browser Back may return to. */
 const HISTORY_SCREENS = new Set(['intro', 'hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'locker', 'recovery', 'vendor', 'workshop', 'card-shop', 'inventory', 'lok-shop', 'weapon-bans', 'jukebox', 'settings', 'palette-store', 'sound-booth', 'account', 'feedback', 'weapon-training-arena']);
@@ -164,6 +166,7 @@ type Screen =
   | { name: 'sector-command' }
   | { name: 'lokpet-battle'; initialTab?: 'league' | 'sparring' | 'kennel' }
   | { name: 'weapon-training-arena' }
+  | { name: 'lok-party' }
   | { name: 'arena-setup' }
   | { name: 'arena-join'; initialCode?: string }
   | { name: 'arena'; area: AreaDef; seats: ArenaSeat[]; net?: ArenaNetRole }
@@ -247,6 +250,9 @@ function initialScreen(): Screen {
   // so it can be tried before the Arcade Box is found.
   if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('jukebox')) {
     return { name: 'jukebox' };
+  }
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('screen') === 'lok-party') {
+    return { name: 'lok-party' };
   }
   if (import.meta.env.DEV && typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
@@ -723,6 +729,7 @@ function Game() {
           onOpenSectorCommand={() => setScreen({ name: 'sector-command' })}
           onOpenLokPetBattle={() => setScreen({ name: 'lokpet-battle' })}
           onOpenTrainingArena={() => setScreen({ name: 'weapon-training-arena' })}
+          onOpenLokParty={() => setScreen({ name: 'lok-party' })}
           onOpenArena={() => setScreen({ name: 'arena-setup' })}
           onOpenRunSetup={openLooks}
           onStartChoiceEvent={(eventId, propId) => {
@@ -735,6 +742,13 @@ function Game() {
 
     case 'lokpet-battle':
       return <LokPetBattleScreen onReturnToHub={goHub} initialTab={screen.initialTab} />;
+
+    case 'lok-party':
+      return (
+        <Suspense fallback={<div className="min-h-dvh bg-[#07061a]" />}>
+          <LokDropScreen onBack={goHub} />
+        </Suspense>
+      );
 
     case 'weapon-training-arena':
       return (
@@ -983,7 +997,7 @@ function Game() {
       <CrewPresenceSync screenName={screen.name} />
       <CrewRunController screenName={screen.name} onLaunch={(launch) => setScreen({ name: 'crew-run', ...launch })} />
       <LokChatHost />
-      {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && screen.name !== 'photosensitivity-notice' && screen.name !== 'weapon-training-arena' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena', 'crew-run'].includes(screen.name) ? 'default' : 'menu'} />}
+      {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && screen.name !== 'photosensitivity-notice' && screen.name !== 'weapon-training-arena' && screen.name !== 'lok-party' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena', 'crew-run'].includes(screen.name) ? 'default' : 'menu'} />}
       <GoToPalette
         unlockedFeatures={unlockedFeatures}
         disabled={['jukebox', 'intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena', 'crew-run'].includes(screen.name)}
@@ -991,7 +1005,7 @@ function Game() {
         onGo={goToScreen}
       />
       {!DOCK_HIDDEN_SCREENS.includes(screen.name) && <MenuDock screenName={screen.name} onGo={goToScreen} onHeadOut={headOut} />}
-      {!['jukebox', 'photosensitivity-notice', 'intro', 'run-setup', 'run', 'arena', 'crew-run', 'starter-lokpet-encounter', 'weapon-training-arena'].includes(screen.name) &&
+      {!['jukebox', 'photosensitivity-notice', 'intro', 'run-setup', 'run', 'arena', 'crew-run', 'starter-lokpet-encounter', 'weapon-training-arena', 'lok-party'].includes(screen.name) &&
         (screen.name !== 'hub' || meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
           <div
             className="fixed right-[max(0.75rem,var(--safe-right))] top-[max(0.75rem,var(--safe-top))] z-[110] flex items-center gap-1.5"
@@ -1067,6 +1081,7 @@ function Providers({ children }: { children: ReactNode }) {
                     <CrewChatProvider>
                       {children}
                       <CrewOverlay />
+                      <PartyInviteToast />
                       <ListenInviteBanner />
                       <CrewToasts />
                     </CrewChatProvider>

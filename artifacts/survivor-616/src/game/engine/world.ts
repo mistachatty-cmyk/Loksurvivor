@@ -10,6 +10,13 @@
  */
 
 import { CALL_INS, CALL_IN_COOLDOWN_MS, CALL_IN_FIRST_READY_MS } from '@/game/data/crewCallIns';
+import { BURST_TOKENS_BY_KIND, RING_STYLES, RING_TRACK_GATE_RADIUS, burstTokenCount, rollBurstToken } from '@/game/data/ringRuns';
+import { streetLifeForChunk } from '@/game/data/streetLife';
+import { MILESTONE_STATS, milestoneForBlockCount } from '@/game/data/streetLife/milestones';
+import { ringHash } from '@/game/data/ringRuns';
+import { STREET_EVENTS_BY_ID, streetEventDelayMs, streetEventFor } from '@/game/data/streetLife/events';
+import type { StreetEventDef, StreetEventMods } from '@/game/data/streetLife/events';
+import type { BurstTokenKind, RingKind } from '@/game/data/ringRuns';
 import { BLACKOUT_STALKERS, RELAY_STORM_DRIFT_PX_PER_SEC, RELAY_STORM_MAX_INSIDE_MS, RELAY_STORM_RADIUS, RELAY_STORM_SLOW, BLOCK_PARTY_NEEDED_MS, BLOCK_PARTY_RADIUS, RUN_EVENTS_BY_ID, scheduleRunEvents, type RunEventId, type ScheduledRunEvent } from '@/game/data/runEvents';
 import { QUIRK_SURGE_LORE } from '@/game/data/quirkSurgeLore';
 import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID, QUIRK_SURGE_MS, quirkHash, quirkSurgeScheduled, quirkSurgeStart, rollEnemyQuirk, type QuirkSurgeMode } from '@/game/data/enemyQuirks';
@@ -57,6 +64,7 @@ import { CellGrid } from '@/game/engine/cellGrid';
 import { millionHordeActorCap, millionHordePopulationCap, millionHordeSweepBudget } from '@/game/performanceProfile';
 import { HordeField } from '@/game/engine/hordeField';
 import type {
+  PowerStateId,
   ActiveCrewRumor,
   AreaDef,
   BaseStats,
@@ -978,10 +986,13 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'glass-block': { variant: 'fixed-breakable', hp: 70 },
   /** A block of ice: shoved across the floor it slides far and leaves a slick trail. */
   'ice-block': { variant: 'medium-movable', hp: 150 },
+  /** Street Life: a roller that never breaks, and a crumbler that wears away into a reward. */
+  boulder: { variant: 'medium-movable' },
+  'boulder-crumbler': { variant: 'medium-movable', hp: 260 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench', 'server-rack', 'tree-digital',
-  'data-pipe', 'digi-arch', 'pressure-door', 'page-block', 'glass-block', 'ice-block',
+  'data-pipe', 'digi-arch', 'pressure-door', 'page-block', 'glass-block', 'ice-block', 'boulder', 'boulder-crumbler',
 ]);
 
 /** Small street-flavor breakables: bonus drops and rare-currency odds are scoped to just these four. */
@@ -1040,6 +1051,10 @@ function propProfile(obstacle: Pick<ObstacleDef, 'kind' | 'propVariant' | 'hp'>)
   if (variant === 'light-breakable') {
     return { variant, mass: 0.8, friction: 0.82, breakable, movable: true };
   }
+  if (obstacle.kind === 'boulder' || obstacle.kind === 'boulder-crumbler') {
+    // Round and heavy, but it rolls: one good shove carries it a long way through a crowd.
+    return { variant, mass: obstacle.kind === 'boulder' ? 1.7 : 1.4, friction: BOULDER_FRICTION, breakable, movable: true };
+  }
   if (obstacle.kind === 'ice-block') {
     // Heavy enough to plough through a crowd, slick enough to coast a long way.
     return { variant, mass: 2.2, friction: ICE_PROP_FRICTION, breakable, movable: true };
@@ -1054,6 +1069,480 @@ function propProfile(obstacle: Pick<ObstacleDef, 'kind' | 'propVariant' | 'hp'>)
     return { variant, mass: Number.POSITIVE_INFINITY, friction: 1, breakable, movable: false };
   }
   return { variant, mass: Number.POSITIVE_INFINITY, friction: 1, breakable: false, movable: false };
+}
+
+const BOULDER_FRICTION = 0.972;
+const BOULDER_DUST_MIN_SPEED = 70;
+const CRUMBLER_BASE_SIZE = new WeakMap<object, { w: number; h: number }>();
+const POWER_STATE_MS: Record<PowerStateId, number> = { gilded: 12000, supersonic: 10000 };
+
+/** Start (or refresh) a power state. States never stack: a new one replaces the old. */
+export function grantPowerState(w: World, id: PowerStateId, durationMs = POWER_STATE_MS[id]) {
+  w.powerState = { id, until: w.now + durationMs };
+  pushAlert(w, id === 'gilded' ? 'GILDED' : 'SUPERSONIC');
+  pushSfx(w, 'ultimate');
+  spawnParticles(w, w.player.x, w.player.y, id === 'gilded' ? '#ffd36b' : '#7ff5ff', 22, 190);
+  spawnParticles(w, w.player.x, w.player.y, '#ffffff', 8, 120);
+}
+
+function powerStateActive(w: World, id: PowerStateId): boolean {
+  return !!w.powerState && w.powerState.id === id && w.now < w.powerState.until;
+}
+
+/** Wear a crumbler down a step: it shrinks with its health and sheds dust and chips. */
+function shrinkCrumbler(w: World, b: BreakableObstacle) {
+  let base = CRUMBLER_BASE_SIZE.get(b);
+  if (!base) {
+    base = { w: b.w, h: b.h };
+    CRUMBLER_BASE_SIZE.set(b, base);
+  }
+  const ratio = clamp(b.hp / b.maxHp, 0, 1);
+  const scale = 0.5 + 0.5 * ratio;
+  b.w = base.w * scale;
+  b.h = base.h * scale;
+  b.mass = 1.4 * (0.55 + 0.45 * ratio);
+  spawnParticles(w, b.x, b.y, '#d9b27a', 5, 90);
+  spawnParticles(w, b.x, b.y, '#ffd36b', 2, 120);
+}
+
+/** The crumbler's payout when it finally breaks. */
+function crumblerReward(w: World, b: BreakableObstacle) {
+  const roll = w.rng();
+  const spread = () => randRange(w.rng, -16, 16);
+  const drop = (kind: 'cred' | 'health' | 'xp', value: number) => w.pickups.push({ uid: uid(w), kind, x: b.x + spread(), y: b.y + spread(), vx: 0, vy: 0, value, bornAt: w.now });
+  spawnParticles(w, b.x, b.y, '#ffd36b', 18, 170);
+  spawnParticles(w, b.x, b.y, '#fff2b8', 8, 130);
+  if (roll < 0.04) {
+    // Jackpot: a gilded boulder core.
+    grantPowerState(w, 'gilded', 16000);
+    for (let i = 0; i < 6; i += 1) drop('cred', 20);
+    pushAlert(w, 'GOLDEN CORE');
+  } else if (roll < 0.30) {
+    grantPowerState(w, 'supersonic');
+  } else if (roll < 0.52) {
+    grantPowerState(w, 'gilded');
+  } else if (roll < 0.74) {
+    drop('health', 24);
+    for (let i = 0; i < 4; i += 1) drop('xp', 10);
+  } else {
+    for (let i = 0; i < 5; i += 1) drop('cred', 14);
+    for (let i = 0; i < 3; i += 1) drop('xp', 10);
+  }
+  // LokPet Collectors get a little extra from every boulder: a chance at a floor Lock Pack.
+  const collector = w.character.lokPetCollector;
+  if (collector && w.rng() < 0.12 + collector.floorPackChance * 12) {
+    w.pickups.push({ uid: uid(w), kind: 'card-pack', x: b.x, y: b.y, vx: 0, vy: 0, value: 1, bornAt: w.now });
+    pushAlert(w, collector.rank + ' cracked a Lock Pack out of the rock');
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Street Life: rings, Ring Runs and Victory Tokens                      */
+/* ------------------------------------------------------------------ */
+
+export interface LiveRing {
+  id: string;
+  chunkKey: string;
+  x: number;
+  y: number;
+  r: number;
+  kind: RingKind;
+  taken: boolean;
+  takenAt: number;
+}
+
+export interface LiveRival {
+  name: string;
+  color: string;
+  /** Speed as a fraction of the runner's base speed. */
+  speedMult: number;
+  dist: number;
+  x: number;
+  y: number;
+  trail: Array<{ x: number; y: number }>;
+  nextTrailAt: number;
+  lastDamageAt: number;
+  finished: boolean;
+}
+
+export interface LiveTrack {
+  id: string;
+  chunkKey: string;
+  gates: Array<{ x: number; y: number; kind: RingKind }>;
+  coins: Array<{ x: number; y: number; taken: boolean }>;
+  /** Cumulative path length at each gate. */
+  cum: number[];
+  length: number;
+  state: 'ready' | 'running' | 'done' | 'failed';
+  next: number;
+  startedAt: number;
+  gateDeadline: number;
+  failedAt: number;
+  mult: number;
+  earned: number;
+  place: 0 | 1 | 2 | 3;
+  rivals: LiveRival[];
+}
+
+export interface BurstToken {
+  uid: number;
+  kind: BurstTokenKind;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  bornAt: number;
+  magnetAt: number;
+}
+
+const RING_COMBO_WINDOW_MS = 3200;
+const RING_BOOST_MS = 2600;
+const RING_BOOST_MULT = 1.35;
+const TRACK_GATE_WINDOW_MS = 4600;
+const TRACK_RETRY_MS = 5000;
+const TRACK_ACTIVE_RANGE = 1000;
+const TOKEN_MAGNET_DELAY_MS = 750;
+const TOKEN_LIFETIME_MS = 22000;
+const OVERSHIELD_MS = 25000;
+
+function trackPoint(track: LiveTrack, dist: number): { x: number; y: number; dx: number; dy: number } {
+  const d = clamp(dist, 0, track.length);
+  let i = 1;
+  while (i < track.cum.length - 1 && track.cum[i]! < d) i += 1;
+  const a = track.gates[i - 1]!;
+  const b = track.gates[i]!;
+  const segLen = Math.max(1, track.cum[i]! - track.cum[i - 1]!);
+  const t = clamp((d - track.cum[i - 1]!) / segLen, 0, 1);
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, dx: (b.x - a.x) / segLen, dy: (b.y - a.y) / segLen };
+}
+
+/** Count a newly entered block and hand out a block milestone when it lands on one. */
+function noteBlockEntered(w: World, key: string) {
+  if (w.visitedBlocks.size === 0) {
+    w.visitedBlocks.add(key);
+    return;
+  }
+  if (w.visitedBlocks.has(key)) return;
+  w.visitedBlocks.add(key);
+  w.blocksCrossed += 1;
+  const milestone = milestoneForBlockCount(w.blocksCrossed);
+  if (!milestone) return;
+  const seed = w.endless?.rngSeed ?? w.rngSeed;
+  const pick = MILESTONE_STATS[Math.floor(ringHash(seed, w.blocksCrossed, 0, 77) * MILESTONE_STATS.length)]!;
+  const add = pick.add * milestone.stepMult;
+  const p = w.player;
+  if (pick.stat === 'maxHp') {
+    w.stats.maxHp += add;
+    p.maxHp += add;
+    p.hp = Math.min(p.maxHp, p.hp + add);
+  } else if (pick.stat === 'armor') {
+    w.stats.armor = Math.min(0.6, w.stats.armor + add);
+  } else {
+    w.stats[pick.stat] += add;
+  }
+  pushAlert(w, `BLOCK ${w.blocksCrossed}: ${pick.label} UP`);
+  pushSfx(w, 'ringPassHigh');
+  spawnParticles(w, p.x, p.y, '#7fe8ff', 10, 120);
+  if (milestone.tokens) burstTokens(w, p.x, p.y, milestone.tokens, 0.1);
+}
+
+function loadRingsForChunk(w: World, key: string, cx: number, cy: number, originX: number, originY: number, axis: 'horizontal' | 'vertical') {
+  const e = w.endless;
+  if (!e) return;
+  const layout = streetLifeForChunk(cx, cy, e.rngSeed, axis);
+  layout.free.forEach((g, i) => {
+    const id = `${key}:r${i}`;
+    if (w.claimedRingIds.has(id)) return;
+    w.rings.push({ id, chunkKey: key, x: originX + g.x, y: originY + g.y, r: g.r, kind: g.kind, taken: false, takenAt: 0 });
+  });
+  if (layout.track) {
+    const id = `${key}:track`;
+    if (w.claimedRingIds.has(id)) return;
+    const gates = layout.track.gates.map((g) => ({ x: originX + g.x, y: originY + g.y, kind: g.kind }));
+    const cum = [0];
+    for (let i = 1; i < gates.length; i += 1) cum.push(cum[i - 1]! + Math.hypot(gates[i]!.x - gates[i - 1]!.x, gates[i]!.y - gates[i - 1]!.y));
+    w.ringTracks.push({
+      id, chunkKey: key, gates, coins: layout.track.coins.map((c) => ({ x: originX + c.x, y: originY + c.y, taken: false })),
+      cum, length: cum[cum.length - 1]!, state: 'ready', next: 0, startedAt: 0, gateDeadline: 0, failedAt: 0, mult: 1, earned: 0, place: 0,
+      rivals: [
+        { name: 'Cyan', color: '#46e6ff', speedMult: 0.92, dist: 0, x: gates[0]!.x, y: gates[0]!.y, trail: [], nextTrailAt: 0, lastDamageAt: 0, finished: false },
+        { name: 'Magenta', color: '#ff4fd8', speedMult: 1.16, dist: 0, x: gates[0]!.x, y: gates[0]!.y, trail: [], nextTrailAt: 0, lastDamageAt: 0, finished: false },
+      ],
+    });
+  }
+}
+
+function unloadRingsForChunk(w: World, key: string) {
+  w.rings = w.rings.filter((r) => r.chunkKey !== key);
+  w.ringTracks = w.ringTracks.filter((t) => t.chunkKey !== key || t.state === 'running');
+}
+
+function ringCredit(w: World, amount: number) {
+  w.cred += Math.max(1, Math.round(amount * streetMod(w, 'credMult')));
+}
+
+/** The multiplier a running street event applies (1 when none is running). */
+export function streetMod(w: World, key: keyof StreetEventMods): number {
+  if (!w.streetEvent) return 1;
+  const def = STREET_EVENTS_BY_ID[w.streetEvent.id];
+  return def?.mods?.[key] ?? 1;
+}
+
+function startStreetEvent(w: World, def: StreetEventDef) {
+  w.streetEvent = { id: def.id, endsAt: w.now + def.durationMs };
+  pushAlert(w, def.startText);
+  pushSfx(w, 'ringFinish');
+  const p = w.player;
+  if (def.freezeEnemiesMs) for (const enemy of w.enemies) enemy.frozenUntil = Math.max(enemy.frozenUntil, w.now + def.freezeEnemiesMs);
+  if (def.enemyHpMult) for (const enemy of w.enemies) enemy.hp = Math.max(1, enemy.hp * def.enemyHpMult);
+  if (def.healFraction) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * def.healFraction);
+  spawnParticles(w, p.x, p.y, def.color, 16, 150);
+}
+
+function updateStreetEvents(w: World) {
+  if (w.outcome !== 'running' || !w.area.endless || !w.endless) return;
+  const seed = w.endless.rngSeed;
+  if (w.streetEvent) {
+    if (w.now < w.streetEvent.endsAt) return;
+    const def = STREET_EVENTS_BY_ID[w.streetEvent.id];
+    w.streetEvent = null;
+    w.streetEventIndex += 1;
+    w.nextStreetEventAt = w.now + streetEventDelayMs(seed, w.streetEventIndex);
+    if (def) {
+      pushAlert(w, def.doneText);
+      if (def.endTokens) burstTokens(w, w.player.x, w.player.y, def.endTokens.count, def.endTokens.luck);
+    }
+    return;
+  }
+  if (w.now >= w.nextStreetEventAt) startStreetEvent(w, streetEventFor(seed, w.streetEventIndex));
+}
+
+function comboStep(w: World, x: number, y: number) {
+  w.ringCombo = w.now < w.ringComboUntil ? w.ringCombo + 1 : 1;
+  w.ringComboUntil = w.now + RING_COMBO_WINDOW_MS;
+  const c = w.ringCombo;
+  pushSfx(w, c >= 5 ? 'ringPassHigh' : 'ringPass');
+  if (c === 5 || c === 10 || c === 15) {
+    ringCredit(w, c * 4);
+    pushAlert(w, `RING CHAIN x${c}`);
+    spawnParticles(w, x, y, '#ffe08a', 14, 150);
+  }
+  if (c === 8) grantPowerState(w, 'supersonic', 5000);
+  if (c === 12) grantPowerState(w, 'gilded', 6000);
+  if (c === 16) burstTokens(w, w.player.x, w.player.y, 8, 0.2);
+}
+
+function takeFreeRing(w: World, ring: LiveRing) {
+  ring.taken = true;
+  ring.takenAt = w.now;
+  w.claimedRingIds.add(ring.id);
+  comboStep(w, ring.x, ring.y);
+  const style = RING_STYLES[ring.kind];
+  spawnParticles(w, ring.x, ring.y, style.color, 12, 140);
+  spawnParticles(w, ring.x, ring.y, style.glow, 5, 90);
+  if (ring.kind === 'speed') {
+    w.ringBoostUntil = w.now + RING_BOOST_MS;
+  } else if (ring.kind === 'coin') {
+    ringCredit(w, 5 * (1 + w.ringCombo * 0.3));
+    w.popups.push({ x: ring.x, y: ring.y - 10, text: '+CRED', color: style.color, bornAt: w.now, vy: 30 });
+  } else {
+    w.ringBoostUntil = w.now + 1600;
+    w.player.hp = Math.min(w.player.maxHp, w.player.hp + w.player.maxHp * 0.04);
+    gainXp(w, 10);
+    w.popups.push({ x: ring.x, y: ring.y - 10, text: 'SURGE', color: style.color, bornAt: w.now, vy: 30 });
+  }
+}
+
+function startTrack(w: World, t: LiveTrack) {
+  t.state = 'running';
+  t.next = 1;
+  t.startedAt = w.now;
+  t.gateDeadline = w.now + TRACK_GATE_WINDOW_MS + 1500;
+  t.mult = 1;
+  t.earned = 0;
+  t.place = 0;
+  for (const c of t.coins) c.taken = false;
+  for (const r of t.rivals) {
+    r.dist = 0; r.finished = false; r.trail.length = 0; r.x = t.gates[0]!.x; r.y = t.gates[0]!.y;
+  }
+  pushSfx(w, 'waveStart');
+  pushAlert(w, 'RING RUN: GO');
+  spawnParticles(w, t.gates[0]!.x, t.gates[0]!.y, '#ffffff', 14, 160);
+}
+
+function finishTrack(w: World, t: LiveTrack) {
+  const beaten = t.rivals.filter((r) => !r.finished).length;
+  const place = (3 - beaten) as 1 | 2 | 3;
+  t.place = place;
+  t.state = 'done';
+  w.claimedRingIds.add(t.id);
+  const bonus = Math.round((60 + t.earned * 0.5) * t.mult * (place === 1 ? 2.5 : place === 2 ? 1.5 : 1));
+  ringCredit(w, bonus);
+  pushSfx(w, 'ringFinish');
+  pushAlert(w, place === 1 ? `RING RUN: FIRST. +${bonus} CRED` : place === 2 ? `RING RUN: SECOND. +${bonus} CRED` : `RING RUN: DONE. +${bonus} CRED`);
+  burstTokens(w, w.player.x, w.player.y, burstTokenCount(place), place === 1 ? 0.5 : place === 2 ? 0.25 : 0);
+}
+
+/** The big explosion: tokens fly out in every direction and are drawn back in. */
+export function burstTokens(w: World, x: number, y: number, count: number, luck: number) {
+  pushSfx(w, 'tokenBlast');
+  spawnParticles(w, x, y, '#ffffff', 26, 260);
+  spawnParticles(w, x, y, '#ffd36b', 22, 220);
+  for (let i = 0; i < count; i += 1) {
+    const angle = (i / count) * Math.PI * 2 + w.rng() * 0.5;
+    const speed = randRange(w.rng, 160, 430);
+    w.burstTokens.push({
+      uid: uid(w), kind: rollBurstToken(w.rng(), luck), x, y,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      bornAt: w.now, magnetAt: w.now + TOKEN_MAGNET_DELAY_MS + w.rng() * 500,
+    });
+  }
+}
+
+function collectBurstToken(w: World, tk: BurstToken) {
+  const p = w.player;
+  const def = BURST_TOKENS_BY_KIND[tk.kind];
+  pushSfx(w, 'tokenGet');
+  spawnParticles(w, tk.x, tk.y, def.color, 6, 90);
+  w.popups.push({ x: p.x, y: p.y - 14, text: def.popup, color: def.color, bornAt: w.now, vy: 34 });
+  switch (tk.kind) {
+    case 'gold':
+      ringCredit(w, 12 + Math.round(w.rng() * 10));
+      break;
+    case 'red':
+      w.damageBuffUntil = Math.max(w.damageBuffUntil, w.now) + 40000;
+      if (w.rng() < 0.1) { w.stats.power *= 1.02; pushAlert(w, 'PERMANENT ATTACK UP'); }
+      break;
+    case 'purple':
+      w.stats.power *= 1.015;
+      w.stats.area *= 1.015;
+      w.stats.speed *= 1.015;
+      w.stats.magnet += 3;
+      break;
+    case 'teal':
+      grantPowerState(w, 'gilded', 8000);
+      ringCredit(w, 60);
+      gainXp(w, 40);
+      break;
+    case 'green':
+      p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.35);
+      break;
+    case 'blue':
+      w.overshield = { hp: 40 + p.maxHp * 0.4, until: w.now + OVERSHIELD_MS };
+      pushAlert(w, 'OVERSHIELD');
+      break;
+    case 'white':
+      w.lootTokensGained += 1;
+      break;
+  }
+}
+
+function updateRings(w: World, dt: number) {
+  const p = w.player;
+  if (w.outcome !== 'running') return;
+  if (w.now >= w.ringComboUntil && w.ringCombo > 0) w.ringCombo = 0;
+  if (w.overshield && w.now >= w.overshield.until) w.overshield = null;
+
+  for (const ring of w.rings) {
+    if (ring.taken) continue;
+    if (Math.abs(ring.x - p.x) > ring.r + 40 || Math.abs(ring.y - p.y) > ring.r + 40) continue;
+    if (dist2(ring.x, ring.y, p.x, p.y) <= (ring.r + p.radius * 0.4) ** 2) takeFreeRing(w, ring);
+  }
+  if (w.rings.length > 0 && w.rings.some((r) => r.taken && w.now - r.takenAt > 900)) {
+    w.rings = w.rings.filter((r) => !r.taken || w.now - r.takenAt <= 900);
+  }
+
+  for (const t of w.ringTracks) {
+    if (t.state === 'done') continue;
+    const first = t.gates[0]!;
+    if (Math.hypot(first.x - p.x, first.y - p.y) > TRACK_ACTIVE_RANGE && t.state !== 'running') continue;
+    const gateR = RING_TRACK_GATE_RADIUS + p.radius * 0.4;
+    if (t.state === 'failed' && w.now - t.failedAt > TRACK_RETRY_MS) t.state = 'ready';
+    if (t.state === 'ready') {
+      if (dist2(first.x, first.y, p.x, p.y) <= gateR * gateR) startTrack(w, t);
+      continue;
+    }
+    if (t.state !== 'running') continue;
+
+    // Rivals race along the path, laying lasers that hurt enemies.
+    const base = w.stats.speed;
+    for (const r of t.rivals) {
+      if (!r.finished) {
+        r.dist += base * r.speedMult * dt;
+        if (r.dist >= t.length) { r.dist = t.length; r.finished = true; }
+      }
+      const pt = trackPoint(t, r.dist);
+      r.x = pt.x - pt.dy * (r.name === 'Cyan' ? 34 : -34);
+      r.y = pt.y + pt.dx * (r.name === 'Cyan' ? 34 : -34);
+      if (w.now >= r.nextTrailAt) {
+        r.nextTrailAt = w.now + 45;
+        r.trail.push({ x: r.x, y: r.y });
+        if (r.trail.length > 22) r.trail.shift();
+      }
+      if (!r.finished && w.now >= r.lastDamageAt + 160) {
+        r.lastDamageAt = w.now;
+        forEachNearby(w, r.x, r.y, 40, (enemy) => {
+          if (dist2(enemy.x, enemy.y, r.x, r.y) <= (24 + enemy.radius) ** 2) damageEnemy(w, enemy, 7 * w.stats.power, 1, r.x, r.y);
+        });
+      }
+    }
+
+    // Coins along the path.
+    for (const c of t.coins) {
+      if (c.taken) continue;
+      if (Math.abs(c.x - p.x) > 30 || Math.abs(c.y - p.y) > 30) continue;
+      if (dist2(c.x, c.y, p.x, p.y) <= 22 * 22) {
+        c.taken = true;
+        const value = Math.max(1, Math.round(2 * t.mult));
+        t.earned += value;
+        ringCredit(w, value);
+        pushSfx(w, 'pickupCred');
+        w.popups.push({ x: c.x, y: c.y - 8, text: `+${value}`, color: '#ffd36b', bornAt: w.now, vy: 28 });
+      }
+    }
+
+    const gate = t.gates[t.next]!;
+    if (dist2(gate.x, gate.y, p.x, p.y) <= gateR * gateR) {
+      t.mult = Math.min(4, t.mult + 0.25);
+      comboStep(w, gate.x, gate.y);
+      spawnParticles(w, gate.x, gate.y, RING_STYLES[gate.kind].color, 12, 140);
+      if (gate.kind === 'speed') w.ringBoostUntil = w.now + RING_BOOST_MS;
+      t.next += 1;
+      t.gateDeadline = w.now + TRACK_GATE_WINDOW_MS;
+      if (t.next >= t.gates.length) finishTrack(w, t);
+    } else if (w.now > t.gateDeadline) {
+      t.state = 'failed';
+      t.failedAt = w.now;
+      t.mult = 1;
+      pushAlert(w, 'RING RUN LOST: step back into the start ring to retry');
+      pushSfx(w, 'playerHurt');
+    }
+  }
+
+  // Victory tokens: scatter, then get pulled in.
+  if (w.burstTokens.length > 0) {
+    const keep: BurstToken[] = [];
+    for (const tk of w.burstTokens) {
+      if (w.now - tk.bornAt > TOKEN_LIFETIME_MS) continue;
+      const drag = Math.pow(0.9, dt * 60);
+      tk.vx *= drag; tk.vy *= drag;
+      if (w.now >= tk.magnetAt) {
+        const dx = p.x - tk.x, dy = p.y - tk.y;
+        const d = Math.max(1, Math.hypot(dx, dy));
+        const pull = 380 + (w.now - tk.magnetAt) * 0.25;
+        tk.vx += (dx / d) * pull * dt * 6;
+        tk.vy += (dy / d) * pull * dt * 6;
+      }
+      tk.x += tk.vx * dt;
+      tk.y += tk.vy * dt;
+      if (w.now >= tk.magnetAt - 300 && dist2(tk.x, tk.y, p.x, p.y) <= 26 * 26) {
+        collectBurstToken(w, tk);
+        continue;
+      }
+      keep.push(tk);
+    }
+    w.burstTokens = keep;
+  }
 }
 
 export const LANDED_HEAT_RADIUS = 116;
@@ -1263,6 +1752,25 @@ export interface World {
   weaponReadyAt: number;
   ultReadyAt: number;
   ultActiveUntil: number;
+  /** Street Life rings, Ring Run tracks and the token explosion after a win. */
+  rings: LiveRing[];
+  /** Street event now running (Endless), and when the next one is due. */
+  streetEvent: { id: string; endsAt: number } | null;
+  streetEventIndex: number;
+  nextStreetEventAt: number;
+  /** Endless blocks entered for the first time (the start block does not count), for block milestones. */
+  blocksCrossed: number;
+  visitedBlocks: Set<string>;
+  ringTracks: LiveTrack[];
+  claimedRingIds: Set<string>;
+  ringCombo: number;
+  ringComboUntil: number;
+  ringBoostUntil: number;
+  burstTokens: BurstToken[];
+  overshield: { hp: number; until: number } | null;
+  damageBuffUntil: number;
+  /** Street Life power state (Gilded or Supersonic), or null. Replaced, never stacked. */
+  powerState: { id: PowerStateId; until: number } | null;
 
   kills: number;
   killsByEnemy: Record<string, number>;
@@ -1902,6 +2410,21 @@ export function createWorld(
     weaponReadyAt: 400,
     ultReadyAt: 4000,
     ultActiveUntil: -1,
+    powerState: null,
+    rings: [],
+    streetEvent: null,
+    streetEventIndex: 0,
+    nextStreetEventAt: streetEventDelayMs(seed, 0),
+    blocksCrossed: 0,
+    visitedBlocks: new Set<string>(),
+    ringTracks: [],
+    claimedRingIds: new Set<string>(),
+    ringCombo: 0,
+    ringComboUntil: 0,
+    ringBoostUntil: 0,
+    burstTokens: [],
+    overshield: null,
+    damageBuffUntil: 0,
     kills: 0,
     killsByEnemy: {},
     weaponKills: {},
@@ -2354,7 +2877,7 @@ function damageMult(w: World): number {
   const ult = ultActive(w) ? (w.character.ultimate.effect.damageMult ?? 1) : 1;
   const isLlamaSovereign = w.character.id === 'llama-mama' || w.character.id === 'llama-overlord';
   const ego = (isLlamaSovereign && w.llamaEgoScore) ? (1 + Math.min(2.5, w.llamaEgoScore * 0.05)) : 1;
-  return w.stats.power * ult * ego;
+  return w.stats.power * ult * ego * (powerStateActive(w, 'gilded') ? 1.35 : 1) * (w.now < w.damageBuffUntil ? 1.3 : 1) * streetMod(w, 'damageMult');
 }
 
 function areaMult(w: World): number {
@@ -2367,7 +2890,7 @@ function speedMult(w: World): number {
   const ult = ultActive(w) ? (w.character.ultimate.effect.speedMult ?? 1) : 1;
   const isLlamaSovereign = w.character.id === 'llama-mama' || w.character.id === 'llama-overlord';
   const ego = (isLlamaSovereign && w.llamaEgoScore) ? (1 + Math.min(0.6, w.llamaEgoScore * 0.025)) : 1;
-  return ult * (w.modifiers.speedMode ? 1.35 : 1) * ego;
+  return ult * (w.modifiers.speedMode ? 1.35 : 1) * ego * (powerStateActive(w, 'supersonic') ? 1.6 : 1) * (w.now < w.ringBoostUntil ? RING_BOOST_MULT : 1) * streetMod(w, 'playerSpeedMult');
 }
 
 /**
@@ -4884,6 +5407,7 @@ function damagePlayer(
   if (w.now < p.invulnUntil) return;
   if (w.stealthConfig?.fullInvisible && w.now < w.stealthUntil) return;
   if (ultActive(w) && w.character.ultimate.effect.invulnerable) return;
+  if (powerStateActive(w, 'gilded')) return;
   const taken = w.enemyQuirks.taken;
   if (taken.size > 0) {
     if (taken.has('flicker') && (w.now / 1000) % 4 < 0.5) return;
@@ -4901,7 +5425,15 @@ function damagePlayer(
   }
 
   if (source === 'contact') triggerBellShock(w);
-  const reduced = amount * (1 - clamp(w.stats.armor, 0, 0.6));
+  let reduced = amount * (1 - clamp(w.stats.armor, 0, 0.6));
+  if (w.overshield && w.now < w.overshield.until) {
+    const soaked = Math.min(w.overshield.hp, reduced);
+    w.overshield.hp -= soaked;
+    reduced -= soaked;
+    spawnParticles(w, p.x, p.y, '#4d9bff', 4, 70);
+    if (w.overshield.hp <= 0) w.overshield = null;
+    if (reduced <= 0) return;
+  }
   p.hp -= reduced;
   if (w.character.id === 'llama-mama' && p.hp > 0 && p.hp / p.maxHp <= 0.24 && !w.llamaMamaEnraged) {
     w.llamaMamaEnraged = true;
@@ -6178,6 +6710,7 @@ export function activateUltimate(w: World): boolean {
   const ult = w.character.ultimate;
   w.ultActiveUntil = w.now + ult.durationMs;
   w.ultReadyAt = w.now + ult.cooldownMs * w.ultCooldownMult;
+  if (w.character.ultimatePowerState) grantPowerState(w, w.character.ultimatePowerState, ult.durationMs);
 
   if (ult.effect.novaDamage && ult.effect.novaRadius) {
     const radius = ult.effect.novaRadius * areaMult(w);
@@ -6675,7 +7208,7 @@ function applyEffect(w: World, effect: UpgradeDef['effects'][number]) {
 }
 
 function gainXp(w: World, amount: number) {
-  w.xp += amount * w.xpMult;
+  w.xp += amount * w.xpMult * streetMod(w, 'xpMult');
   while (w.xp >= w.xpToNext) {
     w.xp -= w.xpToNext;
     w.level += 1;
@@ -6965,6 +7498,7 @@ function damageBreakable(
     b.lastHitX = x;
     b.lastHitY = y;
     b.lastDamage = dealt;
+    if (b.kind === 'boulder-crumbler') shrinkCrumbler(w, b);
     if (b.kind === 'glass-block' || b.kind === 'ice-block') {
       // Cracks grow from where the block was really hit.
       const marks = b.hitMarks ?? (b.hitMarks = []);
@@ -7003,6 +7537,10 @@ function damageBreakable(
       forEachNearby(w, b.x, b.y, 80, (enemy) => {
         if (dist2(enemy.x, enemy.y, b.x, b.y) <= (62 + enemy.radius) ** 2) damageEnemy(w, enemy, 8 * w.stats.power, 2, b.x, b.y);
       });
+    }
+    if (b.kind === 'boulder-crumbler') {
+      crumblerReward(w, b);
+      pushSfx(w, 'obstacleBreak');
     }
     if (b.kind === 'ice-block') {
       // The block bursts into a slick puddle of ice shards.
@@ -7777,6 +8315,14 @@ function updateBreakables(w: World, dt: number) {
       damageEnemiesFromMovingProp(w, b, previousX, previousY);
       let friction = b.chainActive ? Math.max(b.friction, PROP_CHAIN_FRICTION) : b.friction;
       if (w.fluids.length > 0 && friction < ICE_PROP_FRICTION && onIceAt(w, b.x, b.y)) friction = ICE_PROP_FRICTION;
+      if (b.kind === 'boulder' || b.kind === 'boulder-crumbler') {
+        const speedNow = Math.hypot(b.vx, b.vy);
+        if (speedNow >= BOULDER_DUST_MIN_SPEED && w.now >= (b.nextTrailAt ?? 0)) {
+          b.nextTrailAt = w.now + 60;
+          spawnParticles(w, b.x, b.y + b.h * 0.3, '#b9a58a', 2, 45);
+          if (speedNow > 220) spawnParticles(w, b.x, b.y, '#ffe9bd', 1, 70);
+        }
+      }
       if (b.kind === 'ice-block') {
         const speedNow = Math.hypot(b.vx, b.vy);
         if (speedNow >= ICE_TRAIL_MIN_SPEED && w.now >= (b.nextTrailAt ?? 0)) {
@@ -11569,7 +12115,7 @@ function updatePickups(w: World, dt: number) {
           pushSfx(w, 'pickupHealth');
           break;
         case 'cred':
-          w.cred += pickup.value;
+          w.cred += Math.round(pickup.value * streetMod(w, 'credMult'));
           pushSfx(w, 'pickupCred');
           break;
         case 'coin':
@@ -12076,6 +12622,7 @@ function updateEndlessChunks(w: World) {
 
   const VIEW_RADIUS = 2;
   const { cx: playerCx, cy: playerCy } = worldToChunkCoords(px, py);
+  noteBlockEntered(w, chunkKey(playerCx, playerCy));
 
   const needed = new Set<string>();
   for (let dx = -VIEW_RADIUS; dx <= VIEW_RADIUS; dx += 1) {
@@ -12091,6 +12638,7 @@ function updateEndlessChunks(w: World) {
     if (!needed.has(key)) {
       e.chunkObstacles.delete(key);
       e.dungeonEntrances = e.dungeonEntrances.filter((en) => en.chunkKey !== key);
+      unloadRingsForChunk(w, key);
       e.cityBlocks = e.cityBlocks.filter((block) => block.key !== key);
       e.buildings = e.buildings.filter((building) => !building.id.startsWith(`${key}:`));
       e.riverSegments = e.riverSegments.filter((segment) => !(
@@ -12127,6 +12675,7 @@ function updateEndlessChunks(w: World) {
         pothole: obs.pothole,
     }));
     e.chunkObstacles.set(key, worldObs);
+    loadRingsForChunk(w, key, cx, cy, cwx, cwy, chunk.streetAxis);
     e.cityBlocks.push({
       key,
       cx,
@@ -12913,6 +13462,8 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   w.hordeFedThisStep = 0;
   if (w.area.endless && w.endless) {
     updateEndlessChunks(w);
+    updateRings(w, dt);
+    updateStreetEvents(w);
     updateEndlessRoute(w);
     updateEndlessBandHazard(w);
     updateEndlessLandmarkCue(w);
