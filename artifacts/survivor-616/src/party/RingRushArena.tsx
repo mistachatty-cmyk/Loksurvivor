@@ -3,6 +3,9 @@
  * drag to steer. Art rule: runners are our own procedural rigs; the street is drawn here.
  */
 
+import { setPadGameplay } from '@/lib/consolePad';
+import { lokPad } from '../../../../lib/lok-universe/src/gamepad';
+import { isSavingPower } from '@/lib/powerSaver';
 import { useEffect, useRef } from 'react';
 import { CHARACTERS_BY_ID } from '@/game/data/characters';
 import { RING_STYLES } from '@/game/data/ringRuns';
@@ -209,7 +212,7 @@ export function RingRushArena({ seed, roster, onDone, getAudioContext }: Props) 
     let finished = false;
 
     const resize = () => {
-      dpr = Math.min(2, window.devicePixelRatio || 1);
+      dpr = Math.min(isSavingPower() ? 1 : 2, window.devicePixelRatio || 1);
       canvas.width = Math.round(canvas.clientWidth * dpr);
       canvas.height = Math.round(canvas.clientHeight * dpr);
       // Fill a portrait phone edge to edge; on a wide screen keep a centred column.
@@ -252,6 +255,12 @@ export function RingRushArena({ seed, roster, onDone, getAudioContext }: Props) 
     canvas.addEventListener('pointercancel', lift);
     window.addEventListener('keydown', key);
     window.addEventListener('keyup', key);
+    setPadGameplay(true);
+    const offPad = lokPad.subscribe((f) => {
+      if (f.pressed.has('a') || f.pressed.has('menu')) {
+        if (intro < ENTRANCE.countdownAt) intro = ENTRANCE.countdownAt;
+      }
+    });
 
     const text = (s: string, x: number, y: number, size: number, color: string) => {
       ctx.font = `900 ${size}px system-ui, sans-serif`;
@@ -401,6 +410,8 @@ export function RingRushArena({ seed, roster, onDone, getAudioContext }: Props) 
         while (acc >= STEP && !state.over) {
           acc -= STEP;
           input.mx = (keys.has('arrowright') || keys.has('d') ? 1 : 0) - (keys.has('arrowleft') || keys.has('a') ? 1 : 0);
+          const pf = lokPad.frame;
+          if (input.mx === 0 && pf.connected) input.mx = pf.lx || (pf.down.has('right') ? 1 : 0) - (pf.down.has('left') ? 1 : 0);
           stepRingRush(state, state.runners.map((r) => (r.index === me ? input : null)), STEP);
           for (const e of state.events) {
             const runner = state.runners[e.index];
@@ -453,6 +464,8 @@ export function RingRushArena({ seed, roster, onDone, getAudioContext }: Props) 
       canvas.removeEventListener('pointercancel', lift);
       window.removeEventListener('keydown', key);
       window.removeEventListener('keyup', key);
+      setPadGameplay(false);
+      offPad();
     };
   }, [seed, getAudioContext]);
 

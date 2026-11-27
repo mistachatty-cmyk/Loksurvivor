@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 239,
+      "version": "0.43.1",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T18:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Full screen and pop-out button",
+      "body": [
+        "A small square button (top right by default) fills the screen with one tap, or pops the game out into its own window you can move anywhere and keep on top. It fades when you are not using it. Pick what it does and where it sits in Settings.",
+        "Lok Party minigames play with a controller: stick to move, A, X or a bumper to dash.",
+        "Auto power saving also kicks in on a games console, so graphics stay light there."
+      ]
+    },
+    {
       "number": 238,
       "version": "0.42.99",
       "date": "2026-11-27",

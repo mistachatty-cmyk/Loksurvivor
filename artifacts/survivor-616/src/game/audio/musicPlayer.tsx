@@ -9,6 +9,7 @@
  * like a dropped file; nothing routes through a server this app doesn't have.
  */
 
+import { popoutKind, SCREEN_AWAY_EVENT, SCREEN_BACK_EVENT } from '../../../../../lib/lok-universe/src/screen';
 import { isAbortError, isCrossOriginUrl, nextFailureAction } from './playbackRecovery';
 import { readShuffle, writeShuffle } from '@/lib/jukeboxPrefs';
 import { useEq, type EqSettings } from '@/lib/musicEq';
@@ -1854,6 +1855,19 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const cycleRepeat = useCallback(() => setRepeat((r) => (r === 'off' ? 'all' : r === 'all' ? 'one' : 'off')), []);
   const dismissError = useCallback(() => setError(null), []);
   const getAudioContext = useCallback(() => audioContextRef.current, []);
+  // Pop-out into a separate window: that copy plays the music, so this page goes quiet until it is back.
+  useEffect(() => {
+    const away = () => {
+      if (popoutKind() === 'window') void audioContextRef.current?.suspend().catch(() => {});
+    };
+    const back = () => void audioContextRef.current?.resume().catch(() => {});
+    window.addEventListener(SCREEN_AWAY_EVENT, away);
+    window.addEventListener(SCREEN_BACK_EVENT, back);
+    return () => {
+      window.removeEventListener(SCREEN_AWAY_EVENT, away);
+      window.removeEventListener(SCREEN_BACK_EVENT, back);
+    };
+  }, []);
 
   const value = useMemo<MusicPlayerValue>(
     () => ({

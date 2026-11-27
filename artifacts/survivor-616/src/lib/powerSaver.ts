@@ -6,14 +6,16 @@
  *
  * Modes: Off, On, or Auto (default). Auto turns itself on when the device reports a low battery
  * that is not charging, or when the browser's Data Saver is on. Browsers without a battery
- * reading (Safari) simply never trigger the battery reason.
+ * reading (Safari) simply never trigger the battery reason. Auto also saves on a games console
+ * (Xbox Edge), where a web page gets a modest graphics budget on a big screen.
  */
+import { isXboxBrowser } from '../../../../lib/lok-universe/src/gamepad';
 import { useSyncExternalStore } from 'react';
 
 import { createPref } from './devicePref';
 
 export type SaverMode = 'off' | 'auto' | 'on';
-export type SaverReason = 'manual' | 'battery' | 'dataSaver';
+export type SaverReason = 'manual' | 'battery' | 'dataSaver' | 'console';
 export const SAVER_CAPS = [30, 45, 60] as const;
 export type SaverCap = (typeof SAVER_CAPS)[number];
 /** Auto mode starts saving at or below this battery level while not charging. */
@@ -24,6 +26,8 @@ export interface PowerFacts {
   batteryLevel: number | null;
   charging: boolean;
   saveData: boolean;
+  /** A games console browser (Xbox): big screen, modest graphics budget for a web page. */
+  console?: boolean;
 }
 
 export const saverModePref = createPref<SaverMode>('survivor616.power.saver.v1', 'auto', (raw): raw is SaverMode => raw === 'off' || raw === 'auto' || raw === 'on');
@@ -46,6 +50,7 @@ export function savingReason(mode: SaverMode, facts: PowerFacts): SaverReason | 
   if (mode === 'on') return 'manual';
   if (facts.batteryLevel !== null && !facts.charging && facts.batteryLevel <= LOW_BATTERY) return 'battery';
   if (facts.saveData) return 'dataSaver';
+  if (facts.console) return 'console';
   return null;
 }
 
@@ -66,7 +71,7 @@ interface BatteryLike extends EventTarget {
   charging: boolean;
 }
 
-let facts: PowerFacts = { batteryLevel: null, charging: true, saveData: false };
+let facts: PowerFacts = { batteryLevel: null, charging: true, saveData: false, console: typeof navigator !== 'undefined' && isXboxBrowser() };
 let watching = false;
 const listeners = new Set<() => void>();
 let snapshot = compute();

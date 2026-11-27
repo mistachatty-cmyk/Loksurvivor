@@ -4,6 +4,9 @@
  * the shared entrance and podium (stageArt.ts). A cartridge only brings rules and art.
  */
 
+import { setPadGameplay } from '@/lib/consolePad';
+import { lokPad } from '../../../../lib/lok-universe/src/gamepad';
+import { isSavingPower } from '@/lib/powerSaver';
 import { useEffect, useRef } from 'react';
 import { useT } from '@/lib/i18n';
 import { createJuice, drawRefractionRings, impact } from './juiceEngine';
@@ -104,7 +107,7 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
     const info = (): RenderInfo => ({ view, clock, me, calm });
 
     const resize = () => {
-      dpr = Math.min(2, window.devicePixelRatio || 1);
+      dpr = Math.min(isSavingPower() ? 1 : 2, window.devicePixelRatio || 1);
       canvas.width = Math.round(canvas.clientWidth * dpr);
       canvas.height = Math.round(canvas.clientHeight * dpr);
       // Fill a portrait phone edge to edge; on a wide screen keep a centred column.
@@ -185,11 +188,22 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
     canvas.addEventListener('pointerleave', leave);
     window.addEventListener('keydown', key);
     window.addEventListener('keyup', key);
+    // The controller belongs to the minigame while it runs: A, X or a bumper dashes (on press), Start skips the intro.
+    setPadGameplay(true);
+    const offPad = lokPad.subscribe((f) => {
+      if ((f.pressed.has('a') || f.pressed.has('x') || f.pressed.has('rb') || f.pressed.has('lb') || f.pressed.has('rt'))) {
+        skipIntro();
+        action = true;
+      }
+      if (f.pressed.has('menu')) skipIntro();
+    });
 
     const fx: StageFx = {
       impact: (x, y, weight) => impact(juice, clock, (offX + x * fit) / dpr, (y * fit) / dpr, weight),
       burst: (x, y, color, count, opts = {}) => {
         if (calm) return;
+        // Fewer pieces when saving power (low battery, Data Saver, games console).
+        if (isSavingPower()) count = Math.ceil(count / 2);
         const speed = opts.speed ?? 0.35;
         for (let i = 0; i < count; i++) {
           const a = (i / count) * Math.PI * 2 + i * 0.7;
@@ -222,8 +236,14 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
     };
 
     const inputForMe = (): StageInput => {
-      const kx = (keys.has('arrowright') || keys.has('d') ? 1 : 0) - (keys.has('arrowleft') || keys.has('a') ? 1 : 0);
-      const ky = (keys.has('arrowdown') || keys.has('s') ? 1 : 0) - (keys.has('arrowup') || keys.has('w') ? 1 : 0);
+      let kx = (keys.has('arrowright') || keys.has('d') ? 1 : 0) - (keys.has('arrowleft') || keys.has('a') ? 1 : 0);
+      let ky = (keys.has('arrowdown') || keys.has('s') ? 1 : 0) - (keys.has('arrowup') || keys.has('w') ? 1 : 0);
+      // Controller: left stick (analog) or d-pad, when the keys are idle.
+      const pf = lokPad.frame;
+      if (kx === 0 && ky === 0 && pf.connected) {
+        kx = pf.lx || (pf.down.has('right') ? 1 : 0) - (pf.down.has('left') ? 1 : 0);
+        ky = pf.ly || (pf.down.has('down') ? 1 : 0) - (pf.down.has('up') ? 1 : 0);
+      }
       const finger = mover !== null ? touches.get(mover) : undefined;
       const held = finger && clock - finger.downAt >= 60 ? finger : hover;
       const holding = !!held;
@@ -400,6 +420,8 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
       canvas.removeEventListener('pointerleave', leave);
       window.removeEventListener('keydown', key);
       window.removeEventListener('keyup', key);
+      setPadGameplay(false);
+      offPad();
     };
   }, [seed, getAudioContext]);
 

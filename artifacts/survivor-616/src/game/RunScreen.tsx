@@ -122,7 +122,8 @@ import { WeaponIcon } from '@/ui/WeaponIcon';
 import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 import { useT } from '@/lib/i18n';
 import { openCrewOverlay } from '@/state/socialStore';
-import { effectiveFrameRate, saverCapPref, useSavingPower } from '@/lib/powerSaver';
+import { effectiveFrameRate, saverCapPref, useSavingPower, isSavingPower } from '@/lib/powerSaver';
+import { popoutKind } from '../../../../lib/lok-universe/src/screen';
 
 /**
  * Screen point -> world point, using the same camera math `renderWorld` uses.
@@ -593,6 +594,8 @@ export function RunScreen({
     };
     const up = (event: KeyboardEvent) => keysRef.current.delete(event.key.toLowerCase());
     const pauseWhenHidden = () => {
+      // Popped out into a floating window: this page hides or loses focus while the game plays on.
+      if (popoutKind() === 'pip') return;
       keysRef.current.clear();
       if (phaseRef.current === 'playing') setPhaseBoth('paused');
     };
@@ -978,7 +981,8 @@ export function RunScreen({
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
       // Console browsers drive a TV: cap the backing store near 720p wide so fill rate holds up.
-      const maxRatio = isConsoleBrowser ? Math.min(2, 1280 / width) : 2;
+      // Saving power (low battery or Data Saver): one canvas pixel per screen point.
+      const maxRatio = isConsoleBrowser ? Math.min(2, 1280 / width) : isSavingPower() ? 1 : 2;
       const ratio = Math.max(0.5, Math.min(window.devicePixelRatio || 1, maxRatio) * backingScale);
       const height = Math.max(1, rect.height);
       // Backing store must be whole pixels, so derive the scale from it --
