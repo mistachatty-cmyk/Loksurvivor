@@ -1753,5 +1753,10 @@
   "lokParty.online.joinAnyway": "とにかく参加してください",
   "lokParty.online.invited": "{{name}} が Lok Party に招待しました",
   "lokParty.door.title": "Lok Party",
-  "lokParty.door.sub": "ボードゲーム、ミニゲーム、友達と遊ぶ"
+  "lokParty.door.sub": "ボードゲーム、ミニゲーム、友達と遊ぶ",
+  "console.title": "コントローラーをゲームコントロールに切り替えます",
+  "console.body": "ブラウザのメニューが開くまでメニュー ボタンを押したままにして、ゲーム コントロールを選択します。そうするまで、スティックはカーソルを移動し、ページをズームします。",
+  "console.dismiss": "カーソルを保持したままにする",
+  "music.releases.kicker": "最新リリース",
+  "music.releases.tracks": "収録曲: {{count}}"
 }

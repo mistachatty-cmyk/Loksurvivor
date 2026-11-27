@@ -1753,5 +1753,10 @@
   "lokParty.online.joinAnyway": "Machen Sie trotzdem mit",
   "lokParty.online.invited": "{{name}} hat Sie zu einem Lok Party eingeladen",
   "lokParty.door.title": "Lok Party",
-  "lokParty.door.sub": "Brettspiel, Minispiele, mit Freunden spielen"
+  "lokParty.door.sub": "Brettspiel, Minispiele, mit Freunden spielen",
+  "console.title": "Schalten Sie Ihren Controller auf Spielsteuerung um",
+  "console.body": "Halten Sie die Menütaste gedrückt, bis das Browsermenü geöffnet wird, und wählen Sie dann Spielsteuerung aus. Bis Sie dies tun, bewegen die Sticks einen Cursor und zoomen die Seite.",
+  "console.dismiss": "Behalten Sie den Cursor",
+  "music.releases.kicker": "Neueste Veröffentlichungen",
+  "music.releases.tracks": "Titel: {{count}}"
 }

@@ -1753,5 +1753,10 @@
   "lokParty.online.joinAnyway": "无论如何加入",
   "lokParty.online.invited": "{{name}}邀请您参加Lok Party",
   "lokParty.door.title": "Lok Party",
-  "lokParty.door.sub": "桌游、小游戏、与朋友一起玩"
+  "lokParty.door.sub": "桌游、小游戏、与朋友一起玩",
+  "console.title": "将控制器切换到游戏控制器",
+  "console.body": "按住“菜单”按钮直到浏览器菜单打开，然后选择游戏控件。在此之前，摇杆会移动光标并缩放页面。",
+  "console.dismiss": "保持光标",
+  "music.releases.kicker": "最新版本",
+  "music.releases.tracks": "曲目：{{count}}"
 }

@@ -1753,5 +1753,10 @@
   "lokParty.online.joinAnyway": "Rejoignez quand même",
   "lokParty.online.invited": "{{name}} vous a invité à un Lok Party",
   "lokParty.door.title": "Lok Party",
-  "lokParty.door.sub": "Jeu de société, mini-jeux, jouez entre amis"
+  "lokParty.door.sub": "Jeu de société, mini-jeux, jouez entre amis",
+  "console.title": "Basculez votre manette vers les commandes de jeu",
+  "console.body": "Maintenez le bouton Menu enfoncé jusqu'à ce que le menu du navigateur s'ouvre, puis choisissez les commandes de jeu. Jusqu'à ce que vous le fassiez, les sticks déplacent un curseur et zooment sur la page.",
+  "console.dismiss": "Gardez le curseur",
+  "music.releases.kicker": "Dernières versions",
+  "music.releases.tracks": "Pistes : {{count}}"
 }
