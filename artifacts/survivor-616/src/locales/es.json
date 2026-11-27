@@ -1556,6 +1556,7 @@
   "music.unmute": "Dejar de silenciar",
   "feedback.rateStar": "Valora {{n}} sobre 5",
   "lokParty.title": "Lok Party",
+  "lokParty.console.controls": "Movimientos del joystick izquierdo o del pad direccional. {primary} salta, confirma y corre. {secundario} regresa.",
   "lokParty.daily.run": "carrera diaria",
   "lokParty.drop.title": "El Lok Drop",
   "lokParty.drop.pitch": "Rompe cápsulas, libera a tus rivales y guarda tu botín en el Extraction Ring antes de que la bóveda se cierre de golpe.",

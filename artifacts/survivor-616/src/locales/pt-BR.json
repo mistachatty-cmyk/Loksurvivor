@@ -1556,6 +1556,7 @@
   "music.unmute": "Ativar som",
   "feedback.rateStar": "Avalie {{n}} de 5",
   "lokParty.title": "Lok Party",
+  "lokParty.console.controls": "Movimentos do controle esquerdo ou do D-pad. {primary} salta, confirma e corre. {secundário} volta.",
   "lokParty.daily.run": "Corrida diária",
   "lokParty.drop.title": "O Lok Drop",
   "lokParty.drop.pitch": "Quebre cápsulas, solte rivais e guarde seu saque no Extraction Ring antes que o cofre se feche.",

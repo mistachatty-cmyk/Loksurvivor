@@ -1556,6 +1556,7 @@
   "music.unmute": "Stummschaltung aufheben",
   "feedback.rateStar": "Bewerten Sie {{n}} mit 5 Punkten",
   "lokParty.title": "Lok Party",
+  "lokParty.console.controls": "Linker Stick oder D-Pad bewegt sich. {primary} springt, bestätigt und sprintet. {secondary} geht zurück.",
   "lokParty.daily.run": "Täglicher Lauf",
   "lokParty.drop.title": "Der Lok Drop",
   "lokParty.drop.pitch": "Knacken Sie Kapseln, schlagen Sie Rivalen los und bewahren Sie Ihre Beute im Extraction Ring auf, bevor der Tresorraum zuschlägt.",
