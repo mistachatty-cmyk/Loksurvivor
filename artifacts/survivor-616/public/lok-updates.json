@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 243,
+      "version": "0.43.5",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T22:30:00Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "Rain that really falls",
+      "body": [
+        "Rain now falls the whole way down the screen instead of jumping back up every few steps, with near and far drops and little splashes where they land."
+      ]
+    },
+    {
       "number": 242,
       "version": "0.43.4",
       "date": "2026-11-27",
