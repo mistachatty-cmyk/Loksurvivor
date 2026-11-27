@@ -56,6 +56,7 @@ import { JukeboxSettings } from './JukeboxSettings';
 import { SETTINGS_FOCUS_KEY } from '@/lib/jukeboxPrefs';
 import { PowerSettings } from './PowerSettings';
 import { FullscreenSetting } from './FullscreenSetting';
+import { FaithSetting } from './FaithSetting';
 import { ControlsSettings } from './ControlsSettings';
 import { EndgameSettings } from './EndgameSettings';
 import { SettingsPager } from './SettingsPager';
@@ -762,6 +763,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets, onOpenScreen }: S
         <PowerSettings />
 
         <FullscreenSetting />
+        <FaithSetting />
 
         {/* Studio plugins -- off unless deliberately enabled, because this is
             the one feature that runs code from off the device. */}

@@ -2,6 +2,7 @@
  * Cold open. Sets the premise before the player ever sees the hideout.
  * Owned by the design pass -- keep the export name and props stable.
  */
+import { FaithVerseBar } from './FaithVerseBar';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X, ShieldAlert, Sparkles, Megaphone, Dices } from 'lucide-react';
@@ -213,6 +214,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             <ShieldAlert className="h-3.5 w-3.5 text-red-400 shrink-0" />
             <span>MISSION BRIEFING: THE AI TRAP & SOUL SIPHON</span>
           </motion.button>
+          <FaithVerseBar />
 
           {/* Updates & Patch Notes Link */}
           <button

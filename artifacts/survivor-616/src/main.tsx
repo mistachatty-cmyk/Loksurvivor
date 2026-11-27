@@ -16,6 +16,8 @@ import { startPowerWatch } from '@/lib/powerSaver';
 import { installConsolePad } from '@/lib/consolePad';
 import { getControls } from '@/game/input/controls';
 import { startLokScreenAndPad } from '@/lib/lokScreen';
+import { startFaith } from '@/faith/faithSettings';
+import { padGameplayActive } from '@/lib/consolePad';
 
 // After a deploy, an already-open or home-screen copy can ask for a code chunk
 // that no longer exists. Reload once to pick up the new build instead of
@@ -124,6 +126,7 @@ function mount(): void {
   startPowerWatch();
   installConsolePad(() => getControls().gamepad.enabled);
   startLokScreenAndPad();
+  startFaith(padGameplayActive);
   createRoot(document.getElementById('root')!, {
     // Keeps caught errors off reportError(), which would raise the dev overlay.
     onCaughtError: (error, errorInfo) => {
