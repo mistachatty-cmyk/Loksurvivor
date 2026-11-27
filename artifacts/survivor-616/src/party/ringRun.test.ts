@@ -218,3 +218,55 @@ test('lokConsole core imports nothing from any game', () => {
   const src = readFileSync(fileURLToPath(new URL('../lib/lokConsole/core.ts', import.meta.url)), 'utf8');
   assert.equal(/from\s+['"]/.test(src), false);
 });
+
+import { buildProfile, classifyDevice, describeProfile, detectBrowser, detectOs, refineTier } from '../lib/lokCalibrate/core';
+
+const UA = {
+  xbox: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; Xbox; Xbox Series X) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.82 Safari/537.36 Edge/20.02',
+  ps4: 'Mozilla/5.0 (PlayStation 4 9.00) AppleWebKit/605.1.15 (KHTML, like Gecko)',
+  iphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+  win: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
+  tv: 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) 76.0.3809.146/6.0 TV Safari/537.36',
+};
+
+test('calibrate: classifies devices, browsers and operating systems', () => {
+  assert.equal(classifyDevice({ ua: UA.xbox }), 'console');
+  assert.equal(classifyDevice({ ua: UA.tv }), 'tv');
+  assert.equal(classifyDevice({ ua: UA.iphone, touch: true, coarsePointer: true, screenW: 390, screenH: 844 }), 'phone');
+  assert.equal(classifyDevice({ ua: UA.win, cores: 12 }), 'desktop');
+  assert.equal(detectBrowser(UA.win), 'edge');
+  assert.equal(detectBrowser(UA.iphone), 'safari');
+  assert.equal(detectOs(UA.xbox), 'xbox');
+  assert.equal(detectOs(UA.iphone), 'ios');
+});
+
+test('calibrate: profiles fit the device and a slow frame test only lowers them', () => {
+  const x = buildProfile({ ua: UA.xbox, dpr: 2, gamepad: true });
+  assert.equal(x.tier, 'high');
+  assert.equal(x.settings.inputMode, 'gamepad');
+  assert.ok(x.settings.safeInset > 0 && x.settings.dprCap <= 1.25);
+  assert.equal(describeProfile(x), 'Xbox Series X|S in Edge');
+  const ps4 = buildProfile({ ua: UA.ps4 });
+  assert.equal(ps4.tier, 'mid');
+  assert.ok(ps4.notes.includes('old-webkit'));
+  const tv = buildProfile({ ua: UA.tv });
+  assert.equal(tv.settings.fps, 30);
+  const big = buildProfile({ ua: UA.win, cores: 16, memoryGb: 8, dpr: 2 });
+  assert.equal(big.tier, 'high');
+  assert.equal(big.settings.dprCap, 2);
+  const slow = buildProfile({ ua: UA.win, cores: 16, memoryGb: 8, dpr: 2 }, 30);
+  assert.equal(slow.tier, 'mid');
+  assert.ok(slow.notes.includes('measured-slow'));
+  assert.equal(refineTier('low', 10), 'low');
+  assert.equal(refineTier('mid', 40), 'low');
+  const saver = buildProfile({ ua: UA.win, cores: 16, memoryGb: 8, saveData: true });
+  assert.equal(saver.tier, 'mid');
+  const phone = buildProfile({ ua: UA.iphone, touch: true, coarsePointer: true, screenW: 390, screenH: 844, cores: 6, dpr: 3 });
+  assert.ok(phone.notes.includes('ios-no-vibrate') && phone.notes.includes('hi-dpi-capped'));
+});
+
+test('lokCalibrate core imports only the sibling console package', () => {
+  const src = readFileSync(fileURLToPath(new URL('../lib/lokCalibrate/core.ts', import.meta.url)), 'utf8');
+  const imports = [...src.matchAll(/from '([^']+)'/g)].map((m) => m[1]);
+  assert.deepEqual(imports, ['../lokConsole/core']);
+});

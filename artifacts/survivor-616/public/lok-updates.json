@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 237,
+      "version": "0.42.98",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T23:55:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Calibrate: the game tunes itself to your device",
+      "body": [
+        "The game now recognizes your device (Xbox, PlayStation, smart TV, phone, tablet, laptop or desktop) and your browser, and offers a one-tap Turn on card.",
+        "Turning it on tunes canvas sharpness, frame rate and effect weight to what your hardware can do, then runs a quick frame test and eases effects down if frames run slow. It stays on until you turn it off."
+      ]
+    },
+    {
       "number": 236,
       "version": "0.42.97",
       "date": "2026-11-27",

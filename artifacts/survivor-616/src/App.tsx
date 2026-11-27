@@ -14,6 +14,7 @@ import { AuthProvider } from '@/state/authStore';
 import { ListenTogetherProvider } from '@/state/listenTogether';
 import { SocialProvider, useSocial, type Doing } from '@/state/socialStore';
 import { CrewOverlay } from '@/ui/CrewOverlay';
+import { CalibratePrompt } from '@/ui/CalibratePrompt';
 import { PartyInviteToast } from '@/party/PartyLobby';
 import { ListenInviteBanner } from '@/ui/ListenTogether';
 import { CloudSyncProvider } from '@/state/cloudSyncStore';
@@ -995,6 +996,7 @@ function Game() {
       <SaveGuardBanner />
       <ListeningTracker />
       <CrewPresenceSync screenName={screen.name} />
+      <CalibratePrompt screenName={screen.name} />
       <CrewRunController screenName={screen.name} onLaunch={(launch) => setScreen({ name: 'crew-run', ...launch })} />
       <LokChatHost />
       {!(screen.name === 'hub' && chromeLayout === 'new') && screen.name !== 'jukebox' && screen.name !== 'photosensitivity-notice' && screen.name !== 'weapon-training-arena' && screen.name !== 'lok-party' && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena', 'crew-run'].includes(screen.name) ? 'default' : 'menu'} />}

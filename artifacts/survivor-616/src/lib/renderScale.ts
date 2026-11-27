@@ -11,6 +11,7 @@
  */
 
 import { consoleDprCap, detectConsole } from './lokConsole/core';
+import { calibratedSettings } from './lokCalibrate/runtime';
 
 export function isConsoleBrowser(ua: string = typeof navigator === 'undefined' ? '' : navigator.userAgent): boolean {
   return /xbox|playstation|nintendo|tizen|web0s|webos|smart-?tv|crkey|aftb|bravia/i.test(ua);
@@ -20,7 +21,8 @@ export function isConsoleBrowser(ua: string = typeof navigator === 'undefined' ?
 export function baseDpr(raw: number = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1, consoleBrowser: boolean = isConsoleBrowser()): number {
   // A Series X or PS5 may start a little sharper than other TVs; the governor still steps down.
   const cap = consoleBrowser ? (detectConsole() === 'none' ? 1 : Math.max(1, Math.min(1.25, consoleDprCap()))) : 2;
-  return Math.min(cap, Math.max(0.5, raw));
+  const cal = calibratedSettings();
+  return Math.min(cal ? Math.min(cap, cal.dprCap) : cap, Math.max(0.5, raw));
 }
 
 export const GOVERNOR = {
