@@ -68,3 +68,9 @@ v0.42.93: buttons go through `party/press.ts` (pointerdown plus keyboard), onlin
 - **Next for the board:** Crewmate roving allies, Duel spaces, a second minigame (Ring Run Rush) so rounds vary, the Pawnford board, and a Party Lounge door in the hideout.
 - **Slice 4: Cartridge contract.** `LokMinigameCartridge` (mount, getResults, unmount) so Ring Run Rush and Gem Vacuum Frenzy plug in, then iframe cartridges from other repos.
 - **Backend (noted, not built):** room codes over Supabase Realtime broadcast, async seeded score-attack, trusted results before any online LP.
+
+## Ring Run Rush (v0.42.95)
+
+`src/party/ringRush.ts` (pure, seeded rules) and `RingRushArena.tsx` (2.5D street). `minigameForRound` alternates it with the Lok Drop: odd rounds Drop, even rounds Rush, worked out the same way on every client. Online uses the same score report as the Drop. Rivals on your screen are bot stand-ins; only final scores are compared.
+
+Owner rule: every minigame shows each player's character doing something, Mario Party style, with real polish. The Lok Party menu also lists the weekly missions.

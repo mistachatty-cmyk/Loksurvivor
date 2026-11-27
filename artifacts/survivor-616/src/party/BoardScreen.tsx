@@ -3,7 +3,7 @@
  *
  * Draws and paces the pure board engine (lokBoard.ts). Human choices are big cream buttons at
  * thumb height (fired on pointerdown); bots think for a beat so turns read like a show.
- * The Lok Drop runs as the 30-second minigame between rounds.
+ * A 30-second minigame closes each round: the Lok Drop on odd rounds, Ring Run Rush on even ones.
  */
 
 import { press } from './press';
@@ -62,7 +62,9 @@ import {
   type Sprite,
 } from './boardArt';
 import { DropArena, seatOrder } from './LokDropScreen';
-import { dropResults, type DropState } from './lokDrop';
+import { RingRushArena } from './RingRushArena';
+import { minigameForRound } from './ringRush';
+import { botSkillsForTier, dropResults } from './lokDrop';
 import { actVerdict, createActionSync, quietLimitMs, type ActPayload, minigamePlacements, seatToBot, type OnlineSession, type Seat } from './partyNet';
 
 const LANE = ['#38f2ff', '#ff3fd2', '#ffd23f', '#7cff6b'];
@@ -138,14 +140,14 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
   const sentRef = useRef(false);
   sentRef.current = sent;
   const [ui, setUi] = useState(0); // bump to re-render DOM prompts
-  const [minigame, setMinigame] = useState<number | null>(null);
+  const [minigame, setMinigame] = useState<{ seed: number; kind: 'drop' | 'rush' } | null>(null);
   const [overview, setOverview] = useState(false);
   const overviewRef = useRef(false);
   overviewRef.current = overview;
   const actRef = useRef<(a: BoardAction) => void>(() => {});
   const finishRef = useRef(onFinish);
   finishRef.current = onFinish;
-  const minigameDoneRef = useRef<(d: DropState) => void>(() => {});
+  const minigameDoneRef = useRef<(res: { characterId: string; placement: number; banked: number }[]) => void>(() => {});
 
   const labelsRef = useRef({
     round: (r: number, m: number) => t('lokParty.board.round', { round: r, max: m }),
@@ -478,8 +480,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       reports.clear();
       applyMini(placements);
     };
-    minigameDoneRef.current = (d: DropState) => {
-      const res = dropResults(d);
+    minigameDoneRef.current = (res) => {
       if (!online) {
         const placements = s.players.map((p) => res.find((r) => r.characterId === p.characterId)?.placement ?? 4);
         applyMini(placements);
@@ -602,7 +603,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       if (minigameQueued) {
         minigameQueued = false;
         miniRound = s.round;
-        setMinigame((s.seed ^ (s.round * 7919)) >>> 0);
+        setMinigame({ seed: (s.seed ^ (s.round * 7919)) >>> 0, kind: minigameForRound(s.round) });
         return;
       }
       if (s.phase === 'minigame') return;
@@ -1422,17 +1423,29 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       ) : null}
       {minigame !== null ? (
         <div className="fixed inset-0 z-40 bg-[#07061a]">
-          <DropArena
-            seed={minigame}
-            playerId={s.players[localSeat].characterId}
-            durationMs={30_000}
-            ladderTier={ladderTier}
-            getAudioContext={getAudioContext}
-            onDone={(d) => {
-              setMinigame(null);
-              minigameDoneRef.current(d);
-            }}
-          />
+          {minigame.kind === 'rush' ? (
+            <RingRushArena
+              seed={minigame.seed}
+              roster={seatOrder(s.players[localSeat].characterId).map((id, i) => ({ characterId: id, bot: i !== 0, botSkill: [0, ...botSkillsForTier(ladderTier)][i] }))}
+              getAudioContext={getAudioContext}
+              onDone={(res) => {
+                setMinigame(null);
+                minigameDoneRef.current(res);
+              }}
+            />
+          ) : (
+            <DropArena
+              seed={minigame.seed}
+              playerId={s.players[localSeat].characterId}
+              durationMs={30_000}
+              ladderTier={ladderTier}
+              getAudioContext={getAudioContext}
+              onDone={(d) => {
+                setMinigame(null);
+                minigameDoneRef.current(dropResults(d));
+              }}
+            />
+          )}
         </div>
       ) : null}
     </div>

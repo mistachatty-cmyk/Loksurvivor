@@ -44,6 +44,7 @@ import {
   openCapsule,
   passTier,
   pendingGrants,
+  refreshTimers,
   saveLokPartyMeta,
   type LokPartyMeta,
   type MatchReport,
@@ -258,6 +259,7 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
       ) : null}
       {phase === 'hub' ? (
         <Hub
+          missions={refreshTimers(meta, Date.now()).weekly.missions}
           vault={meta.vault}
           onCrack={crack}
           onPick={(m) => {
@@ -1576,7 +1578,7 @@ function ModePreview({ mode }: { mode: Mode }) {
   return <canvas ref={ref} className="w-full rounded-lg border-2" style={{ aspectRatio: '2 / 1', borderColor: ESPRESSO }} />;
 }
 
-function Hub({ vault, onCrack, onPick, onBack, t }: { vault: LokPartyMeta['vault']; onCrack: () => void; onPick: (m: Mode) => void; onBack: () => void; t: ReturnType<typeof useT> }) {
+function Hub({ missions, vault, onCrack, onPick, onBack, t }: { missions: LokPartyMeta['weekly']['missions']; vault: LokPartyMeta['vault']; onCrack: () => void; onPick: (m: Mode) => void; onBack: () => void; t: ReturnType<typeof useT> }) {
   return (
     <div className="absolute inset-0 overflow-y-auto" style={{ background: 'radial-gradient(ellipse at 50% 20%, #2a1d5c 0%, #07061a 70%)' }}>
       <div className="flex min-h-full flex-col items-center justify-center gap-4 p-4">
@@ -1596,6 +1598,27 @@ function Hub({ vault, onCrack, onPick, onBack, t }: { vault: LokPartyMeta['vault
             </CreamCard>
           ))}
         </div>
+        {missions.length ? (
+          <div className="w-full max-w-xs">
+            <CreamCard>
+              <div className="text-sm font-black">{t('lokParty.missions.title')}</div>
+              {missions.map((m) => {
+                const done = Math.min(m.progress, m.target);
+                return (
+                  <div key={m.id} className="mt-2">
+                    <div className="flex justify-between gap-2 text-xs font-bold">
+                      <span>{t(`lokParty.missions.${m.id}`, { target: m.target })}</span>
+                      <span>{done >= m.target ? t('lokParty.missions.done') : `${done}/${m.target}`}</span>
+                    </div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full" style={{ background: '#e4d8c0' }}>
+                      <div className="h-full" style={{ width: `${(100 * done) / m.target}%`, background: done >= m.target ? '#3fbf4a' : '#ff9f2e' }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </CreamCard>
+          </div>
+        ) : null}
         {/* A capsule saved from an earlier match can be opened here, not only on its results screen. */}
         {vault.capsules > 0 && vault.keys > 0 ? (
           <button type="button" {...press(onCrack)} className="flex w-full max-w-xs flex-col items-center gap-1 rounded-xl border-2 border-amber-300/60 p-3 active:scale-95" style={{ background: '#1a1238' }}>

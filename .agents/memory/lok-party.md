@@ -13,3 +13,7 @@ Read before touching `artifacts/survivor-616/src/party/` or anything Lok Party p
 - Online (v0.42.92): the relay loses messages. Anything that matters is resent until answered (`createActionSync`, `actVerdict` in partyNet.ts); the host never commits a guest choice directly from the message handler.
 - Decided 2026-11-26: Lok Party stays in this repo for now, kept extractable. The four engine files must import only each other (test enforces it); host hooks live in the screens.
 - Board depth (Slice 3): never bake buildings, gantry, chute or props into the ground layer; they are sprites sorted with spaces and players by `nodeSortY`/`propSortY`/`y1`. Elevated spaces sort at y + z*100 so they draw above their own roof. City taps are cosmetic only and must never pay out.
+
+- Owner rule (2026-11-27): minigames are interactive party games with every character visible and acting, never filler. Vault screen waits for the owner's pick of layout A/B/C.
+
+- Owner rule (2026-11-27): minigames are interactive party games with every character visible and acting, never filler. Vault screen waits for the owner's pick of layout A/B/C.
