@@ -47,3 +47,6 @@ Every new feature gets a one-page plan before building, in `docs/`, with these h
 - Host room shows a QR code (existing `QrCode`) plus the 5-letter code and link.
 - Guests ready up; the host's Start waits until every human guest is ready (`canStart`, `setGuestReady`, `readyCounts` in `party/partyNet.ts`, tested). Bots never block.
 - Next: lift these pure helpers and the lobby UI into `@lok/couch` and reuse them from Survivor 616 crews.
+
+## Package extracted (0.42.96)
+`artifacts/survivor-616/src/lib/couch/` now holds the game-agnostic lobby rules (room codes, ready-up, `canStart`, guest-to-bot). It imports nothing (test-enforced). Lok Party's `partyNet.ts` re-exports from it, so any other game can add a pre-match lobby by importing `lib/couch` and extending `LobbySeat`. Still to do: the QR/ready lobby UI as a shared component, and wiring Survivor 616 crew runs to use it.

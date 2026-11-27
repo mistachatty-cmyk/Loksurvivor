@@ -181,3 +181,8 @@ test('dailySeed is stable within a day and changes across days', () => {
   assert.equal(dailySeed(new Date(2026, 10, 27, 1)), dailySeed(new Date(2026, 10, 27, 23)));
   assert.notEqual(dailySeed(new Date(2026, 10, 27)), dailySeed(new Date(2026, 10, 28)));
 });
+
+test('lib/couch imports nothing from any game', () => {
+  const src = readFileSync(fileURLToPath(new URL('../lib/couch/core.ts', import.meta.url)), 'utf8');
+  assert.equal(/from\s+['"]/.test(src), false);
+});

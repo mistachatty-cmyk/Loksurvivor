@@ -15,22 +15,13 @@
 
 import type { BoardAction } from './lokBoard';
 
-export const PARTY_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+import { ROOM_CODE_ALPHABET, canStart, createRoomCode, normalizeRoomCode, readyCounts, setGuestReady, guestToBot, type LobbySeat } from '../lib/couch/core';
 
-export function createPartyCode(length = 5, rand: () => number = Math.random): string {
-  let code = '';
-  for (let i = 0; i < length; i += 1) code += PARTY_CODE_ALPHABET[Math.floor(rand() * PARTY_CODE_ALPHABET.length)];
-  return code;
-}
-
-export function normalizePartyCode(raw: string): string {
-  return raw
-    .toUpperCase()
-    .split('')
-    .filter((c) => PARTY_CODE_ALPHABET.includes(c))
-    .join('')
-    .slice(0, 5);
-}
+// The lobby rules live in the game-agnostic couch package; Lok Party only adds its own link shape.
+export { canStart, readyCounts, setGuestReady };
+export const PARTY_CODE_ALPHABET = ROOM_CODE_ALPHABET;
+export const createPartyCode = createRoomCode;
+export const normalizePartyCode = (raw: string): string => normalizeRoomCode(raw);
 
 export function partyLink(code: string, origin: string): string {
   return `${origin}/?screen=lok-party&party=${code}`;
@@ -42,15 +33,8 @@ export function partyLink(code: string, origin: string): string {
 
 export type SeatKind = 'host' | 'guest' | 'bot';
 
-export interface Seat {
-  index: number;
-  kind: SeatKind;
+export interface Seat extends LobbySeat {
   characterId: string;
-  name: string;
-  /** The guest's join request id (stable per tab). */
-  clientId?: string;
-  /** A guest's ready-up flag. The host does not need one and bots are always ready. */
-  ready?: boolean;
 }
 
 /** Default lobby: host in seat 0, three bots on the rest of the launch roster. */
@@ -83,26 +67,7 @@ export function assignSeat(seats: Seat[], req: { clientId: string; characterId: 
   return { seats: next, seat: target.index };
 }
 
-export function seatToBot(seats: Seat[], index: number): Seat[] {
-  return seats.map((s) => (s.index === index && s.kind === 'guest' ? { ...s, kind: 'bot', name: '', clientId: undefined, ready: undefined } : s));
-}
-
-/** Set one guest's ready flag, found by clientId (so a stale seat index can never flip the wrong seat). */
-export function setGuestReady(seats: Seat[], clientId: string, ready: boolean): Seat[] {
-  return seats.map((s) => (s.kind === 'guest' && s.clientId === clientId ? { ...s, ready } : s));
-}
-
-/** How many human guests there are and how many have readied up. */
-export function readyCounts(seats: Seat[]): { guests: number; ready: number } {
-  const guests = seats.filter((s) => s.kind === 'guest');
-  return { guests: guests.length, ready: guests.filter((s) => s.ready).length };
-}
-
-/** The host may start when every human guest is ready (a lobby with no guests may always start). */
-export function canStart(seats: Seat[]): boolean {
-  const c = readyCounts(seats);
-  return c.ready === c.guests;
-}
+export const seatToBot = (seats: Seat[], index: number): Seat[] => guestToBot(seats, index);
 
 // ---------------------------------------------------------------------------
 // Minigame placements (async score-attack)
