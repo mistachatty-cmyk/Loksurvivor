@@ -8,7 +8,7 @@ import { drawRig, drawShadow } from '@/game/render/sprite';
 import { t as tr } from '@/lib/i18n';
 import { Squash } from './juiceEngine';
 import { SEAT_COLORS, type MinigameCartridge, type RenderInfo, type StageView } from './minigameKit';
-import { RUMBLE, createRoofRumble, rumbleResults, stepRoofRumble, type RumbleRunner, type RumbleState } from './roofRumble';
+import { RUMBLE, crackingRing, createRoofRumble, rumbleResults, stepRoofRumble, type RumbleArena, type RumbleRunner, type RumbleState } from './roofRumble';
 import { STAGE_W, backlight, outlined } from './stageArt';
 
 const TILT = 0.7;
@@ -169,10 +169,12 @@ function drawRoof(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleState
   ctx.fillStyle = 'rgba(255,210,63,0.28)';
   ctx.fillText('L', 0, 4);
   ctx.restore();
+  if (s.arena === 'collapse') drawRingSeams(ctx, view, s, clock, calm);
   // Hazard band along the edge; it pulses while the roof is crumbling.
-  const shrinking = s.now > RUMBLE.shrinkFromMs && s.now < RUMBLE.shrinkToMs;
+  const shrinking = s.arena === 'sumo' && s.now > RUMBLE.shrinkFromMs && s.now < RUMBLE.shrinkToMs;
   const pulse = shrinking && !calm ? 0.55 + 0.45 * Math.sin(clock / 90) : 0.5;
-  ctx.globalAlpha = pulse;
+  // Collapse reads its danger from the cracking ring instead.
+  ctx.globalAlpha = s.arena === 'collapse' ? 0 : pulse;
   ctx.strokeStyle = '#ff3b5c';
   ctx.lineWidth = 34 * SCALE;
   ctx.setLineDash([22, 18]);
@@ -193,6 +195,74 @@ function drawRoof(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleState
   ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
+}
+
+function annulus(ctx: CanvasRenderingContext2D, cx: number, cy: number, inner: number, outer: number) {
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, outer * SCALE, outer * SCALE * TILT, 0, 0, Math.PI * 2);
+  ctx.moveTo(cx + inner * SCALE, cy);
+  ctx.ellipse(cx, cy, inner * SCALE, inner * SCALE * TILT, 0, 0, Math.PI * 2);
+  ctx.fill('evenodd');
+}
+
+/** Roof Collapse: the seams between floor rings, and the ring that is cracking. */
+function drawRingSeams(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleState, clock: number, calm: boolean) {
+  const { cx, cy } = layout(view);
+  ctx.strokeStyle = 'rgba(7,6,26,0.65)';
+  ctx.lineWidth = 5;
+  for (const r of RUMBLE.rings) {
+    if (r >= s.radius) continue;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * SCALE, r * SCALE * TILT, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  const i = crackingRing(s.now);
+  if (i < 0) return;
+  const outer = RUMBLE.rings[i];
+  const inner = RUMBLE.rings[i + 1];
+  const left = RUMBLE.ringDropAt[i] - s.now;
+  const urgency = 1 - left / RUMBLE.ringWarnMs;
+  const jx = calm ? 0 : Math.sin(clock / 23) * 4 * urgency;
+  const jy = calm ? 0 : Math.cos(clock / 19) * 3 * urgency;
+  // Flashes faster as the drop gets closer.
+  const on = calm || Math.floor(clock / (60 + 180 * (1 - urgency))) % 2 === 0;
+  ctx.fillStyle = on ? `rgba(255,59,92,${0.35 + 0.35 * urgency})` : 'rgba(255,210,63,0.18)';
+  annulus(ctx, cx + jx, cy + jy, inner, outer);
+  // Cracks spreading across the ring.
+  ctx.strokeStyle = '#07061a';
+  ctx.lineWidth = 3;
+  const cracks = 10;
+  for (let k = 0; k < cracks; k++) {
+    const a = (k / cracks) * Math.PI * 2 + hash(i * 7 + k) * 0.4;
+    const reach = inner + (outer - inner) * Math.min(1, urgency * 1.4);
+    ctx.beginPath();
+    for (let step = 0; step <= 4; step++) {
+      const d = inner + ((reach - inner) * step) / 4;
+      const wob = (hash(k * 13 + step) - 0.5) * 0.12;
+      const p = project(view, Math.cos(a + wob) * d, Math.sin(a + wob) * d);
+      ctx[step === 0 ? 'moveTo' : 'lineTo'](p.x + jx, p.y + jy);
+    }
+    ctx.stroke();
+  }
+}
+
+/** Roof Collapse: a ring that just dropped, falling away down the building. */
+function drawFallingRings(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleState) {
+  const { cx, cy } = layout(view);
+  RUMBLE.ringDropAt.forEach((at, i) => {
+    const e = s.now - at;
+    if (e < 0 || e > 1100) return;
+    const drop = e * e * 0.0009 + e * 0.08;
+    ctx.globalAlpha = Math.max(0, 1 - e / 1100);
+    ctx.fillStyle = '#3a2d78';
+    annulus(ctx, cx, cy + drop, RUMBLE.rings[i + 1], RUMBLE.rings[i]);
+    ctx.strokeStyle = '#38f2ff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + drop, RUMBLE.rings[i] * SCALE, RUMBLE.rings[i] * SCALE * TILT, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
 }
 
 function drawBarrel(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleState, b: RumbleState['barrels'][number], clock: number, calm: boolean) {
@@ -352,12 +422,15 @@ function drawFaller(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleSta
 
 const HITS = ['lokParty.rumble.hit1', 'lokParty.rumble.hit2', 'lokParty.rumble.hit3'] as const;
 
-export const roofRumble: MinigameCartridge<RumbleState> = {
-  id: 'rumble',
-  accent: '#ff3fd2',
+const makeRumble = (arena: RumbleArena): MinigameCartridge<RumbleState> => ({
+  id: arena === 'collapse' ? 'collapse' : 'rumble',
+  accent: arena === 'collapse' ? '#ffd23f' : '#ff3fd2',
   bpm: 140,
-  labels: (t) => ({ title: t('lokParty.rumble.title'), prompt: t('lokParty.rumble.prompt'), hint: t('lokParty.rumble.hint') }),
-  create: (seed, seats) => createRoofRumble(seed, seats),
+  labels: (t) =>
+    arena === 'collapse'
+      ? { title: t('lokParty.collapse.title'), prompt: t('lokParty.rumble.prompt'), hint: t('lokParty.collapse.hint') }
+      : { title: t('lokParty.rumble.title'), prompt: t('lokParty.rumble.prompt'), hint: t('lokParty.rumble.hint') },
+  create: (seed, seats) => createRoofRumble(seed, seats, arena),
   step: stepRoofRumble,
   isOver: (s) => s.over,
   timeLeftMs: (s) => s.durationMs - s.now,
@@ -385,6 +458,7 @@ export const roofRumble: MinigameCartridge<RumbleState> = {
     drawAntenna(ctx, view, s, clock);
     // Fallers off the back edge drop behind the building.
     for (const r of s.runners) if (r.fallingSince && r.fallY < 0) drawFaller(ctx, view, s, r, clock);
+    if (s.arena === 'collapse') drawFallingRings(ctx, view, s);
     drawRoof(ctx, view, s, clock, calm);
     const things: { y: number; draw: () => void }[] = [];
     for (const b of s.barrels) if (!b.gone) things.push({ y: b.y, draw: () => drawBarrel(ctx, view, s, b, clock, calm) });
@@ -480,9 +554,31 @@ export const roofRumble: MinigameCartridge<RumbleState> = {
           }
           break;
         }
+        case 'ringWarn': {
+          const p = at(0, -e.outer * 0.4);
+          fx.toast(p.x, p.y, tr('lokParty.collapse.warn'), '#ff3b5c', 48);
+          fx.sound('crack');
+          fx.flash('#ff3b5c', 140);
+          break;
+        }
+        case 'ringDrop': {
+          const front = at(0, e.outer);
+          fx.impact(front.x, front.y, 1);
+          fx.flash('#ffffff', 120);
+          fx.sound('slam');
+          for (let k = 0; k < 12; k++) {
+            const a = (k / 11) * Math.PI;
+            const p = at(Math.cos(a) * e.outer, Math.sin(a) * e.outer);
+            fx.burst(p.x, p.y, k % 2 ? '#4c3c8f' : '#38f2ff', 4, { speed: 0.16, size: 13, gravity: 0.0018 });
+          }
+          break;
+        }
         default:
           break;
       }
     }
   },
-};
+});
+
+export const roofRumble = makeRumble('sumo');
+export const roofCollapse = makeRumble('collapse');

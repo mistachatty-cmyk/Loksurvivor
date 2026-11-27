@@ -3,7 +3,7 @@
  *
  * Draws and paces the pure board engine (lokBoard.ts). Human choices are big cream buttons at
  * thumb height (fired on pointerdown); bots think for a beat so turns read like a show.
- * A 30-second minigame closes each round, rotating the Lok Drop, Ring Run Rush and Roof Rumble.
+ * A 30-second minigame closes each round, rotating the Lok Drop, Ring Run Rush, Roof Rumble and Roof Collapse.
  */
 
 import { press } from './press';
@@ -65,7 +65,7 @@ import { DropArena, seatOrder } from './LokDropScreen';
 import { RingRushArena } from './RingRushArena';
 import { minigameForRound, type MinigameId } from './minigameKit';
 import { MinigameStage } from './MinigameStage';
-import { roofRumble } from './roofRumbleArt';
+import { roofCollapse, roofRumble } from './roofRumbleArt';
 import { botSkillsForTier, dropResults } from './lokDrop';
 import { actVerdict, createActionSync, quietLimitMs, type ActPayload, minigamePlacements, seatToBot, type OnlineSession, type Seat } from './partyNet';
 
@@ -1425,9 +1425,9 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       ) : null}
       {minigame !== null ? (
         <div className="fixed inset-0 z-40 bg-[#07061a]">
-          {minigame.kind === 'rumble' ? (
+          {minigame.kind === 'rumble' || minigame.kind === 'collapse' ? (
             <MinigameStage
-              cartridge={roofRumble}
+              cartridge={minigame.kind === 'collapse' ? roofCollapse : roofRumble}
               seed={minigame.seed}
               seats={seatOrder(s.players[localSeat].characterId).map((id, i) => ({ characterId: id, bot: i !== 0, botSkill: [0, ...botSkillsForTier(ladderTier)][i] }))}
               getAudioContext={getAudioContext}

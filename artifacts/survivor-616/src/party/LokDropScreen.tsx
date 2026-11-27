@@ -20,7 +20,7 @@ import { BoardScreen } from './BoardScreen';
 import { PartyLobby } from './PartyLobby';
 import { MinigameStage } from './MinigameStage';
 import { RingRushArena } from './RingRushArena';
-import { roofRumble } from './roofRumbleArt';
+import { roofCollapse, roofRumble } from './roofRumbleArt';
 import type { OnlineSession } from './partyNet';
 import { boardStandings, type BoardState } from './lokBoard';
 import { drawCrown, drawDiceBlock, drawOwl, drawCoin } from './boardArt';
@@ -143,7 +143,7 @@ function RigPreview({ id, size = 96 }: { id: string; size?: number }) {
 // ------------------------------------------------------------------ screen
 
 type Phase = 'hub' | 'lobby' | 'online' | 'play' | 'board' | 'results' | 'practice';
-type PracticeGame = 'rush' | 'rumble';
+type PracticeGame = 'rush' | 'rumble' | 'collapse';
 type Mode = 'blitz' | 'drop' | 'friends';
 
 function inviteCode(): string | null {
@@ -1595,8 +1595,8 @@ function ModePreview({ mode }: { mode: Mode }) {
 /** A single minigame from the menu, against bots, with no rewards. */
 function PracticeRun({ game, seed, pick, tier, getAudioContext, onDone }: { game: PracticeGame; seed: number; pick: string; tier: number; getAudioContext: () => AudioContext | null; onDone: () => void }) {
   const seats = seatOrder(pick).map((id, i) => ({ characterId: id, bot: i !== 0, botSkill: [0, ...botSkillsForTier(tier)][i] }));
-  return game === 'rumble' ? (
-    <MinigameStage cartridge={roofRumble} seed={seed} seats={seats} getAudioContext={getAudioContext} onDone={onDone} />
+  return game !== 'rush' ? (
+    <MinigameStage cartridge={game === 'collapse' ? roofCollapse : roofRumble} seed={seed} seats={seats} getAudioContext={getAudioContext} onDone={onDone} />
   ) : (
     <RingRushArena seed={seed} roster={seats} getAudioContext={getAudioContext} onDone={onDone} />
   );
@@ -1626,10 +1626,10 @@ function Hub({ onPractice, missions, vault, onCrack, onPick, onBack, t }: { onPr
           <CreamCard>
             <div className="text-xl font-black">{t('lokParty.games.title')}</div>
             <p className="mt-1 text-sm opacity-80">{t('lokParty.games.pitch')}</p>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              {(['rumble', 'rush'] as PracticeGame[]).map((g) => (
-                <button key={g} type="button" {...press(() => onPractice(g))} className="rounded-xl border-[3px] px-2 py-3 text-base font-black active:translate-y-[3px]" style={{ background: g === 'rumble' ? '#ff3fd2' : '#38f2ff', borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
-                  {g === 'rumble' ? t('lokParty.rumble.title') : t('lokParty.rush.title')}
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {(['rumble', 'collapse', 'rush'] as PracticeGame[]).map((g) => (
+                <button key={g} type="button" {...press(() => onPractice(g))} className="rounded-xl border-[3px] px-1 py-3 text-sm font-black leading-tight active:translate-y-[3px]" style={{ background: g === 'rumble' ? '#ff3fd2' : g === 'collapse' ? '#ffd23f' : '#38f2ff', borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
+                  {g === 'rumble' ? t('lokParty.rumble.title') : g === 'collapse' ? t('lokParty.collapse.title') : t('lokParty.rush.title')}
                 </button>
               ))}
             </div>

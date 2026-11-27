@@ -100,8 +100,8 @@ export const ENTRANCE = {
 
 export const PODIUM_MS = 4200;
 
-export type MinigameId = 'drop' | 'rush' | 'rumble';
-const ROTATION: MinigameId[] = ['drop', 'rush', 'rumble'];
+export type MinigameId = 'drop' | 'rush' | 'rumble' | 'collapse';
+const ROTATION: MinigameId[] = ['drop', 'rush', 'rumble', 'collapse'];
 
 /** Which minigame closes a given board round. Every client works it out the same way. */
 export const minigameForRound = (round: number): MinigameId => ROTATION[(((Math.floor(round) - 1) % ROTATION.length) + ROTATION.length) % ROTATION.length];

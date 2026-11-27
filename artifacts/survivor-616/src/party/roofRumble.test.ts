@@ -66,3 +66,19 @@ test('a barrel blast throws everyone near it outward', () => {
   assert.ok(s.events.some((e) => e.type === 'boom'));
   assert.ok(s.runners[0].vx < -500 && s.runners[1].vx > 500);
 });
+
+test('Roof Collapse: rings crack, then drop one at a time, and bots mostly step off in time', () => {
+  const s = createRoofRumble(4, bots([0.6, 0.7, 0.8, 0.9]), 'collapse');
+  const seen: string[] = [];
+  let caught = 0;
+  while (!s.over) {
+    stepRoofRumble(s, [null, null, null, null], 1000 / 60);
+    for (const e of s.events) {
+      if (e.type === 'ringWarn' || e.type === 'ringDrop') seen.push(`${e.type}:${e.outer}`);
+      if (e.type === 'fall' && RUMBLE.ringDropAt.some((at) => Math.abs(s.now - at) < 50)) caught++;
+    }
+  }
+  assert.deepEqual(seen, ['ringWarn:330', 'ringDrop:330', 'ringWarn:250', 'ringDrop:250', 'ringWarn:180', 'ringDrop:180']);
+  assert.equal(s.radius, RUMBLE.rings[3]);
+  assert.ok(caught <= 3, `${caught} bots rode a ring down`);
+});
