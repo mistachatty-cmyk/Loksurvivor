@@ -51,7 +51,7 @@ How much of each there is right now.
 | Ambient kinds | 4 |
 | Hats | 18 |
 | Celebrations | 7 |
-| Themed palettes | 69 |
+| Themed palettes | 77 |
 | Cards | 347 |
 | Lok glyph icons | 82 |
 | Sound cues | 38 |
@@ -837,6 +837,14 @@ Non-combat background actors (`src/game/data/ambient.ts`).
 | honeycomb-reactor | Honeycomb Reactor |
 | mothlight-grove | Mothlight Grove |
 | deepwater-crown | Deepwater Crown |
+| acid-bloom | Acid Bloom |
+| void-static | Void Static |
+| molten-chrome | Molten Chrome |
+| bioluminescent-abyss | Bioluminescent Abyss |
+| lavender-dusk | Lavender Dusk |
+| sea-glass | Sea Glass |
+| morning-matcha | Morning Matcha |
+| festival-lantern | Festival Lantern |
 
 ## Cards
 

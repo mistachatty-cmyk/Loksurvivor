@@ -77,6 +77,14 @@ export const RUN_AURAS: RunAuraDef[] = [
     tier: 'legendary',
     style: 'ember-orbit',
   },
+  // Wild ones (2026-11-27).
+  { id: 'black-hole', name: 'Event Horizon', description: 'A pocket black hole at your feet. Light spirals in, bends around the edge and never comes back.', cost: 5, tier: 'legendary', style: 'black-hole' },
+  { id: 'prism-storm', name: 'Prism Storm', description: 'Shards of every colour whirl around you like a kaleidoscope someone dropped down the stairs.', cost: 5, tier: 'legendary', style: 'prism-storm' },
+  { id: 'lightning-cage', name: 'Lightning Cage', description: 'Arcs crack between four floating pylons. Loud to look at, harmless to touch.', cost: 4, tier: 'legendary', style: 'lightning-cage' },
+  // Peaceful ones (2026-11-27).
+  { id: 'koi-pond', name: 'Koi Pond', description: 'Two koi circle slowly in a still pool that ripples when you walk.', cost: 3, tier: 'rare', style: 'koi-pond' },
+  { id: 'firefly-meadow', name: 'Firefly Meadow', description: 'Soft fireflies drift up around you and blink on a summer-night rhythm.', cost: 3, tier: 'rare', style: 'firefly-meadow' },
+  { id: 'sakura-drift', name: 'Sakura Drift', description: 'Pale petals fall around you and settle without a sound.', cost: 3, tier: 'rare', style: 'sakura-drift' },
 ];
 
 export const RUN_AURAS_BY_ID: Record<string, RunAuraDef> = Object.fromEntries(

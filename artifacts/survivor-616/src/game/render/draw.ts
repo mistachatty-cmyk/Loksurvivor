@@ -5954,6 +5954,195 @@ function drawActors(
           ctx.fillRect(tx, ty, tileSize - 1, tileSize * 0.5 - 1);
         }
       }
+    } else if (w.runAuraStyle === 'black-hole') {
+      // A pocket black hole: light spirals in along the disc, bends around the rim, and is gone.
+      ctx.save();
+      const cy = p.y + 2;
+      const hole = p.radius + 16;
+      const core = ctx.createRadialGradient(p.x, cy, 0, p.x, cy, hole);
+      core.addColorStop(0, 'rgba(0,0,0,1)');
+      core.addColorStop(0.62, 'rgba(0,0,0,0.92)');
+      core.addColorStop(0.8, 'rgba(40,10,60,0.55)');
+      core.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = core;
+      ctx.beginPath();
+      ctx.ellipse(p.x, cy, hole, hole * 0.42, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowColor = glow;
+      for (let i = 0; i < 18; i += 1) {
+        const t = (phase * 0.55 + i / 18) % 1;
+        const radius = (p.radius + 34) * (1 - t) + (p.radius + 13) * t;
+        const angle = i * 2.39 + t * 7 + phase * 1.4;
+        // Light stretches and brightens as it falls in, then winks out at the rim.
+        ctx.globalAlpha = (0.2 + t * 0.75) * (t > 0.92 ? (1 - t) / 0.08 : 1);
+        ctx.fillStyle = t > 0.7 ? '#ffffff' : i % 2 ? '#c084fc' : glow;
+        ctx.shadowBlur = 4 + t * 8;
+        ctx.beginPath();
+        ctx.arc(p.x + Math.cos(angle) * radius, cy + Math.sin(angle) * radius * 0.42, 1.2 + t * 1.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#ffe9b0';
+      ctx.shadowColor = '#ff9d3d';
+      ctx.globalAlpha = 0.75 + Math.sin(phase * 9) * 0.2;
+      ctx.beginPath();
+      ctx.ellipse(p.x, cy, p.radius + 13, (p.radius + 13) * 0.42, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#c084fc';
+      ctx.globalAlpha = 0.3 * (1 - ((phase * 0.8) % 1));
+      ctx.beginPath();
+      const swell = p.radius + 16 + ((phase * 0.8) % 1) * 22;
+      ctx.ellipse(p.x, cy, swell, swell * 0.42, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    } else if (w.runAuraStyle === 'prism-storm') {
+      // Coloured shards whirling in two rings, each spinning on its own.
+      ctx.save();
+      ctx.shadowBlur = 7;
+      for (let i = 0; i < 9; i += 1) {
+        const ring = i % 2;
+        const angle = phase * (ring ? -1.9 : 1.5) + (i * Math.PI * 2) / 9;
+        const radius = p.radius + 13 + ring * 9;
+        const x = p.x + Math.cos(angle) * radius;
+        const y = p.y - 4 + Math.sin(angle) * radius * 0.5;
+        const hue = (i * 40 + phase * 140) % 360;
+        ctx.fillStyle = `hsl(${hue} 95% 62%)`;
+        ctx.shadowColor = `hsl(${hue} 95% 70%)`;
+        ctx.globalAlpha = 0.8;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(phase * 5 + i);
+        ctx.beginPath();
+        ctx.moveTo(0, -4.5);
+        ctx.lineTo(3.4, 3);
+        ctx.lineTo(-3.4, 3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+    } else if (w.runAuraStyle === 'lightning-cage') {
+      // Four floating pylons with arcs cracking between them, re-struck many times a second.
+      ctx.save();
+      const pylons: { x: number; y: number }[] = [];
+      for (let i = 0; i < 4; i += 1) {
+        const angle = Math.PI / 4 + (i * Math.PI) / 2 + phase * 0.3;
+        pylons.push({ x: p.x + Math.cos(angle) * (p.radius + 17), y: p.y - 6 + Math.sin(angle) * (p.radius + 17) * 0.5 + Math.sin(phase * 3 + i) * 1.5 });
+      }
+      const strike = Math.floor(phase * 14);
+      const jag = (n: number) => {
+        const v = Math.sin(n * 12.9898 + strike * 78.233) * 43758.5453;
+        return (v - Math.floor(v)) * 2 - 1;
+      };
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 4; i += 1) {
+        if (jag(i + 40) < -0.35) continue; // some arcs skip a beat
+        const a = pylons[i];
+        const b = pylons[(i + 1) % 4];
+        const pts: [number, number][] = [[a.x, a.y]];
+        for (let k = 1; k < 5; k += 1) {
+          const t = k / 5;
+          pts.push([a.x + (b.x - a.x) * t + jag(i * 7 + k) * 4, a.y + (b.y - a.y) * t + jag(i * 11 + k) * 4]);
+        }
+        pts.push([b.x, b.y]);
+        for (const [width, color, alpha] of [[4, glow, 0.35], [1.4, '#ffffff', 0.95]] as const) {
+          ctx.lineWidth = width;
+          ctx.strokeStyle = color;
+          ctx.globalAlpha = alpha;
+          ctx.beginPath();
+          pts.forEach(([x, y], k) => (k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+          ctx.stroke();
+        }
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = accent;
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 8;
+      for (const py of pylons) ctx.fillRect(py.x - 1.5, py.y - 4, 3, 8);
+      ctx.restore();
+    } else if (w.runAuraStyle === 'koi-pond') {
+      // A still pool with two koi circling, and a ripple that spreads now and then.
+      ctx.save();
+      const cy = p.y + 3;
+      const pool = p.radius + 18;
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = '#3aa7c9';
+      ctx.beginPath();
+      ctx.ellipse(p.x, cy, pool, pool * 0.42, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#d8f6ff';
+      ctx.lineWidth = 1;
+      for (let k = 0; k < 2; k += 1) {
+        const t = (phase * 0.35 + k / 2) % 1;
+        const r = p.radius + 4 + t * 16;
+        ctx.globalAlpha = (1 - t) * 0.45;
+        ctx.beginPath();
+        ctx.ellipse(p.x, cy, r, r * 0.42, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      for (let k = 0; k < 2; k += 1) {
+        const angle = phase * 0.6 + k * Math.PI;
+        const r = pool - 6;
+        const x = p.x + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r * 0.42;
+        const heading = Math.atan2(Math.cos(angle) * r * 0.42, -Math.sin(angle) * r);
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(heading);
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = k ? '#ffffff' : '#ff8a3d';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 4.5, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = k ? '#ff8a3d' : '#ffffff';
+        ctx.fillRect(-1, -1, 2, 2);
+        const tail = Math.sin(phase * 6 + k) * 1.5;
+        ctx.fillStyle = k ? '#ffe2cc' : '#ffb27a';
+        ctx.beginPath();
+        ctx.moveTo(-4, 0);
+        ctx.lineTo(-7.5, -2.2 + tail);
+        ctx.lineTo(-7.5, 2.2 + tail);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+    } else if (w.runAuraStyle === 'firefly-meadow') {
+      // Fireflies rising slowly and blinking on and off.
+      ctx.save();
+      ctx.shadowColor = '#d6ff6b';
+      for (let i = 0; i < 12; i += 1) {
+        const rise = (phase * 9 + i * 9) % 42;
+        const x = p.x + Math.sin(phase * 0.45 + i * 1.7) * (p.radius + 10 + (i % 3) * 4);
+        const y = p.y + 4 - rise;
+        const blink = Math.max(0, Math.sin(phase * 2.1 + i * 2.3));
+        ctx.globalAlpha = blink * (1 - rise / 42) * 0.95;
+        ctx.shadowBlur = 6 + blink * 6;
+        ctx.fillStyle = '#fff7a8';
+        ctx.beginPath();
+        ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    } else if (w.runAuraStyle === 'sakura-drift') {
+      // Petals falling gently around you and fading as they land.
+      ctx.save();
+      for (let i = 0; i < 13; i += 1) {
+        const fall = (phase * 12 + i * 6.7) % 44;
+        const x = p.x + (i - 6) * 4.6 + Math.sin(phase * 1.2 + i) * 6;
+        const y = p.y - 36 + fall;
+        ctx.globalAlpha = Math.min(1, fall / 8) * (1 - fall / 44) * 0.9;
+        ctx.fillStyle = i % 3 ? '#ffc6da' : '#ff9fc4';
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(phase * 1.4 + i);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 3.4, 1.9, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
     }
 
     const paletteEffect = w.paletteEffect;

@@ -2315,7 +2315,13 @@ export type RunAuraStyle =
   | 'glitch-echo'
   | 'mothlight'
   | 'tile-bloom'
-  | 'comet-trail';
+  | 'comet-trail'
+  | 'black-hole'
+  | 'prism-storm'
+  | 'lightning-cage'
+  | 'koi-pond'
+  | 'firefly-meadow'
+  | 'sakura-drift';
 
 export interface RunAuraDef {
   id: string;
