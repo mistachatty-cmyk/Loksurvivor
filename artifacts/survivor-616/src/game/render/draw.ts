@@ -781,34 +781,86 @@ function drawSteamVents(ctx: CanvasRenderingContext2D, w: World, left: number, t
   ctx.restore();
 }
 
-const RAIN_CELL = 64;
+/** Rain repeats in big identical tiles, so a drop leaving the bottom of one tile is the same drop entering the next. */
+const RAIN_TILE = 512;
+/** World units a drop drifts sideways per unit it falls (the wind lean). */
+const RAIN_LEAN = 0.24;
+const RAIN_LAYERS = [
+  // Far: thin, dim, short and a little slower. Near: longer, brighter, faster.
+  { count: 34, speed: 0.62, len: 14, width: 1, alpha: 0.22, color: '#9fbfdf', seed: 3 },
+  { count: 22, speed: 0.95, len: 26, width: 1.6, alpha: 0.42, color: '#cfe3f7', seed: 17 },
+] as const;
+
+const rainHash = (n: number): number => {
+  const v = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return v - Math.floor(v);
+};
 
 /**
  * Falling rain, leaning with the same wind that carries the clouds and litter.
- * Each cell owns one drop that wraps within the cell; neighbouring cells fill
- * the gaps, so a sparse grid reads as continuous rainfall.
+ * Every drop falls the whole way down the view: the pattern repeats in 512-unit
+ * tiles that line up exactly (sideways lean included), so there is no point where
+ * drops pop back to the top. Two depth layers, plus small splashes on the ground.
  */
 function drawRain(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number, intensity: number) {
   if (intensity <= 0) return;
-  const startX = Math.floor(left / RAIN_CELL) * RAIN_CELL;
-  const startY = Math.floor(top / RAIN_CELL) * RAIN_CELL;
+  const P = RAIN_TILE;
+  const tx0 = Math.floor((left - P * 0.3) / P);
+  const tx1 = Math.floor(right / P);
+  const ty0 = Math.floor((top - 40) / P);
+  const ty1 = Math.floor(bottom / P);
   ctx.save();
-  ctx.strokeStyle = '#a8c8e8';
-  ctx.lineWidth = 1.3;
-  ctx.globalAlpha = 0.38 * intensity;
-  ctx.beginPath();
-  for (let x = startX; x < right; x += RAIN_CELL) {
-    for (let y = startY; y < bottom; y += RAIN_CELL) {
-      const n = hashCell(x / RAIN_CELL + 11, y / RAIN_CELL - 11);
-      const fall = (w.now * (0.5 + n * 0.28) + n * 5000) % RAIN_CELL;
-      const dx = x + n * RAIN_CELL * 0.8 + fall * 0.26;
-      const dy = y + fall;
-      const len = 13 + n * 10;
-      ctx.moveTo(dx, dy);
-      ctx.lineTo(dx - len * 0.26, dy - len);
+  ctx.lineCap = 'round';
+  for (const layer of RAIN_LAYERS) {
+    const count = Math.round(layer.count * Math.min(1, intensity));
+    ctx.strokeStyle = layer.color;
+    ctx.lineWidth = layer.width;
+    ctx.globalAlpha = layer.alpha * (0.55 + 0.45 * intensity);
+    ctx.beginPath();
+    for (let k = 0; k < count; k += 1) {
+      const hx = rainHash(k * 7 + layer.seed);
+      const hp = rainHash(k * 13 + layer.seed * 5);
+      const hs = rainHash(k * 29 + layer.seed * 3);
+      const speed = layer.speed * (0.85 + hs * 0.3);
+      const y = (w.now * speed + hp * P) % P;
+      const len = layer.len * (0.8 + hs * 0.4);
+      for (let ty = ty0; ty <= ty1; ty += 1) {
+        const gy = ty * P + y;
+        if (gy < top - 4 || gy - len > bottom) continue;
+        // Wrapping the sideways drift by the tile width keeps neighbouring tiles seamless.
+        const drift = (((hx * P + gy * RAIN_LEAN) % P) + P) % P;
+        for (let tx = tx0; tx <= tx1; tx += 1) {
+          const gx = tx * P + drift;
+          if (gx < left - 30 || gx - len * RAIN_LEAN > right + 30) continue;
+          ctx.moveTo(gx, gy);
+          ctx.lineTo(gx - len * RAIN_LEAN, gy - len);
+        }
+      }
+    }
+    ctx.stroke();
+  }
+  // Splashes: small rings that flick open where drops land, scattered across the view.
+  const splashes = Math.round(18 * Math.min(1, intensity));
+  ctx.strokeStyle = '#d6ebff';
+  ctx.lineWidth = 1;
+  for (let k = 0; k < splashes; k += 1) {
+    const life = 380;
+    const offset = rainHash(k * 3 + 91) * life;
+    const slot = Math.floor((w.now + offset) / life);
+    const t = ((w.now + offset) % life) / life;
+    for (let ty = ty0; ty <= ty1; ty += 1) {
+      for (let tx = tx0; tx <= tx1; tx += 1) {
+        const sx = tx * P + rainHash(slot * 1.7 + k * 41 + tx * 3) * P;
+        const sy = ty * P + rainHash(slot * 2.3 + k * 59 + ty * 5) * P;
+        if (sx < left || sx > right || sy < top || sy > bottom) continue;
+        const r = 1.5 + t * 6;
+        ctx.globalAlpha = (1 - t) * 0.5 * intensity;
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, r, r * 0.42, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
   }
-  ctx.stroke();
   ctx.restore();
 }
 
