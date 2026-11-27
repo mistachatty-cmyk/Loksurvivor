@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 237,
+      "version": "0.42.98",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T17:10:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party: Roof Collapse, the main event",
+      "body": [
+        "Roof Collapse now drops four rings, one after another, down to a tiny last ring. Each drop counts down 3, 2, 1, cracks and shakes, then the ring shatters and tumbles down the building.",
+        "Sharper controls: on desktop your character follows the mouse and a click dashes instantly; on a phone there is a DASH button for your second thumb. A dash pressed just early still fires.",
+        "Clutch saves: knocked over the edge? Dash back in fast and you stay on the roof."
+      ]
+    },
+    {
       "number": 236,
       "version": "0.42.97",
       "date": "2026-11-27",

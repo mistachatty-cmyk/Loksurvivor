@@ -78,7 +78,44 @@ test('Roof Collapse: rings crack, then drop one at a time, and bots mostly step 
       if (e.type === 'fall' && RUMBLE.ringDropAt.some((at) => Math.abs(s.now - at) < 50)) caught++;
     }
   }
-  assert.deepEqual(seen, ['ringWarn:330', 'ringDrop:330', 'ringWarn:250', 'ringDrop:250', 'ringWarn:180', 'ringDrop:180']);
+  assert.deepEqual(seen, ['ringWarn:330', 'ringDrop:330', 'ringWarn:245', 'ringDrop:245', 'ringWarn:165', 'ringDrop:165']);
   assert.equal(s.radius, RUMBLE.rings[3]);
   assert.ok(caught <= 3, `${caught} bots rode a ring down`);
+});
+
+test('clutch save: dash back inward while teetering over the edge and you stay on', () => {
+  const s = createRoofRumble(3, [{ characterId: 'me', bot: false }]);
+  s.nextBarrelAt = 1e9;
+  const me = s.runners[0];
+  Object.assign(me, { x: RUMBLE.radius + 20, y: 0, vx: 300 });
+  const none = { keys: { x: 0, y: 0 }, aim: null, holding: false, tap: null, action: false };
+  stepRoofRumble(s, [none], 1000 / 60);
+  assert.ok(me.teeterUntil > 0, 'teetering');
+  stepRoofRumble(s, [{ ...none, keys: { x: -1, y: 0 }, action: true }], 1000 / 60);
+  for (let i = 0; i < 20; i++) stepRoofRumble(s, [none], 1000 / 60);
+  assert.equal(me.fallingSince, 0);
+  assert.equal(me.falls, 0);
+  assert.equal(me.score, RUMBLE.points.clutch);
+});
+
+test('no dash over the edge means a fall once coyote time runs out', () => {
+  const s = createRoofRumble(3, [{ characterId: 'me', bot: false }]);
+  s.nextBarrelAt = 1e9;
+  Object.assign(s.runners[0], { x: RUMBLE.radius + 20, y: 0, vx: 300 });
+  for (let i = 0; i < 30; i++) stepRoofRumble(s, [null], 1000 / 60);
+  assert.equal(s.runners[0].falls, 1);
+});
+
+test('a dash pressed just before the cooldown ends still fires', () => {
+  const s = createRoofRumble(3, [{ characterId: 'me', bot: false }]);
+  s.nextBarrelAt = 1e9;
+  const me = s.runners[0];
+  Object.assign(me, { x: 0, y: 0 });
+  const press = { keys: { x: 1, y: 0 }, aim: null, holding: false, tap: null, action: true };
+  stepRoofRumble(s, [press], 1000 / 60);
+  const first = me.dashReadyAt;
+  while (s.now < first - 100) stepRoofRumble(s, [null], 1000 / 60);
+  stepRoofRumble(s, [press], 1000 / 60);
+  while (s.now < first + 20) stepRoofRumble(s, [null], 1000 / 60);
+  assert.ok(me.dashReadyAt > first, 'buffered dash fired');
 });

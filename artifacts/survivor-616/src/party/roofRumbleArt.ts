@@ -186,11 +186,13 @@ function drawRoof(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleState
   ctx.globalAlpha = 1;
   ctx.restore();
   // Neon rim.
+  const finalRing = s.arena === 'collapse' && s.ringsDropped === RUMBLE.rings.length - 1;
+  const rim = finalRing ? '#ffd23f' : '#38f2ff';
   ctx.save();
-  ctx.shadowColor = '#38f2ff';
-  ctx.shadowBlur = 22;
-  ctx.strokeStyle = '#38f2ff';
-  ctx.lineWidth = 6;
+  ctx.shadowColor = rim;
+  ctx.shadowBlur = finalRing && !calm ? 22 + 14 * Math.abs(Math.sin(clock / 140)) : 22;
+  ctx.strokeStyle = rim;
+  ctx.lineWidth = finalRing ? 9 : 6;
   ctx.beginPath();
   ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
   ctx.stroke();
@@ -244,25 +246,66 @@ function drawRingSeams(ctx: CanvasRenderingContext2D, view: StageView, s: Rumble
     }
     ctx.stroke();
   }
+  // The safe line: where the floor will still be.
+  ctx.save();
+  ctx.shadowColor = '#ffd23f';
+  ctx.shadowBlur = 18;
+  ctx.strokeStyle = '#ffd23f';
+  ctx.globalAlpha = calm ? 0.9 : 0.6 + 0.4 * Math.abs(Math.sin(clock / 110));
+  ctx.lineWidth = 6;
+  ctx.setLineDash([16, 10]);
+  ctx.lineDashOffset = calm ? 0 : clock / 25;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, inner * SCALE, inner * SCALE * TILT, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 }
 
-/** Roof Collapse: a ring that just dropped, falling away down the building. */
-function drawFallingRings(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleState) {
+/** Roof Collapse: a ring that just dropped breaks into chunks that tumble down the building. */
+function drawFallingRings(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleState, side: 'back' | 'front', calm: boolean) {
   const { cx, cy } = layout(view);
+  const pieces = 20;
   RUMBLE.ringDropAt.forEach((at, i) => {
     const e = s.now - at;
-    if (e < 0 || e > 1100) return;
-    const drop = e * e * 0.0009 + e * 0.08;
-    ctx.globalAlpha = Math.max(0, 1 - e / 1100);
-    ctx.fillStyle = '#3a2d78';
-    annulus(ctx, cx, cy + drop, RUMBLE.rings[i + 1], RUMBLE.rings[i]);
-    ctx.strokeStyle = '#38f2ff';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + drop, RUMBLE.rings[i] * SCALE, RUMBLE.rings[i] * SCALE * TILT, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
+    if (e < 0 || e > 1900) return;
+    const outer = RUMBLE.rings[i];
+    const inner = RUMBLE.rings[i + 1];
+    const mid = (outer + inner) / 2;
+    for (let k = 0; k < pieces; k++) {
+      const a0 = (k / pieces) * Math.PI * 2;
+      const a1 = ((k + 1) / pieces) * Math.PI * 2;
+      const am = (a0 + a1) / 2;
+      if ((Math.sin(am) < 0) !== (side === 'back')) continue;
+      // Each chunk lets go a beat apart, so the ring visibly shatters rather than sliding as one.
+      const t = Math.max(0, e - hash(i * 31 + k) * 260);
+      const drop = t * t * 0.0011 + t * 0.05;
+      const out = t * 0.05;
+      const spin = calm ? 0 : ((hash(k + i * 7) - 0.5) * t) / 170;
+      const c = project(view, Math.cos(am) * mid, Math.sin(am) * mid);
+      const sector = (y: number, fill: string) => {
+        ctx.fillStyle = fill;
+        ctx.beginPath();
+        ctx.ellipse(cx, y, outer * SCALE, outer * SCALE * TILT, 0, a0, a1);
+        ctx.ellipse(cx, y, inner * SCALE, inner * SCALE * TILT, 0, a1, a0, true);
+        ctx.closePath();
+        ctx.fill();
+      };
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - t / 1600);
+      ctx.translate(c.x + Math.cos(am) * out, c.y + drop + Math.sin(am) * out * TILT);
+      ctx.rotate(spin);
+      ctx.translate(-c.x, -c.y);
+      sector(cy + 20, '#1d1544');
+      sector(cy, k % 2 ? '#4c3c8f' : '#43357f');
+      ctx.strokeStyle = '#38f2ff';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, outer * SCALE, outer * SCALE * TILT, 0, a0, a1);
+      ctx.stroke();
+      ctx.restore();
+    }
   });
+  ctx.globalAlpha = 1;
 }
 
 function drawBarrel(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleState, b: RumbleState['barrels'][number], clock: number, calm: boolean) {
@@ -372,8 +415,12 @@ function drawRunner(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleSta
   }
   backlight(ctx, p.x, p.y - 34 - lift, 62, color);
   ctx.globalAlpha = blink ? 0.45 : 1;
+  const teetering = r.teeterUntil > s.now;
+  if (teetering) backlight(ctx, p.x, p.y - 30, 70, '#ff3b5c');
   ctx.save();
   ctx.translate(p.x, p.y - lift);
+  // Windmilling on the edge.
+  if (teetering && !calm) ctx.rotate(Math.sin(clock / 28) * 0.3);
   ctx.scale(art.squash[r.index].scaleX, art.squash[r.index].scaleY);
   const speed = Math.hypot(r.vx, r.vy);
   const anim = dashing ? 'attack' : stunned ? 'hurt' : speed > 40 ? 'walk' : 'idle';
@@ -381,7 +428,9 @@ function drawRunner(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleSta
   ctx.restore();
   ctx.globalAlpha = 1;
   const head = p.y - lift - 22 * RIG;
-  if (stunned) {
+  if (teetering) {
+    outlined(ctx, '!!', p.x, head - 6, 44, '#ff3b5c');
+  } else if (stunned) {
     for (let k = 0; k < 3; k++) {
       const a = clock / 120 + (k * Math.PI * 2) / 3;
       outlined(ctx, '*', p.x + Math.cos(a) * 30, head - 6 + Math.sin(a) * 8, 30, '#ffd23f');
@@ -441,6 +490,11 @@ const makeRumble = (arena: RumbleArena): MinigameCartridge<RumbleState> => ({
     return { x: (x - l.cx) / l.s, y: (y - l.cy) / (l.s * TILT) };
   },
   toStage: project,
+  hud: drawCollapseHud,
+  dashReady: (s, me) => {
+    const r = s.runners[me];
+    return r ? 1 - Math.max(0, r.dashReadyAt - s.now) / RUMBLE.dashCooldownMs : 1;
+  },
 
   render(ctx, s, info) {
     const { view, clock, calm } = info;
@@ -458,8 +512,9 @@ const makeRumble = (arena: RumbleArena): MinigameCartridge<RumbleState> => ({
     drawAntenna(ctx, view, s, clock);
     // Fallers off the back edge drop behind the building.
     for (const r of s.runners) if (r.fallingSince && r.fallY < 0) drawFaller(ctx, view, s, r, clock);
-    if (s.arena === 'collapse') drawFallingRings(ctx, view, s);
+    if (s.arena === 'collapse') drawFallingRings(ctx, view, s, 'back', calm);
     drawRoof(ctx, view, s, clock, calm);
+    if (s.arena === 'collapse') drawFallingRings(ctx, view, s, 'front', calm);
     const things: { y: number; draw: () => void }[] = [];
     for (const b of s.barrels) if (!b.gone) things.push({ y: b.y, draw: () => drawBarrel(ctx, view, s, b, clock, calm) });
     for (const r of s.runners) if (!r.fallingSince) things.push({ y: r.y, draw: () => drawRunner(ctx, view, s, r, art, info) });
@@ -555,22 +610,55 @@ const makeRumble = (arena: RumbleArena): MinigameCartridge<RumbleState> => ({
           break;
         }
         case 'ringWarn': {
-          const p = at(0, -e.outer * 0.4);
-          fx.toast(p.x, p.y, tr('lokParty.collapse.warn'), '#ff3b5c', 48);
+          // The banner under the timer says it; a popup here would cover the fight.
           fx.sound('crack');
           fx.flash('#ff3b5c', 140);
+          break;
+        }
+        case 'ringTick': {
+          fx.sound('hit');
+          fx.flash('#ff3b5c', 70);
+          const ring = crackingRing(s.now);
+          if (ring >= 0) {
+            const mid = (RUMBLE.rings[ring] + RUMBLE.rings[ring + 1]) / 2;
+            for (let k = 0; k < 6; k++) {
+              const a = (hash(s.now + k) * 0.9 + 0.05) * Math.PI;
+              const p = at(Math.cos(a) * mid, Math.sin(a) * mid);
+              fx.burst(p.x, p.y, '#bfb6e6', 3, { speed: 0.1, size: 10, smoke: true });
+            }
+          }
           break;
         }
         case 'ringDrop': {
           const front = at(0, e.outer);
           fx.impact(front.x, front.y, 1);
-          fx.flash('#ffffff', 120);
+          fx.flash('#ffffff', 170);
           fx.sound('slam');
-          for (let k = 0; k < 12; k++) {
-            const a = (k / 11) * Math.PI;
-            const p = at(Math.cos(a) * e.outer, Math.sin(a) * e.outer);
-            fx.burst(p.x, p.y, k % 2 ? '#4c3c8f' : '#38f2ff', 4, { speed: 0.16, size: 13, gravity: 0.0018 });
+          fx.sound('crack');
+          for (let k = 0; k < 20; k++) {
+            const a = (k / 20) * Math.PI * 2;
+            const p = at(Math.cos(a) * e.inner, Math.sin(a) * e.inner);
+            fx.burst(p.x, p.y, '#bfb6e6', 2, { speed: 0.12, size: 14, smoke: true });
           }
+          break;
+        }
+        case 'teeter': {
+          if (e.index === me) fx.sound('hit');
+          break;
+        }
+        case 'save': {
+          const p = at(e.x, e.y);
+          fx.impact(p.x, p.y - 30, 0.45);
+          fx.burst(p.x, p.y - 30, '#ffd23f', 16, { speed: 0.45 });
+          fx.toast(p.x, p.y - 110, tr('lokParty.rumble.clutch'), '#ffd23f', 54);
+          if (e.index === me) fx.chime(true);
+          art.squash[e.index].launch(1.2);
+          break;
+        }
+        case 'multiKo': {
+          const p = at(e.x, e.y);
+          fx.toast(p.x, p.y - 150, tr(e.count >= 3 ? 'lokParty.rumble.triple' : 'lokParty.rumble.double'), SEAT_COLORS[e.by % 4], 62);
+          fx.flash(SEAT_COLORS[e.by % 4], 120);
           break;
         }
         default:
@@ -579,6 +667,51 @@ const makeRumble = (arena: RumbleArena): MinigameCartridge<RumbleState> => ({
     }
   },
 });
+
+function drawCollapseHud(ctx: CanvasRenderingContext2D, s: RumbleState, info: RenderInfo) {
+  if (s.arena !== 'collapse') return;
+  const { clock, calm } = info;
+  const cx = STAGE_W / 2;
+  const cy = 128;
+  const cracking = crackingRing(s.now);
+  // Ring pips: outermost first. Lit while standing, red while cracking, dim once gone.
+  RUMBLE.rings.forEach((_, k) => {
+    const r = 34 - k * 8;
+    const gone = k < s.ringsDropped;
+    const flashing = k === cracking && (calm || Math.floor(clock / 110) % 2 === 0);
+    ctx.strokeStyle = gone ? 'rgba(255,255,255,0.15)' : flashing ? '#ff3b5c' : k === RUMBLE.rings.length - 1 ? '#ffd23f' : '#38f2ff';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r, r * 0.6, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+  // Slam banner right after a ring drops.
+  const lastDrop = s.ringsDropped > 0 ? RUMBLE.ringDropAt[s.ringsDropped - 1] : -1e9;
+  const since = s.now - lastDrop;
+  if (since >= 0 && since < 1400) {
+    const final = s.ringsDropped === RUMBLE.rings.length - 1;
+    const slam = calm ? 1 : 1 + Math.max(0, 1 - since / 220) * 1.6;
+    ctx.save();
+    ctx.translate(cx, cy + 74);
+    ctx.scale(slam, slam);
+    ctx.globalAlpha = Math.min(1, (1400 - since) / 300);
+    outlined(ctx, tr(final ? 'lokParty.collapse.finalRing' : 'lokParty.collapse.ringDown'), 0, 0, 56, final ? '#ffd23f' : '#ff3b5c');
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  } else if (cracking >= 0) {
+    const left = RUMBLE.ringDropAt[cracking] - s.now;
+    const n = Math.max(1, Math.ceil(left / RUMBLE.ringTickMs));
+    const beat = (RUMBLE.ringWarnMs - left) % RUMBLE.ringTickMs;
+    const pop = calm ? 1 : 1 + Math.max(0, 1 - beat / 200) * 0.35;
+    ctx.save();
+    ctx.translate(cx, cy + 66);
+    ctx.scale(pop, pop);
+    outlined(ctx, tr('lokParty.collapse.fallsIn', { n }), 0, 0, 34, '#ff3b5c');
+    ctx.restore();
+  } else if (s.ringsDropped === RUMBLE.rings.length - 1) {
+    outlined(ctx, tr('lokParty.collapse.finalRing'), cx, cy + 66, 30, '#ffd23f');
+  }
+}
 
 export const roofRumble = makeRumble('sumo');
 export const roofCollapse = makeRumble('collapse');

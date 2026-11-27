@@ -11,7 +11,7 @@ import { ENTRANCE, PODIUM_MS, SEAT_COLORS, type MinigameCartridge, type Minigame
 import { STAGE_W, countdownAt, drawEntrance, drawPodium, outlined } from './stageArt';
 
 const STEP = 1000 / 60;
-const TAP_MS = 230;
+const TAP_MS = 200;
 const TAP_SLOP = 26;
 
 interface Props<S> {
@@ -55,6 +55,7 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
     you: t('lokParty.drop.you'),
     skip: t('lokParty.stage.skip'),
     finish: t('lokParty.rush.over'),
+    dash: t('lokParty.stage.dash'),
   };
   const labelsRef = useRef(labels);
   labelsRef.current = labels;
@@ -87,12 +88,18 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
     let overAt = 0;
     let finished = false;
     let results: MinigameResult[] | null = null;
-    // Pointer state, in stage units.
-    let pointer: { x: number; y: number } | null = null;
-    let downAt = 0;
-    let downPos = { x: 0, y: 0 };
+    // Pointer state, in stage units. Mouse: the character follows the cursor and a click dashes at
+    // once (on press, not release). Touch: one finger steers, a quick tap dashes, and a second thumb
+    // can hit the DASH button, which also fires on press.
+    const touches = new Map<number, { x: number; y: number; downAt: number; sx: number; sy: number; button: boolean }>();
+    let mover: number | null = null;
+    let hover: { x: number; y: number } | null = null;
     let tap: { x: number; y: number } | null = null;
     let action = false;
+    let seenTouch = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+    let buttonPressedAt = -1e9;
+    const button = () => ({ x: STAGE_W - 92, y: view.h - 130, r: 70 });
+    const showButton = () => seenTouch && !!game.dashReady;
 
     const info = (): RenderInfo => ({ view, clock, me, calm });
 
@@ -117,16 +124,42 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
     const down = (e: PointerEvent) => {
       e.preventDefault();
       skipIntro();
-      pointer = toStage(e);
-      downPos = pointer;
-      downAt = clock;
+      const pt = toStage(e);
+      if (e.pointerType === 'mouse') {
+        hover = pt;
+        if (e.button === 0) tap = pt;
+        return;
+      }
+      seenTouch = true;
+      const b = button();
+      if (showButton() && Math.hypot(pt.x - b.x, pt.y - b.y) < b.r + 14) {
+        action = true;
+        buttonPressedAt = clock;
+        touches.set(e.pointerId, { ...pt, downAt: clock, sx: pt.x, sy: pt.y, button: true });
+        return;
+      }
+      touches.set(e.pointerId, { ...pt, downAt: clock, sx: pt.x, sy: pt.y, button: false });
+      if (mover === null) mover = e.pointerId;
     };
     const move = (e: PointerEvent) => {
-      if (pointer && (e.buttons > 0 || e.pressure > 0)) pointer = toStage(e);
+      const pt = toStage(e);
+      if (e.pointerType === 'mouse') {
+        hover = pt;
+        return;
+      }
+      const t0 = touches.get(e.pointerId);
+      if (t0 && !t0.button) Object.assign(t0, pt);
     };
-    const up = () => {
-      if (pointer && clock - downAt < TAP_MS && Math.hypot(pointer.x - downPos.x, pointer.y - downPos.y) < TAP_SLOP) tap = pointer;
-      pointer = null;
+    const up = (e: PointerEvent) => {
+      const t0 = touches.get(e.pointerId);
+      if (!t0) return;
+      touches.delete(e.pointerId);
+      if (!t0.button && clock - t0.downAt < TAP_MS && Math.hypot(t0.x - t0.sx, t0.y - t0.sy) < TAP_SLOP) tap = { x: t0.x, y: t0.y };
+      if (mover === e.pointerId) mover = [...touches.entries()].find(([, v]) => !v.button)?.[0] ?? null;
+    };
+    const leave = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') hover = null;
+      else up(e);
     };
     const key = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
@@ -149,6 +182,7 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
     canvas.addEventListener('pointermove', move);
     canvas.addEventListener('pointerup', up);
     canvas.addEventListener('pointercancel', up);
+    canvas.addEventListener('pointerleave', leave);
     window.addEventListener('keydown', key);
     window.addEventListener('keyup', key);
 
@@ -167,7 +201,15 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
       toast: (x, y, text, color, size = 34) => {
         // Keep popup words on screen.
         const margin = Math.min(STAGE_W / 2, size * 2.2);
-        toasts.push({ x: Math.max(margin, Math.min(STAGE_W - margin, x)), y: Math.max(size + 100, y), text, color, size, born: clock });
+        const tx = Math.max(margin, Math.min(STAGE_W - margin, x));
+        let ty = Math.max(size + 100, y);
+        // Stack instead of overlapping a recent popup.
+        for (let tries = 0; tries < 4; tries++) {
+          const hit = toasts.find((o) => clock - o.born < 500 && Math.abs(o.x - tx) < 220 && Math.abs(o.y - ty) < (o.size + size) * 0.6);
+          if (!hit) break;
+          ty = hit.y - (hit.size + size) * 0.62;
+        }
+        toasts.push({ x: tx, y: Math.max(size + 100, ty), text, color, size, born: clock });
         if (toasts.length > 10) toasts.shift();
       },
       flash: (color, ms) => {
@@ -182,10 +224,12 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
     const inputForMe = (): StageInput => {
       const kx = (keys.has('arrowright') || keys.has('d') ? 1 : 0) - (keys.has('arrowleft') || keys.has('a') ? 1 : 0);
       const ky = (keys.has('arrowdown') || keys.has('s') ? 1 : 0) - (keys.has('arrowup') || keys.has('w') ? 1 : 0);
-      const holding = !!pointer && clock - downAt >= 60;
+      const finger = mover !== null ? touches.get(mover) : undefined;
+      const held = finger && clock - finger.downAt >= 60 ? finger : hover;
+      const holding = !!held;
       const input: StageInput = {
         keys: { x: kx, y: ky },
-        aim: holding && pointer ? game.toWorld(view, pointer.x, pointer.y) : null,
+        aim: held ? game.toWorld(view, held.x, held.y) : null,
         holding,
         tap: tap ? game.toWorld(view, tap.x, tap.y) : null,
         action,
@@ -260,7 +304,34 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
         ctx.fillRect(0, 0, STAGE_W, view.h);
         ctx.globalAlpha = 1;
       }
-      if (intro >= ENTRANCE.playAt && !results) drawHud();
+      if (intro >= ENTRANCE.playAt && !results) {
+        drawHud();
+        game.hud?.(ctx, state, info());
+        if (showButton()) {
+          const b = button();
+          const ready = Math.max(0, Math.min(1, game.dashReady!(state, me)));
+          const pressed = clock - buttonPressedAt < 120;
+          ctx.save();
+          ctx.translate(b.x, b.y);
+          if (pressed) ctx.scale(0.9, 0.9);
+          ctx.globalAlpha = ready >= 1 ? 0.92 : 0.55;
+          ctx.fillStyle = ready >= 1 ? '#ffd23f' : '#3b2a20';
+          ctx.strokeStyle = '#07061a';
+          ctx.lineWidth = 6;
+          ctx.beginPath();
+          ctx.arc(0, 0, b.r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 8;
+          ctx.beginPath();
+          ctx.arc(0, 0, b.r - 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ready);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          outlined(ctx, L.dash, 0, 10, 28, ready >= 1 ? '#3b2a20' : '#ffffff', b.r * 1.7);
+          ctx.restore();
+        }
+      }
       if (intro < ENTRANCE.playAt + ENTRANCE.goMs) {
         drawEntrance(ctx, {
           h: view.h,
@@ -326,6 +397,7 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
       canvas.removeEventListener('pointermove', move);
       canvas.removeEventListener('pointerup', up);
       canvas.removeEventListener('pointercancel', up);
+      canvas.removeEventListener('pointerleave', leave);
       window.removeEventListener('keydown', key);
       window.removeEventListener('keyup', key);
     };

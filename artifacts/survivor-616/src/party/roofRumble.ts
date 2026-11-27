@@ -18,12 +18,21 @@ export const RUMBLE = {
   shrinkFromMs: 6_000,
   shrinkToMs: 26_000,
   body: 30,
-  walkAccel: 2100,
-  walkMax: 255,
+  walkAccel: 3200,
+  walkMax: 270,
   friction: 5.5,
+  /** Braking when nobody is steering, so a runner stops where you let go. */
+  brake: 9,
   dashSpeed: 900,
   dashMs: 230,
-  dashCooldownMs: 850,
+  dashCooldownMs: 750,
+  /** A dash pressed this close to the end of the cooldown fires the moment it is ready. */
+  dashBufferMs: 160,
+  /** Coyote time over the edge: dash back inside this window and you are saved. */
+  coyoteMs: 240,
+  /** Aim assist for a keyboard or button dash: snap to a rival inside this cone. */
+  assistRange: 190,
+  assistCos: 0.8,
   hitDash: 1000,
   clashBounce: 620,
   stunMs: 380,
@@ -38,11 +47,13 @@ export const RUMBLE = {
   barrelRadius: 26,
   blastRadius: 175,
   blastForce: 1300,
-  points: { ko: 3, fall: -1 },
+  points: { ko: 3, fall: -1, clutch: 1 },
+  multiKoMs: 4_000,
   /** Roof Collapse: the floor is concentric rings that drop away from the outside in. */
-  rings: [330, 250, 180, 120],
-  ringDropAt: [9_000, 16_000, 23_000],
-  ringWarnMs: 1_700,
+  rings: [330, 245, 165, 95],
+  ringDropAt: [8_000, 15_000, 22_000],
+  ringWarnMs: 2_400,
+  ringTickMs: 800,
 } as const;
 
 /**
@@ -80,6 +91,14 @@ export interface RumbleRunner {
   thinkAt: number;
   aimX: number;
   aimY: number;
+  /** Over the edge but not gone yet (coyote time). 0 when on solid roof. */
+  teeterUntil: number;
+  teeterDashed: boolean;
+  queuedUntil: number;
+  queuedX: number;
+  queuedY: number;
+  lastKoAt: number;
+  koStreak: number;
 }
 
 export interface RumbleBarrel {
@@ -104,7 +123,11 @@ export type RumbleEvent =
   | { type: 'boom'; by: number; x: number; y: number }
   | { type: 'crumble'; radius: number }
   | { type: 'ringWarn'; inner: number; outer: number }
-  | { type: 'ringDrop'; inner: number; outer: number };
+  | { type: 'ringTick'; n: number }
+  | { type: 'ringDrop'; inner: number; outer: number; left: number }
+  | { type: 'teeter'; index: number; x: number; y: number }
+  | { type: 'save'; index: number; x: number; y: number }
+  | { type: 'multiKo'; by: number; count: number; x: number; y: number };
 
 export interface RumbleState {
   seed: number;
@@ -112,6 +135,7 @@ export interface RumbleState {
   /** Collapse: how many outer rings have dropped. */
   ringsDropped: number;
   ringsWarned: number;
+  lastTick: number;
   now: number;
   durationMs: number;
   radius: number;
@@ -172,6 +196,13 @@ export function createRoofRumble(seed: number, seats: MinigameSeat[], arena: Rum
       thinkAt: 0,
       aimX: 0,
       aimY: 0,
+      teeterUntil: 0,
+      teeterDashed: false,
+      queuedUntil: 0,
+      queuedX: 0,
+      queuedY: 0,
+      lastKoAt: -1e9,
+      koStreak: 0,
     };
   });
   return {
@@ -179,6 +210,7 @@ export function createRoofRumble(seed: number, seats: MinigameSeat[], arena: Rum
     arena,
     ringsDropped: 0,
     ringsWarned: 0,
+    lastTick: -1,
     now: 0,
     durationMs,
     radius: RUMBLE.radius,
@@ -197,7 +229,21 @@ const onRoof = (r: RumbleRunner, now: number) => r.fallingSince === 0 && now >= 
 
 function dash(s: RumbleState, r: RumbleRunner, dx: number, dy: number) {
   const d = len(dx, dy);
-  if (d < 1 || s.now < r.dashReadyAt || s.now < r.stunUntil) return;
+  if (d < 1) return;
+  const teetering = r.teeterUntil > 0;
+  // Over the edge, a dash always answers: that is the clutch save.
+  if (s.now < r.stunUntil && !teetering) return;
+  if (s.now < r.dashReadyAt) {
+    if (r.dashReadyAt - s.now <= RUMBLE.dashBufferMs) {
+      r.queuedUntil = r.dashReadyAt + 1;
+      r.queuedX = dx;
+      r.queuedY = dy;
+    }
+    return;
+  }
+  if (teetering) r.teeterDashed = true;
+  r.stunUntil = 0;
+  r.queuedUntil = 0;
   r.vx = (dx / d) * RUMBLE.dashSpeed;
   r.vy = (dy / d) * RUMBLE.dashSpeed;
   r.dashUntil = s.now + RUMBLE.dashMs;
@@ -242,6 +288,25 @@ export function safeRadius(s: RumbleState): number {
   if (s.arena !== 'collapse') return s.radius;
   const i = crackingRing(s.now);
   return i >= 0 ? RUMBLE.rings[i + 1] : s.radius;
+}
+
+/** Keyboard or button dash: snap onto a rival roughly ahead. */
+function assist(s: RumbleState, r: RumbleRunner, dx: number, dy: number): [number, number] {
+  const d = len(dx, dy);
+  if (d < 0.001) return [dx, dy];
+  let best: RumbleRunner | null = null;
+  let bestD: number = RUMBLE.assistRange;
+  for (const o of s.runners) {
+    if (o === r || !onRoof(o, s.now)) continue;
+    const ox = o.x - r.x;
+    const oy = o.y - r.y;
+    const od = len(ox, oy);
+    if (od < bestD && (ox * dx + oy * dy) / (od * d) > RUMBLE.assistCos) {
+      bestD = od;
+      best = o;
+    }
+  }
+  return best ? [best.x - r.x, best.y - r.y] : [dx, dy];
 }
 
 function botThink(s: RumbleState, r: RumbleRunner) {
@@ -308,9 +373,17 @@ export function stepRoofRumble(s: RumbleState, inputs: (StageInput | null)[], dt
       s.ringsWarned = cracking + 1;
       s.events.push({ type: 'ringWarn', inner: RUMBLE.rings[cracking + 1], outer: RUMBLE.rings[cracking] });
     }
+    if (cracking >= 0) {
+      const beat = Math.floor((s.now - (RUMBLE.ringDropAt[cracking] - RUMBLE.ringWarnMs)) / RUMBLE.ringTickMs);
+      const key = cracking * 10 + beat;
+      if (key !== s.lastTick) {
+        s.lastTick = key;
+        s.events.push({ type: 'ringTick', n: Math.ceil(RUMBLE.ringWarnMs / RUMBLE.ringTickMs) - beat });
+      }
+    }
     const dropped = ringsDroppedAt(s.now);
     while (s.ringsDropped < dropped) {
-      s.events.push({ type: 'ringDrop', inner: RUMBLE.rings[s.ringsDropped + 1], outer: RUMBLE.rings[s.ringsDropped] });
+      s.events.push({ type: 'ringDrop', inner: RUMBLE.rings[s.ringsDropped + 1], outer: RUMBLE.rings[s.ringsDropped], left: RUMBLE.rings.length - s.ringsDropped - 2 });
       s.ringsDropped++;
     }
   } else {
@@ -359,7 +432,11 @@ export function stepRoofRumble(s: RumbleState, inputs: (StageInput | null)[], dt
     }
     if (!onRoof(r, s.now)) continue;
 
+    if (r.queuedUntil && s.now >= r.dashReadyAt) dash(s, r, r.queuedX, r.queuedY);
+    // A bot over the edge may try to dash back.
+    if (r.bot && r.teeterUntil && !r.teeterDashed && s.rng() < r.skill * 0.07) dash(s, r, -r.x, -r.y);
     const control = s.now >= r.stunUntil;
+    // Teetering runners can still be steered by a dash (handled above), not by walking.
     let ax = 0;
     let ay = 0;
     if (control && r.bot) {
@@ -369,7 +446,7 @@ export function stepRoofRumble(s: RumbleState, inputs: (StageInput | null)[], dt
       if (len(ax, ay) < 14) ax = ay = 0;
     } else if (control) {
       const input = inputs[r.index];
-      if (input?.tap) {
+      if (input?.tap && (s.now >= r.stunUntil || r.teeterUntil)) {
         // Aim assist: a tap near a rival dashes straight at them.
         let tx = input.tap.x;
         let ty = input.tap.y;
@@ -384,7 +461,21 @@ export function stepRoofRumble(s: RumbleState, inputs: (StageInput | null)[], dt
         }
         dash(s, r, tx - r.x, ty - r.y);
       }
-      else if (input?.action) dash(s, r, input.keys.x || r.facing, input.keys.y);
+      else if (input?.action) {
+        // Dash where you are steering: keys, then a held finger or the mouse, then the way you face.
+        let dx = input.keys.x;
+        let dy = input.keys.y;
+        if (!dx && !dy && input.holding && input.aim) {
+          dx = input.aim.x - r.x;
+          dy = input.aim.y - r.y;
+        }
+        if (len(dx, dy) < 4) {
+          dx = r.facing;
+          dy = 0;
+        }
+        const [ax2, ay2] = assist(s, r, dx, dy);
+        dash(s, r, ax2, ay2);
+      }
       if (input?.holding && input.aim) {
         ax = input.aim.x - r.x;
         ay = input.aim.y - r.y;
@@ -402,7 +493,7 @@ export function stepRoofRumble(s: RumbleState, inputs: (StageInput | null)[], dt
       r.vy += (ay / a) * RUMBLE.walkAccel * dt;
       if (Math.abs(ax) > 4) r.facing = ax > 0 ? 1 : -1;
     }
-    const drag = Math.exp(-(dashing ? 1.2 : RUMBLE.friction) * dt);
+    const drag = Math.exp(-(dashing ? 1.2 : a > 0 ? RUMBLE.friction : RUMBLE.brake) * dt);
     r.vx *= drag;
     r.vy *= drag;
     r.x += r.vx * dt;
@@ -470,7 +561,28 @@ export function stepRoofRumble(s: RumbleState, inputs: (StageInput | null)[], dt
   }
 
   for (const r of s.runners) {
-    if (!onRoof(r, s.now) || len(r.x, r.y) <= s.radius + RUMBLE.body * 0.2) continue;
+    if (!onRoof(r, s.now)) continue;
+    const over = len(r.x, r.y) > s.radius + RUMBLE.body * 0.2;
+    if (!over) {
+      if (r.teeterUntil) {
+        if (r.teeterDashed) {
+          r.score += RUMBLE.points.clutch;
+          r.lastHitBy = -1;
+          s.events.push({ type: 'save', index: r.index, x: r.x, y: r.y });
+        }
+        r.teeterUntil = 0;
+        r.teeterDashed = false;
+      }
+      continue;
+    }
+    if (!r.teeterUntil) {
+      r.teeterUntil = s.now + RUMBLE.coyoteMs;
+      s.events.push({ type: 'teeter', index: r.index, x: r.x, y: r.y });
+      continue;
+    }
+    if (s.now < r.teeterUntil) continue;
+    r.teeterUntil = 0;
+    r.teeterDashed = false;
     r.fallingSince = s.now;
     r.fallX = r.x;
     r.fallY = r.y;
@@ -482,6 +594,9 @@ export function stepRoofRumble(s: RumbleState, inputs: (StageInput | null)[], dt
       by.kos++;
       by.score += RUMBLE.points.ko;
       s.events.push({ type: 'ko', by: by.index, index: r.index, x: r.x, y: r.y });
+      by.koStreak = s.now - by.lastKoAt <= RUMBLE.multiKoMs ? by.koStreak + 1 : 1;
+      by.lastKoAt = s.now;
+      if (by.koStreak >= 2) s.events.push({ type: 'multiKo', by: by.index, count: by.koStreak, x: r.x, y: r.y });
     }
   }
 

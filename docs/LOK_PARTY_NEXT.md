@@ -46,7 +46,7 @@ The rules are written and tested, but the player cannot reach them.
 
 ## 4. Minigames (s5), the biggest hole
 
-Three exist and rotate on the board: The Lok Drop, Ring Run Rush (v0.42.95) and Roof Rumble (v0.42.96) and Roof Collapse (v0.42.97, a second rooftop arena). Rush, Rumble and Collapse can also be played alone from "Party games" on the menu (practice, no rewards). New games plug into the minigame kit (`minigameKit.ts` + `MinigameStage.tsx`): a rules file and an art file, and the shared entrance, controls, effects, HUD and podium come free.
+Three exist and rotate on the board: The Lok Drop, Ring Run Rush (v0.42.95) and Roof Rumble (v0.42.96) and Roof Collapse (v0.42.97, rebuilt as the main event in v0.42.98: four rings down to a tiny core, clutch saves, touch DASH button). Rush, Rumble and Collapse can also be played alone from "Party games" on the menu (practice, no rewards). New games plug into the minigame kit (`minigameKit.ts` + `MinigameStage.tsx`): a rules file and an art file, and the shared entrance, controls, effects, HUD and podium come free.
 
 1. Done in v0.42.96 as the minigame kit. Still to do: move Ring Run Rush and the Lok Drop onto `MinigameStage`, and an iframe/postMessage bridge for games hosted in other repos. (M)
 2. More rooftop arenas (square, tile drop, tilting deck, conveyor, bridge, storm): plan in LOK_PARTY.md, each S to M on the shared rules. (Look)

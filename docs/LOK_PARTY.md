@@ -98,3 +98,16 @@ Each is a new `RumbleArena` value: a floor shape and a way it gives way, plus a 
 4. **Conveyor roof**: the floor scrolls one way, toward an open edge, and reverses every few seconds.
 5. **Two roofs and a bridge**: a narrow catwalk between two small roofs; a boom barrel can break the catwalk.
 6. **Storm night**: wind gusts with an on-screen arrow push everyone the same way for two seconds.
+
+## Roof Collapse, the main event (v0.42.98)
+
+Four rings, 330/245/165/95: drops at 8, 15 and 22 s leave a tiny last ring for the final 8 s. Each drop gets a 2.4 s warning: a "Ring drops in 3, 2, 1" banner with a tick sound and red pulse on every beat (`ringTick`), the ring flashing and shaking with spreading cracks and dust, and a gold dashed safe line on the next seam. On the drop: a slam banner ("RING DOWN!", or "FINAL RING!" for the last one), hit-stop, flash and shake, and the ring shatters into 20 chunks that let go a beat apart and tumble down the building (back chunks behind it, front ones in front). Ring pips under the timer show what is left. The last ring's rim glows gold.
+
+Precision and feel (shared by Roof Rumble too):
+- Mouse: the character follows the cursor; a click dashes on press, not release.
+- Touch: one finger steers, a quick tap dashes (aim assist onto a rival near the tap), and a DASH button for the second thumb fires on press and shows the cooldown.
+- Keys: WASD or arrows, Space to dash; a keyboard or button dash snaps onto a rival in a 37 degree cone.
+- Dash buffer: pressed within 160 ms of the cooldown ending, it fires the moment it is ready.
+- Snappier walking (accel 3200, brake when you let go), cooldown 750 ms.
+- Clutch save: going over the edge gives 240 ms of coyote time; dash back in and you stay up for +1 and a "CLUTCH!" popup. A shoved, stunned runner can still clutch.
+- Multi-KO popups (DOUBLE KO, TRIPLE KO) and popups that stack instead of overlapping, for streams.
