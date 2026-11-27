@@ -26,6 +26,7 @@ import { getCelebrationStyle } from '@/game/data/celebrations';
 import { getHatStyle } from '@/game/data/hats';
 import { grpdEndgameWeaponEarned } from '@/game/data/grpdArmory';
 import { callInRoster } from '@/game/data/crewCallIns';
+import { activePad, isConsoleBrowser, setPadGameplay } from '@/lib/consolePad';
 import { actionForKey, dashDirection, getControls, padMove } from '@/game/input/controls';
 import { getDisabledRunEvents } from '@/game/state/runEventSetting';
 import { endgameReached, mapsCleared } from '@/game/data/endgameUnlocks';
@@ -435,6 +436,12 @@ export function RunScreen({
   const finalRewardMultiplier = utilityRewardMultiplierProp ?? rewardCredMultiplier(meta);
   const prefersReducedMotion = prefersReducedMotionNow();
 
+  // The run reads the pad itself while playing; menus take it over otherwise.
+  useEffect(() => {
+    setPadGameplay(phase === 'playing' || phase === 'countdown');
+    return () => setPadGameplay(false);
+  }, [phase]);
+
   // The command hint is a nudge, not a state: it clears itself.
   useEffect(() => {
     if (!commandHint) return;
@@ -749,6 +756,9 @@ export function RunScreen({
       }
     }
 
+    // Console browsers turn the controller into a mouse; that cursor must not drive the touch joystick.
+    if (isConsoleBrowser && event.pointerType === 'mouse' && activePad()) return;
+
     pointerModeRef.current = 'stick';
     const next: StickState = {
       active: true,
@@ -826,6 +836,14 @@ export function RunScreen({
     }
     const stick = stickRef.current;
     if (pointerModeRef.current !== 'stick' || !stick.active || stick.pointerId !== event.pointerId) return;
+    // A mouse with no button down lost its release: let go instead of walking forever.
+    if (event.pointerType === 'mouse' && event.buttons === 0) {
+      const idle = { ...stick, active: false, pointerId: null, dx: 0, dy: 0 };
+      pointerModeRef.current = 'none';
+      stickRef.current = idle;
+      setStickVisual(idle);
+      return;
+    }
     let dx = event.clientX - stick.originX;
     let dy = event.clientY - stick.originY;
     const len = Math.hypot(dx, dy);
@@ -957,9 +975,11 @@ export function RunScreen({
       // load this backs the canvas down in a few small, reversible steps;
       // that is substantially cheaper than allowing a heavy frame to block
       // input or trigger a long fixed-step catch-up burst.
-      const ratio = Math.max(0.5, Math.min(window.devicePixelRatio || 1, 2) * backingScale);
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
+      // Console browsers drive a TV: cap the backing store near 720p wide so fill rate holds up.
+      const maxRatio = isConsoleBrowser ? Math.min(2, 1280 / width) : 2;
+      const ratio = Math.max(0.5, Math.min(window.devicePixelRatio || 1, maxRatio) * backingScale);
       const height = Math.max(1, rect.height);
       // Backing store must be whole pixels, so derive the scale from it --
       // comparing against a fractional product never matches.
@@ -1025,12 +1045,11 @@ export function RunScreen({
         // Controller: the first connected pad steers (left stick or d-pad, only when nothing
         // else is steering) and its buttons trigger actions on the press, not while held.
         const controls = getControls();
-        const pads = controls.gamepad.enabled ? navigator.getGamepads?.() : undefined;
-        const pad = pads ? Array.from(pads).find((candidate) => candidate && candidate.connected) ?? null : null;
+        const pad = controls.gamepad.enabled ? activePad() : null;
         if (pad) {
           const isDown = (button: number) => Boolean(pad.buttons[button]?.pressed);
           if (moveX === 0 && moveY === 0) {
-            const steer = padMove(pad.axes, isDown, controls.gamepad.deadzone);
+            const steer = padMove(pad.axes, isDown, isConsoleBrowser ? Math.max(0.25, controls.gamepad.deadzone) : controls.gamepad.deadzone);
             moveX = steer.x;
             moveY = steer.y;
           }

@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 238,
+      "version": "0.42.99",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T17:30:00Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "Xbox controller support",
+      "body": [
+        "On Xbox, the D-pad and left stick now move through menus. A selects, B or Start goes back.",
+        "Fixed the character walking one way on its own when playing with a controller in a console browser.",
+        "Console browsers now draw at a lighter resolution to cut lag."
+      ]
+    },
+    {
       "number": 237,
       "version": "0.42.98",
       "date": "2026-11-27",
