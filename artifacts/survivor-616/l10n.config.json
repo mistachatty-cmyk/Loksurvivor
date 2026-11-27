@@ -4,6 +4,7 @@
   "engine": "google,argos",
   "targets": ["es", "fr", "de", "pt-BR", "ja", "ko", "zh-CN"],
   "glossary": [
+    "Ring Run Rush",
     "Survivor616",
     "DJ Misfit",
     "New Fits",
