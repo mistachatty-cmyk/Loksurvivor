@@ -103,10 +103,27 @@ function press(): void {
   else if (items[0]) focusOn(primary(items));
 }
 
+/** Back or close buttons, for screens that do not listen for Escape. */
+const BACK = '[data-testid="button-back"],[data-testid$="-back"],[data-testid^="button-close"]';
+
 function back(): void {
+  const button = targets().find((el) => el.matches(BACK));
+  if (button) { button.click(); return; }
+  escape();
+}
+
+function escape(): void {
   const el = document.activeElement ?? document.body;
   el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
   el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }));
+}
+
+/** Right stick scrolls whatever holds the focused control, or the page. */
+function scroll(amount: number): void {
+  let el = document.activeElement as HTMLElement | null;
+  while (el && !(el.scrollHeight > el.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(el).overflowY))) el = el.parentElement;
+  if (el) el.scrollTop += amount;
+  else window.scrollBy(0, amount);
 }
 
 const REPEAT_FIRST_MS = 380;
@@ -131,6 +148,8 @@ export function installConsolePad(enabled: () => boolean): void {
     raf = requestAnimationFrame(poll);
     const down = (i: number) => Boolean(pad.buttons[i]?.pressed);
     const [x = 0, y = 0] = pad.axes;
+    const rightY = pad.axes[3] ?? 0;
+    if (!gameplay && enabled() && Math.abs(rightY) > 0.3) scroll(rightY * 18);
     const inputs: [string, boolean, () => void, boolean][] = [
       ['up', down(12) || y < -0.6, () => move('up'), true],
       ['down', down(13) || y > 0.6, () => move('down'), true],
@@ -138,7 +157,7 @@ export function installConsolePad(enabled: () => boolean): void {
       ['right', down(15) || x > 0.6, () => move('right'), true],
       ['a', down(0), press, false],
       ['b', down(1), back, false],
-      ['start', down(9), back, false],
+      ['start', down(9), escape, false],
     ];
     for (const [name, on, run, repeats] of inputs) {
       if (!on) { held.delete(name); continue; }
