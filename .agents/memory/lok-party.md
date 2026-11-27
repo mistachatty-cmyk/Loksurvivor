@@ -18,3 +18,4 @@ Read before touching `artifacts/survivor-616/src/party/` or anything Lok Party p
 
 - Owner rule (2026-11-27): minigames are interactive party games with every character visible and acting, never filler. Vault screen waits for the owner's pick of layout A/B/C.
 - New minigames go through the kit (minigameKit.ts + MinigameStage.tsx): rules file + art file; never hand-roll another entrance or podium. Visuals made in chat go in docs/art-library/lok-party/ with how they were made.
+- Owner direction (2026-11-27): Roof Collapse is the streamer showpiece. Rings 4 to 1 with a loud, readable drop each time; controls must be precise and fire on press (mouse follow + click dash, touch DASH button, dash buffer, coyote clutch saves).

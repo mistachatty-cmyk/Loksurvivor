@@ -1614,7 +1614,6 @@
   "lokParty.rumble.ko": "KO ! +{{points}}",
   "lokParty.collapse.title": "Roof Collapse",
   "lokParty.collapse.hint": "Le sol s'effondre anneau après anneau. Lâchez un ring qui craque !",
-  "lokParty.collapse.warn": "CRAQUANT !",
   "lokParty.stage.go": "ALLEZ!",
   "lokParty.stage.skip": "Appuyez pour ignorer",
   "lokParty.games.title": "Jeux de société",

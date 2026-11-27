@@ -1614,7 +1614,6 @@
   "lokParty.rumble.ko": "NO! +{{points}}",
   "lokParty.collapse.title": "Roof Collapse",
   "lokParty.collapse.hint": "O chão cai anel por anel. Saia de um anel quebrado!",
-  "lokParty.collapse.warn": "QUEBRANDO!",
   "lokParty.stage.go": "VÁ!",
   "lokParty.stage.skip": "Toque para pular",
   "lokParty.games.title": "Jogos de festa",

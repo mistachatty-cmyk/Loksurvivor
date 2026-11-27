@@ -1614,7 +1614,6 @@
   "lokParty.rumble.ko": "¡KO! +{{points}}",
   "lokParty.collapse.title": "Roof Collapse",
   "lokParty.collapse.hint": "El suelo cae anillo a anillo. ¡Bájate del ring!",
-  "lokParty.collapse.warn": "¡CRACKIENDO!",
   "lokParty.stage.go": "¡VAMOS!",
   "lokParty.stage.skip": "Toca para saltar",
   "lokParty.games.title": "juegos de fiesta",

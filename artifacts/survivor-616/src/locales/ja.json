@@ -1614,7 +1614,6 @@
   "lokParty.rumble.ko": "こー！ +{{points}}",
   "lokParty.collapse.title": "Roof Collapse",
   "lokParty.collapse.hint": "リングごとにフロアが下がっていきます。クラックリングから抜け出せ！",
-  "lokParty.collapse.warn": "割れる！",
   "lokParty.stage.go": "ゴー！",
   "lokParty.stage.skip": "タップしてスキップ",
   "lokParty.games.title": "パーティーゲーム",

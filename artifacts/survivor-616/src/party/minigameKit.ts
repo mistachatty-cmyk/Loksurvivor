@@ -82,6 +82,10 @@ export interface MinigameCartridge<S> {
   render(ctx: CanvasRenderingContext2D, s: S, info: RenderInfo): void;
   /** Turn this step's rule events into effects. Called after every fixed step. */
   react(s: S, fx: StageFx, info: RenderInfo): void;
+  /** Screen-space overlay drawn over the HUD (banners, counters). Stage units, no camera shake. */
+  hud?(ctx: CanvasRenderingContext2D, s: S, info: RenderInfo): void;
+  /** Show the touch DASH button; the value is how ready the player's dash is, 0..1. */
+  dashReady?(s: S, me: number): number;
 }
 
 export const SEAT_COLORS = ['#38f2ff', '#ff3fd2', '#ffd23f', '#7cff6b'] as const;
