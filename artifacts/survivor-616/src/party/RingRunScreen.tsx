@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { CHARACTERS_BY_ID } from '@/game/data/characters';
 import { BURST_TOKENS } from '@/game/data/ringRuns';
 import { drawRig, drawShadow } from '@/game/render/sprite';
+import { rumble } from '@/lib/lokConsole/core';
 import { FrameGovernor } from '@/lib/renderScale';
 import { useT } from '@/lib/i18n';
 import { subscribeActions } from '@/lib/lokInput';
@@ -201,7 +202,7 @@ export function RingRunArena({ seed, playerId, onDone, getAudioContext, botSkill
             juice.chimes.pickup(realNow, { pan, bright: e.kind !== 'ring' });
             toasts.push({ x: sx + 10, y: sy - 24, text: `+${e.value ?? 0}`, born: realNow, color: col, big: e.kind === 'gold' });
             if (e.kind === 'gold') impact(juice, realNow, c.x, c.y, 0.7);
-            if (navigator.vibrate && e.kind === 'gold') navigator.vibrate(18);
+            if (e.kind === 'gold') { rumble(0.3, 40); if (navigator.vibrate) navigator.vibrate(18); }
           }
           break;
         }
@@ -231,6 +232,7 @@ export function RingRunArena({ seed, playerId, onDone, getAudioContext, botSkill
             impact(juice, realNow, c.x, c.y, e.weight);
             juice.chimes.accent('hit', pan);
             toasts.push({ x: RX, y: syOf(p.lane, 0) - 110, text: L.stumble, born: realNow, color: '#ff3f5a', big: true });
+            rumble(0.8, 140);
             if (navigator.vibrate) navigator.vibrate(40);
           } else juice.camera.addTrauma(0.05 * motion);
           break;

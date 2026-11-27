@@ -13,6 +13,7 @@ import { initLocalization } from '@/lib/i18n';
 import { getCrashScreen, lokCrash, startCrashWatch } from '@/lib/lokCrash';
 import { optionalChunkLoading } from '@/lib/optionalChunk';
 import { startPowerWatch } from '@/lib/powerSaver';
+import { applyConsoleProfile } from '@/lib/lokConsole';
 
 // After a deploy, an already-open or home-screen copy can ask for a code chunk
 // that no longer exists. Reload once to pick up the new build instead of
@@ -109,6 +110,7 @@ function installRuntimeDiagnostics(): void {
 }
 
 installRuntimeDiagnostics();
+applyConsoleProfile();
 restoreUiTransparency();
 applyMotionMode();
 applyTextSize();

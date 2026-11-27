@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 236,
+      "version": "0.42.97",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T23:45:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Xbox and PlayStation support",
+      "body": [
+        "Xbox Series X|S, Xbox One, PlayStation 5, PlayStation 4, Switch and smart TVs are now recognized. Newer consoles start a little sharper while the built-in frame governor still keeps play smooth.",
+        "Controller hints show your console buttons: A and B on Xbox, Cross and Circle on PlayStation.",
+        "Controller rumble works in Ring Run Rush on consoles."
+      ]
+    },
+    {
       "number": 235,
       "version": "0.42.96",
       "date": "2026-11-27",

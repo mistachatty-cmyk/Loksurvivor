@@ -17,6 +17,7 @@ import { FrameGovernor } from '@/lib/renderScale';
 import { useT, type MessageKey } from '@/lib/i18n';
 import { CapsulePullOverlay } from './CapsulePullOverlay';
 import { BoardScreen } from './BoardScreen';
+import { consoleProfile, padHint } from '@/lib/lokConsole/core';
 import { CARTRIDGES, cartridgeById } from './cartridges';
 import { dailySeed, type MiniOutcome } from './cartridge';
 import { BOT_LEVELS, loadBotLevels, resolveBotSkills, saveBotLevels, type BotLevel, type BotLevels } from './botLevels';
@@ -437,7 +438,7 @@ function Lobby({ mode, botLevels, setBotLevel, rounds, setRounds, pick, setPick,
         <div className="mt-3 text-xs opacity-80">{t('lokParty.results.ladder', { ladder: t('lokParty.ladder.solo'), rank: ladderLabel(meta.ladders.solo) })}</div>
         <div className="text-xs opacity-80">{t('lokParty.results.pass', { tier: passTier(meta.pass.xp) })}</div>
       </CreamCard>
-      <p className="text-xs text-white/60">{touch ? t('lokParty.drop.controlsTouch') : cartridgeById(mode) ? t(cartridgeById(mode)!.controlsKeysKey) : t('lokParty.drop.controlsKeys')}</p>
+      <p className="text-xs text-white/60">{consoleProfile().kind !== 'none' ? padHint(t('lokParty.console.controls')) : touch ? t('lokParty.drop.controlsTouch') : cartridgeById(mode) ? t(cartridgeById(mode)!.controlsKeysKey) : t('lokParty.drop.controlsKeys')}</p>
       <div className="flex gap-3">
         <button type="button" onPointerDown={onBack} className="rounded-lg border border-white/30 px-5 py-3 text-sm font-bold">
           {t('lokParty.drop.back')}

@@ -10,13 +10,17 @@
  *     and only gets a little softer. Gameplay never changes: simulations are fixed-step.
  */
 
+import { consoleDprCap, detectConsole } from './lokConsole/core';
+
 export function isConsoleBrowser(ua: string = typeof navigator === 'undefined' ? '' : navigator.userAgent): boolean {
   return /xbox|playstation|nintendo|tizen|web0s|webos|smart-?tv|crkey|aftb|bravia/i.test(ua);
 }
 
 /** Pixel ratio a canvas should start at. */
 export function baseDpr(raw: number = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1, consoleBrowser: boolean = isConsoleBrowser()): number {
-  return Math.min(consoleBrowser ? 1 : 2, Math.max(0.5, raw));
+  // A Series X or PS5 may start a little sharper than other TVs; the governor still steps down.
+  const cap = consoleBrowser ? (detectConsole() === 'none' ? 1 : Math.max(1, Math.min(1.25, consoleDprCap()))) : 2;
+  return Math.min(cap, Math.max(0.5, raw));
 }
 
 export const GOVERNOR = {

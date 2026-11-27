@@ -1556,6 +1556,7 @@
   "music.unmute": "Unmute",
   "feedback.rateStar": "Rate {{n}} out of 5",
   "lokParty.title": "Lok Party",
+  "lokParty.console.controls": "Left stick or D-pad moves. {primary} jumps, confirms and dashes. {secondary} goes back.",
   "lokParty.daily.run": "Daily run",
   "lokParty.drop.title": "The Lok Drop",
   "lokParty.drop.pitch": "Crack capsules, knock rivals loose, and bank your loot in the Extraction Ring before the vault slams shut.",

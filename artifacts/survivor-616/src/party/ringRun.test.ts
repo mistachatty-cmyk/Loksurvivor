@@ -186,3 +186,35 @@ test('lib/couch imports nothing from any game', () => {
   const src = readFileSync(fileURLToPath(new URL('../lib/couch/core.ts', import.meta.url)), 'utf8');
   assert.equal(/from\s+['"]/.test(src), false);
 });
+
+import { buttonName, consoleDprCap, consoleProfile, detectConsole, padHint, rumble } from '../lib/lokConsole/core';
+
+test('console detection picks the right profile and button names', () => {
+  const xs = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; Xbox; Xbox Series X) AppleWebKit/537.36 Edge/44';
+  const xo = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; Xbox; Xbox One) AppleWebKit/537.36 Edge/44';
+  const ps5 = 'Mozilla/5.0 (PlayStation 5 4.03) AppleWebKit/605.1.15';
+  const ps4 = 'Mozilla/5.0 (PlayStation 4 9.00) AppleWebKit/605.1.15';
+  assert.equal(detectConsole(xs), 'xbox-series');
+  assert.equal(detectConsole(xo), 'xbox-one');
+  assert.equal(detectConsole(ps5), 'playstation-5');
+  assert.equal(detectConsole(ps4), 'playstation-4');
+  assert.equal(detectConsole('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)'), 'none');
+  assert.equal(buttonName('primary', consoleProfile('xbox-series')), 'A');
+  assert.equal(buttonName('primary', consoleProfile('playstation-5')), 'Cross');
+  assert.equal(padHint('{primary} jumps, {menu} pauses', consoleProfile('playstation-4')), 'Cross jumps, Options pauses');
+  assert.ok(consoleDprCap('xbox-series') > consoleDprCap('xbox-one'));
+});
+
+test('rumble reaches a connected pad, clamps its inputs and ignores pads without a motor', () => {
+  const calls: Record<string, number>[] = [];
+  const pad = { connected: true, vibrationActuator: { playEffect: (_t: string, p: Record<string, number>) => { calls.push(p); return Promise.resolve(); } } };
+  assert.equal(rumble(5, 9999, [pad, { connected: true }, null]), true);
+  assert.equal(calls[0].duration, 400);
+  assert.equal(calls[0].strongMagnitude, 1);
+  assert.equal(rumble(1, 50, [{ connected: true }]), false);
+});
+
+test('lokConsole core imports nothing from any game', () => {
+  const src = readFileSync(fileURLToPath(new URL('../lib/lokConsole/core.ts', import.meta.url)), 'utf8');
+  assert.equal(/from\s+['"]/.test(src), false);
+});
