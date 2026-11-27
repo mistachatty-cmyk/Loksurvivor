@@ -472,7 +472,7 @@ test('board: the ladder junction offers a real choice', () => {
 
 // ---------------------------------------------------------------- Slice 4: online parties
 
-import { actVerdict, assignSeat, createActionSync, createPartyCode, initialSeats, minigamePlacements, normalizePartyCode, openPartyRoom, seatToBot, type BroadcastClient } from './partyNet';
+import { quietLimitMs, actVerdict, assignSeat, createActionSync, createPartyCode, initialSeats, minigamePlacements, normalizePartyCode, openPartyRoom, seatToBot, type BroadcastClient } from './partyNet';
 import type { BoardAction } from './lokBoard';
 
 const ROSTER4 = ['zero-day', 'shade', 'quarry-kid', 'golden-hour'];
@@ -639,4 +639,8 @@ test('online recovery: repeats and early choices are never spent on the wrong tu
   sync.take();
   sync.receive(1, { type: 'roll', signature: true });
   assert.equal(sync.have(), 2);
+});
+
+test('online presence: someone who switched apps gets longer than someone who vanished', () => {
+  for (const peer of ['host', 'guest'] as const) assert.ok(quietLimitMs(peer, true) >= 3 * quietLimitMs(peer, false));
 });

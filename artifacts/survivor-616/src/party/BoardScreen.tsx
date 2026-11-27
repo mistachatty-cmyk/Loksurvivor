@@ -63,7 +63,7 @@ import {
 } from './boardArt';
 import { DropArena, seatOrder } from './LokDropScreen';
 import { dropResults, type DropState } from './lokDrop';
-import { actVerdict, createActionSync, type ActPayload, minigamePlacements, seatToBot, type OnlineSession, type Seat } from './partyNet';
+import { actVerdict, createActionSync, quietLimitMs, type ActPayload, minigamePlacements, seatToBot, type OnlineSession, type Seat } from './partyNet';
 
 const LANE = ['#38f2ff', '#ff3fd2', '#ffd23f', '#7cff6b'];
 const CREAM = '#FAF6EE';
@@ -133,6 +133,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
   );
   const [waitingOthers, setWaitingOthers] = useState(false);
   const [hostGone, setHostGone] = useState(false);
+  const [awayName, setAwayName] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const sentRef = useRef(false);
   sentRef.current = sent;
@@ -501,6 +502,13 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
     // Presence: pings both ways; quiet guests become bots, a quiet host ends the party.
     const lastSeen = new Map<number, number>();
     let lastHost = 0;
+    const away = new Map<number, string>(); // seats whose page is in the background
+    let hostAway = false;
+    const markAway = (seat: number, isAway: boolean) => {
+      if (isAway) away.set(seat, online?.seats[seat]?.name ?? '');
+      else away.delete(seat);
+      setAwayName(away.values().next().value ?? null);
+    };
     if (room) {
       room.setHandlers({
         onApply: (m) => {
@@ -531,7 +539,9 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
           setUi((v) => v + 1);
         },
         onPing: (m) => {
+          markAway(m.seat, !!m.away);
           if (m.host) {
+            hostAway = !!m.away;
             lastHost = now;
             return;
           }
@@ -551,6 +561,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       seatsRef.current = seatToBot(seatsRef.current, seat);
       room?.send('seat-bot', { seat });
       reports.delete(seat);
+      markAway(seat, false);
       tryFinishMini();
       setUi((v) => v + 1);
     };
@@ -560,7 +571,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       if (now >= pingAt) {
         pingAt = now + 4000;
         const waiting = !isHost && localMiniDone ? miniRound : undefined;
-        room.send('ping', { seat: localSeat, host: isHost, have: sync.have(), waiting });
+        room.send('ping', { seat: localSeat, host: isHost, have: sync.have(), waiting, away: document.hidden });
         if (!isHost && outbox && sync.have() <= outbox.after) room.send('act', { ...outbox });
         if (waiting !== undefined) room.send('mini-report', { round: waiting, seat: localSeat, banked: myBanked });
       }
@@ -569,14 +580,20 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
           if (st.kind !== 'guest') continue;
           const seen = lastSeen.get(st.index) ?? 0;
           if (!lastSeen.has(st.index)) lastSeen.set(st.index, now);
-          else if (now - seen > 20_000) dropSeat(st.index);
+          else if (now - seen > quietLimitMs('guest', away.has(st.index))) dropSeat(st.index);
         }
         if (hostBanked && now > miniDeadline) tryFinishMini(true);
       } else {
         if (!lastHost) lastHost = now;
-        if (now - lastHost > 25_000) setHostGone(true);
+        if (now - lastHost > quietLimitMs('host', hostAway)) setHostGone(true);
       }
     };
+
+    // A hidden page stops drawing, so say so the moment it happens: friends then wait longer.
+    const onVisibility = () => {
+      room?.send('ping', { seat: localSeat, host: isHost, have: sync.have(), away: document.hidden });
+    };
+    if (room) document.addEventListener('visibilitychange', onVisibility);
 
     // Pace the game.
     const tick = () => {
@@ -1288,6 +1305,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
     window.addEventListener('pagehide', onUnload);
     return () => {
       window.removeEventListener('pagehide', onUnload);
+      document.removeEventListener('visibilitychange', onVisibility);
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('pointerdown', onDown);
@@ -1382,6 +1400,13 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
         <div className="absolute inset-x-0 top-1/3 flex justify-center">
           <div className="rounded-2xl border-[3px] px-5 py-3 text-sm font-black" style={{ background: CREAM, borderColor: ESPRESSO, color: ESPRESSO }}>
             {t('lokParty.online.waiting')}
+          </div>
+        </div>
+      ) : null}
+      {awayName !== null && !hostGone ? (
+        <div className="pointer-events-none absolute inset-x-0 top-1/3 z-40 flex justify-center p-4">
+          <div role="status" className="rounded-full border-2 px-4 py-2 text-sm font-black" style={{ background: CREAM, borderColor: ESPRESSO, color: ESPRESSO }}>
+            {t('lokParty.online.stepAway', { name: awayName || t('lokParty.online.friend') })}
           </div>
         </div>
       ) : null}
