@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 235,
+      "version": "0.42.96",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T23:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party: QR join and ready up",
+      "body": [
+        "Hosting a Lok Party room now shows a QR code. Friends scan it with their phone camera and land straight in your room.",
+        "Friends tap Ready up, you see who is ready, and Start unlocks once every friend is ready. Bots never hold the room up."
+      ]
+    },
+    {
       "number": 234,
       "version": "0.42.95",
       "date": "2026-11-27",

@@ -42,3 +42,8 @@ Same rule as lokInput: it imports nothing from any game. Games talk to it throug
 
 ## Planning doctrine for the Lok ecosystem (proposed)
 Every new feature gets a one-page plan before building, in `docs/`, with these headings: Goal, What already exists, Pieces, Flows, Cost and backend notes, Build order, What is not built. Plans say plainly what is built and what is not. Anything liftable gets an isolation test. Anything needing a backend is noted in the repo docs. Anything new for players gets a changelog entry. No emoji, procedural art, no new runtime cost without a reason.
+
+## Built so far (0.42.96)
+- Host room shows a QR code (existing `QrCode`) plus the 5-letter code and link.
+- Guests ready up; the host's Start waits until every human guest is ready (`canStart`, `setGuestReady`, `readyCounts` in `party/partyNet.ts`, tested). Bots never block.
+- Next: lift these pure helpers and the lobby UI into `@lok/couch` and reuse them from Survivor 616 crews.

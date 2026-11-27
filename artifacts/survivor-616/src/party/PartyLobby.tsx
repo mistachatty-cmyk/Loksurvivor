@@ -11,7 +11,8 @@ import { lokClient } from '@/lib/lokClient';
 import { useSocialOptional } from '@/state/socialStore';
 import { useT } from '@/lib/i18n';
 import { RigPreview, ROSTER_IDS } from './LokDropScreen';
-import { assignSeat, createPartyCode, initialSeats, normalizePartyCode, openPartyRoom, partyLink, seatToBot, type OnlineSession, type PartyRoom, type Seat } from './partyNet';
+import { QrCode } from '@/ui/QrCode';
+import { assignSeat, canStart, createPartyCode, initialSeats, normalizePartyCode, openPartyRoom, partyLink, readyCounts, seatToBot, setGuestReady, type OnlineSession, type PartyRoom, type Seat } from './partyNet';
 
 const CREAM = '#FAF6EE';
 const ESPRESSO = '#3b2a20';
@@ -81,6 +82,11 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
         setSeats(r.seats);
         broadcast();
       },
+      onReady: (m) => {
+        seatsRef.current = setGuestReady(seatsRef.current, m.clientId, !!m.ready);
+        setSeats(seatsRef.current);
+        broadcast();
+      },
       onLeave: (m) => {
         if (m.host) return;
         seatsRef.current = seatToBot(seatsRef.current, m.seat);
@@ -138,9 +144,15 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
     };
   }, [mode, code, characterId, myName, me]);
 
+  const toggleReady = () => {
+    const mine = seatsRef.current.find((st) => st.clientId === me);
+    if (!mine) return;
+    roomRef.current?.send('ready', { clientId: me, ready: !mine.ready });
+  };
+
   const start = () => {
     const room = roomRef.current;
-    if (!room) return;
+    if (!room || !canStart(seatsRef.current)) return;
     const seed = (Date.now() ^ 0x616) >>> 0;
     started.current = true;
     room.send('start', { seed, rounds, seats: seatsRef.current });
@@ -225,6 +237,12 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
         </div>
         <StatusDot status={status} t={t} />
       </div>
+      {mode === 'host' && link ? (
+        <div className="mt-3 flex flex-col items-center gap-1" data-testid="party-qr">
+          <QrCode value={link} size={168} label={t('lokParty.online.qrLabel', { code })} />
+          <span className="text-[11px] font-bold opacity-70">{t('lokParty.online.qrHint')}</span>
+        </div>
+      ) : null}
       {mode === 'host' ? (
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Small onPress={copy}>{copied ? t('lokParty.online.copied') : t('lokParty.online.copy')}</Small>
@@ -239,18 +257,28 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
           <div key={st.index} className="flex flex-col items-center rounded-xl border-[3px] p-1" style={{ borderColor: st.clientId === me || (mode === 'host' && st.index === 0) ? LANE[st.index] : ESPRESSO, background: st.kind === 'bot' ? '#efe5d0' : '#fff' }}>
             <RigPreview id={st.characterId} size={56} />
             <span className="w-full truncate text-center text-[11px] font-black">{st.kind === 'bot' ? t('lokParty.drop.bot') : st.name}</span>
-            <span className="text-[9px] font-bold uppercase opacity-60">{st.kind === 'host' ? t('lokParty.online.hostTag') : st.kind === 'guest' ? t('lokParty.online.friend') : t('lokParty.online.open')}</span>
+            <span className="text-[9px] font-bold uppercase opacity-60">{st.kind === 'host' ? t('lokParty.online.hostTag') : st.kind === 'guest' ? (st.ready ? t('lokParty.online.ready') : t('lokParty.online.notReady')) : t('lokParty.online.open')}</span>
           </div>
         ))}
       </div>
       {full ? <p className="mt-2 text-sm font-bold text-red-700">{t('lokParty.online.full')}</p> : null}
       <p className="mt-3 text-xs opacity-75">{t('lokParty.online.botsFill')}</p>
       {mode === 'host' ? (
-        <Big onPress={start} tone="#7cff6b">
-          {t('lokParty.online.start')}
-        </Big>
+        <>
+          {!canStart(seats) ? <p className="mt-2 text-center text-xs font-black">{t('lokParty.online.waitReady', { ready: readyCounts(seats).ready, guests: readyCounts(seats).guests })}</p> : null}
+          <Big onPress={start} tone={canStart(seats) ? '#7cff6b' : '#d9d2c2'}>
+            {t('lokParty.online.start')}
+          </Big>
+        </>
       ) : (
-        <p className="mt-2 text-center text-sm font-black">{t('lokParty.online.waitHost')}</p>
+        <>
+          {seats.some((st) => st.clientId === me) ? (
+            <Big onPress={toggleReady} tone={seats.find((st) => st.clientId === me)?.ready ? '#7cff6b' : '#ffcf3c'}>
+              {seats.find((st) => st.clientId === me)?.ready ? t('lokParty.online.readyOn') : t('lokParty.online.readyUp')}
+            </Big>
+          ) : null}
+          <p className="mt-2 text-center text-sm font-black">{t('lokParty.online.waitHost')}</p>
+        </>
       )}
     </Shell>
   );

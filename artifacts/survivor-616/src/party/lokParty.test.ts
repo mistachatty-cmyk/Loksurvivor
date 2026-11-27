@@ -472,7 +472,7 @@ test('board: the ladder junction offers a real choice', () => {
 
 // ---------------------------------------------------------------- Slice 4: online parties
 
-import { assignSeat, createPartyCode, initialSeats, minigamePlacements, normalizePartyCode, openPartyRoom, seatToBot, type BroadcastClient } from './partyNet';
+import { canStart, readyCounts, setGuestReady, assignSeat, createPartyCode, initialSeats, minigamePlacements, normalizePartyCode, openPartyRoom, seatToBot, type BroadcastClient } from './partyNet';
 import type { BoardAction } from './lokBoard';
 
 const ROSTER4 = ['zero-day', 'shade', 'quarry-kid', 'golden-hour'];
@@ -582,4 +582,21 @@ test('lockstep: a guest replaying the host action log ends in the identical game
     host.players.map((p) => [p.node, p.coins, p.crowns, p.items.join()]),
   );
   assert.equal(ai, log.length);
+});
+
+test('lobby ready-up: host waits for every human guest, bots never block', () => {
+  let seats = initialSeats('a', 'Host', ['a', 'b', 'c', 'd']);
+  assert.equal(canStart(seats), true);
+  seats = assignSeat(seats, { clientId: 'g1', characterId: 'b', name: 'G1' })!.seats;
+  seats = assignSeat(seats, { clientId: 'g2', characterId: 'c', name: 'G2' })!.seats;
+  assert.equal(canStart(seats), false);
+  seats = setGuestReady(seats, 'g1', true);
+  assert.deepEqual(readyCounts(seats), { guests: 2, ready: 1 });
+  assert.equal(canStart(seats), false);
+  seats = setGuestReady(seats, 'g2', true);
+  assert.equal(canStart(seats), true);
+  const g1 = seats.find((s) => s.clientId === 'g1')!;
+  seats = seatToBot(seats, g1.index);
+  assert.equal(seats[g1.index].ready, undefined);
+  assert.equal(canStart(seats), true);
 });

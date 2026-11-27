@@ -49,6 +49,8 @@ export interface Seat {
   name: string;
   /** The guest's join request id (stable per tab). */
   clientId?: string;
+  /** A guest's ready-up flag. The host does not need one and bots are always ready. */
+  ready?: boolean;
 }
 
 /** Default lobby: host in seat 0, three bots on the rest of the launch roster. */
@@ -82,7 +84,24 @@ export function assignSeat(seats: Seat[], req: { clientId: string; characterId: 
 }
 
 export function seatToBot(seats: Seat[], index: number): Seat[] {
-  return seats.map((s) => (s.index === index && s.kind === 'guest' ? { ...s, kind: 'bot', name: '', clientId: undefined } : s));
+  return seats.map((s) => (s.index === index && s.kind === 'guest' ? { ...s, kind: 'bot', name: '', clientId: undefined, ready: undefined } : s));
+}
+
+/** Set one guest's ready flag, found by clientId (so a stale seat index can never flip the wrong seat). */
+export function setGuestReady(seats: Seat[], clientId: string, ready: boolean): Seat[] {
+  return seats.map((s) => (s.kind === 'guest' && s.clientId === clientId ? { ...s, ready } : s));
+}
+
+/** How many human guests there are and how many have readied up. */
+export function readyCounts(seats: Seat[]): { guests: number; ready: number } {
+  const guests = seats.filter((s) => s.kind === 'guest');
+  return { guests: guests.length, ready: guests.filter((s) => s.ready).length };
+}
+
+/** The host may start when every human guest is ready (a lobby with no guests may always start). */
+export function canStart(seats: Seat[]): boolean {
+  const c = readyCounts(seats);
+  return c.ready === c.guests;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +139,7 @@ export interface ApplyPayload {
 export interface PartyHandlers {
   onJoinRequest?(m: { clientId: string; characterId: string; name: string }): void;
   onLobby?(m: { seats: Seat[]; rounds: number }): void;
+  onReady?(m: { clientId: string; ready: boolean }): void;
   onStart?(m: StartPayload): void;
   onAct?(m: { seat: number; action: BoardAction }): void;
   onApply?(m: ApplyPayload): void;
@@ -153,6 +173,7 @@ export interface PartyRoom {
 const EVENTS: [string, keyof PartyHandlers][] = [
   ['join-request', 'onJoinRequest'],
   ['lobby', 'onLobby'],
+  ['ready', 'onReady'],
   ['start', 'onStart'],
   ['act', 'onAct'],
   ['apply', 'onApply'],
