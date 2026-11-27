@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 240,
+      "version": "0.43.2",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T19:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Faith Mode (optional)",
+      "body": [
+        "Settings > Faith (optional): choose Christian for a verse of the day under the title, an optional bouncing Bible reminder, and the whole Bible to read (King James Version and World English Bible) with bookmarks, notes and search.",
+        "It is free, off by default, and nothing in the game needs it. It never shows up during a run or a minigame."
+      ]
+    },
+    {
       "number": 239,
       "version": "0.43.1",
       "date": "2026-11-27",

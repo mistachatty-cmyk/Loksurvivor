@@ -13,6 +13,8 @@ export const isConsoleBrowser = typeof navigator !== 'undefined' && /Xbox|PlaySt
 let gameplay = false;
 /** While true the game reads the pad itself and menu navigation stays out of the way. */
 export function setPadGameplay(active: boolean): void { gameplay = active; }
+/** True while a run or a minigame is being played (other features use it to stay out of the way). */
+export function padGameplayActive(): boolean { return gameplay; }
 
 /** The connected pad to read: a standard-mapped one wins, then the most recently used. */
 export function activePad(): Gamepad | null {
