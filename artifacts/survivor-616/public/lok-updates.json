@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 239,
+      "version": "0.43.0",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T17:45:00Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "Controller: back and scroll",
+      "body": [
+        "B now uses the back or close button on screens where it did nothing before.",
+        "The right stick scrolls long menus.",
+        "Rebinding a controller button no longer triggers the menu at the same time."
+      ]
+    },
+    {
       "number": 238,
       "version": "0.42.99",
       "date": "2026-11-27",

@@ -10,6 +10,7 @@ import {
   CONTROL_ACTIONS, CONTROL_LABELS, GAMEPAD_BUTTON_NAMES, getControls, keyLabel, rebindButton, rebindKey,
   resetControls, saveControls, type ControlAction, type ControlSettings,
 } from '@/game/input/controls';
+import { setPadGameplay } from '@/lib/consolePad';
 import { useT } from '@/lib/i18n';
 import { Switch } from './EndgameControls';
 
@@ -78,6 +79,8 @@ export function ControlsSettings() {
   useEffect(() => {
     if (listening?.kind !== 'pad') return undefined;
     let raf = 0;
+    // The next press is the new binding, not a menu command.
+    setPadGameplay(true);
     const waitUp = new Set<number>();
     const poll = () => {
       const pad = Array.from(navigator.getGamepads?.() ?? []).find((candidate) => candidate && candidate.connected);
@@ -96,7 +99,7 @@ export function ControlsSettings() {
     // Buttons already held when listening starts are ignored until released.
     Array.from(navigator.getGamepads?.() ?? []).forEach((pad) => pad?.buttons.forEach((b, i) => { if (b.pressed) waitUp.add(i); }));
     raf = requestAnimationFrame(poll);
-    return () => { cancelAnimationFrame(raf); raf = -1; };
+    return () => { cancelAnimationFrame(raf); raf = -1; setPadGameplay(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listening, controls]);
 
