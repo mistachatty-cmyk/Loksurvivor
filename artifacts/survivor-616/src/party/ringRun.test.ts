@@ -175,3 +175,9 @@ test('validResults needs four seats with placements 1 to 4', () => {
   assert.equal(validResults(ok.slice(0, 3)), false);
   assert.equal(validResults(ok.map((r) => ({ ...r, placement: 1 }))), false);
 });
+
+import { dailySeed } from './cartridge';
+test('dailySeed is stable within a day and changes across days', () => {
+  assert.equal(dailySeed(new Date(2026, 10, 27, 1)), dailySeed(new Date(2026, 10, 27, 23)));
+  assert.notEqual(dailySeed(new Date(2026, 10, 27)), dailySeed(new Date(2026, 10, 28)));
+});

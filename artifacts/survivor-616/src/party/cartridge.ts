@@ -87,3 +87,8 @@ export function validResults(results: readonly MiniResult[], seats = 4): boolean
   const places = results.map((r) => r.placement).sort((a, b) => a - b);
   return places.every((p, i) => p === i + 1) && results.every((r) => Number.isFinite(r.banked));
 }
+
+/** Same seed for everyone on a given local calendar day, so a daily run is comparable. */
+export function dailySeed(d: Date = new Date()): number {
+  return Math.floor(hash(d.getFullYear() * 400 + d.getMonth() * 32 + d.getDate(), 0x616) * 4294967296) >>> 0;
+}

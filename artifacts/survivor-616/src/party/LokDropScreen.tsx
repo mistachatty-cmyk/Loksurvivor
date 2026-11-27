@@ -18,7 +18,7 @@ import { useT, type MessageKey } from '@/lib/i18n';
 import { CapsulePullOverlay } from './CapsulePullOverlay';
 import { BoardScreen } from './BoardScreen';
 import { CARTRIDGES, cartridgeById } from './cartridges';
-import type { MiniOutcome } from './cartridge';
+import { dailySeed, type MiniOutcome } from './cartridge';
 import { BOT_LEVELS, loadBotLevels, resolveBotSkills, saveBotLevels, type BotLevel, type BotLevels } from './botLevels';
 import { PartyLobby } from './PartyLobby';
 import { GameModeButton } from '@/ui/GameModeButton';
@@ -191,10 +191,10 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
   // Resolved once per match seed, so a Random bot keeps its level for the whole match.
   const botSkills = useMemo(() => resolveBotSkills(botLevels, meta.ladders.solo.tier, seed), [botLevels, meta.ladders.solo.tier, seed]);
 
-  const startMatch = useCallback(() => {
+  const startMatch = useCallback((fixedSeed?: number) => {
     ensureAudioContext();
     void getAudioContext()?.resume?.();
-    setSeed((s) => (s * 1664525 + 1013904223) >>> 0);
+    setSeed((s) => (typeof fixedSeed === 'number' ? fixedSeed >>> 0 : (s * 1664525 + 1013904223) >>> 0));
     setReport(null);
     setShards(null);
     setOnline(null);
@@ -313,7 +313,7 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
         />
       ) : null}
       {phase === 'lobby' ? (
-        <Lobby mode={mode} botLevels={botLevels} setBotLevel={setBotLevel} rounds={rounds} setRounds={setRounds} pick={pick} setPick={setPick} meta={meta} onStart={startMatch} onBack={() => setPhase('hub')} t={t} />
+        <Lobby mode={mode} botLevels={botLevels} setBotLevel={setBotLevel} rounds={rounds} setRounds={setRounds} pick={pick} setPick={setPick} meta={meta} onStart={() => startMatch()} onDaily={() => startMatch(dailySeed())} onBack={() => setPhase('hub')} t={t} />
       ) : null}
       {phase === 'results' && report ? (
         <Results
@@ -363,7 +363,7 @@ function CreamCard({ children, className = '' }: { children: React.ReactNode; cl
   );
 }
 
-function Lobby({ mode, botLevels, setBotLevel, rounds, setRounds, pick, setPick, meta, onStart, onBack, t }: { mode: Mode; botLevels: BotLevels; setBotLevel: (i: number, lv: BotLevel) => void; rounds: number; setRounds: (n: number) => void; pick: string; setPick: (id: string) => void; meta: LokPartyMeta; onStart: () => void; onBack: () => void; t: ReturnType<typeof useT> }) {
+function Lobby({ mode, botLevels, setBotLevel, rounds, setRounds, pick, setPick, meta, onStart, onDaily, onBack, t }: { mode: Mode; botLevels: BotLevels; setBotLevel: (i: number, lv: BotLevel) => void; rounds: number; setRounds: (n: number) => void; pick: string; setPick: (id: string) => void; meta: LokPartyMeta; onStart: () => void; onDaily: () => void; onBack: () => void; t: ReturnType<typeof useT> }) {
   const touch = typeof window !== 'undefined' && 'ontouchstart' in window;
   return (
     <div className="absolute inset-0 overflow-y-auto" style={{ background: 'radial-gradient(ellipse at 50% 30%, #1d1450 0%, #07061a 70%)' }}>
@@ -442,6 +442,11 @@ function Lobby({ mode, botLevels, setBotLevel, rounds, setRounds, pick, setPick,
         <button type="button" onPointerDown={onBack} className="rounded-lg border border-white/30 px-5 py-3 text-sm font-bold">
           {t('lokParty.drop.back')}
         </button>
+        {cartridgeById(mode) ? (
+          <button type="button" tabIndex={-1} data-testid="button-daily-run" onPointerDown={onDaily} className="rounded-lg border border-cyan-300/60 px-5 py-3 text-sm font-black text-cyan-200">
+            {t('lokParty.daily.run')}
+          </button>
+        ) : null}
         <button type="button" onPointerDown={onStart} className="rounded-lg px-8 py-3 text-base font-black text-black" style={{ background: '#7cff6b', boxShadow: '0 0 24px #7cff6b88' }}>
           {t('lokParty.drop.start')}
         </button>
