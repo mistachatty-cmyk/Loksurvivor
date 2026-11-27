@@ -1556,6 +1556,7 @@
   "music.unmute": "Activer le son",
   "feedback.rateStar": "Notez {{n}} sur 5",
   "lokParty.title": "Lok Party",
+  "lokParty.daily.run": "Course quotidienne",
   "lokParty.drop.title": "Le Lok Drop",
   "lokParty.drop.pitch": "Cassez des capsules, libérez vos rivaux et mettez votre butin dans le Extraction Ring avant que le coffre-fort ne se ferme brusquement.",
   "lokParty.drop.controlsTouch": "Faites glisser n'importe où pour vous déplacer. Appuyez sur DASH pour vous lancer.",

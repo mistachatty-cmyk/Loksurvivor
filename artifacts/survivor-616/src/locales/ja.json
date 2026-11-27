@@ -1556,6 +1556,7 @@
   "music.unmute": "ミュートを解除する",
   "feedback.rateStar": "{{n}} を 5 点満点中評価します",
   "lokParty.title": "Lok Party",
+  "lokParty.daily.run": "毎日のランニング",
   "lokParty.drop.title": "Lok Drop",
   "lokParty.drop.pitch": "金庫がバタンと閉まる前に、カプセルを割ってライバルを解き放ち、戦利品を Extraction Ring に預けましょう。",
   "lokParty.drop.controlsTouch": "任意の場所にドラッグして移動します。 「DASH」をタップしてダッシュします。",
