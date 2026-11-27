@@ -1753,5 +1753,10 @@
   "lokParty.online.joinAnyway": "Únete de todos modos",
   "lokParty.online.invited": "{{name}} te invitó a un Lok Party",
   "lokParty.door.title": "Lok Party",
-  "lokParty.door.sub": "Juego de mesa, minijuegos, jugar con amigos."
+  "lokParty.door.sub": "Juego de mesa, minijuegos, jugar con amigos.",
+  "console.title": "Cambia tu controlador a controles de juego",
+  "console.body": "Mantenga presionado el botón Menú hasta que se abra el menú del navegador, luego elija los controles del juego. Hasta que lo hagas, los joysticks mueven un cursor y hacen zoom en la página.",
+  "console.dismiss": "Mantenga el cursor",
+  "music.releases.kicker": "Últimos lanzamientos",
+  "music.releases.tracks": "Pistas: {{count}}"
 }

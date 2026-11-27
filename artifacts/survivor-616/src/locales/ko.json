@@ -1752,5 +1752,10 @@
   "lokParty.online.joinAnyway": "어쨌든 가입하세요",
   "lokParty.online.invited": "{{name}}가 귀하를 Lok Party에 초대했습니다.",
   "lokParty.door.title": "Lok Party",
-  "lokParty.door.sub": "보드게임, 미니게임, 친구들과 놀기"
+  "lokParty.door.sub": "보드게임, 미니게임, 친구들과 놀기",
+  "console.title": "컨트롤러를 게임 컨트롤로 전환하세요",
+  "console.body": "브라우저 메뉴가 열릴 때까지 메뉴 버튼을 누른 다음 게임 컨트롤을 선택하세요. 그렇게 하기 전까지 스틱은 커서를 이동하고 페이지를 확대/축소합니다.",
+  "console.dismiss": "커서를 유지하세요",
+  "music.releases.kicker": "최신 릴리스",
+  "music.releases.tracks": "트랙: {{count}}"
 }
