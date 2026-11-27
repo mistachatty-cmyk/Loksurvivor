@@ -1681,6 +1681,7 @@
   "lokParty.online.unavailable": "Los grupos en línea aún no están activados para esta versión. Aún puedes jugar Turbo Crown Blitz contra bots.",
   "lokParty.online.waiting": "Esperando a que los demás jugadores terminen",
   "lokParty.online.hostLeft": "El anfitrión abandonó la fiesta.",
+  "lokParty.online.stepAway": "{{name}} se alejó. Esperando un momento.",
   "lokParty.online.leaveRun": "Unirse ahora finaliza tu carrera.",
   "lokParty.online.joinAnyway": "Únete de todos modos",
   "lokParty.online.invited": "{{name}} te invitó a un Lok Party",

@@ -1680,6 +1680,7 @@
   "lokParty.online.unavailable": "이 빌드에서는 아직 온라인 파티가 활성화되지 않았습니다. 여전히 봇을 상대로 Turbo Crown Blitz를 플레이할 수 있습니다.",
   "lokParty.online.waiting": "다른 플레이어가 끝날 때까지 기다리는 중",
   "lokParty.online.hostLeft": "호스트가 파티를 떠났습니다.",
+  "lokParty.online.stepAway": "{{name}}가 물러섰다. 잠시만 기다리세요.",
   "lokParty.online.leaveRun": "이제 참여하면 달리기가 종료됩니다.",
   "lokParty.online.joinAnyway": "어쨌든 가입하세요",
   "lokParty.online.invited": "{{name}}가 귀하를 Lok Party에 초대했습니다.",
