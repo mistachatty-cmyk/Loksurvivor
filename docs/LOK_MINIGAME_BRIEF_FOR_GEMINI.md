@@ -12,7 +12,7 @@ Hard constraints for every idea:
 - Procedural art only: shapes, gradients, particles drawn on a 2D canvas. No images, no sprite sheets, no 3D.
 - Must be readable in 2 seconds with one line of instructions, and feel good: hit-stop, screen shake, chimes, a visible score chain or multiplier.
 - Ends with a clear placement 1 to 4 and a numeric score per player.
-- No network, no AI at runtime, no emoji,.
+- No network, no AI at runtime, no emoji.
 
 Existing games (do not repeat): Ring Run Rush (auto-run lanes, collect rings, jump hazards) and The Lok Drop (arena dash-and-collect).
 
