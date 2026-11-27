@@ -13,10 +13,14 @@ import { CHARACTERS_BY_ID } from '@/game/data/characters';
 import { drawRig, drawShadow } from '@/game/render/sprite';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { useMeta } from '@/game/state/metaStore';
-import { useT } from '@/lib/i18n';
+import { useT, type MessageKey } from '@/lib/i18n';
 import { CapsulePullOverlay } from './CapsulePullOverlay';
 import { BoardScreen } from './BoardScreen';
+import { RingRunArena } from './RingRunScreen';
+import { rushPerformance, rushResults, type RushState } from './ringRun';
 import { PartyLobby } from './PartyLobby';
+import { GameModeButton } from '@/ui/GameModeButton';
+import { LokInputDock } from '@/ui/LokInputDock';
 import type { OnlineSession } from './partyNet';
 import { boardStandings, type BoardState } from './lokBoard';
 import { drawCrown, drawDiceBlock, drawOwl, drawCoin } from './boardArt';
@@ -138,7 +142,7 @@ function RigPreview({ id, size = 96 }: { id: string; size?: number }) {
 // ------------------------------------------------------------------ screen
 
 type Phase = 'hub' | 'lobby' | 'online' | 'play' | 'board' | 'results';
-type Mode = 'blitz' | 'drop' | 'friends';
+type Mode = 'blitz' | 'drop' | 'friends' | 'rush';
 
 function inviteCode(): string | null {
   try {
@@ -180,7 +184,7 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
     setReport(null);
     setShards(null);
     setOnline(null);
-    setPhase(mode === 'drop' ? 'play' : 'board');
+    setPhase(mode === 'drop' || mode === 'rush' ? 'play' : 'board');
   }, [ensureAudioContext, getAudioContext, mode]);
 
   const settle = useCallback(
@@ -205,6 +209,32 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
       const mine = results.find((r) => !r.bot);
       if (!mine) return;
       settle(dropPerformance(state, mine), state.seed, { placement: mine.placement, players: results.length, banked: mine.banked });
+    },
+    [settle],
+  );
+
+  const finishRush = useCallback(
+    (state: RushState, newBest: boolean) => {
+      const results = rushResults(state);
+      const mine = results.find((r) => !r.bot);
+      if (!mine) return;
+      const best = (() => {
+        try {
+          return Number(window.localStorage.getItem('lokparty.rush.best.v1')) || mine.banked;
+        } catch {
+          return mine.banked;
+        }
+      })();
+      settle(rushPerformance(state, mine), state.seed, {
+        placement: mine.placement,
+        players: results.length,
+        banked: mine.banked,
+        extra: [
+          { key: 'lokParty.rush.statRings', params: { count: mine.rings } },
+          { key: 'lokParty.rush.statPeak', params: { mult: mine.peakMult } },
+          newBest ? { key: 'lokParty.rush.statNewBest', params: { score: best } } : { key: 'lokParty.rush.statBest', params: { score: best } },
+        ],
+      });
     },
     [settle],
   );
@@ -250,8 +280,11 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="fixed inset-0 select-none overflow-hidden bg-[#07061a] text-white" style={{ touchAction: 'none' }}>
-      {phase === 'play' ? (
+      {phase === 'play' && mode === 'drop' ? (
         <DropArena key={seed} seed={seed} playerId={pick} onDone={finish} getAudioContext={getAudioContext} ladderTier={meta.ladders.solo.tier} />
+      ) : null}
+      {phase === 'play' && mode === 'rush' ? (
+        <RingRunArena key={seed} seed={seed} playerId={pick} onDone={finishRush} getAudioContext={getAudioContext} ladderTier={meta.ladders.solo.tier} />
       ) : null}
       {phase === 'hub' ? (
         <Hub
@@ -318,6 +351,8 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
           t={t}
         />
       ) : null}
+      {phase === 'hub' || phase === 'lobby' || phase === 'results' || phase === 'online' ? <GameModeButton className="absolute right-3 top-3 z-30" /> : null}
+      <LokInputDock getAudioContext={getAudioContext} />
       {pulling ? (
         <CapsulePullOverlay
           characterId={pick}
@@ -350,8 +385,8 @@ function Lobby({ mode, rounds, setRounds, pick, setPick, meta, onStart, onBack, 
      <div className="flex min-h-full flex-col items-center justify-center gap-4 p-4">
       <div className="text-center">
         <div className="font-mono text-xs uppercase tracking-[.3em] text-cyan-300">{t('lokParty.title')}</div>
-        <h1 className="mt-1 text-3xl font-black tracking-tight">{mode === 'blitz' ? t('lokParty.hub.blitzTitle') : t('lokParty.drop.title')}</h1>
-        <p className="mx-auto mt-2 max-w-md text-sm text-white/75">{mode === 'blitz' ? t('lokParty.hub.blitzPitch') : t('lokParty.drop.pitch')}</p>
+        <h1 className="mt-1 text-3xl font-black tracking-tight">{mode === 'blitz' ? t('lokParty.hub.blitzTitle') : mode === 'rush' ? t('lokParty.rush.title') : t('lokParty.drop.title')}</h1>
+        <p className="mx-auto mt-2 max-w-md text-sm text-white/75">{mode === 'blitz' ? t('lokParty.hub.blitzPitch') : mode === 'rush' ? t('lokParty.rush.pitch') : t('lokParty.drop.pitch')}</p>
       </div>
       <CreamCard className="w-full max-w-md">
         <div className="mb-2 text-xs font-bold uppercase tracking-widest">{t('lokParty.drop.pick')}</div>
@@ -390,7 +425,7 @@ function Lobby({ mode, rounds, setRounds, pick, setPick, meta, onStart, onBack, 
         <div className="mt-3 text-xs opacity-80">{t('lokParty.results.ladder', { ladder: t('lokParty.ladder.solo'), rank: ladderLabel(meta.ladders.solo) })}</div>
         <div className="text-xs opacity-80">{t('lokParty.results.pass', { tier: passTier(meta.pass.xp) })}</div>
       </CreamCard>
-      <p className="text-xs text-white/60">{touch ? t('lokParty.drop.controlsTouch') : t('lokParty.drop.controlsKeys')}</p>
+      <p className="text-xs text-white/60">{mode === 'rush' && !touch ? t('lokParty.rush.controlsKeys') : touch ? t('lokParty.drop.controlsTouch') : t('lokParty.drop.controlsKeys')}</p>
       <div className="flex gap-3">
         <button type="button" onPointerDown={onBack} className="rounded-lg border border-white/30 px-5 py-3 text-sm font-bold">
           {t('lokParty.drop.back')}
@@ -411,6 +446,7 @@ interface ReportData {
   placement: number;
   players: number;
   banked?: number;
+  extra?: { key: string; params?: Record<string, string | number> }[];
   standings?: Standing[];
 }
 
@@ -445,6 +481,7 @@ function Results({
     t('lokParty.results.fragments', { count: r.keyFragmentsEarned }),
     ...(r.keysCompleted ? [t('lokParty.results.keyReady')] : []),
     ...r.missionsCompleted.map(() => t('lokParty.results.mission')),
+    ...(data.extra ?? []).map((x) => t(x.key as MessageKey, x.params)),
     ...r.milestones.map((m) => t('lokParty.results.milestone', { value: m.value, stat: m.stat.replace(/-/g, ' ') })),
     ...(r.victoriousUnlocked ? [t('lokParty.results.victorious')] : []),
   ];
@@ -1537,6 +1574,49 @@ function ModePreview({ mode }: { mode: Mode }) {
           ctx.fillRect(x - 9, y + bob + 1, 18, 9);
         });
         drawCrown(ctx, 150, 28, 22, t);
+      } else if (mode === 'rush') {
+        // Neon street: three lanes, rings sliding past, a runner bobbing along.
+        const sky = ctx.createLinearGradient(0, 0, 0, 70);
+        sky.addColorStop(0, '#2a1458');
+        sky.addColorStop(1, '#a8366e');
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, w, 70);
+        for (let i = 0; i < 10; i += 1) {
+          const bh = 20 + ((i * 29) % 36);
+          ctx.fillStyle = i % 2 ? '#1e1548' : '#2d1f66';
+          ctx.fillRect(i * 34 - ((t / 40) % 34), 70 - bh, 30, bh);
+        }
+        ctx.fillStyle = '#1b1440';
+        ctx.fillRect(0, 70, w, h - 70);
+        for (const y of [96, 122]) {
+          ctx.strokeStyle = 'rgba(255,230,160,0.5)';
+          ctx.setLineDash([16, 12]);
+          ctx.lineDashOffset = t / 12;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(w, y);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        for (let i = 0; i < 6; i += 1) {
+          const x = w - (((t / 5 + i * 60) % (w + 40)) - 20);
+          const lane = i % 3;
+          ctx.strokeStyle = ['#46e6ff', '#e86bff', '#ffc94d'][lane];
+          ctx.lineWidth = 3;
+          ctx.shadowColor = ctx.strokeStyle;
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.ellipse(x, 84 + lane * 26, 5, 13, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+        const bob = Math.abs(Math.sin(t / 150)) * 6;
+        ctx.fillStyle = '#38f2ff';
+        ctx.fillRect(66, 92 - bob, 12, 22);
+        ctx.fillStyle = '#faf6ee';
+        ctx.fillRect(68, 84 - bob, 8, 8);
+        ctx.fillStyle = 'rgba(56,242,255,0.5)';
+        ctx.fillRect(18, 100 - bob, 48, 4);
       } else {
         // Vault doors, ring and falling capsules.
         ctx.strokeStyle = '#38f2ff';
@@ -1577,13 +1657,13 @@ function Hub({ onPick, onBack, t }: { onPick: (m: Mode) => void; onBack: () => v
           <div className="font-mono text-xs uppercase tracking-[.3em] text-cyan-300">{t('lokParty.title')}</div>
           <h1 className="mt-1 text-3xl font-black tracking-tight">{t('lokParty.hub.pick')}</h1>
         </div>
-        <div className="grid w-full max-w-5xl gap-4 sm:grid-cols-3">
-          {(['blitz', 'friends', 'drop'] as Mode[]).map((m) => (
+        <div className="grid w-full max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {(['blitz', 'friends', 'rush', 'drop'] as Mode[]).map((m) => (
             <CreamCard key={m}>
               <ModePreview mode={m} />
-              <div className="mt-3 text-xl font-black">{m === 'blitz' ? t('lokParty.hub.blitzTitle') : m === 'friends' ? t('lokParty.hub.friendsTitle') : t('lokParty.drop.title')}</div>
-              <p className="mt-1 text-sm opacity-80">{m === 'blitz' ? t('lokParty.hub.blitzPitch') : m === 'friends' ? t('lokParty.hub.friendsPitch') : t('lokParty.hub.dropPitch')}</p>
-              <button type="button" onPointerDown={() => onPick(m)} className="mt-3 w-full rounded-xl border-[3px] py-3 text-base font-black active:translate-y-[3px]" style={{ background: m === 'blitz' ? '#ffcf3c' : m === 'friends' ? '#38f2ff' : '#7cff6b', borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
+              <div className="mt-3 text-xl font-black">{m === 'blitz' ? t('lokParty.hub.blitzTitle') : m === 'friends' ? t('lokParty.hub.friendsTitle') : m === 'rush' ? t('lokParty.rush.title') : t('lokParty.drop.title')}</div>
+              <p className="mt-1 text-sm opacity-80">{m === 'blitz' ? t('lokParty.hub.blitzPitch') : m === 'friends' ? t('lokParty.hub.friendsPitch') : m === 'rush' ? t('lokParty.rush.hubPitch') : t('lokParty.hub.dropPitch')}</p>
+              <button type="button" onPointerDown={() => onPick(m)} className="mt-3 w-full rounded-xl border-[3px] py-3 text-base font-black active:translate-y-[3px]" style={{ background: m === 'blitz' ? '#ffcf3c' : m === 'friends' ? '#38f2ff' : m === 'rush' ? '#ff8fe6' : '#7cff6b', borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
                 {t('lokParty.hub.play')}
               </button>
             </CreamCard>

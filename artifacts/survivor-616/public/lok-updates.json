@@ -7,10 +7,26 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 231,
+      "version": "0.42.92",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T18:40:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party: Ring Run Rush, Game Mode and the input pad",
+      "body": [
+        "Ring Run Rush is a 30 second neon street sprint. Hit rings to build a chain and a score multiplier, jump rocks, dodge walls, and race rivals with laser trails. It has its own card in the Lok Party hub, it alternates with The Lok Drop between board rounds, and it keeps a personal best.",
+        "The board now plays with the keyboard or a gamepad: arrows pick a path, Space or Enter confirms, X rolls the signature die, number keys use items.",
+        "A Game Mode button fills the whole screen and shows how to leave. A small translucent input pad switches between mouse, keyboard and gamepad; drag it anywhere or lock it in place."
+      ]
+    },
+    {
       "number": 230,
       "version": "0.42.91",
       "date": "2026-11-26",
-      "publishedAt": "2026-11-26T17:15:00Z",
+      "publishedAt": "2026-11-26T19:00:00Z",
       "kind": "update",
       "categoryLabel": "Major Update",
       "categoryColor": "#22d3ee",

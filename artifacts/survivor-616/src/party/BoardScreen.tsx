@@ -61,6 +61,10 @@ import {
   type Sprite,
 } from './boardArt';
 import { DropArena, seatOrder } from './LokDropScreen';
+import { RingRunArena } from './RingRunScreen';
+import { rushResults } from './ringRun';
+import { GameModeButton } from '@/ui/GameModeButton';
+import { subscribeActions, type LokAction } from '@/lib/lokInput';
 import { dropResults, type DropState } from './lokDrop';
 import { minigamePlacements, seatToBot, type OnlineSession, type Seat } from './partyNet';
 
@@ -143,7 +147,8 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
   const actRef = useRef<(a: BoardAction) => void>(() => {});
   const finishRef = useRef(onFinish);
   finishRef.current = onFinish;
-  const minigameDoneRef = useRef<(d: DropState) => void>(() => {});
+  const [minigameKind, setMinigameKind] = useState<'drop' | 'rush'>('drop');
+  const minigameDoneRef = useRef<(res: { characterId: string; placement: number; banked: number }[]) => void>(() => {});
 
   const labelsRef = useRef({
     round: (r: number, m: number) => t('lokParty.board.round', { round: r, max: m }),
@@ -237,7 +242,9 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
     let raf = 0;
     let waitUntil = 600;
     let dice: { label: string; color: string; spinning: boolean; until: number; sq: Squash } | null = null;
-    let arrows: { id: string; x: number; y: number }[] = [];
+    let arrows: { id: string; x: number; y: number; ang: number }[] = [];
+    /** Junction arrow picked with the keyboard; a second press (or Enter) confirms it. */
+    let armedId: string | null = null;
     const cam = { x: disp[0].x, y: disp[0].y - 60, zoom: 1.25 };
     let bonusShown = 0;
     let minigameQueued = false;
@@ -460,8 +467,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       reports.clear();
       applyMini(placements);
     };
-    minigameDoneRef.current = (d: DropState) => {
-      const res = dropResults(d);
+    minigameDoneRef.current = (res) => {
       if (!online) {
         const placements = s.players.map((p) => res.find((r) => r.characterId === p.characterId)?.placement ?? 4);
         applyMini(placements);
@@ -551,6 +557,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       if (minigameQueued) {
         minigameQueued = false;
         miniRound = s.round;
+        setMinigameKind(s.round % 2 === 0 ? 'rush' : 'drop');
         setMinigame((s.seed ^ (s.round * 7919)) >>> 0);
         return;
       }
@@ -714,6 +721,53 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
         juice.chimes.accent('crack', pan);
       }
     };
+    // Keyboard and gamepad arrive as shared actions from lokInput (src/lib/lokInput), so a pad
+    // works exactly like keys: direction picks a path (again to go), primary confirms and rolls,
+    // tertiary rolls the signature die, number keys pick items and custom dice, secondary passes.
+    const onAction = (act: LokAction) => {
+      if (s.phase === 'minigame' || s.turnOf !== localSeat || sentRef.current) return;
+      const pend = s.pending;
+      if (!pend || roleOf(s.turnOf) !== 'local') return;
+      ensureAudio();
+      const me = s.players[localSeat];
+      if (pend.type === 'junction') {
+        if (act.kind === 'dir') {
+          let best: (typeof arrows)[number] | null = null;
+          let bestDot = 0.15;
+          for (const a of arrows) {
+            const dot = Math.cos(a.ang) * act.dx + Math.sin(a.ang) * act.dy;
+            if (dot > bestDot) {
+              bestDot = dot;
+              best = a;
+            }
+          }
+          if (!best) return;
+          if (armedId === best.id) actRef.current({ type: 'junction', to: best.id });
+          else {
+            armedId = best.id;
+            juice.chimes.pickup(now, { bright: false });
+          }
+        } else if (act.kind === 'primary' && arrows.length) {
+          const pick = arrows.find((a) => a.id === armedId) ?? arrows[0];
+          actRef.current({ type: 'junction', to: pick.id });
+        }
+        return;
+      }
+      armedId = null;
+      if (pend.type === 'roll') {
+        if (act.kind === 'primary') actRef.current({ type: 'roll', signature: false });
+        else if (act.kind === 'tertiary' && SIGNATURE_DICE[me.characterId] && me.customValue === null) actRef.current({ type: 'roll', signature: true });
+      } else if (pend.type === 'item') {
+        if (act.kind === 'num' && act.n >= 1 && act.n <= me.items.length) actRef.current({ type: 'use-item', item: me.items[act.n - 1] });
+        else if (act.kind === 'primary' || act.kind === 'secondary') actRef.current({ type: 'use-item', item: null });
+      } else if (pend.type === 'custom-dice') {
+        if (act.kind === 'num' && act.n <= 6) actRef.current({ type: 'custom', value: act.n });
+      } else if (pend.type === 'crown') {
+        if (act.kind === 'primary') actRef.current({ type: 'crown', buy: true });
+        else if (act.kind === 'secondary') actRef.current({ type: 'crown', buy: false });
+      }
+    };
+    const offActions = subscribeActions(onAction);
     canvas.addEventListener('pointerdown', onDown);
 
     const frame = (ts: number) => {
@@ -1029,7 +1083,18 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
           const bob = Math.sin(now / 150) * 4;
           const ax = sx + Math.cos(ang) * bob;
           const ay = sy + Math.sin(ang) * bob;
-          arrows.push({ id, x: ax, y: ay });
+          arrows.push({ id, x: ax, y: ay, ang });
+          if (armedId === id) {
+            // Keyboard pick: a pulsing halo so the chosen path is obvious from across a room.
+            ctx.save();
+            ctx.strokeStyle = '#ffd23f';
+            ctx.lineWidth = 5;
+            ctx.globalAlpha = 0.55 + 0.4 * Math.sin(now / 120);
+            ctx.beginPath();
+            ctx.arc(ax, ay, 40 + Math.sin(now / 160) * 3, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
           ctx.save();
           ctx.translate(ax, ay);
           ctx.rotate(ang);
@@ -1250,6 +1315,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       window.removeEventListener('pagehide', onUnload);
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
+      offActions();
       canvas.removeEventListener('pointerdown', onDown);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one game per mount
@@ -1261,6 +1327,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
   const pend = myTurn ? s.pending : null;
   const act = useCallback((a: BoardAction) => actRef.current(a), []);
   const sigFaces = SIGNATURE_DICE[me.characterId];
+  const touchDevice = typeof window !== 'undefined' && 'ontouchstart' in window;
   const compact = typeof window !== 'undefined' && window.innerHeight < 520 && window.innerWidth > window.innerHeight;
   void ui;
 
@@ -1327,6 +1394,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
               </>
             ) : null}
             {pend.type === 'junction' ? <div className="text-center text-sm font-black uppercase tracking-widest">{t('lokParty.board.junction')}</div> : null}
+            {!touchDevice ? <div className="mt-2 text-center text-[10px] font-bold opacity-60">{t('lokParty.board.keys')}</div> : null}
           </div>
         </div>
       ) : null}
@@ -1337,6 +1405,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
         <button type="button" onPointerDown={onQuit} className="rounded-full border-[3px] px-4 py-2 text-xs font-black uppercase" style={{ background: 'transparent', borderColor: CREAM, color: CREAM, display: pend ? 'none' : undefined }}>
           {t('lokParty.drop.back')}
         </button>
+        <GameModeButton />
       </div>
       {waitingOthers && minigame === null ? (
         <div className="absolute inset-x-0 top-1/3 flex justify-center">
@@ -1357,17 +1426,31 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       ) : null}
       {minigame !== null ? (
         <div className="fixed inset-0 z-40 bg-[#07061a]">
-          <DropArena
-            seed={minigame}
-            playerId={s.players[localSeat].characterId}
-            durationMs={30_000}
-            ladderTier={ladderTier}
-            getAudioContext={getAudioContext}
-            onDone={(d) => {
-              setMinigame(null);
-              minigameDoneRef.current(d);
-            }}
-          />
+{minigameKind === 'rush' ? (
+            <RingRunArena
+              seed={minigame}
+              playerId={s.players[localSeat].characterId}
+              durationMs={30_000}
+              ladderTier={ladderTier}
+              getAudioContext={getAudioContext}
+              onDone={(r) => {
+                setMinigame(null);
+                minigameDoneRef.current(rushResults(r));
+              }}
+            />
+          ) : (
+            <DropArena
+              seed={minigame}
+              playerId={s.players[localSeat].characterId}
+              durationMs={30_000}
+              ladderTier={ladderTier}
+              getAudioContext={getAudioContext}
+              onDone={(d) => {
+                setMinigame(null);
+                minigameDoneRef.current(dropResults(d));
+              }}
+            />
+          )}
         </div>
       ) : null}
     </div>

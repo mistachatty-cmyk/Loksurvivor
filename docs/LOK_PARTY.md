@@ -57,6 +57,11 @@ Play it: `?screen=lok-party` (works in every build; it writes only its own save 
 - **Backend notes:** nothing is stored; results stay unranked online until a server can verify them.
 
 ## Next slices
-- **Next for the board:** Crewmate roving allies, Duel spaces, a second minigame (Ring Run Rush) so rounds vary, the Pawnford board, and a Party Lounge door in the hideout.
+- **Next for the board:** Crewmate roving allies, Duel spaces, the Pawnford board, and a Party Lounge door in the hideout.
 - **Slice 4: Cartridge contract.** `LokMinigameCartridge` (mount, getResults, unmount) so Ring Run Rush and Gem Vacuum Frenzy plug in, then iframe cartridges from other repos.
 - **Backend (noted, not built):** room codes over Supabase Realtime broadcast, async seeded score-attack, trusted results before any online LP.
+
+## Ring Run Rush, Game Mode and the input pad (v0.42.92)
+- **Ring Run Rush** (`party/ringRun.ts`, `RingRunScreen.tsx`): 30 second three-lane street sprint. Rings use the main game's colors (cyan speed, gold coin, magenta surge), a chain meter raises a x1 to x8 multiplier every 4 rings, rocks are jumped, walls need a lane change, boost pads surge. Rivals leave laser trails; the winner gets a Victory Token burst. Seeded and pure; bots use a hash, never the shared rng. Personal best is kept in `lokparty.rush.best.v1`. It has its own hub card and alternates with The Lok Drop on board rounds.
+- **Controls:** board and Ring Run Rush take keyboard and gamepad through `src/lib/lokInput`. Plan and rules: `docs/LOK_INPUT_PLAN.md`.
+- **Next ideas:** shared per-round Ring Run seeds for a daily challenge, ghost of your best run, rival taunts on chain milestones.
