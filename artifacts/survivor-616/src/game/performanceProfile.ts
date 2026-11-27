@@ -21,6 +21,8 @@ export function classifyRuntimePerformance(capabilities: RuntimeCapabilities): R
 
 export function detectRuntimePerformanceTier(): RuntimePerformanceTier {
   if (typeof navigator === 'undefined' || typeof window === 'undefined') return 'high-mobile';
+  // Console browsers report desktop-like hardware but give a page far less of it.
+  if (/Xbox|PlayStation|Nintendo/i.test(navigator.userAgent)) return 'standard-mobile';
   const extendedNavigator = navigator as Navigator & { deviceMemory?: number };
   const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
     || (navigator.maxTouchPoints > 1 && window.matchMedia('(pointer: coarse)').matches);
