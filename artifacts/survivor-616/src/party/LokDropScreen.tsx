@@ -8,6 +8,8 @@
  * only informed the camera tilt, wet-asphalt lighting, ring colors and the minimal top HUD.
  */
 
+import { setPadGameplay } from '@/lib/consolePad';
+import { lokPad } from '../../../../lib/lok-universe/src/gamepad';
 import { press } from './press';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CHARACTERS_BY_ID } from '@/game/data/characters';
@@ -612,9 +614,16 @@ export function DropArena({ seed, playerId, onDone, getAudioContext, ladderTier,
     const up = (e: KeyboardEvent) => keys.current.delete(e.key.toLowerCase());
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
+    // Controller: A, X or a bumper dashes on press; the stick steers (read each step below).
+    setPadGameplay(true);
+    const offPad = lokPad.subscribe((f) => {
+      if ((f.pressed.has('a') || f.pressed.has('x') || f.pressed.has('rb') || f.pressed.has('lb') || f.pressed.has('rt'))) inputRef.current.dashPressed = true;
+    });
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
+      setPadGameplay(false);
+      offPad();
     };
   }, []);
 
@@ -759,6 +768,11 @@ export function DropArena({ seed, playerId, onDone, getAudioContext, ladderTier,
           mx = (dx / len) * m;
           my = (dy / len) * m;
         }
+      }
+      const pf = lokPad.frame;
+      if (mx === 0 && my === 0 && pf.connected) {
+        mx = pf.lx || (pf.down.has('right') ? 1 : 0) - (pf.down.has('left') ? 1 : 0);
+        my = pf.ly || (pf.down.has('down') ? 1 : 0) - (pf.down.has('up') ? 1 : 0);
       }
       const dash = inputRef.current.dashPressed;
       inputRef.current.dashPressed = false;

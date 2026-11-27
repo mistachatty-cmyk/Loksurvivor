@@ -78,7 +78,9 @@ export function PowerSettings() {
       ? t('settings.power.status.battery', { level: battery })
       : status.reason === 'dataSaver'
         ? t('settings.power.status.dataSaver')
-        : t('settings.power.status.manual');
+        : status.reason === 'console'
+          ? t('settings.power.status.console')
+          : t('settings.power.status.manual');
   const share = report?.usage != null && report.quota ? Math.min(100, Math.max(1, Math.round((report.usage / report.quota) * 100))) : null;
 
   return (

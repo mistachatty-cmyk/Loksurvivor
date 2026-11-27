@@ -84,6 +84,7 @@ export function MenuDock({ screenName, onGo, onHeadOut }: Props) {
     <nav
       ref={navRef}
       aria-label={t('goto.dockLabel')}
+      data-lok-menu-anchor
       className="fixed inset-x-0 bottom-0 z-[100] flex flex-col border-t border-white/15 bg-black/90 pb-[var(--safe-bottom)] pl-[var(--safe-left)] pr-[var(--safe-right)] backdrop-blur sm:inset-x-auto sm:inset-y-0 sm:left-0 sm:w-20 sm:justify-center sm:border-r sm:border-t-0 sm:pb-0 sm:pr-0"
       data-testid="menu-dock"
     >

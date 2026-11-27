@@ -32,3 +32,8 @@ test('the saver holds the frame rate down to its cap and never raises it', () =>
   assert.equal(effectiveFrameRate(30, true, 60), 30);
   assert.equal(effectiveFrameRate(120, false, 30), 120);
 });
+
+test('auto mode saves power on a games console', () => {
+  assert.equal(savingReason('auto', facts({ console: true })), 'console');
+  assert.equal(savingReason('off', facts({ console: true })), null);
+});
