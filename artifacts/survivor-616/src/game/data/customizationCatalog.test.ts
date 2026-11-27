@@ -23,8 +23,8 @@ test('the customization shop has twenty new palettes and a deep animated collect
   }
 });
 
-test('run auras cover eight paid styles across multiple cosmetic tiers', () => {
-  assert.equal(RUN_AURAS.filter((aura) => aura.cost > 0).length, 8);
+test('run auras cover fourteen paid styles across multiple cosmetic tiers', () => {
+  assert.equal(RUN_AURAS.filter((aura) => aura.cost > 0).length, 14);
   assert.equal(new Set(RUN_AURAS.map((aura) => aura.id)).size, RUN_AURAS.length);
   assert.deepEqual(new Set(RUN_AURAS.map((aura) => aura.tier)), new Set(['standard', 'uncommon', 'rare', 'legendary']));
 });
@@ -82,4 +82,15 @@ test('version ten Lookbook-era saves migrate without carrying portable customiza
   assert.equal('customizationLooks' in migrated, false);
   assert.deepEqual(migrated.ownedRunAuraIds, ['street-halo']);
   assert.equal(migrated.activeRunAuraId, 'street-halo');
+});
+
+test('every palette, aura, hat and celebration id is unique (a duplicate silently hides one item)', async () => {
+  const { THEMED_PALETTES } = await import('./themedPalettes');
+  const { RUN_AURAS } = await import('./runAuras');
+  const { HATS } = await import('./hats');
+  const { CELEBRATIONS } = await import('./celebrations');
+  for (const [name, list] of [['palettes', THEMED_PALETTES], ['auras', RUN_AURAS], ['hats', HATS], ['celebrations', CELEBRATIONS]] as const) {
+    const ids = list.map((x) => x.id);
+    assert.deepEqual(ids.filter((id, i) => ids.indexOf(id) !== i), [], `duplicate ${name}`);
+  }
 });
