@@ -1,11 +1,9 @@
 /**
  * Survivor 616's hookup for two Lok ecosystem baselines from the shared SDK:
  * - the fullscreen / pop-out button (screen.ts), and
- * - controllers (gamepad.ts): the shared poller that Lok Party minigames read. Menu navigation in 616
- *   comes from consolePad.ts, and minigames switch it off with setPadGameplay while you play.
+ * - controllers (gamepad.ts): consolePad.ts starts the shared poller and drives the menus from it.
  */
 
-import { lokPad } from '../../../../lib/lok-universe/src/gamepad';
 import { mountScreenButton, popoutKind, SCREEN_AWAY_EVENT, SCREEN_BACK_EVENT, type ScreenButtonHandle } from '../../../../lib/lok-universe/src/screen';
 import { t } from '@/lib/i18n';
 
@@ -38,8 +36,6 @@ export function pressScreenButton(): Promise<void> {
 export function startLokScreenAndPad(): void {
   if (typeof window === 'undefined' || handle) return;
   handle = mountScreenButton({ labels: labels(), notify: toast });
-  // Menus are driven by consolePad.ts here; the shared poller only feeds Lok Party minigames.
-  lokPad.start();
   // A separate pop-out window runs its own copy of the game: this page goes quiet meanwhile.
   window.addEventListener(SCREEN_AWAY_EVENT, () => {
     if (popoutKind() === 'window') document.documentElement.setAttribute('data-lok-away', '');

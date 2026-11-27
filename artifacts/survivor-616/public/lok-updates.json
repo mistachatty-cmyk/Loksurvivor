@@ -7,6 +7,23 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 241,
+      "version": "0.43.3",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T19:45:00Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "Controllers: game controls reminder, back and scroll",
+      "body": [
+        "On Xbox, the game now tells you how to switch the browser to game controls, so the sticks stop moving a cursor and zooming the page.",
+        "B uses the back or close button on screens where it did nothing before, and the right stick scrolls long menus.",
+        "Rebinding a controller button no longer triggers the menu at the same time.",
+        "The Soundtrack screen now lists every release, newest first, with one press to play."
+      ]
+    },
+    {
       "number": 240,
       "version": "0.43.2",
       "date": "2026-11-27",

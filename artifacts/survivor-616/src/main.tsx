@@ -16,6 +16,7 @@ import { startPowerWatch } from '@/lib/powerSaver';
 import { installConsolePad } from '@/lib/consolePad';
 import { getControls } from '@/game/input/controls';
 import { startLokScreenAndPad } from '@/lib/lokScreen';
+import { startConsoleGate } from '@/lib/consoleGate';
 import { startFaith } from '@/faith/faithSettings';
 import { padGameplayActive } from '@/lib/consolePad';
 
@@ -126,6 +127,7 @@ function mount(): void {
   startPowerWatch();
   installConsolePad(() => getControls().gamepad.enabled);
   startLokScreenAndPad();
+  startConsoleGate();
   startFaith(padGameplayActive);
   createRoot(document.getElementById('root')!, {
     // Keeps caught errors off reportError(), which would raise the dev overlay.

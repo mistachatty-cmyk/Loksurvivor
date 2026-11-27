@@ -1,6 +1,9 @@
 /**
  * Controller support for browsers on consoles (and any pad on desktop).
  *
+ * Input comes from the one shared Lok poller (lokPad). Screens that play with the
+ * pad claim it through setPadGameplay; everything else is menu navigation here.
+ *
  * Xbox Edge starts in "mouse mode": the left stick drags a cursor and A clicks,
  * which our touch joystick reads as a drag that can stick. We opt out where the
  * browser allows it, and drive menus from the pad ourselves.
@@ -8,13 +11,18 @@
  * Self-contained so other Lok games can copy this file as is.
  */
 
-export const isConsoleBrowser = typeof navigator !== 'undefined' && /Xbox|PlayStation|Nintendo/i.test(navigator.userAgent);
+import { isXboxBrowser, lokPad, type PadFrame } from '../../../../lib/lok-universe/src/gamepad';
 
-let gameplay = false;
+export const isConsoleBrowser = typeof navigator !== 'undefined' && (isXboxBrowser() || /PlayStation|Nintendo/i.test(navigator.userAgent));
+
+let release: (() => void) | null = null;
 /** While true the game reads the pad itself and menu navigation stays out of the way. */
-export function setPadGameplay(active: boolean): void { gameplay = active; }
+export function setPadGameplay(active: boolean): void {
+  if (active) release ??= lokPad.claim('survivor616');
+  else { release?.(); release = null; }
+}
 /** True while a run or a minigame is being played (other features use it to stay out of the way). */
-export function padGameplayActive(): boolean { return gameplay; }
+export function padGameplayActive(): boolean { return lokPad.claimedBy !== null; }
 
 /** The connected pad to read: a standard-mapped one wins, then the most recently used. */
 export function activePad(): Gamepad | null {
@@ -105,10 +113,27 @@ function press(): void {
   else if (items[0]) focusOn(primary(items));
 }
 
+/** Back or close buttons, for screens that do not listen for Escape. */
+const BACK = '[data-testid="button-back"],[data-testid$="-back"],[data-testid^="button-close"]';
+
 function back(): void {
+  const button = targets().find((el) => el.matches(BACK));
+  if (button) { button.click(); return; }
+  escape();
+}
+
+function escape(): void {
   const el = document.activeElement ?? document.body;
   el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
   el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }));
+}
+
+/** Right stick scrolls whatever holds the focused control, or the page. */
+function scroll(amount: number): void {
+  let el = document.activeElement as HTMLElement | null;
+  while (el && !(el.scrollHeight > el.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(el).overflowY))) el = el.parentElement;
+  if (el) el.scrollTop += amount;
+  else window.scrollBy(0, amount);
 }
 
 const REPEAT_FIRST_MS = 380;
@@ -126,21 +151,21 @@ export function installConsolePad(enabled: () => boolean): void {
   document.head.appendChild(style);
 
   const held = new Map<string, number>(); // input name -> time it may fire again
-  let raf = 0;
-  const poll = (time: number) => {
-    const pad = activePad();
-    if (!pad) { raf = 0; held.clear(); return; }
-    raf = requestAnimationFrame(poll);
-    const down = (i: number) => Boolean(pad.buttons[i]?.pressed);
-    const [x = 0, y = 0] = pad.axes;
+  lokPad.start();
+  lokPad.subscribe((frame: PadFrame) => {
+    if (!frame.connected) { held.clear(); return; }
+    const time = performance.now();
+    const has = (b: Parameters<PadFrame['down']['has']>[0]) => frame.down.has(b);
+    const busy = padGameplayActive();
+    if (!busy && enabled() && Math.abs(frame.ry) > 0.2) scroll(frame.ry * 18);
     const inputs: [string, boolean, () => void, boolean][] = [
-      ['up', down(12) || y < -0.6, () => move('up'), true],
-      ['down', down(13) || y > 0.6, () => move('down'), true],
-      ['left', down(14) || x < -0.6, () => move('left'), true],
-      ['right', down(15) || x > 0.6, () => move('right'), true],
-      ['a', down(0), press, false],
-      ['b', down(1), back, false],
-      ['start', down(9), back, false],
+      ['up', has('up') || frame.ly < -0.55, () => move('up'), true],
+      ['down', has('down') || frame.ly > 0.55, () => move('down'), true],
+      ['left', has('left') || frame.lx < -0.55, () => move('left'), true],
+      ['right', has('right') || frame.lx > 0.55, () => move('right'), true],
+      ['a', has('a'), press, false],
+      ['b', has('b'), back, false],
+      ['start', has('menu'), escape, false],
     ];
     for (const [name, on, run, repeats] of inputs) {
       if (!on) { held.delete(name); continue; }
@@ -148,10 +173,7 @@ export function installConsolePad(enabled: () => boolean): void {
       if (due !== undefined && (!repeats || time < due)) continue;
       held.set(name, time + (due === undefined ? REPEAT_FIRST_MS : REPEAT_MS));
       // Held state is tracked during play too, so a button held into a menu does not fire there.
-      if (!gameplay && enabled()) run();
+      if (!busy && enabled()) run();
     }
-  };
-  const start = () => { if (!raf) raf = requestAnimationFrame(poll); };
-  window.addEventListener('gamepadconnected', start);
-  if (activePad()) start();
+  });
 }

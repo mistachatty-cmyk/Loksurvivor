@@ -6,7 +6,7 @@
  */
 import { useRef, useState } from 'react';
 import { formatBytes } from '@/game/audio/localTrackLibrary';
-import { formatTime, NEW_FITS_ALBUM_ID, useMusicPlayer, type Track } from '@/game/audio/musicPlayer';
+import { formatTime, useMusicPlayer, type Track } from '@/game/audio/musicPlayer';
 import { useT } from '@/lib/i18n';
 import { ScreenLayout } from './ScreenLayout';
 import {
@@ -45,8 +45,8 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
   const anyFileInputRef = useRef<HTMLInputElement>(null);
   const player = useMusicPlayer();
   const t = useT();
-  const newFits = player.albums.find((album) => album.id === NEW_FITS_ALBUM_ID);
-  const newFitsTracks = newFits ? newFits.trackIds.map((id) => player.tracks.find((track) => track.id === id)).filter((track): track is Track => Boolean(track)) : [];
+  // Every catalog release after the main soundtrack, newest first, so a new catalog entry shows up on its own.
+  const releases = player.albums.slice(1).reverse();
   const [dragActive, setDragActive] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkValue, setLinkValue] = useState('');
@@ -229,6 +229,58 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
             </motion.div>
           )}
 
+          <section className="mb-5 border border-primary/35 bg-primary/5 p-4" aria-labelledby="main-soundtrack-title">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p id="main-soundtrack-title" className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-primary">
+                  <Disc3 className="h-4 w-4" /> Main game soundtrack
+                </p>
+                <p className="mt-1 text-sm font-semibold text-white">Lokifed — Take 1</p>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
+                  Tracks release in album order as you finish run objectives. Your own local files and playlists stay separate.
+                </p>
+              </div>
+              <span className="shrink-0 border border-primary/30 bg-black/30 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-primary">
+                {Math.min(player.soundtrackObjectiveCompletions + 1, player.albums[0]?.trackIds.length ?? 0)}/{player.albums[0]?.trackIds.length ?? 0} unlocked
+              </span>
+            </div>
+          </section>
+
+          {releases.length > 0 && (
+            <section className="mb-5 border border-fuchsia-300/40 bg-fuchsia-400/5 p-4" aria-labelledby="releases-title" data-testid="section-releases">
+              <p id="releases-title" className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-fuchsia-200">
+                <Disc3 className="h-4 w-4" /> {t('music.releases.kicker')}
+              </p>
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                {releases.map((album) => {
+                  const playing = player.isPlaying && !!player.currentTrack && album.trackIds.includes(player.currentTrack.id);
+                  return (
+                    <li key={album.id} className="min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (playing) { player.togglePlay(); return; }
+                          player.setActivePlaylist(album.id);
+                          player.playTrack(album.trackIds[0]!);
+                        }}
+                        className="flex min-h-14 w-full items-center justify-between gap-3 border border-fuchsia-300/30 bg-black/30 px-3 py-2 text-left transition hover:border-fuchsia-200"
+                        data-testid={`button-release-${album.id}`}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-white">{album.title}</span>
+                          <span className="block truncate text-[11px] text-muted-foreground">{album.sourceName ?? 'Survivor616'} · {t('music.releases.tracks', { count: album.trackIds.length })}</span>
+                        </span>
+                        <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-fuchsia-200">
+                          {playing ? t('music.pause') : t('music.play')}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
           <section className="mb-5 border border-border bg-card/50 p-4" aria-labelledby="local-soundtrack-title">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -252,50 +304,6 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
               Clearing browser/site data also clears this library. Use <span className="font-semibold text-white">Clear local library</span> when you want to free space.
             </p>
           </section>
-
-          <section className="mb-5 border border-primary/35 bg-primary/5 p-4" aria-labelledby="main-soundtrack-title">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p id="main-soundtrack-title" className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-primary">
-                  <Disc3 className="h-4 w-4" /> Main game soundtrack
-                </p>
-                <p className="mt-1 text-sm font-semibold text-white">Lokifed — Take 1</p>
-                <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
-                  Tracks release in album order as you finish run objectives. Your own local files and playlists stay separate.
-                </p>
-              </div>
-              <span className="shrink-0 border border-primary/30 bg-black/30 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-primary">
-                {Math.min(player.soundtrackObjectiveCompletions + 1, player.albums[0]?.trackIds.length ?? 0)}/{player.albums[0]?.trackIds.length ?? 0} unlocked
-              </span>
-            </div>
-          </section>
-
-          {newFitsTracks.length > 0 && (
-            <section className="mb-5 border border-fuchsia-300/40 bg-fuchsia-400/5 p-4" aria-labelledby="new-fits-title" data-testid="section-new-fits">
-              <p id="new-fits-title" className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-fuchsia-200">
-                <Disc3 className="h-4 w-4" /> {t('music.newFits.kicker')}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-white">{newFits?.title}</p>
-              <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">{t('music.newFits.body')}</p>
-              <ul className="mt-3 flex flex-col gap-2">
-                {newFitsTracks.map((track) => (
-                  <li key={track.id}>
-                    <button
-                      type="button"
-                      onClick={() => player.playTrack(track.id)}
-                      className="flex min-h-11 w-full items-center justify-between gap-3 border border-fuchsia-300/30 bg-black/30 px-3 py-2 text-left text-sm text-white transition hover:border-fuchsia-200"
-                      data-testid={`button-new-fits-${track.id}`}
-                    >
-                      <span className="truncate">{track.title}</span>
-                      <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-fuchsia-200">
-                        {player.currentTrack?.id === track.id && player.isPlaying ? t('music.newFits.pause') : t('music.newFits.play')}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
 
           {player.streamingEmbeds.length > 0 && (
             <section className="mb-6 border border-primary/35 bg-card/70 p-4" aria-labelledby="streaming-shelf-title">
