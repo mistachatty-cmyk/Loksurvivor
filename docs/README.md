@@ -36,3 +36,4 @@ Everything written down about the game, grouped by what you are trying to do. Th
 - Lore and character notes: `artifacts/survivor-616/docs/` (LORE.md, character-reference-guide.md and more).
 - Durable decisions and the reasons behind them: `.agents/memory/` (start at MEMORY.md).
 - Project rules for every AI: `CLAUDE.md` at the repo root.
+- [LOK_PARTY_TEN_MODES.md](./LOK_PARTY_TEN_MODES.md): the plan to grow Lok Party from 5 to 10 modes, what lifts the whole mode, and which work needs a higher tier.
