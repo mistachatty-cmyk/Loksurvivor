@@ -1,6 +1,6 @@
 # Lok Party: what is still needed
 
-Checked 2026-11-26 (v0.42.95) against the blueprint Google Doc "GSix / Lok Party Mode: Cross-Game Mario Party Mechanics & Minigame Blueprint". Build notes for what exists: [LOK_PARTY.md](./LOK_PARTY.md). Section numbers (s2, s5) point into the blueprint.
+Checked 2026-11-26 (v0.42.96) against the blueprint Google Doc "GSix / Lok Party Mode: Cross-Game Mario Party Mechanics & Minigame Blueprint". Build notes for what exists: [LOK_PARTY.md](./LOK_PARTY.md). Section numbers (s2, s5) point into the blueprint.
 
 Size: **S** a few hours, **M** a session, **L** several sessions. **Look** means it needs new art or a new screen, so show the owner visuals before building.
 
@@ -46,9 +46,9 @@ The rules are written and tested, but the player cannot reach them.
 
 ## 4. Minigames (s5), the biggest hole
 
-Two exist: The Lok Drop (odd rounds) and Ring Run Rush (even rounds, v0.42.95). Rush is not on the menu on its own.
+Three exist and rotate on the board: The Lok Drop, Ring Run Rush (v0.42.95) and Roof Rumble (v0.42.96). Rush and Rumble can also be played alone from "Party games" on the menu (practice, no rewards). New games plug into the minigame kit (`minigameKit.ts` + `MinigameStage.tsx`): a rules file and an art file, and the shared entrance, controls, effects, HUD and podium come free.
 
-1. `LokMinigameCartridge` contract (`mount`, `getResults`, `unmount`) so new games plug in. (M)
+1. Done in v0.42.96 as the minigame kit. Still to do: move Ring Run Rush and the Lok Drop onto `MinigameStage`, and an iframe/postMessage bridge for games hosted in other repos. (M)
 2. Gem Vacuum Frenzy. (M, Look)
 3. Then: Kinetic Knockout, PongFall Panic, Pigeon Kick Climb, Lexicon Lightning; three 2v2; three 1v3; two 1v1. Formats picked by space color. (L)
 
@@ -58,7 +58,6 @@ All minigames must keep the seeded, score-attack shape so online stays cheap.
 
 - **Face Off:** doodle on your operative's face against the clock; it wears your art for the rest of the match, then everyone votes. Online needs the strokes shared. (M, Look)
 - **Strike a Pose:** the leader flashes a pose and you drag your operative's arms and legs to match it. (M, Look)
-- **Rooftop Bumpers:** sumo on a shrinking roof; drag to charge and knock rivals off (a light take on Kinetic Knockout). (M, Look)
 
 ## 5. Characters, boards, modes
 

@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 235,
+      "version": "0.42.96",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T15:40:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party: Roof Rumble",
+      "body": [
+        "A new minigame: shove your rivals off a crumbling neon rooftop. Drag to move, tap to dash, and dash into boom barrels to blast everyone nearby.",
+        "Every minigame now opens with a proper entrance: title, the four characters lining up, the controls, then 3, 2, 1, GO.",
+        "Party games on the Lok Party menu lets you jump straight into Roof Rumble or Ring Run Rush for practice."
+      ]
+    },
+    {
       "number": 234,
       "version": "0.42.95",
       "date": "2026-11-27",
