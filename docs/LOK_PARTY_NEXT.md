@@ -46,11 +46,12 @@ The rules are written and tested, but the player cannot reach them.
 
 ## 4. Minigames (s5), the biggest hole
 
-Three exist and rotate on the board: The Lok Drop, Ring Run Rush (v0.42.95) and Roof Rumble (v0.42.96). Rush and Rumble can also be played alone from "Party games" on the menu (practice, no rewards). New games plug into the minigame kit (`minigameKit.ts` + `MinigameStage.tsx`): a rules file and an art file, and the shared entrance, controls, effects, HUD and podium come free.
+Three exist and rotate on the board: The Lok Drop, Ring Run Rush (v0.42.95) and Roof Rumble (v0.42.96) and Roof Collapse (v0.42.97, a second rooftop arena). Rush, Rumble and Collapse can also be played alone from "Party games" on the menu (practice, no rewards). New games plug into the minigame kit (`minigameKit.ts` + `MinigameStage.tsx`): a rules file and an art file, and the shared entrance, controls, effects, HUD and podium come free.
 
 1. Done in v0.42.96 as the minigame kit. Still to do: move Ring Run Rush and the Lok Drop onto `MinigameStage`, and an iframe/postMessage bridge for games hosted in other repos. (M)
-2. Gem Vacuum Frenzy. (M, Look)
-3. Then: Kinetic Knockout, PongFall Panic, Pigeon Kick Climb, Lexicon Lightning; three 2v2; three 1v3; two 1v1. Formats picked by space color. (L)
+2. More rooftop arenas (square, tile drop, tilting deck, conveyor, bridge, storm): plan in LOK_PARTY.md, each S to M on the shared rules. (Look)
+3. Gem Vacuum Frenzy. (M, Look)
+4. Then: Kinetic Knockout, PongFall Panic, Pigeon Kick Climb, Lexicon Lightning; three 2v2; three 1v3; two 1v1. Formats picked by space color. (L)
 
 All minigames must keep the seeded, score-attack shape so online stays cheap.
 

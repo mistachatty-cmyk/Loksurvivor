@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 236,
+      "version": "0.42.97",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T16:20:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party: Roof Collapse",
+      "body": [
+        "A second rooftop arena: the floor drops away one ring at a time. Each ring cracks and flashes red before it falls, so get to the middle.",
+        "Roof Collapse joins the board rotation and the Party games menu."
+      ]
+    },
+    {
       "number": 235,
       "version": "0.42.96",
       "date": "2026-11-27",

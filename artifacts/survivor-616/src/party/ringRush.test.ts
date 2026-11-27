@@ -43,5 +43,5 @@ test('sharper bots score more over many streets', () => {
 });
 
 test('board rounds rotate through the minigames', () => {
-  assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map(minigameForRound), ['drop', 'rush', 'rumble', 'drop', 'rush', 'rumble', 'drop']);
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map(minigameForRound), ['drop', 'rush', 'rumble', 'collapse', 'drop', 'rush', 'rumble']);
 });

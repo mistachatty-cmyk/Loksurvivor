@@ -39,7 +39,18 @@ export const RUMBLE = {
   blastRadius: 175,
   blastForce: 1300,
   points: { ko: 3, fall: -1 },
+  /** Roof Collapse: the floor is concentric rings that drop away from the outside in. */
+  rings: [330, 250, 180, 120],
+  ringDropAt: [9_000, 16_000, 23_000],
+  ringWarnMs: 1_700,
 } as const;
+
+/**
+ * Arenas share every rule except how the floor gives way.
+ * sumo: the edge crumbles inward smoothly (Roof Rumble).
+ * collapse: whole rings crack, flash and drop, one at a time (Roof Collapse).
+ */
+export type RumbleArena = 'sumo' | 'collapse';
 
 export interface RumbleRunner {
   index: number;
@@ -91,10 +102,16 @@ export type RumbleEvent =
   | { type: 'barrelDrop'; x: number; y: number }
   | { type: 'barrelLand'; x: number; y: number }
   | { type: 'boom'; by: number; x: number; y: number }
-  | { type: 'crumble'; radius: number };
+  | { type: 'crumble'; radius: number }
+  | { type: 'ringWarn'; inner: number; outer: number }
+  | { type: 'ringDrop'; inner: number; outer: number };
 
 export interface RumbleState {
   seed: number;
+  arena: RumbleArena;
+  /** Collapse: how many outer rings have dropped. */
+  ringsDropped: number;
+  ringsWarned: number;
   now: number;
   durationMs: number;
   radius: number;
@@ -110,12 +127,23 @@ export interface RumbleState {
 
 const len = (x: number, y: number) => Math.hypot(x, y);
 
-export function rumbleRadius(now: number): number {
+/** Collapse: rings dropped by a time. */
+export function ringsDroppedAt(now: number): number {
+  return RUMBLE.ringDropAt.filter((at) => now >= at).length;
+}
+
+/** Collapse: the ring currently cracking, if any (index into the drop schedule). */
+export function crackingRing(now: number): number {
+  return RUMBLE.ringDropAt.findIndex((at) => now >= at - RUMBLE.ringWarnMs && now < at);
+}
+
+export function rumbleRadius(now: number, arena: RumbleArena = 'sumo'): number {
+  if (arena === 'collapse') return RUMBLE.rings[ringsDroppedAt(now)];
   const p = Math.min(1, Math.max(0, (now - RUMBLE.shrinkFromMs) / (RUMBLE.shrinkToMs - RUMBLE.shrinkFromMs)));
   return RUMBLE.radius - (RUMBLE.radius - RUMBLE.minRadius) * p;
 }
 
-export function createRoofRumble(seed: number, seats: MinigameSeat[], durationMs: number = RUMBLE.durationMs): RumbleState {
+export function createRoofRumble(seed: number, seats: MinigameSeat[], arena: RumbleArena = 'sumo', durationMs: number = RUMBLE.durationMs): RumbleState {
   const runners = seats.map((seat, index): RumbleRunner => {
     const a = -Math.PI / 2 + (index * Math.PI * 2) / Math.max(1, seats.length) + Math.PI / 4;
     return {
@@ -148,6 +176,9 @@ export function createRoofRumble(seed: number, seats: MinigameSeat[], durationMs
   });
   return {
     seed,
+    arena,
+    ringsDropped: 0,
+    ringsWarned: 0,
     now: 0,
     durationMs,
     radius: RUMBLE.radius,
@@ -206,11 +237,18 @@ function explode(s: RumbleState, b: RumbleBarrel, by: number) {
   }
 }
 
+/** Where it is safe to stand: during a crack, the ring about to drop does not count. */
+export function safeRadius(s: RumbleState): number {
+  if (s.arena !== 'collapse') return s.radius;
+  const i = crackingRing(s.now);
+  return i >= 0 ? RUMBLE.rings[i + 1] : s.radius;
+}
+
 function botThink(s: RumbleState, r: RumbleRunner) {
   // A sharper bot thinks more often and aims truer.
   r.thinkAt = s.now + 110 + (1 - r.skill) * 260 + s.rng() * 80;
   const fromCentre = len(r.x, r.y);
-  if (fromCentre > s.radius - 70) {
+  if (fromCentre > safeRadius(s) - 70) {
     r.aimX = r.x * 0.2;
     r.aimY = r.y * 0.2;
     return;
@@ -263,10 +301,23 @@ export function stepRoofRumble(s: RumbleState, inputs: (StageInput | null)[], dt
   if (s.over) return;
   s.now += dtMs;
   const dt = dtMs / 1000;
-  s.radius = rumbleRadius(s.now);
-  while (s.lastCrumble - s.radius >= 10) {
-    s.lastCrumble -= 10;
-    s.events.push({ type: 'crumble', radius: s.lastCrumble });
+  s.radius = rumbleRadius(s.now, s.arena);
+  if (s.arena === 'collapse') {
+    const cracking = crackingRing(s.now);
+    if (cracking >= 0 && s.ringsWarned <= cracking) {
+      s.ringsWarned = cracking + 1;
+      s.events.push({ type: 'ringWarn', inner: RUMBLE.rings[cracking + 1], outer: RUMBLE.rings[cracking] });
+    }
+    const dropped = ringsDroppedAt(s.now);
+    while (s.ringsDropped < dropped) {
+      s.events.push({ type: 'ringDrop', inner: RUMBLE.rings[s.ringsDropped + 1], outer: RUMBLE.rings[s.ringsDropped] });
+      s.ringsDropped++;
+    }
+  } else {
+    while (s.lastCrumble - s.radius >= 10) {
+      s.lastCrumble -= 10;
+      s.events.push({ type: 'crumble', radius: s.lastCrumble });
+    }
   }
 
   // Barrels drop in, land, and blow on their own after a fuse.

@@ -4,6 +4,7 @@
   "engine": "google,argos",
   "targets": ["es", "fr", "de", "pt-BR", "ja", "ko", "zh-CN"],
   "glossary": [
+    "Roof Collapse",
     "Roof Rumble",
     "Ring Run Rush",
     "Survivor616",

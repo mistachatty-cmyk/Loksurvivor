@@ -80,3 +80,21 @@ Owner rule: every minigame shows each player's character doing something, Mario 
 `minigameKit.ts` is the cartridge contract (blueprint s10): a game supplies seeded rules (`create`, `step`, `results`, scores) plus `render` and `react`, and `MinigameStage.tsx` runs it with the shared entrance and podium from `stageArt.ts` (title slam, character lineup, controls card, 3-2-1-GO, tap to skip; podium with rising steps and confetti), touch/keys (`StageInput`: hold to aim, quick tap, Space), fixed step with hit-stop, camera, particles and popup words. `minigameForRound` (in the kit) rotates drop, rush, rumble.
 
 Roof Rumble (`roofRumble.ts` rules, `roofRumbleArt.ts` look): sumo on a neon rooftop that shrinks from 330 to 150 units. Drag to move, tap to dash (aim assist snaps a tap near a rival onto them). A knockout is +3 when the rival falls within 3.5 s of your hit; falling is -1 and you drop back in. Boom barrels drop every 4.2 s, show their blast zone, blow on a fuse or when dashed into, and chain. Ring Run Rush now uses the shared entrance and podium but keeps its own loop; porting it onto the stage is a later tidy-up.
+
+## Rooftop arenas (v0.42.97)
+
+Roof Rumble's rules take an arena (`RumbleArena` in `roofRumble.ts`); everything else (dash, shove, barrels, knockouts) is shared, and each arena is its own cartridge (`roofRumble`, `roofCollapse` from `makeRumble`) so it gets its own title and its own slot in the rotation (drop, rush, rumble, collapse).
+
+- **sumo** (Roof Rumble): the edge crumbles inward smoothly, 330 to 150.
+- **collapse** (Roof Collapse): the floor is rings 330/250/180/120. At 9, 16 and 23 s the outer ring drops; for 1.7 s before, it flashes red with spreading cracks and shakes. Bots treat a cracking ring as off the roof (`safeRadius`).
+
+### Arena plan (next, same rules engine)
+
+Each is a new `RumbleArena` value: a floor shape and a way it gives way, plus a draw function.
+
+1. **Square roof** (corners are death traps; the walls slide in). Edge test becomes max(|x|, |y|).
+2. **Tile drop**: the floor is a hex grid; random tiles flash and fall, so holes open in the middle too, not just the edge.
+3. **Tilting deck**: a rooftop platform on a crane that tips toward whichever side has more players, so everyone slides.
+4. **Conveyor roof**: the floor scrolls one way, toward an open edge, and reverses every few seconds.
+5. **Two roofs and a bridge**: a narrow catwalk between two small roofs; a boom barrel can break the catwalk.
+6. **Storm night**: wind gusts with an on-screen arrow push everyone the same way for two seconds.
