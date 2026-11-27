@@ -3,7 +3,7 @@
  *
  * Draws and paces the pure board engine (lokBoard.ts). Human choices are big cream buttons at
  * thumb height (fired on pointerdown); bots think for a beat so turns read like a show.
- * A 30-second minigame closes each round: the Lok Drop on odd rounds, Ring Run Rush on even ones.
+ * A 30-second minigame closes each round, rotating the Lok Drop, Ring Run Rush and Roof Rumble.
  */
 
 import { press } from './press';
@@ -63,7 +63,9 @@ import {
 } from './boardArt';
 import { DropArena, seatOrder } from './LokDropScreen';
 import { RingRushArena } from './RingRushArena';
-import { minigameForRound } from './ringRush';
+import { minigameForRound, type MinigameId } from './minigameKit';
+import { MinigameStage } from './MinigameStage';
+import { roofRumble } from './roofRumbleArt';
 import { botSkillsForTier, dropResults } from './lokDrop';
 import { actVerdict, createActionSync, quietLimitMs, type ActPayload, minigamePlacements, seatToBot, type OnlineSession, type Seat } from './partyNet';
 
@@ -140,7 +142,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
   const sentRef = useRef(false);
   sentRef.current = sent;
   const [ui, setUi] = useState(0); // bump to re-render DOM prompts
-  const [minigame, setMinigame] = useState<{ seed: number; kind: 'drop' | 'rush' } | null>(null);
+  const [minigame, setMinigame] = useState<{ seed: number; kind: MinigameId } | null>(null);
   const [overview, setOverview] = useState(false);
   const overviewRef = useRef(false);
   overviewRef.current = overview;
@@ -1423,7 +1425,18 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       ) : null}
       {minigame !== null ? (
         <div className="fixed inset-0 z-40 bg-[#07061a]">
-          {minigame.kind === 'rush' ? (
+          {minigame.kind === 'rumble' ? (
+            <MinigameStage
+              cartridge={roofRumble}
+              seed={minigame.seed}
+              seats={seatOrder(s.players[localSeat].characterId).map((id, i) => ({ characterId: id, bot: i !== 0, botSkill: [0, ...botSkillsForTier(ladderTier)][i] }))}
+              getAudioContext={getAudioContext}
+              onDone={(res) => {
+                setMinigame(null);
+                minigameDoneRef.current(res);
+              }}
+            />
+          ) : minigame.kind === 'rush' ? (
             <RingRushArena
               seed={minigame.seed}
               roster={seatOrder(s.players[localSeat].characterId).map((id, i) => ({ characterId: id, bot: i !== 0, botSkill: [0, ...botSkillsForTier(ladderTier)][i] }))}

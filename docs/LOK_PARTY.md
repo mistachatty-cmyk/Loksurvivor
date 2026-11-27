@@ -74,3 +74,9 @@ v0.42.93: buttons go through `party/press.ts` (pointerdown plus keyboard), onlin
 `src/party/ringRush.ts` (pure, seeded rules) and `RingRushArena.tsx` (2.5D street). `minigameForRound` alternates it with the Lok Drop: odd rounds Drop, even rounds Rush, worked out the same way on every client. Online uses the same score report as the Drop. Rivals on your screen are bot stand-ins; only final scores are compared.
 
 Owner rule: every minigame shows each player's character doing something, Mario Party style, with real polish. The Lok Party menu also lists the weekly missions.
+
+## Minigame kit and Roof Rumble (v0.42.96)
+
+`minigameKit.ts` is the cartridge contract (blueprint s10): a game supplies seeded rules (`create`, `step`, `results`, scores) plus `render` and `react`, and `MinigameStage.tsx` runs it with the shared entrance and podium from `stageArt.ts` (title slam, character lineup, controls card, 3-2-1-GO, tap to skip; podium with rising steps and confetti), touch/keys (`StageInput`: hold to aim, quick tap, Space), fixed step with hit-stop, camera, particles and popup words. `minigameForRound` (in the kit) rotates drop, rush, rumble.
+
+Roof Rumble (`roofRumble.ts` rules, `roofRumbleArt.ts` look): sumo on a neon rooftop that shrinks from 330 to 150 units. Drag to move, tap to dash (aim assist snaps a tap near a rival onto them). A knockout is +3 when the rival falls within 3.5 s of your hit; falling is -1 and you drop back in. Boom barrels drop every 4.2 s, show their blast zone, blow on a fuse or when dashed into, and chain. Ring Run Rush now uses the shared entrance and podium but keeps its own loop; porting it onto the stage is a later tidy-up.

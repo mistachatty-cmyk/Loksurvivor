@@ -186,6 +186,3 @@ export function rushResults(s: RushState): RushResult[] {
     .sort((a, b) => b.score - a.score || b.bestCombo - a.bestCombo || a.index - b.index)
     .map((r, i) => ({ index: r.index, characterId: r.characterId, placement: i + 1, banked: r.score }));
 }
-
-/** Which minigame closes a given board round. Every client works it out the same way. */
-export const minigameForRound = (round: number): 'drop' | 'rush' => (round % 2 === 0 ? 'rush' : 'drop');

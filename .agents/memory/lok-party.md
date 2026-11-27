@@ -17,3 +17,4 @@ Read before touching `artifacts/survivor-616/src/party/` or anything Lok Party p
 - Owner rule (2026-11-27): minigames are interactive party games with every character visible and acting, never filler. Vault screen waits for the owner's pick of layout A/B/C.
 
 - Owner rule (2026-11-27): minigames are interactive party games with every character visible and acting, never filler. Vault screen waits for the owner's pick of layout A/B/C.
+- New minigames go through the kit (minigameKit.ts + MinigameStage.tsx): rules file + art file; never hand-roll another entrance or podium. Visuals made in chat go in docs/art-library/lok-party/ with how they were made.

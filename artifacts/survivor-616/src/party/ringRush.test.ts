@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUSH, createRingRush, minigameForRound, rushCourse, rushResults, stepRingRush, type RushState } from './ringRush';
+import { minigameForRound } from './minigameKit';
+import { RUSH, createRingRush, rushCourse, rushResults, stepRingRush, type RushState } from './ringRush';
 
 const roster = (skills: number[]) => skills.map((botSkill, i) => ({ characterId: `c${i}`, bot: true, botSkill }));
 function run(s: RushState, drive?: (s: RushState) => number) {
@@ -41,6 +42,6 @@ test('sharper bots score more over many streets', () => {
   assert.ok(sharp > weak * 1.5, `sharp ${sharp} weak ${weak}`);
 });
 
-test('board rounds alternate between the two minigames', () => {
-  assert.deepEqual([1, 2, 3, 4].map(minigameForRound), ['drop', 'rush', 'drop', 'rush']);
+test('board rounds rotate through the minigames', () => {
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map(minigameForRound), ['drop', 'rush', 'rumble', 'drop', 'rush', 'rumble', 'drop']);
 });

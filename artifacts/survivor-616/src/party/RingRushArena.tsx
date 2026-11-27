@@ -8,6 +8,8 @@ import { CHARACTERS_BY_ID } from '@/game/data/characters';
 import { RING_STYLES } from '@/game/data/ringRuns';
 import { drawRig, drawShadow } from '@/game/render/sprite';
 import { useT } from '@/lib/i18n';
+import { ENTRANCE, PODIUM_MS } from './minigameKit';
+import { drawEntrance, drawPodium } from './stageArt';
 import { Squash, createJuice, drawRefractionRings } from './juiceEngine';
 import { RUSH, createRingRush, rushMultiplier, rushResults, stepRingRush, type RushInput, type RushResult, type RushState } from './ringRush';
 
@@ -15,8 +17,6 @@ const W = 600;
 const MID = W / 2;
 const HALF = 262; // street half width where runners stand
 const FOCAL = 430; // smaller means a deeper, faster looking street
-const READY_MS = 3000;
-const DONE_MS = 4000;
 const STEP = 1000 / 60;
 const LANE_COLORS = ['#38f2ff', '#ff3fd2', '#ffd23f', '#7cff6b'];
 
@@ -163,6 +163,9 @@ export function RingRushArena({ seed, roster, onDone, getAudioContext }: Props) 
     title: t('lokParty.rush.title'),
     prompt: t('lokParty.rush.prompt'),
     over: t('lokParty.rush.over'),
+    hint: t('lokParty.rush.hint'),
+    go: t('lokParty.stage.go'),
+    skip: t('lokParty.stage.skip'),
     you: t('lokParty.drop.you'),
   };
   const labelsRef = useRef(labels);
@@ -199,6 +202,7 @@ export function RingRushArena({ seed, roster, onDone, getAudioContext }: Props) 
     let raf = 0;
     let last = performance.now();
     let clock = 0;
+    let intro = 0;
     let acc = 0;
     let overAt = 0;
     const hopAt = state.runners.map(() => -999);
@@ -225,6 +229,7 @@ export function RingRushArena({ seed, roster, onDone, getAudioContext }: Props) 
     };
     const down = (e: PointerEvent) => {
       e.preventDefault();
+      if (intro < ENTRANCE.countdownAt) intro = ENTRANCE.countdownAt;
       aim(e);
     };
     const move = (e: PointerEvent) => {
@@ -363,40 +368,17 @@ export function RingRushArena({ seed, roster, onDone, getAudioContext }: Props) 
         .forEach((r, i) => text(`${r.score}`, W - 70, 46 + i * 34, 24, LANE_COLORS[r.index % 4]));
 
       const middle = view.h / 2;
-      if (clock < READY_MS) {
-        ctx.fillStyle = 'rgba(7,6,26,0.6)';
-        ctx.fillRect(0, 0, W, view.h);
-        text(L.title, MID, middle - 130, 58, '#38f2ff');
-        text(L.prompt, MID, middle - 66, 27, '#ffffff');
-        text(String(Math.ceil((READY_MS - clock) / 1000)), MID, middle + 80, 120, '#ffd23f');
-      } else if (state.over) {
-        // Podium: everyone on a step by placement, the winner jumping under confetti.
-        ctx.fillStyle = 'rgba(12,8,40,0.88)';
-        ctx.fillRect(0, 0, W, view.h);
-        const floor = middle + 230;
-        backlight(ctx, 230, floor - 330, 260, '#ffd23f');
-        if (!calm) {
-          for (let c = 0; c < 70; c++) {
-            ctx.fillStyle = LANE_COLORS[c % 4];
-            ctx.fillRect((c * 97) % W, ((c * 151 + clock * (0.12 + (c % 5) * 0.03)) % (view.h + 40)) - 20, 8, 13);
-          }
-        }
-        text(L.over, MID, middle - 230, 68, '#ffd23f');
-        rushResults(state).forEach((res, place) => {
-          const def = CHARACTERS_BY_ID[res.characterId];
-          if (!def) return;
-          const x = [230, 95, 365, 500][place];
-          const top = floor - [210, 150, 105, 60][place];
-          const color = LANE_COLORS[res.index % 4];
-          ctx.fillStyle = color;
-          ctx.fillRect(x - 60, top, 120, floor - top);
-          const bounce = place === 0 && !calm ? Math.abs(Math.sin(clock / 160)) * 34 : 0;
-          backlight(ctx, x, top - 60 - bounce, 90, color);
-          drawRig(ctx, def.rig, def.palette, place === 0 ? 'attack' : place === 3 ? 'hurt' : 'idle', clock, x, top - bounce, 1, place === 0 ? 5 : 4);
-          text(`${place + 1}`, x, top + 44, 36, '#ffffff');
-          text(String(res.banked), x, floor + 40, 30, res.index === me ? '#ffd23f' : '#ffffff');
-          if (res.index === me) text(L.you, x, floor + 74, 26, '#ffd23f');
+      if (intro < ENTRANCE.playAt + ENTRANCE.goMs) {
+        drawEntrance(ctx, {
+          h: view.h,
+          t: intro,
+          calm,
+          accent: '#38f2ff',
+          seats: state.runners.map((r) => ({ characterId: r.characterId, you: r.index === me })),
+          labels: { title: L.title, prompt: L.prompt, hint: L.hint, go: L.go, you: L.you, skip: L.skip },
         });
+      } else if (state.over) {
+        drawPodium(ctx, { h: view.h, clock, since: clock - overAt, calm, me, title: L.over, you: L.you, results: rushResults(state) });
       }
       ctx.restore();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -407,12 +389,14 @@ export function RingRushArena({ seed, roster, onDone, getAudioContext }: Props) 
       const dt = Math.min(100, Math.max(0, ts - last));
       last = ts;
       clock += dt;
+      intro += dt;
+      if (state.over) overAt ||= clock;
       juice.camera.step(dt);
       juice.waves.prune(clock);
       for (const sq of squash) sq.step(dt);
       while (sparks.length && clock - sparks[0].born > 520) sparks.shift();
       while (toasts.length && clock - toasts[0].born > 600) toasts.shift();
-      if (clock >= READY_MS && !state.over) {
+      if (intro >= ENTRANCE.playAt && !state.over) {
         acc += dt;
         while (acc >= STEP && !state.over) {
           acc -= STEP;
@@ -450,7 +434,7 @@ export function RingRushArena({ seed, roster, onDone, getAudioContext }: Props) 
       draw();
       if (state.over) {
         overAt ||= clock;
-        if (!finished && clock - overAt >= DONE_MS) {
+        if (!finished && clock - overAt >= PODIUM_MS) {
           finished = true;
           doneRef.current(rushResults(state));
           return;
