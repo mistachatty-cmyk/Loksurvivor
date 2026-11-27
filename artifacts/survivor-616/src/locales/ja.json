@@ -1681,6 +1681,7 @@
   "lokParty.online.unavailable": "このビルドではオンライン パーティーがまだ有効になっていません。ターボ クラウン ブリッツをボットと対戦することもできます。",
   "lokParty.online.waiting": "他のプレイヤーが終了するのを待っています",
   "lokParty.online.hostLeft": "主催者はパーティーから退席しました。",
+  "lokParty.online.stepAway": "{{name}}は立ち去った。ちょっと待ってください。",
   "lokParty.online.leaveRun": "今すぐ参加すると実行が終了します。",
   "lokParty.online.joinAnyway": "とにかく参加してください",
   "lokParty.online.invited": "{{name}} が Lok Party に招待しました",

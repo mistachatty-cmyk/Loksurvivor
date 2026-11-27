@@ -1681,6 +1681,7 @@
   "lokParty.online.unavailable": "Online-Partys sind für diesen Build noch nicht aktiviert. Sie können Turbo Crown Blitz weiterhin gegen Bots spielen.",
   "lokParty.online.waiting": "Warten, bis die anderen Spieler fertig sind",
   "lokParty.online.hostLeft": "Der Gastgeber verließ die Party.",
+  "lokParty.online.stepAway": "{{name}} trat zurück. Einen Moment warten.",
   "lokParty.online.leaveRun": "Wenn Sie jetzt beitreten, ist Ihr Lauf beendet.",
   "lokParty.online.joinAnyway": "Machen Sie trotzdem mit",
   "lokParty.online.invited": "{{name}} hat Sie zu einem Lok Party eingeladen",

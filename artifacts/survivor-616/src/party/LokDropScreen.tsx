@@ -258,6 +258,8 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
       ) : null}
       {phase === 'hub' ? (
         <Hub
+          vault={meta.vault}
+          onCrack={crack}
           onPick={(m) => {
             setMode(m);
             setPhase(m === 'friends' ? 'online' : 'lobby');
@@ -327,7 +329,8 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
           shards={pulling}
           getAudioContext={getAudioContext}
           onDone={() => {
-            setShards(pulling);
+            // Only a results screen lists what dropped; the hub just shows the new vault count.
+            if (phase !== 'hub') setShards(pulling);
             setPulling(null);
           }}
         />
@@ -1573,7 +1576,7 @@ function ModePreview({ mode }: { mode: Mode }) {
   return <canvas ref={ref} className="w-full rounded-lg border-2" style={{ aspectRatio: '2 / 1', borderColor: ESPRESSO }} />;
 }
 
-function Hub({ onPick, onBack, t }: { onPick: (m: Mode) => void; onBack: () => void; t: ReturnType<typeof useT> }) {
+function Hub({ vault, onCrack, onPick, onBack, t }: { vault: LokPartyMeta['vault']; onCrack: () => void; onPick: (m: Mode) => void; onBack: () => void; t: ReturnType<typeof useT> }) {
   return (
     <div className="absolute inset-0 overflow-y-auto" style={{ background: 'radial-gradient(ellipse at 50% 20%, #2a1d5c 0%, #07061a 70%)' }}>
       <div className="flex min-h-full flex-col items-center justify-center gap-4 p-4">
@@ -1593,6 +1596,14 @@ function Hub({ onPick, onBack, t }: { onPick: (m: Mode) => void; onBack: () => v
             </CreamCard>
           ))}
         </div>
+        {/* A capsule saved from an earlier match can be opened here, not only on its results screen. */}
+        {vault.capsules > 0 && vault.keys > 0 ? (
+          <button type="button" {...press(onCrack)} className="flex w-full max-w-xs flex-col items-center gap-1 rounded-xl border-2 border-amber-300/60 p-3 active:scale-95" style={{ background: '#1a1238' }}>
+            <CapsuleGlyph />
+            <span className="text-xs font-bold text-amber-200">{t('lokParty.results.crack')}</span>
+            <span className="text-xs opacity-70">{t('lokParty.results.vault', { capsules: vault.capsules, keys: vault.keys, shards: vault.shards.length })}</span>
+          </button>
+        ) : null}
         <button type="button" {...press(onBack)} className="rounded-lg border border-white/30 px-5 py-2 text-sm font-bold">
           {t('lokParty.drop.back')}
         </button>

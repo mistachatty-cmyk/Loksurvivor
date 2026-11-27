@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 233,
+      "version": "0.42.94",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T08:10:00Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "Lok Party: step away and come back",
+      "body": [
+        "Switching apps during an online party now gives you 90 seconds to get back, and your friends see that you stepped away.",
+        "A saved capsule can be opened from the Lok Party menu."
+      ]
+    },
+    {
       "number": 232,
       "version": "0.42.93",
       "date": "2026-11-26",

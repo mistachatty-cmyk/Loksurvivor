@@ -1,6 +1,6 @@
 # Lok Party: what is still needed
 
-Checked 2026-11-26 (v0.42.93) against the blueprint Google Doc "GSix / Lok Party Mode: Cross-Game Mario Party Mechanics & Minigame Blueprint". Build notes for what exists: [LOK_PARTY.md](./LOK_PARTY.md). Section numbers (s2, s5) point into the blueprint.
+Checked 2026-11-26 (v0.42.94) against the blueprint Google Doc "GSix / Lok Party Mode: Cross-Game Mario Party Mechanics & Minigame Blueprint". Build notes for what exists: [LOK_PARTY.md](./LOK_PARTY.md). Section numbers (s2, s5) point into the blueprint.
 
 Size: **S** a few hours, **M** a session, **L** several sessions. **Look** means it needs new art or a new screen, so show the owner visuals before building.
 
@@ -15,7 +15,6 @@ The rules are written and tested, but the player cannot reach them.
 | Gap | Today | Size |
 | --- | --- | --- |
 | No vault screen | Shards pile up. `forgeShard`, `disenchantShard` and `rerollShards` have no buttons, so no shard ever becomes a permanent unlock. | M, Look |
-| Capsules only open on the results screen | Leave that screen and a saved capsule waits until the next match ends. | S |
 | Unlocks show nowhere outside the pull | `exportFlex` is not read by 616, so Party palettes, capes and hats cannot be worn in the main game. | M |
 | Weekly missions are invisible | They track and pay XP, but there is no list. Only "mission complete" appears. | S, Look |
 | Pass tiers give nothing before 50 | The tier number rises; only the bonus shards past tier 50 are paid. | M (needs a reward list from the owner) |
@@ -24,8 +23,8 @@ The rules are written and tested, but the player cannot reach them.
 ## 2. Prove online on real devices
 
 - Never tested against real Supabase or on a phone. Only unit tests and two browser tabs over a stand-in relay. **Do this before inviting anyone.** (S, needs a deploy)
-- A host who leaves the tab for more than 25 seconds ends the party for guests (for example, switching to Messages on iPhone). No host hand-over. (S for a longer grace and a "host is away" note; M for hand-over)
-- Opening an invite link in a second tab while the game is already open shows a false "Lok caught a crash" card (`src/lib/lokCrash.ts`). Seen in browser testing, with two tabs sharing one save. Not specific to Lok Party. (S)
+- Someone who switches apps now gets 90 seconds and the others see a note (v0.42.94). Past that, a guest becomes a bot and a host ends the party. There is no host hand-over. (M)
+- Two game windows visible side by side can show a false "Lok caught a crash" card (`src/lib/lokCrash.ts`). Switching tabs does not, because a hidden tab clears its marker. Minor, not specific to Lok Party. (S)
 - Online results are unranked on purpose. The Online Crew ladder stays unfed until a server can verify results. (L, backend)
 
 ## 3. Board game depth (s3)

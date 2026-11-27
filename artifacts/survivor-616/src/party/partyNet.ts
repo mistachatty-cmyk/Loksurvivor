@@ -135,6 +135,14 @@ export interface PingPayload {
   have?: number;
   /** Guest: the minigame round it is still waiting on a result for. */
   waiting?: number;
+  /** The sender's page is in the background (for example, switching apps to send an invite). */
+  away?: boolean;
+}
+
+/** How long a silent peer is given before the party gives up on them. */
+export function quietLimitMs(peer: 'host' | 'guest', away: boolean): number {
+  if (away) return 90_000;
+  return peer === 'host' ? 25_000 : 20_000;
 }
 
 // ---------------------------------------------------------------------------

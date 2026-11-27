@@ -1681,6 +1681,7 @@
   "lokParty.online.unavailable": "此版本尚未开启在线派对。您仍然可以与机器人玩 Turbo Crown Blitz。",
   "lokParty.online.waiting": "等待其他玩家完成",
   "lokParty.online.hostLeft": "主持人离开了聚会。",
+  "lokParty.online.stepAway": "{{name}}退开。稍等一下。",
   "lokParty.online.leaveRun": "现在加入即可结束您的跑步。",
   "lokParty.online.joinAnyway": "无论如何加入",
   "lokParty.online.invited": "{{name}}邀请您参加Lok Party",
