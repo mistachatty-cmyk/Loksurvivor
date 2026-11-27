@@ -17,9 +17,9 @@ import { FrameGovernor } from '@/lib/renderScale';
 import { useT, type MessageKey } from '@/lib/i18n';
 import { CapsulePullOverlay } from './CapsulePullOverlay';
 import { BoardScreen } from './BoardScreen';
-import { RingRunArena } from './RingRunScreen';
+import { CARTRIDGES, cartridgeById } from './cartridges';
+import type { MiniOutcome } from './cartridge';
 import { BOT_LEVELS, loadBotLevels, resolveBotSkills, saveBotLevels, type BotLevel, type BotLevels } from './botLevels';
-import { rushPerformance, rushResults, type RushState } from './ringRun';
 import { PartyLobby } from './PartyLobby';
 import { GameModeButton } from '@/ui/GameModeButton';
 import { LokInputDock } from '@/ui/LokInputDock';
@@ -144,7 +144,8 @@ function RigPreview({ id, size = 96 }: { id: string; size?: number }) {
 // ------------------------------------------------------------------ screen
 
 type Phase = 'hub' | 'lobby' | 'online' | 'play' | 'board' | 'results';
-type Mode = 'blitz' | 'drop' | 'friends' | 'rush';
+/** 'blitz' and 'friends' are board modes; any other id is a minigame cartridge (cartridges.tsx). */
+type Mode = string;
 
 function inviteCode(): string | null {
   try {
@@ -197,7 +198,7 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
     setReport(null);
     setShards(null);
     setOnline(null);
-    setPhase(mode === 'drop' || mode === 'rush' ? 'play' : 'board');
+    setPhase(cartridgeById(mode) ? 'play' : 'board');
   }, [ensureAudioContext, getAudioContext, mode]);
 
   const settle = useCallback(
@@ -216,38 +217,9 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
     [meta, claimLokPartyGrant],
   );
 
-  const finish = useCallback(
-    (state: DropState) => {
-      const results = dropResults(state);
-      const mine = results.find((r) => !r.bot);
-      if (!mine) return;
-      settle(dropPerformance(state, mine), state.seed, { placement: mine.placement, players: results.length, banked: mine.banked });
-    },
-    [settle],
-  );
-
-  const finishRush = useCallback(
-    (state: RushState, newBest: boolean) => {
-      const results = rushResults(state);
-      const mine = results.find((r) => !r.bot);
-      if (!mine) return;
-      const best = (() => {
-        try {
-          return Number(window.localStorage.getItem('lokparty.rush.best.v1')) || mine.banked;
-        } catch {
-          return mine.banked;
-        }
-      })();
-      settle(rushPerformance(state, mine), state.seed, {
-        placement: mine.placement,
-        players: results.length,
-        banked: mine.banked,
-        extra: [
-          { key: 'lokParty.rush.statRings', params: { count: mine.rings } },
-          { key: 'lokParty.rush.statPeak', params: { mult: mine.peakMult } },
-          newBest ? { key: 'lokParty.rush.statNewBest', params: { score: best } } : { key: 'lokParty.rush.statBest', params: { score: best } },
-        ],
-      });
+  const finishCartridge = useCallback(
+    (o: MiniOutcome) => {
+      settle(o.perf, o.seed, { placement: o.placement, players: o.players, banked: o.banked, extra: o.extra });
     },
     [settle],
   );
@@ -293,12 +265,12 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="fixed inset-0 select-none overflow-hidden bg-[#07061a] text-white" style={{ touchAction: 'none' }}>
-      {phase === 'play' && mode === 'drop' ? (
-        <DropArena key={seed} seed={seed} playerId={pick} onDone={finish} getAudioContext={getAudioContext} botSkills={botSkills} />
-      ) : null}
-      {phase === 'play' && mode === 'rush' ? (
-        <RingRunArena key={seed} seed={seed} playerId={pick} onDone={finishRush} getAudioContext={getAudioContext} botSkills={botSkills} />
-      ) : null}
+      {phase === 'play' && cartridgeById(mode)
+        ? (() => {
+            const cart = cartridgeById(mode)!;
+            return <cart.Component key={seed} seed={seed} playerId={pick} botSkills={botSkills} durationMs={cart.soloMs} getAudioContext={getAudioContext} onDone={finishCartridge} />;
+          })()
+        : null}
       {phase === 'hub' ? (
         <Hub
           onPick={(m) => {
@@ -398,8 +370,8 @@ function Lobby({ mode, botLevels, setBotLevel, rounds, setRounds, pick, setPick,
      <div className="flex min-h-full flex-col items-center justify-center gap-4 p-4">
       <div className="text-center">
         <div className="font-mono text-xs uppercase tracking-[.3em] text-cyan-300">{t('lokParty.title')}</div>
-        <h1 className="mt-1 text-3xl font-black tracking-tight">{mode === 'blitz' ? t('lokParty.hub.blitzTitle') : mode === 'rush' ? t('lokParty.rush.title') : t('lokParty.drop.title')}</h1>
-        <p className="mx-auto mt-2 max-w-md text-sm text-white/75">{mode === 'blitz' ? t('lokParty.hub.blitzPitch') : mode === 'rush' ? t('lokParty.rush.pitch') : t('lokParty.drop.pitch')}</p>
+        <h1 className="mt-1 text-3xl font-black tracking-tight">{mode === 'blitz' ? t('lokParty.hub.blitzTitle') : cartridgeById(mode) ? t(cartridgeById(mode)!.titleKey) : t('lokParty.hub.friendsTitle')}</h1>
+        <p className="mx-auto mt-2 max-w-md text-sm text-white/75">{mode === 'blitz' ? t('lokParty.hub.blitzPitch') : cartridgeById(mode) ? t(cartridgeById(mode)!.pitchKey) : t('lokParty.hub.friendsPitch')}</p>
       </div>
       <CreamCard className="w-full max-w-md">
         <div className="mb-2 text-xs font-bold uppercase tracking-widest">{t('lokParty.drop.pick')}</div>
@@ -465,7 +437,7 @@ function Lobby({ mode, botLevels, setBotLevel, rounds, setRounds, pick, setPick,
         <div className="mt-3 text-xs opacity-80">{t('lokParty.results.ladder', { ladder: t('lokParty.ladder.solo'), rank: ladderLabel(meta.ladders.solo) })}</div>
         <div className="text-xs opacity-80">{t('lokParty.results.pass', { tier: passTier(meta.pass.xp) })}</div>
       </CreamCard>
-      <p className="text-xs text-white/60">{mode === 'rush' && !touch ? t('lokParty.rush.controlsKeys') : touch ? t('lokParty.drop.controlsTouch') : t('lokParty.drop.controlsKeys')}</p>
+      <p className="text-xs text-white/60">{touch ? t('lokParty.drop.controlsTouch') : cartridgeById(mode) ? t(cartridgeById(mode)!.controlsKeysKey) : t('lokParty.drop.controlsKeys')}</p>
       <div className="flex gap-3">
         <button type="button" onPointerDown={onBack} className="rounded-lg border border-white/30 px-5 py-3 text-sm font-bold">
           {t('lokParty.drop.back')}
@@ -1704,12 +1676,12 @@ function Hub({ onPick, onBack, t }: { onPick: (m: Mode) => void; onBack: () => v
           <h1 className="mt-1 text-3xl font-black tracking-tight">{t('lokParty.hub.pick')}</h1>
         </div>
         <div className="grid w-full max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {(['blitz', 'friends', 'rush', 'drop'] as Mode[]).map((m) => (
+          {(['blitz', 'friends', ...CARTRIDGES.map((c) => c.id)] as Mode[]).map((m) => (
             <CreamCard key={m}>
               <ModePreview mode={m} />
-              <div className="mt-3 text-xl font-black">{m === 'blitz' ? t('lokParty.hub.blitzTitle') : m === 'friends' ? t('lokParty.hub.friendsTitle') : m === 'rush' ? t('lokParty.rush.title') : t('lokParty.drop.title')}</div>
-              <p className="mt-1 text-sm opacity-80">{m === 'blitz' ? t('lokParty.hub.blitzPitch') : m === 'friends' ? t('lokParty.hub.friendsPitch') : m === 'rush' ? t('lokParty.rush.hubPitch') : t('lokParty.hub.dropPitch')}</p>
-              <button type="button" onPointerDown={() => onPick(m)} className="mt-3 w-full rounded-xl border-[3px] py-3 text-base font-black active:translate-y-[3px]" style={{ background: m === 'blitz' ? '#ffcf3c' : m === 'friends' ? '#38f2ff' : m === 'rush' ? '#ff8fe6' : '#7cff6b', borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
+              <div className="mt-3 text-xl font-black">{m === 'blitz' ? t('lokParty.hub.blitzTitle') : m === 'friends' ? t('lokParty.hub.friendsTitle') : t(cartridgeById(m)!.titleKey)}</div>
+              <p className="mt-1 text-sm opacity-80">{m === 'blitz' ? t('lokParty.hub.blitzPitch') : m === 'friends' ? t('lokParty.hub.friendsPitch') : t(cartridgeById(m)!.hubPitchKey)}</p>
+              <button type="button" onPointerDown={() => onPick(m)} className="mt-3 w-full rounded-xl border-[3px] py-3 text-base font-black active:translate-y-[3px]" style={{ background: m === 'blitz' ? '#ffcf3c' : m === 'friends' ? '#38f2ff' : cartridgeById(m)!.accent, borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
                 {t('lokParty.hub.play')}
               </button>
             </CreamCard>

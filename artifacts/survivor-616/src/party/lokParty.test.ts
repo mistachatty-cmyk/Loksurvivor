@@ -377,7 +377,7 @@ test('Solo Blitz bots sharpen with rank and stay beatable', () => {
 });
 
 test('Lok Party engines stay free of game imports (so the mode can become its own game)', () => {
-  for (const f of ['juiceEngine.ts', 'lokPartyMeta.ts', 'lokDrop.ts', 'capsulePull.ts', 'ringRun.ts', 'botLevels.ts']) {
+  for (const f of ['juiceEngine.ts', 'lokPartyMeta.ts', 'lokDrop.ts', 'capsulePull.ts', 'ringRun.ts', 'botLevels.ts', 'cartridge.ts']) {
     const src = readFileSync(fileURLToPath(new URL(`./${f}`, import.meta.url)), 'utf8');
     const imports = [...src.matchAll(/from '([^']+)'/g)].map((m) => m[1]);
     assert.ok(imports.every((p) => p.startsWith('./')), `${f} imports ${imports.join(', ')}`);

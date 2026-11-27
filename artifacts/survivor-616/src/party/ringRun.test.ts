@@ -154,3 +154,24 @@ test('render scale: consoles start at 1x, slow frames step resolution down, calm
   for (let i = 0; i < 200; i += 1) hitch.tick(400);
   assert.equal(hitch.scale, 1, 'tab-switch hitches are ignored');
 });
+
+import { minigameForRound, validResults } from './cartridge';
+
+test('minigameForRound is deterministic and never repeats back to back', () => {
+  const ids = ['rush', 'drop'];
+  let prev = '';
+  for (let r = 1; r <= 12; r += 1) {
+    const a = minigameForRound(ids, 777, r);
+    assert.equal(a, minigameForRound(ids, 777, r));
+    assert.notEqual(a, prev);
+    prev = a;
+  }
+  assert.equal(minigameForRound(['solo'], 1, 5), 'solo');
+});
+
+test('validResults needs four seats with placements 1 to 4', () => {
+  const ok = [1, 2, 3, 4].map((p) => ({ characterId: 'c' + p, placement: p, banked: p * 10 }));
+  assert.equal(validResults(ok), true);
+  assert.equal(validResults(ok.slice(0, 3)), false);
+  assert.equal(validResults(ok.map((r) => ({ ...r, placement: 1 }))), false);
+});

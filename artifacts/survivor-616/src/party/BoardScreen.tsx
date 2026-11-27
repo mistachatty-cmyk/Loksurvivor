@@ -62,8 +62,8 @@ import {
   type Sprite,
 } from './boardArt';
 import { DropArena, seatOrder } from './LokDropScreen';
-import { RingRunArena } from './RingRunScreen';
-import { rushResults } from './ringRun';
+import { CARTRIDGE_IDS, cartridgeById } from './cartridges';
+import { minigameForRound, validResults } from './cartridge';
 import { GameModeButton } from '@/ui/GameModeButton';
 import { subscribeActions, type LokAction } from '@/lib/lokInput';
 import { dropResults, type DropState } from './lokDrop';
@@ -148,7 +148,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, botSkills, getAudioCon
   const actRef = useRef<(a: BoardAction) => void>(() => {});
   const finishRef = useRef(onFinish);
   finishRef.current = onFinish;
-  const [minigameKind, setMinigameKind] = useState<'drop' | 'rush'>('drop');
+  const [minigameKind, setMinigameKind] = useState<string>(CARTRIDGE_IDS[0]);
   const minigameDoneRef = useRef<(res: { characterId: string; placement: number; banked: number }[]) => void>(() => {});
 
   const labelsRef = useRef({
@@ -559,7 +559,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, botSkills, getAudioCon
       if (minigameQueued) {
         minigameQueued = false;
         miniRound = s.round;
-        setMinigameKind(s.round % 2 === 0 ? 'rush' : 'drop');
+        setMinigameKind(minigameForRound(CARTRIDGE_IDS, s.seed, s.round));
         setMinigame((s.seed ^ (s.round * 7919)) >>> 0);
         return;
       }
@@ -1432,31 +1432,24 @@ export function BoardScreen({ humanId, rounds = 10, seed, botSkills, getAudioCon
       ) : null}
       {minigame !== null ? (
         <div className="fixed inset-0 z-40 bg-[#07061a]">
-{minigameKind === 'rush' ? (
-            <RingRunArena
-              seed={minigame}
-              playerId={s.players[localSeat].characterId}
-              durationMs={30_000}
-              botSkills={botSkills}
-              getAudioContext={getAudioContext}
-              onDone={(r) => {
-                setMinigame(null);
-                minigameDoneRef.current(rushResults(r));
-              }}
-            />
-          ) : (
-            <DropArena
-              seed={minigame}
-              playerId={s.players[localSeat].characterId}
-              durationMs={30_000}
-              botSkills={botSkills}
-              getAudioContext={getAudioContext}
-              onDone={(d) => {
-                setMinigame(null);
-                minigameDoneRef.current(dropResults(d));
-              }}
-            />
-          )}
+{(() => {
+            const cart = cartridgeById(minigameKind) ?? cartridgeById(CARTRIDGE_IDS[0])!;
+            return (
+              <cart.Component
+                seed={minigame}
+                playerId={s.players[localSeat].characterId}
+                durationMs={cart.boardMs}
+                botSkills={botSkills}
+                getAudioContext={getAudioContext}
+                onDone={(o) => {
+                  setMinigame(null);
+                  // A malformed result must never stall the board: fall back to seat order.
+                  const results = validResults(o.results) ? o.results : s.players.map((p, i) => ({ characterId: p.characterId, placement: i + 1, banked: 0 }));
+                  minigameDoneRef.current(results);
+                }}
+              />
+            );
+          })()}
         </div>
       ) : null}
     </div>
