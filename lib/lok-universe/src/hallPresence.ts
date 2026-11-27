@@ -11,8 +11,19 @@
 import type { RoomGame, RoomLayout } from "./rooms";
 
 export const HALL_CHANNEL = "lok-hall:v1";
-export const MAX_PEERS = 24;
-export const MOVE_INTERVAL_MS = 250;
+/** People per hall instance. Beyond this a new instance opens, which keeps realtime traffic roughly linear in players. */
+export const HALL_CAP = 12;
+export const MAX_SHARDS = 12;
+export const MAX_PEERS = HALL_CAP + 4;
+/** Two position updates a second is enough: peers are smoothed on screen. */
+export const MOVE_INTERVAL_MS = 500;
+const MIN_STEP = 6;
+
+/** Channel for one hall instance. Room "lok" shard 0 keeps the original name; a streamer's hall is its own room. */
+export function hallChannelName(room = "lok", shard = 0): string {
+  const safe = room.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 32) || "lok";
+  return safe === "lok" && shard === 0 ? HALL_CHANNEL : `${HALL_CHANNEL}:${safe}:${shard}`;
+}
 const GAMES: readonly RoomGame[] = ["survivor", "qnk", "lok"];
 
 export interface HallPeer { id: string; name: string; game: RoomGame; x: number; y: number }
@@ -51,13 +62,13 @@ export interface HallPresence {
   leave(): void;
 }
 
-export function joinHall(client: HallClient, opts: { id: string; name?: string; game: RoomGame; layout: RoomLayout; onPeers?: (peers: HallPeer[]) => void }): HallPresence {
+export function joinHall(client: HallClient, opts: { id: string; name?: string; game: RoomGame; layout: RoomLayout; room?: string; shard?: number; /** Called once, after the first sync, if this instance already holds `cap` others. */ onFull?: () => void; cap?: number; onPeers?: (peers: HallPeer[]) => void }): HallPresence {
   const { id, game, layout } = opts;
   const name = (opts.name && opts.name.trim()) || guestName(id);
   const pos = new Map<string, { x: number; y: number }>();
   const tags = new Map<string, HallPeer>();
-  let last = 0, left = false;
-  const ch = client.channel(HALL_CHANNEL, { config: { broadcast: { self: false }, presence: { key: id } } });
+  let last = 0, left = false, checkedFull = false, lx = -1e9, ly = -1e9;
+  const ch = client.channel(hallChannelName(opts.room, opts.shard ?? 0), { config: { broadcast: { self: false }, presence: { key: id } } });
   const publish = () => opts.onPeers?.(list());
   const list = (): HallPeer[] => [...tags.values()].map((p) => ({ ...p, ...(pos.get(p.id) ?? {}) })).slice(0, MAX_PEERS);
   const readPresence = () => {
@@ -69,6 +80,7 @@ export function joinHall(client: HallClient, opts: { id: string; name?: string; 
     }
     for (const k of [...pos.keys()]) if (!tags.has(k)) pos.delete(k);
     publish();
+    if (!checkedFull) { checkedFull = true; if (tags.size >= (opts.cap ?? HALL_CAP)) opts.onFull?.(); }
   };
   ch.on("presence", { event: "sync" }, readPresence)
     .on("broadcast", { event: "pos" }, ({ payload }: { payload?: { id?: string; x?: number; y?: number } }) => {
@@ -80,11 +92,19 @@ export function joinHall(client: HallClient, opts: { id: string; name?: string; 
     .subscribe((status) => { if (status === "SUBSCRIBED" && !left) void ch.track({ name, game, x: layout.start.col * layout.tile, y: layout.start.row * layout.tile }); });
   return {
     move(x, y, now = Date.now()) {
-      if (left || now - last < MOVE_INTERVAL_MS) return;
-      last = now;
+      if (left || now - last < MOVE_INTERVAL_MS || Math.hypot(x - lx, y - ly) < MIN_STEP) return;
+      last = now; lx = x; ly = y;
       void ch.send({ type: "broadcast", event: "pos", payload: { id, x: Math.round(x), y: Math.round(y) } });
     },
     peers: list,
     leave() { if (left) return; left = true; void ch.untrack?.(); void client.removeChannel(ch); },
   };
+}
+
+/** Joins the first hall instance with room, hopping to the next when one is full. Returns one handle for whichever is current. */
+export function joinHallSharded(client: HallClient, opts: { id: string; name?: string; game: RoomGame; layout: RoomLayout; room?: string; cap?: number; onPeers?: (peers: HallPeer[]) => void }): HallPresence {
+  let shard = 0, cur: HallPresence, closed = false;
+  const open = (): HallPresence => joinHall(client, { ...opts, shard, onFull: () => { if (closed || shard >= MAX_SHARDS - 1) return; cur.leave(); shard += 1; cur = open(); } });
+  cur = open();
+  return { move: (x, y, now) => cur.move(x, y, now), peers: () => cur.peers(), leave: () => { closed = true; cur.leave(); } };
 }

@@ -14,3 +14,4 @@ export * from "./invite";
 export * from "./onboarding";
 export * from "./rooms";
 export * from "./hallPresence";
+export * from "./verse";

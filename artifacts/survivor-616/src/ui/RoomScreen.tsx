@@ -6,6 +6,7 @@
  * contract (`lib/lok-universe/src/rooms.ts`). Reduced motion removes the bob and glow pulses' motion only.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { drawHallPeer, drawVerseAnchor, drawVerseBase } from '../../../../lib/lok-universe/src/verse';
 import type { HallPeer } from '../../../../lib/lok-universe/src/hallPresence';
 import { nearestAnchor, startPos, stepAvatar, useTiles, type RoomAnchor, type RoomLayout, type RoomPos } from '../../../../lib/lok-universe/src/rooms';
 import { drawRig, drawShadow } from '@/game/render/sprite';
@@ -54,6 +55,8 @@ export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, t
   const peersRef = useRef<HallPeer[] | undefined>(peers);
   peersRef.current = peers;
   const shown = useRef(new Map<string, { x: number; y: number }>());
+  const labelRef = useRef(labelFor);
+  labelRef.current = labelFor;
   const moveRef = useRef(onMove);
   moveRef.current = onMove;
   const statusRef = useRef(status);
@@ -137,10 +140,12 @@ export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, t
       ctx.translate((cw - worldW * scale) / 2, (ch - worldH * scale) / 2);
       ctx.scale(scale, scale);
       const state = { now: reduceMotion ? 0 : now, focusId: focusRef.current, leverPublic: leverRef.current, status: statusRef.current };
-      drawRoomBase(ctx, layout, skin, state);
+      const verse = layout.id === 'hall.lok';
+      const vs = { now: reduceMotion ? 0 : now, focusId: focusRef.current, homeGame: 'survivor' };
+      if (verse) drawVerseBase(ctx, layout, vs); else drawRoomBase(ctx, layout, skin, state);
       // Draw objects and the avatar sorted by their feet so the avatar walks behind and in front of furniture.
       const feetY = posRef.current.y;
-      const drawables: Array<{ y: number; draw: () => void }> = layout.anchors.map((a) => ({ y: (a.row + a.h) * layout.tile, draw: () => drawAnchor(ctx, layout, skin, a, state) }));
+      const drawables: Array<{ y: number; draw: () => void }> = layout.anchors.map((a) => ({ y: (a.row + a.h) * layout.tile, draw: () => (verse ? drawVerseAnchor(ctx, layout, a, vs, labelRef.current(a)) : drawAnchor(ctx, layout, skin, a, state)) }));
       drawables.push({
         y: feetY,
         draw: () => {
@@ -153,7 +158,7 @@ export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, t
         const cur = shown.current.get(peer.id) ?? { x: peer.x, y: peer.y };
         cur.x += (peer.x - cur.x) * Math.min(1, dt * 8); cur.y += (peer.y - cur.y) * Math.min(1, dt * 8);
         shown.current.set(peer.id, cur);
-        drawables.push({ y: cur.y, draw: () => drawPeerToken(ctx, skin, cur.x, cur.y, peer) });
+        drawables.push({ y: cur.y, draw: () => drawHallPeer(ctx, cur.x, cur.y, peer.game, peer.name) });
       }
       drawables.sort((p, q) => p.y - q.y).forEach((d) => d.draw());
       ctx.restore();
@@ -201,20 +206,4 @@ export function RoomScreen({ layout, skin, character, labelFor, onUse, onBack, t
       </div>
     </div>
   );
-}
-
-const GAME_TAG: Record<string, { tag: string; color: string }> = { survivor: { tag: '616', color: '#ff3d8b' }, qnk: { tag: 'QnK', color: '#4c8dff' }, lok: { tag: 'LOK', color: '#f2c14e' } };
-
-/** Another player: a small round token with a game tag and a short name. Deliberately not a character, since each game has its own. */
-function drawPeerToken(ctx: CanvasRenderingContext2D, skin: RoomSkin, x: number, y: number, peer: HallPeer): void {
-  const g = GAME_TAG[peer.game] ?? GAME_TAG.lok!;
-  ctx.save();
-  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(x, y + 2, 11, 4, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = skin.ink; ctx.beginPath(); ctx.arc(x, y - 14, 12, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = g.color; ctx.beginPath(); ctx.arc(x, y - 14, 10, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(g.tag, x, y - 14);
-  ctx.font = 'bold 9px monospace'; ctx.fillStyle = '#fff'; ctx.strokeStyle = skin.ink; ctx.lineWidth = 3;
-  ctx.strokeText(peer.name, x, y - 32); ctx.fillText(peer.name, x, y - 32);
-  ctx.restore();
 }

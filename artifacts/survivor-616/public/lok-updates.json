@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 217,
+      "version": "0.42.78",
+      "date": "2026-11-27",
+      "publishedAt": "2026-11-27T19:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Lok hall looks the same in every game",
+      "body": [
+        "The Lok hall now has one look shared by every Lok game: a dark polished floor, light strips, a glowing LOK sign and an arched doorway for each game in that game's color. Your own game decor stays in your own rooms.",
+        "Halls now split into groups of 12 so they stay smooth when many people show up, and other players appear as colored tokens with their game tag."
+      ]
+    },
+    {
       "number": 216,
       "version": "0.42.77",
       "date": "2026-11-23",
