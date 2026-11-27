@@ -119,3 +119,38 @@ test('lokInput stays free of game imports so it can become its own package', () 
     assert.ok(imports.every((p) => p.startsWith('./') || p === 'react'), `${f} imports ${imports.join(', ')}`);
   }
 });
+
+import { BOT_LEVELS, DEFAULT_BOT_LEVELS, resolveBotSkills, sanitizeBotLevels } from './botLevels';
+import { botSkillsForTier } from './lokDrop';
+
+test('bot levels: auto follows rank, fixed levels are fixed, random is seeded and varies by seat', () => {
+  assert.deepEqual(resolveBotSkills(DEFAULT_BOT_LEVELS, 3, 9), botSkillsForTier(3));
+  const fixed = resolveBotSkills(['easy', 'hard', 'master'], 0, 1);
+  assert.ok(fixed[0] < fixed[1] && fixed[1] < fixed[2]);
+  const a = resolveBotSkills(['random', 'random', 'random'], 0, 42);
+  assert.deepEqual(a, resolveBotSkills(['random', 'random', 'random'], 0, 42), 'same seed, same pick');
+  const seen = new Set<number>();
+  for (let seed = 1; seed < 80; seed += 1) for (const v of resolveBotSkills(['random', 'random', 'random'], 0, seed)) seen.add(v);
+  assert.equal(seen.size, 4, 'random reaches every fixed level');
+  assert.deepEqual(sanitizeBotLevels(['hard', 'bogus']), ['hard', 'auto', 'auto']);
+  assert.ok(BOT_LEVELS.includes('random'));
+});
+
+import { FrameGovernor, baseDpr, isConsoleBrowser } from '../lib/renderScale';
+
+test('render scale: consoles start at 1x, slow frames step resolution down, calm frames recover', () => {
+  assert.equal(isConsoleBrowser('Mozilla/5.0 (Windows NT 10.0; Win64; x64; Xbox; Xbox Series X) AppleWebKit/537.36 Edge/44'), true);
+  assert.equal(isConsoleBrowser('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)'), false);
+  assert.equal(baseDpr(2, true), 1);
+  assert.equal(baseDpr(3, false), 2);
+  const g = new FrameGovernor(1);
+  let changed = 0;
+  for (let i = 0; i < 400; i += 1) if (g.tick(33)) changed += 1;
+  assert.ok(changed >= 2 && g.scale < 0.8 && g.scale >= 0.55, `scale ${g.scale}`);
+  const low = g.scale;
+  for (let i = 0; i < 2000; i += 1) g.tick(8);
+  assert.ok(g.scale > low, 'recovers when frames are fast');
+  const hitch = new FrameGovernor(1);
+  for (let i = 0; i < 200; i += 1) hitch.tick(400);
+  assert.equal(hitch.scale, 1, 'tab-switch hitches are ignored');
+});

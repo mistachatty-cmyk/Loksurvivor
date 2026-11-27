@@ -10,6 +10,7 @@ import { useEffect, useRef } from 'react';
 
 import { drawRig } from '@/game/render/sprite';
 import type { AnimName, SpritePalette, SpriteRig } from '@/game/types';
+import { baseDpr } from '@/lib/renderScale';
 
 export interface VignetteActor {
   name: string;
@@ -52,7 +53,7 @@ export function HideoutVignette({ left, right, support, size = 110, className = 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = baseDpr();
     const cssW = size * 2.4;
     const cssH = size;
     canvas.width = cssW * dpr;

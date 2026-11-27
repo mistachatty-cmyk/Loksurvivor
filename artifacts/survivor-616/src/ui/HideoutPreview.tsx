@@ -107,6 +107,7 @@ import { drawRig } from '@/game/render/sprite';
 import { hideoutNoticeMs } from '@/game/state/hideoutNoticeSetting';
 import type { EvolutionOverlayId, HideoutBiome, HideoutWeather, LokPetPalette, LokPetSilhouette, SpritePalette, SpriteRig } from '@/game/types';
 import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
+import { baseDpr } from '@/lib/renderScale';
 
 /** What the strip needs to know about each pet that walks it. */
 export interface HideoutPetInfo {
@@ -308,7 +309,7 @@ export function HideoutPreview({
     if (!ctx) return;
 
     const reduceMotion = prefersReducedMotionNow();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = baseDpr();
     let cssW = root.clientWidth;
     let cssH = root.clientHeight || height;
 

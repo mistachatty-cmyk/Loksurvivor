@@ -14,10 +14,10 @@ import { useEffect, useMemo, useRef } from 'react';
 import { CHARACTERS_BY_ID } from '@/game/data/characters';
 import { BURST_TOKENS } from '@/game/data/ringRuns';
 import { drawRig, drawShadow } from '@/game/render/sprite';
+import { FrameGovernor } from '@/lib/renderScale';
 import { useT } from '@/lib/i18n';
 import { subscribeActions } from '@/lib/lokInput';
 import { Squash, createJuice, drawRefractionRings, impact, type Juice } from './juiceEngine';
-import { botSkillsForTier } from './lokDrop';
 import { RUSH, NO_INPUT, createRingRun, hash01, piecesBetween, rushResults, rushTimeLeftMs, stepRingRun, type Piece, type RushEvent, type RushInput, type RushState } from './ringRun';
 import { seatOrder } from './LokDropScreen';
 
@@ -39,7 +39,8 @@ export interface RingRunProps {
   playerId: string;
   onDone: (s: RushState, newBest: boolean) => void;
   getAudioContext: () => AudioContext | null;
-  ladderTier: number;
+  /** The three bot skills, already resolved from the lobby's difficulty choices. */
+  botSkills: [number, number, number];
   durationMs?: number;
 }
 
@@ -87,12 +88,12 @@ function writeBest(v: number): void {
 }
 
 /** Seat roster: the human plus three laser rivals whose skill follows the Solo Blitz tier. */
-export function rushRoster(playerId: string, tier: number) {
-  const skills = [0, ...botSkillsForTier(tier)];
+export function rushRoster(playerId: string, botSkills: [number, number, number]) {
+  const skills = [0, ...botSkills];
   return seatOrder(playerId).map((id, i) => ({ characterId: id, bot: i !== 0, botSkill: skills[i] }));
 }
 
-export function RingRunArena({ seed, playerId, onDone, getAudioContext, ladderTier, durationMs = RUSH.durationMs }: RingRunProps) {
+export function RingRunArena({ seed, playerId, onDone, getAudioContext, botSkills, durationMs = RUSH.durationMs }: RingRunProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const inputRef = useRef<RushInput>({ laneDelta: 0, jumpPressed: false });
@@ -125,7 +126,7 @@ export function RingRunArena({ seed, playerId, onDone, getAudioContext, ladderTi
     const motion = reducedMotion() ? 0 : 1;
     const juice: Juice = createJuice(getAudioContext, { motion, bpm: 124 });
     const L = labelsRef.current;
-    const state = createRingRun(seed, rushRoster(playerId, ladderTier), durationMs);
+    const state = createRingRun(seed, rushRoster(playerId, botSkills), durationMs);
     const squash = state.players.map(() => new Squash());
     const sparks: Spark[] = [];
     const toasts: Toast[] = [];
@@ -144,7 +145,8 @@ export function RingRunArena({ seed, playerId, onDone, getAudioContext, ladderTi
     let fastBpm = false;
     let flash = 0;
 
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const gov = new FrameGovernor();
+    let dpr = gov.dpr;
     let fit = 1;
     let offX = 0;
     let offY = 0;
@@ -456,6 +458,10 @@ export function RingRunArena({ seed, playerId, onDone, getAudioContext, ladderTi
 
     const frame = (now: number) => {
       const dt = Math.min(100, now - last);
+      if (gov.tick(dt)) {
+        dpr = gov.dpr;
+        resize();
+      }
       last = now;
       realNow += dt;
       if (realNow < COUNTDOWN_MS) {

@@ -13,10 +13,12 @@ import { CHARACTERS_BY_ID } from '@/game/data/characters';
 import { drawRig, drawShadow } from '@/game/render/sprite';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { useMeta } from '@/game/state/metaStore';
+import { FrameGovernor } from '@/lib/renderScale';
 import { useT, type MessageKey } from '@/lib/i18n';
 import { CapsulePullOverlay } from './CapsulePullOverlay';
 import { BoardScreen } from './BoardScreen';
 import { RingRunArena } from './RingRunScreen';
+import { BOT_LEVELS, loadBotLevels, resolveBotSkills, saveBotLevels, type BotLevel, type BotLevels } from './botLevels';
 import { rushPerformance, rushResults, type RushState } from './ringRun';
 import { PartyLobby } from './PartyLobby';
 import { GameModeButton } from '@/ui/GameModeButton';
@@ -176,6 +178,17 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
   const [shards, setShards] = useState<Shard[] | null>(null);
   const [pulling, setPulling] = useState<Shard[] | null>(null);
   const [seed, setSeed] = useState(() => (Date.now() ^ 0x616) >>> 0);
+  const [botLevels, setBotLevelsState] = useState<BotLevels>(() => loadBotLevels(storage()));
+  const setBotLevel = useCallback((i: number, lv: BotLevel) => {
+    setBotLevelsState((cur) => {
+      const next = [...cur] as BotLevels;
+      next[i] = lv;
+      saveBotLevels(storage(), next);
+      return next;
+    });
+  }, []);
+  // Resolved once per match seed, so a Random bot keeps its level for the whole match.
+  const botSkills = useMemo(() => resolveBotSkills(botLevels, meta.ladders.solo.tier, seed), [botLevels, meta.ladders.solo.tier, seed]);
 
   const startMatch = useCallback(() => {
     ensureAudioContext();
@@ -281,10 +294,10 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
   return (
     <div className="fixed inset-0 select-none overflow-hidden bg-[#07061a] text-white" style={{ touchAction: 'none' }}>
       {phase === 'play' && mode === 'drop' ? (
-        <DropArena key={seed} seed={seed} playerId={pick} onDone={finish} getAudioContext={getAudioContext} ladderTier={meta.ladders.solo.tier} />
+        <DropArena key={seed} seed={seed} playerId={pick} onDone={finish} getAudioContext={getAudioContext} botSkills={botSkills} />
       ) : null}
       {phase === 'play' && mode === 'rush' ? (
-        <RingRunArena key={seed} seed={seed} playerId={pick} onDone={finishRush} getAudioContext={getAudioContext} ladderTier={meta.ladders.solo.tier} />
+        <RingRunArena key={seed} seed={seed} playerId={pick} onDone={finishRush} getAudioContext={getAudioContext} botSkills={botSkills} />
       ) : null}
       {phase === 'hub' ? (
         <Hub
@@ -316,7 +329,7 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
           rounds={rounds}
           seed={seed}
           online={online ?? undefined}
-          ladderTier={meta.ladders.solo.tier}
+          botSkills={botSkills}
           getAudioContext={getAudioContext}
           onFinish={finishBoard}
           onQuit={() => {
@@ -328,7 +341,7 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
         />
       ) : null}
       {phase === 'lobby' ? (
-        <Lobby mode={mode} rounds={rounds} setRounds={setRounds} pick={pick} setPick={setPick} meta={meta} onStart={startMatch} onBack={() => setPhase('hub')} t={t} />
+        <Lobby mode={mode} botLevels={botLevels} setBotLevel={setBotLevel} rounds={rounds} setRounds={setRounds} pick={pick} setPick={setPick} meta={meta} onStart={startMatch} onBack={() => setPhase('hub')} t={t} />
       ) : null}
       {phase === 'results' && report ? (
         <Results
@@ -378,7 +391,7 @@ function CreamCard({ children, className = '' }: { children: React.ReactNode; cl
   );
 }
 
-function Lobby({ mode, rounds, setRounds, pick, setPick, meta, onStart, onBack, t }: { mode: Mode; rounds: number; setRounds: (n: number) => void; pick: string; setPick: (id: string) => void; meta: LokPartyMeta; onStart: () => void; onBack: () => void; t: ReturnType<typeof useT> }) {
+function Lobby({ mode, botLevels, setBotLevel, rounds, setRounds, pick, setPick, meta, onStart, onBack, t }: { mode: Mode; botLevels: BotLevels; setBotLevel: (i: number, lv: BotLevel) => void; rounds: number; setRounds: (n: number) => void; pick: string; setPick: (id: string) => void; meta: LokPartyMeta; onStart: () => void; onBack: () => void; t: ReturnType<typeof useT> }) {
   const touch = typeof window !== 'undefined' && 'ontouchstart' in window;
   return (
     <div className="absolute inset-0 overflow-y-auto" style={{ background: 'radial-gradient(ellipse at 50% 30%, #1d1450 0%, #07061a 70%)' }}>
@@ -422,6 +435,33 @@ function Lobby({ mode, rounds, setRounds, pick, setPick, meta, onStart, onBack, 
             </div>
           </div>
         ) : null}
+        <div className="mt-3">
+          <div className="mb-1 text-xs font-bold uppercase tracking-widest">{t('lokParty.bots.title')}</div>
+          <div className="space-y-1.5">
+            {seatOrder(pick)
+              .slice(1)
+              .map((id, i) => (
+                <div key={id} className="flex items-center gap-2 rounded-lg border-2 px-2 py-1" style={{ borderColor: '#3b2a2033' }}>
+                  <RigPreview id={id} size={40} />
+                  <span className="min-w-0 flex-1 truncate text-sm font-bold">{CHARACTERS_BY_ID[id]?.name ?? id}</span>
+                  <select
+                    value={botLevels[i]}
+                    onChange={(e) => setBotLevel(i, e.target.value as BotLevel)}
+                    aria-label={t('lokParty.bots.aria', { name: CHARACTERS_BY_ID[id]?.name ?? id })}
+                    className="rounded-lg border-2 bg-transparent px-2 py-1.5 text-sm font-black"
+                    style={{ borderColor: ESPRESSO, color: ESPRESSO }}
+                    data-testid={`select-bot-level-${i}`}
+                  >
+                    {BOT_LEVELS.map((lv) => (
+                      <option key={lv} value={lv}>
+                        {t(`lokParty.bots.${lv}` as MessageKey)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+          </div>
+        </div>
         <div className="mt-3 text-xs opacity-80">{t('lokParty.results.ladder', { ladder: t('lokParty.ladder.solo'), rank: ladderLabel(meta.ladders.solo) })}</div>
         <div className="text-xs opacity-80">{t('lokParty.results.pass', { tier: passTier(meta.pass.xp) })}</div>
       </CreamCard>
@@ -584,10 +624,11 @@ export interface ArenaProps {
   onDone: (s: DropState) => void;
   getAudioContext: () => AudioContext | null;
   /** Solo Blitz tier, so bots scale with the player's rank. */
-  ladderTier: number;
+  /** The three bot skills, resolved from the lobby's difficulty choices. */
+  botSkills: [number, number, number];
 }
 
-export function DropArena({ seed, playerId, onDone, getAudioContext, ladderTier, durationMs = DROP.durationMs }: ArenaProps) {
+export function DropArena({ seed, playerId, onDone, getAudioContext, botSkills, durationMs = DROP.durationMs }: ArenaProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const inputRef = useRef<PlayerInput>({ mx: 0, my: 0, dashPressed: false });
@@ -640,7 +681,7 @@ export function DropArena({ seed, playerId, onDone, getAudioContext, ladderTier,
     const motion = prefersReducedMotion() ? 0 : 1;
     const juice: Juice = createJuice(getAudioContext, { motion, bpm: 118 });
     const labels = labelsRef.current;
-    const skills = [0, ...botSkillsForTier(ladderTier)];
+    const skills = [0, ...botSkills];
     const roster = seatOrder(playerId).map((id, i) => ({ characterId: id, bot: i !== 0, botSkill: skills[i] }));
     const state = createLokDrop(seed, roster, durationMs);
     const squash = state.players.map(() => new Squash());
@@ -655,7 +696,8 @@ export function DropArena({ seed, playerId, onDone, getAudioContext, ladderTier,
     let endAt = 0;
     let frenzyShown = false;
 
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const gov = new FrameGovernor();
+    let dpr = gov.dpr;
     let fit = 1;
     let portrait = false;
     let offX = 0;
@@ -895,6 +937,10 @@ export function DropArena({ seed, playerId, onDone, getAudioContext, ladderTier,
 
     const frame = (now: number) => {
       const dt = Math.min(100, now - last);
+      if (gov.tick(dt)) {
+        dpr = gov.dpr;
+        resize();
+      }
       last = now;
       realNow += dt;
       const simDt = juice.hitStop.simDt(realNow, dt);

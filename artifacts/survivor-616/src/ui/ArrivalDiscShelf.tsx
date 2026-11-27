@@ -17,7 +17,9 @@ import { watchDiscGuard } from '@/lib/discGuard';
 import { useT } from '@/lib/i18n';
 import { DiscShelves } from './DiscShelves';
 
-const DISC_SIZE = 'clamp(150px, 46vw, 300px)';
+// Width alone clipped the discs on wide, short screens (an Xbox reports about 1280 by 720 CSS pixels):
+// the shelf box is 54dvh tall, so the disc is also capped by height.
+const DISC_SIZE = 'clamp(110px, min(46vw, 33dvh), 300px)';
 
 export default function ArrivalDiscShelf({ lite, onPlay }: { lite?: boolean; onPlay?: () => void }) {
   useEffect(() => watchDiscGuard(), []);

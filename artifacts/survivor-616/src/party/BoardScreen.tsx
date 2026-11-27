@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CHARACTERS_BY_ID } from '@/game/data/characters';
 import { drawRig, drawShadow } from '@/game/render/sprite';
+import { FrameGovernor } from '@/lib/renderScale';
 import { useT, type MessageKey } from '@/lib/i18n';
 import { createJuice, drawRefractionRings, impact, Squash, type Juice } from './juiceEngine';
 import {
@@ -78,7 +79,7 @@ interface Props {
   humanId: string;
   rounds?: number;
   seed: number;
-  ladderTier: number;
+  botSkills: [number, number, number];
   getAudioContext: () => AudioContext | null;
   onFinish: (s: BoardState, localSeat: number) => void;
   /** Present when this is an online party. */
@@ -120,7 +121,7 @@ function faceLabel(f: DieFace): string {
 
 export type SeatRole = 'local' | 'bot' | 'remote';
 
-export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioContext, onFinish, onQuit, online }: Props) {
+export function BoardScreen({ humanId, rounds = 10, seed, botSkills, getAudioContext, onFinish, onQuit, online }: Props) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const seats = useMemo(() => (online ? online.seats.map((st) => st.characterId) : seatOrder(humanId)), [humanId, online]);
@@ -182,7 +183,8 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
     const motion = prefersReducedMotion() ? 0 : 1;
     const juice: Juice = createJuice(getAudioContext, { motion, bpm: 104 });
     const ensureAudio = () => void getAudioContext()?.resume?.();
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const gov = new FrameGovernor();
+    let dpr = gov.dpr;
     const bakeScale = Math.min(2, Math.max(1, dpr * 0.9));
     const city = createCityState();
     const grounds: { day: HTMLCanvasElement | null; night: HTMLCanvasElement | null } = { day: null, night: null };
@@ -772,6 +774,10 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
 
     const frame = (ts: number) => {
       const dt = Math.min(100, ts - last);
+      if (gov.tick(dt)) {
+        dpr = gov.dpr;
+        resize();
+      }
       last = ts;
       now += dt;
       // Human roll: spinning block while waiting for the hit.
@@ -1431,7 +1437,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
               seed={minigame}
               playerId={s.players[localSeat].characterId}
               durationMs={30_000}
-              ladderTier={ladderTier}
+              botSkills={botSkills}
               getAudioContext={getAudioContext}
               onDone={(r) => {
                 setMinigame(null);
@@ -1443,7 +1449,7 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
               seed={minigame}
               playerId={s.players[localSeat].characterId}
               durationMs={30_000}
-              ladderTier={ladderTier}
+              botSkills={botSkills}
               getAudioContext={getAudioContext}
               onDone={(d) => {
                 setMinigame(null);

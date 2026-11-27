@@ -122,6 +122,7 @@ import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 import { useT } from '@/lib/i18n';
 import { openCrewOverlay } from '@/state/socialStore';
 import { effectiveFrameRate, saverCapPref, useSavingPower } from '@/lib/powerSaver';
+import { baseDpr } from '@/lib/renderScale';
 
 /**
  * Screen point -> world point, using the same camera math `renderWorld` uses.
@@ -957,7 +958,7 @@ export function RunScreen({
       // load this backs the canvas down in a few small, reversible steps;
       // that is substantially cheaper than allowing a heavy frame to block
       // input or trigger a long fixed-step catch-up burst.
-      const ratio = Math.max(0.5, Math.min(window.devicePixelRatio || 1, 2) * backingScale);
+      const ratio = Math.max(0.5, baseDpr() * backingScale);
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
       const height = Math.max(1, rect.height);
