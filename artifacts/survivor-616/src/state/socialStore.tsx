@@ -21,7 +21,7 @@ import { useAuth } from './authStore';
 
 export const GAME_KEY = 'survivor616';
 export const OPEN_CREW_EVENT = 'lok:open-crew';
-export type CrewTab = 'crew' | 'friends' | 'recent' | 'add';
+export type CrewTab = 'crew' | 'games' | 'friends' | 'recent' | 'add';
 export type Doing = 'menu' | 'run' | 'theater';
 
 /** Short live messages shared by everyone in the crew (listening together, chat, emotes). */

@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 251,
+      "version": "0.43.13",
+      "date": "2026-11-28",
+      "publishedAt": "2026-11-28T15:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Crew Games tab and Follow the host",
+      "body": [
+        "The Crew menu has a new Games tab listing every mode you can play together, with the solo ones in a scroll underneath. The crew leader is the host: tap Lok Party and a room opens and your crew is invited at once. Anyone with Follow the host on (it is on by default, and the switch is right there) sees a short Following card and is taken along; tap Stay here to skip it. With Follow off you get the usual join button instead."
+      ]
+    },
+    {
       "number": 250,
       "version": "0.43.12",
       "date": "2026-11-28",
