@@ -20,6 +20,7 @@ import { useT } from '@/lib/i18n';
 import { CapsulePullOverlay } from './CapsulePullOverlay';
 import { BoardScreen } from './BoardScreen';
 import { PartyLobby } from './PartyLobby';
+import { VaultScreen } from './VaultScreen';
 import { MinigameStage } from './MinigameStage';
 import { RingRushArena } from './RingRushArena';
 import { CARTRIDGES, PRACTICE_ORDER, isKitGame, type KitGameId } from './cartridges';
@@ -144,7 +145,7 @@ function RigPreview({ id, size = 96 }: { id: string; size?: number }) {
 
 // ------------------------------------------------------------------ screen
 
-type Phase = 'hub' | 'lobby' | 'online' | 'play' | 'board' | 'results' | 'practice';
+type Phase = 'hub' | 'lobby' | 'online' | 'play' | 'board' | 'results' | 'practice' | 'vault';
 type PracticeGame = KitGameId | 'rush';
 type Mode = 'blitz' | 'drop' | 'friends';
 
@@ -278,12 +279,23 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
           missions={refreshTimers(meta, Date.now()).weekly.missions}
           vault={meta.vault}
           onCrack={crack}
+          onVault={() => setPhase('vault')}
           onPick={(m) => {
             setMode(m);
             setPhase(m === 'friends' ? 'online' : 'lobby');
           }}
           onBack={onBack}
           t={t}
+        />
+      ) : null}
+      {phase === 'vault' ? (
+        <VaultScreen
+          meta={meta}
+          onChange={(m) => {
+            saveLokPartyMeta(storage(), m);
+            setMeta(m);
+          }}
+          onBack={() => setPhase('hub')}
         />
       ) : null}
       {phase === 'online' ? (
@@ -1616,7 +1628,7 @@ function PracticeRun({ game, seed, pick, tier, getAudioContext, onDone }: { game
   );
 }
 
-function Hub({ onPractice, missions, vault, onCrack, onPick, onBack, t }: { onPractice: (g: PracticeGame) => void; missions: LokPartyMeta['weekly']['missions']; vault: LokPartyMeta['vault']; onCrack: () => void; onPick: (m: Mode) => void; onBack: () => void; t: ReturnType<typeof useT> }) {
+function Hub({ onPractice, missions, vault, onCrack, onVault, onPick, onBack, t }: { onVault: () => void; onPractice: (g: PracticeGame) => void; missions: LokPartyMeta['weekly']['missions']; vault: LokPartyMeta['vault']; onCrack: () => void; onPick: (m: Mode) => void; onBack: () => void; t: ReturnType<typeof useT> }) {
   return (
     <div className="absolute inset-0 overflow-y-auto" style={{ background: 'radial-gradient(ellipse at 50% 20%, #2a1d5c 0%, #07061a 70%)' }}>
       <div className="flex min-h-full flex-col items-center justify-center gap-4 p-4">
@@ -1678,6 +1690,9 @@ function Hub({ onPractice, missions, vault, onCrack, onPick, onBack, t }: { onPr
             <span className="text-xs opacity-70">{t('lokParty.results.vault', { capsules: vault.capsules, keys: vault.keys, shards: vault.shards.length })}</span>
           </button>
         ) : null}
+        <button type="button" {...press(onVault)} className="rounded-xl border-2 border-fuchsia-300/60 px-5 py-2 text-sm font-black" style={{ background: '#1a1238' }}>
+          {t('lokParty.vault.open', { n: vault.shards.length })}
+        </button>
         <button type="button" {...press(onBack)} className="rounded-lg border border-white/30 px-5 py-2 text-sm font-bold">
           {t('lokParty.drop.back')}
         </button>

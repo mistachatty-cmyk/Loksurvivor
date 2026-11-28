@@ -18,7 +18,7 @@ The rules are written and tested, but the player cannot reach them.
 
 | Gap | Today | Size |
 | --- | --- | --- |
-| No vault screen | Shards pile up. `forgeShard`, `disenchantShard` and `rerollShards` have no buttons, so no shard ever becomes a permanent unlock. | M, Look |
+| ~~No vault screen~~ | Done in v0.43.6: `VaultScreen.tsx`, a shelf with forge, break and reroll. | done |
 | Unlocks show nowhere outside the pull | `exportFlex` is not read by 616, so Party palettes, capes and hats cannot be worn in the main game. | M |
 | Pass tiers give nothing before 50 | The tier number rises; only the bonus shards past tier 50 are paid. | M (needs a reward list from the owner) |
 | Seasons never turn over | `startSplit` is never called, so the capsule-per-character reset and rank soft reset never happen. | S (needs a season length) |

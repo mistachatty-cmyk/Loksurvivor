@@ -19,3 +19,8 @@ Read before touching `artifacts/survivor-616/src/party/` or anything Lok Party p
 - Owner rule (2026-11-27): minigames are interactive party games with every character visible and acting, never filler. Vault screen waits for the owner's pick of layout A/B/C.
 - New minigames go through the kit (minigameKit.ts + MinigameStage.tsx): rules file + art file; never hand-roll another entrance or podium. Visuals made in chat go in docs/art-library/lok-party/ with how they were made.
 - Owner direction (2026-11-27): Roof Collapse is the streamer showpiece. Rings 4 to 1 with a loud, readable drop each time; controls must be precise and fire on press (mouse follow + click dash, touch DASH button, dash buffer, coyote clutch saves).
+
+## v0.43.6 (2026-11-28): ten modes and the vault
+- New kit games: Gem Vacuum Frenzy (`gemVacuum*.ts`), Strike a Pose (`strikePose*.ts`), Face Off (`faceOff*.ts`), Rooftop Relay 2v2 (`relay*.ts`, team = seat % 2, a human's tap jumps their team's runner) and Tilting Deck (a `'tilt'` arena inside `roofRumble.ts`). All are listed in `party/cartridges.ts` (`CARTRIDGES`, `PRACTICE_ORDER`) and in the rotation in `minigameKit.ts`; BoardScreen and the practice menu look games up there, so a new game is rules + art + one line in cartridges.ts and minigameForRound.
+- Vault: `VaultScreen.tsx` shelf layout (owner said pick what is best). Cosmetic names are `lokParty.vault.item.<id>` keys in en.json: add one when adding a cosmetic to `PARTY_COSMETICS`.
+- Art was done at medium effort; entrances, particles and reveals are candidates for a higher-tier polish pass. Previews: `docs/art-library/lok-party/new-modes-2026-11-27/`.

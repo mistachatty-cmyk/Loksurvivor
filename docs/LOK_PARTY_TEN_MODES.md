@@ -1,8 +1,10 @@
 # Lok Party: the road to 10 modes (2026-11-27)
 
+**Status (v0.43.6): all ten are built.** Gem Vacuum Frenzy, Strike a Pose, Face Off, Rooftop Relay (2v2) and Tilting Deck joined the rotation, and the Vault shelf shipped. They were built at medium effort; the rules are tested, the art is solid but a higher-tier pass on the entrances, particles and reveals is still worth doing (see "Who builds what"). Registry: `src/party/cartridges.ts`.
+
 Goal from the owner: about 10 modes in Lok Party. "Mode" here means something a party can play: the board plus every minigame in the rotation. Every one follows the owner rule in [LOK_PARTY_NEXT.md](./LOK_PARTY_NEXT.md): a party game with each player's character on screen doing something, polished, seeded and score-attack so online stays cheap.
 
-## Count today: 5
+## Count at the start of the day: 5
 
 1. Turbo Crown Blitz (the board)
 2. The Lok Drop
