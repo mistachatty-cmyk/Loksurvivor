@@ -1701,11 +1701,7 @@
   "lokParty.face.brows": "Augenbrauen",
   "lokParty.redlight.title": "Rotes Licht, grünes Licht",
   "lokParty.redlight.prompt": "Zum Ausführen tippen. Auf Rot einfrieren!",
-<<<<<<< HEAD
   "lokParty.redlight.hint": "Tippen Sie so schnell wie möglich, um auf die Eule zuzulaufen. Wenn sich sein Kopf dreht, machen Sie sich bereit. Wenn seine Augen rot werden, hören Sie auf zu klopfen, sonst erwischt Sie der Laser. Jeder kann in die Luft gesprengt werden. Wer als Erster die Ziellinie überquert, gewinnt.",
-=======
-  "lokParty.redlight.hint": "Tippen Sie so schnell wie möglich, um auf die Eule zuzulaufen. Wenn sich der Kopf dreht, machen Sie sich bereit. Wenn seine Augen rot werden, hören Sie auf zu klopfen, sonst erwischt Sie der Laser. Jeder kann in die Luft gesprengt werden. Wer als Erster die Ziellinie überquert, gewinnt.",
->>>>>>> origin/claude/party-roadmap
   "lokParty.redlight.go": "LOS!",
   "lokParty.redlight.warn": "Machen Sie sich bereit",
   "lokParty.redlight.freeze": "EINFRIEREN!",
