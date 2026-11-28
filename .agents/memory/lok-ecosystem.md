@@ -7,4 +7,5 @@
 - `lok:new-app <name>` scaffolds `artifacts/<name>` (headless starter: manifest, chat cast + runtime, crash capture, contract test).
   Verified by generating, installing, typechecking and testing it; the generated folder was deleted afterwards (do the same when testing).
 - `lok:status --write` regenerates `docs/ECOSYSTEM_STATUS.md`; run it when an app manifest changes.
-- Not done: moving the LOK Chat overlay into `@lok/chat`, SDK schema entries, extraction to separate repos.
+- The starter also generates `src/ChatPanel.tsx` (+ test) using `@lok/chat/react`. `lok:status --check` runs in CI.
+- Not done: SDK schema entries (paste-ready in `docs/SDK_PATCH_lokChat_lokErrorReport.md`), extraction to separate repos.

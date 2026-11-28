@@ -28,9 +28,11 @@ createChatActions({ engine, store, features, pace })   // sendToAlly, startProac
 validateCast(cast)  ·  runTranscript(engine, self, others, opts)  ·  CHAT_FEATURES / mergeFeatures
 ```
 616 binds these once in `src/game/chat/runtime.ts`; `engine/lokChat.ts`, `state/lokChatStore.ts` and
-`state/lokChatActions.ts` are thin re-exports that keep the old import paths. The React overlay (`ui/LokChat.tsx`) is
-still 616's own reference implementation; moving it into the package behind a strings object and theme tokens is
-tracked in the roadmap.
+`state/lokChatActions.ts` are thin re-exports that keep the old import paths. The chat window and launcher are in the package too
+(`@lok/chat/react`: `LokChatWindow`, `LokChatLauncher`, `defaultChatStrings`, `InitialsAvatar`). An app passes its `people`, a
+`strings` object (616 builds it from `en.json` in `lib/lokChatStrings.ts`), the `runtime` (`{ store, actions }`), a
+`features` source (`{ isOn, subscribe }`) and optionally `renderAvatar` (616 passes the rig portraits). The classes are tailwind
+utilities: a tailwind v4 app must add `@source` for `packages/lok-chat/src/react` in its CSS (616: `src/index.css`).
 
 ## Feature switches
 `lok.universe.json`: `"lokChat": { "enabled": true, "source": "616_survivor", "features": { "scenes": false } }`.
@@ -69,7 +71,7 @@ The manifest schema lives in the vendored SDK: `Lok-EcoSystsem/universe-sdk` nee
 1. Add `@lok/chat` as a workspace dependency.
 2. Copy `examples/minimal-cast/cast.ts`, write your people, and run `validateCast` in your tests.
 3. Provide `buildContext` (the facts) and your UI strings; create the engine, store and actions once (see 616's `runtime.ts`).
-4. Mount a launcher and conversation UI (616's `ui/LokChat.tsx` is the reference).
+4. Mount `LokChatLauncher` and `LokChatWindow` from `@lok/chat/react` (616's `ui/LokChat.tsx` is a ~60-line wrapper; `lok:new-app` generates a `ChatPanel.tsx`).
 5. Add the `lokChat` manifest block and a Settings section that lists the features (`ui/LokChatSettings.tsx`).
 6. Add transcript tests with `runTranscript` and hold the fallback rate (616: <= 20% per run, < 8% average).
 

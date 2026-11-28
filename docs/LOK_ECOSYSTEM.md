@@ -34,7 +34,7 @@ All plugins follow `docs/LOK_COST_DISCIPLINE.md`: free to run, no runtime LLM, n
 - `lok:check`: validates every `artifacts/*/lok.universe.json` (also run in CI). Knows the `lokErrorReport` and `lokChat`
   blocks; `SDK_SCHEMA_PATCH` in `src/manifest.ts` is the text to add to `Lok-EcoSystsem/universe-sdk` so the vendored
   `PlatformManifest` carries them (never edit `lib/lok-universe` here).
-- `lok:status [--write]`: per app, which plugins are on, SDK version, manifest problems; `--write` updates `docs/ECOSYSTEM_STATUS.md`.
+- `lok:status [--write | --check]`: per app, which plugins are on, SDK version, manifest problems; `--write` updates `docs/ECOSYSTEM_STATUS.md`, `--check` fails in CI if it is stale.
 - `lok:catalog [--check]`: regenerates (or verifies) `docs/lok-plugins.json`.
 - `lok:new-app <name> [--label "Name"] [--no-chat] [--no-errors]`: scaffolds `artifacts/<name>` with a valid manifest, the
   chat plugin on a starter cast, crash capture, and a contract test. It never overwrites an existing folder.
@@ -50,5 +50,5 @@ Add a row to `PLUGINS` in `packages/lok-ecosystem/src/catalog.ts`, run `lok:cata
 checks), add its manifest block to `checkManifest` and `SDK_SCHEMA_PATCH`, and follow the conventions.
 
 ## Still open
-Move the LOK Chat overlay into `@lok/chat`; add the `lokChat` / `lokErrorReport` entries to the SDK; extract plugins into
-their own repos once a second app exists; the planned plugins above.
+Add the `lokChat` / `lokErrorReport` entries to the SDK (paste-ready: `docs/SDK_PATCH_lokChat_lokErrorReport.md`); extract plugins
+into their own repos once a second app exists; the planned plugins above. The LOK Chat window now lives in `@lok/chat/react`.

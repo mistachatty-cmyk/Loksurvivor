@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
+import { CHAT_FEATURES } from '@lok/chat';
 import { PLUGINS, SDK_SCHEMA_PATCH, appStatus, catalogJson, checkManifest, renderStatus, scaffoldApp, validAppName } from './index';
 import { readManifests, repoRoot, sdkVersion } from '../scripts/_files';
 
@@ -33,6 +34,9 @@ describe('checkManifest', () => {
   it('describes the SDK entries that need adding', () => {
     assert.match(SDK_SCHEMA_PATCH, /lokChat\?:/);
     assert.match(SDK_SCHEMA_PATCH, /lokErrorReport\?:/);
+    for (const feature of CHAT_FEATURES) assert.ok(SDK_SCHEMA_PATCH.includes(`"${feature}"`), `SDK patch is missing ${feature}`);
+    const doc = readFileSync(join(repoRoot(), 'docs/SDK_PATCH_lokChat_lokErrorReport.md'), 'utf8');
+    for (const feature of CHAT_FEATURES) assert.ok(doc.includes(`"${feature}"`), `docs/SDK_PATCH is missing ${feature}`);
   });
 });
 
@@ -70,7 +74,7 @@ describe('starter kit', () => {
 
   it('generates a valid manifest, wired plugins and a contract test', () => {
     const files = scaffoldApp({ name: 'harbor-quest', sdkVersion: '1.2.0', starterCast });
-    assert.deepEqual(Object.keys(files).sort(), ['README.md', 'lok.universe.json', 'package.json', 'src/chat/cast.ts', 'src/chat/runtime.ts', 'src/errors.ts', 'src/starter.test.ts', 'tsconfig.json']);
+    assert.deepEqual(Object.keys(files).sort(), ['README.md', 'lok.universe.json', 'package.json', 'src/ChatPanel.tsx', 'src/chat-panel.test.tsx', 'src/chat/cast.ts', 'src/chat/runtime.ts', 'src/errors.ts', 'src/starter.test.ts', 'tsconfig.json']);
     const manifest = JSON.parse(files['lok.universe.json']!);
     assert.deepEqual(checkManifest(manifest), []);
     assert.equal(manifest.appKey, 'harbor_quest');
@@ -83,7 +87,7 @@ describe('starter kit', () => {
 
   it('can leave plugins out, and refuses bad names', () => {
     const slim = scaffoldApp({ name: 'tiny', sdkVersion: '1.2.0', starterCast, chat: false, errorReport: false });
-    assert.ok(!('src/chat/cast.ts' in slim) && !('src/errors.ts' in slim));
+    assert.ok(!('src/chat/cast.ts' in slim) && !('src/errors.ts' in slim) && !('src/ChatPanel.tsx' in slim));
     assert.ok(!('lokChat' in JSON.parse(slim['lok.universe.json']!)));
     for (const bad of ['Bad Name', '../escape', 'a--b', '', '-x', 'x'.repeat(41)]) assert.equal(validAppName(bad), false, bad);
     assert.throws(() => scaffoldApp({ name: '../escape', sdkVersion: '1.2.0', starterCast }));
