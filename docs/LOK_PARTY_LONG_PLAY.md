@@ -23,7 +23,7 @@ against each other, and it needs to answer back in ways that make sense.
 - Art is procedural and medium-effort; show visuals before any final art decision.
 - Not checked on a real device.
 
-## Added in v0.43.8
+## Added in v0.43.10
 - Districts (`BoardDef.districts`): Market Row, The Terrace, Riverside, West Side, The Rooftops. Each round one is hot (landing pays +3, chosen where the trailing player has spaces 1-8 hops ahead, never the same twice in a row). Hot spaces glow amber.
 - Streaks: ending a turn on a good space (cred, supply, event, start) back to back builds a streak; cred spaces pay up to +3 more; a bad space breaks it.
 - Bounty: the crown leader wears one; a rival who ends a turn on the leader's space takes up to 5 cred.
@@ -38,7 +38,7 @@ against each other, and it needs to answer back in ways that make sense.
 - Comeback crowns: last-place players choose where next round's hot district sits.
 - Season goals across matches (relic collection, district tours) tied to the Vault.
 
-## Online lobby (v0.43.8)
+## Online lobby (v0.43.10)
 - Scan-to-join QR card always visible (host and guests), built on device from the room link. Test: `party invite` in lokParty.test.ts.
 - Game options drawer: host picks goal and length online; sent with the seats (`rounds` code). Guests see the same line read-only.
 - Wake lock while gathering; haptic when a friend sits down.

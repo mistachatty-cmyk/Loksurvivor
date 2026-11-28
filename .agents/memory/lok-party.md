@@ -28,5 +28,5 @@ Read before touching `artifacts/survivor-616/src/party/` or anything Lok Party p
 ## v0.43.7 board goals
 Goals (crowns/relics race) and per-round spawns live in party/lokBoard.ts; goal rides in the `rounds` number (encodeGoal/decodeGoal). See docs/LOK_PARTY_LONG_PLAY.md.
 
-## v0.43.8
+## v0.43.10
 Haptics via SDK 1.10.0 (partyHaptics.ts hook, Settings > Haptics). Districts/streaks/bounty in lokBoard.ts. pnpm check:feel is the on-demand feel check. Files split: dropShared, DropArena, LobbyScreens, boardShared, boardUi.

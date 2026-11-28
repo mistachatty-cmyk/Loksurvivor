@@ -34,7 +34,7 @@ function placeFrom(anchor: HTMLElement): Place {
  * Drawn as an overlay (portal + fixed) so opening it changes nothing about the
  * bar's own footprint, and it is never shown until the player asks for it.
  */
-export function SoundbarPanel({ anchorRef, onClose }: { anchorRef: RefObject<HTMLElement | null>; onClose: () => void }) {
+export function SoundbarPanel({ anchorRef, onClose, onOpenMusic }: { anchorRef: RefObject<HTMLElement | null>; onClose: () => void; onOpenMusic?: () => void }) {
   const t = useT();
   const player = useMusicPlayer();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -197,6 +197,21 @@ export function SoundbarPanel({ anchorRef, onClose }: { anchorRef: RefObject<HTM
           {player.playbackRate}x
         </button>
       </div>
+
+      {onOpenMusic && (
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            onOpenMusic();
+          }}
+          className="soundbar-row mt-2 w-full border border-white/20 px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-white/80 transition hover:border-primary hover:text-primary"
+          style={row(3)}
+          data-testid="button-global-music-open-panel"
+        >
+          {t('soundbar.openPanel')}
+        </button>
+      )}
     </div>,
     overlayContainer(),
   );
