@@ -5,6 +5,7 @@
 
 import type { MinigameCartridge, MinigameId } from './minigameKit';
 import { gemVacuum } from './gemVacuumArt';
+import { faceOff } from './faceOffArt';
 import { strikePose } from './strikePoseArt';
 import { roofCollapse, roofRumble } from './roofRumbleArt';
 
@@ -17,9 +18,10 @@ export const CARTRIDGES: Record<KitGameId, MinigameCartridge<any>> = {
   collapse: roofCollapse,
   gems: gemVacuum,
   pose: strikePose,
+  face: faceOff,
 };
 
 export const isKitGame = (id: MinigameId): id is KitGameId => id in CARTRIDGES;
 
 /** The practice menu's order. */
-export const PRACTICE_ORDER: (KitGameId | 'rush')[] = ['rumble', 'collapse', 'gems', 'pose', 'rush'];
+export const PRACTICE_ORDER: (KitGameId | 'rush')[] = ['rumble', 'collapse', 'gems', 'pose', 'face', 'rush'];
