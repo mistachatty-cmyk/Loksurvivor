@@ -28,3 +28,5 @@ export * from "./collect";
 export * from "./screen";
 export * from "./gamepad";
 export * from "./haptics";
+export * from "./gameDirectory";
+export * from "./crewFollow";
