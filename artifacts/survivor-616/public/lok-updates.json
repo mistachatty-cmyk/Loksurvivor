@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 245,
+      "version": "0.43.7",
+      "date": "2026-11-28",
+      "publishedAt": "2026-11-28T01:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party board: real goals and a board that answers back",
+      "body": [
+        "The board now has goals beyond \"play N rounds\": pick Crown race (first to 3 crowns) or Relic hunt (collect 5 relics) in the lobby. The game ends the round someone gets there, so everyone has equal turns.",
+        "The board puts something new down every round, aimed a few spaces ahead of whoever is furthest behind: supply caches (cred and maybe an item), tailwind beacons (+2 on your next roll), safe houses (block your next loss) and, in a relic hunt, relics. Uncollected pickups fade after two rounds, and arrival is a soft chime rather than a banner so a long session stays calm."
+      ]
+    },
+    {
       "number": 244,
       "version": "0.43.6",
       "date": "2026-11-28",

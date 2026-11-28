@@ -1861,3 +1861,83 @@ export function drawDiceBlock(ctx: CanvasRenderingContext2D, x: number, y: numbe
   ctx.restore();
   void t;
 }
+
+
+/** Spawn colours: one per kind so a glance tells you what is worth walking toward. */
+export const SPAWN_COLOR: Record<'cache' | 'beacon' | 'rest' | 'relic', string> = {
+  cache: '#ffcf3c',
+  beacon: '#38d5ff',
+  rest: '#5fe36f',
+  relic: '#c77dff',
+};
+
+/**
+ * Procedural pickup art for things the board puts down: a gold crate (cache), a cyan pulse pillar (beacon),
+ * a green arch (safe house) and a spinning violet shard (relic). `age` 0..1 is how close it is to fading:
+ * fading pickups blink slowly so nobody is surprised when one vanishes. Never animates when `calm` is set.
+ */
+export function drawSpawn(ctx: CanvasRenderingContext2D, kind: 'cache' | 'beacon' | 'rest' | 'relic', x: number, y: number, t: number, age: number, calm: boolean) {
+  const col = SPAWN_COLOR[kind];
+  const bob = calm ? 0 : Math.sin(t / 380 + x) * 3;
+  if (age > 0.75 && !calm && Math.floor(t / 280) % 2 === 0) ctx.globalAlpha = 0.45;
+  const glow = ctx.createRadialGradient(x, y, 2, x, y, 40);
+  glow.addColorStop(0, col + '66');
+  glow.addColorStop(1, col + '00');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(x, y + 4, 40, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.save();
+  ctx.translate(x, y - 16 + bob);
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#2b1a12';
+  ctx.fillStyle = col;
+  if (kind === 'cache') {
+    ctx.beginPath();
+    ctx.roundRect(-11, -9, 22, 18, 3);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#fff6c4';
+    ctx.fillRect(-11, -2, 22, 4);
+  } else if (kind === 'beacon') {
+    ctx.beginPath();
+    ctx.moveTo(-7, 10);
+    ctx.lineTo(-3, -16);
+    ctx.lineTo(3, -16);
+    ctx.lineTo(7, 10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    const r = 8 + (calm ? 4 : ((t / 90) % 14));
+    ctx.strokeStyle = col;
+    ctx.globalAlpha *= Math.max(0, 1 - r / 24);
+    ctx.beginPath();
+    ctx.arc(0, -18, r, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (kind === 'rest') {
+    ctx.beginPath();
+    ctx.moveTo(-12, 10);
+    ctx.lineTo(-12, -2);
+    ctx.quadraticCurveTo(0, -18, 12, -2);
+    ctx.lineTo(12, 10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#2b1a12';
+    ctx.fillRect(-4, 0, 8, 10);
+  } else {
+    const spin = calm ? 0 : t / 600;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i += 1) {
+      const a = spin + (i / 6) * Math.PI * 2;
+      const rr = i % 2 ? 7 : 13;
+      ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr * 1.15);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}

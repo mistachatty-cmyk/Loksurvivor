@@ -24,3 +24,6 @@ Read before touching `artifacts/survivor-616/src/party/` or anything Lok Party p
 - New kit games: Gem Vacuum Frenzy (`gemVacuum*.ts`), Strike a Pose (`strikePose*.ts`), Face Off (`faceOff*.ts`), Rooftop Relay 2v2 (`relay*.ts`, team = seat % 2, a human's tap jumps their team's runner) and Tilting Deck (a `'tilt'` arena inside `roofRumble.ts`). All are listed in `party/cartridges.ts` (`CARTRIDGES`, `PRACTICE_ORDER`) and in the rotation in `minigameKit.ts`; BoardScreen and the practice menu look games up there, so a new game is rules + art + one line in cartridges.ts and minigameForRound.
 - Vault: `VaultScreen.tsx` shelf layout (owner said pick what is best). Cosmetic names are `lokParty.vault.item.<id>` keys in en.json: add one when adding a cosmetic to `PARTY_COSMETICS`.
 - Art was done at medium effort; entrances, particles and reveals are candidates for a higher-tier polish pass. Previews: `docs/art-library/lok-party/new-modes-2026-11-27/`.
+
+## v0.43.7 board goals
+Goals (crowns/relics race) and per-round spawns live in party/lokBoard.ts; goal rides in the `rounds` number (encodeGoal/decodeGoal). See docs/LOK_PARTY_LONG_PLAY.md.

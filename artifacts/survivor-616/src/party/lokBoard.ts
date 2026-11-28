@@ -109,6 +109,12 @@ export interface BoardPlayer {
   /** Item effects for this turn. */
   doubleDice: boolean;
   customValue: number | null;
+  /** Relics carried (relic race). */
+  relics: number;
+  /** Next roll goes two spaces further (a Tailwind Beacon). */
+  tailwind: boolean;
+  /** Blocks the next coin loss (a Safe House). */
+  shield: boolean;
   stats: { spacesMoved: number; chaos: number; coinsSpent: number; minigameCoins: number; minigameWins: number; steals: number };
 }
 
@@ -120,6 +126,44 @@ export type Pending =
   | { type: 'custom-dice' };
 
 export type Phase = 'turn' | 'move' | 'land' | 'minigame' | 'bonus' | 'over';
+
+/**
+ * What a game is played to. 'rounds' is the classic Turbo Crown Blitz (most crowns after N rounds). The
+ * race goals end the moment someone reaches the target (at the end of that round, so every player has had
+ * the same number of turns) and are built for long sessions: the round cap is only a safety net.
+ */
+export type BoardGoal = { kind: 'rounds' } | { kind: 'crowns'; target: number } | { kind: 'relics'; target: number };
+export const RACE_CAP_ROUNDS = 40;
+export const goalLabelKey = (g: BoardGoal) => g.kind;
+
+/**
+ * A goal travels through the existing `rounds` number (lobby, online start message, props) so no network
+ * shape changes and older clients still play a classic game: 5..15 = classic rounds, 100 + n = race to n
+ * crowns, 200 + n = hunt n relics.
+ */
+export function encodeGoal(goal: BoardGoal, rounds: number): number {
+  if (goal.kind === 'crowns') return 100 + goal.target;
+  if (goal.kind === 'relics') return 200 + goal.target;
+  return rounds;
+}
+export function decodeGoal(code: number): { rounds: number; goal: BoardGoal } {
+  if (code >= 200) return { rounds: 10, goal: { kind: 'relics', target: Math.min(12, Math.max(2, code - 200)) } };
+  if (code >= 100) return { rounds: 10, goal: { kind: 'crowns', target: Math.min(8, Math.max(2, code - 100)) } };
+  return { rounds: code, goal: { kind: 'rounds' } };
+}
+
+/** Things the board puts down on its own, so the board answers back instead of sitting still. */
+export type SpawnKind = 'cache' | 'beacon' | 'rest' | 'relic';
+export interface Spawn {
+  id: number;
+  node: string;
+  kind: SpawnKind;
+  bornRound: number;
+}
+/** Supply caches, beacons and safe houses fade after this many rounds if nobody takes them. */
+export const SPAWN_LIFE_ROUNDS = 2;
+export const SPAWN_CAP = 3;
+export const RELICS_ON_BOARD = 2;
 
 export type BoardEvent =
   | { kind: 'turn-start'; who: number; round: number }
@@ -141,6 +185,11 @@ export type BoardEvent =
   | { kind: 'overtime' }
   | { kind: 'minigame' }
   | { kind: 'bonus'; name: BonusCrownName; winners: number[] }
+  | { kind: 'spawn'; id: number; node: string; spawn: SpawnKind }
+  | { kind: 'spawn-collected'; who: number; id: number; node: string; spawn: SpawnKind; relics: number }
+  | { kind: 'spawn-fade'; id: number; node: string; spawn: SpawnKind }
+  | { kind: 'shield-used'; who: number }
+  | { kind: 'goal-reached'; who: number }
   | { kind: 'game-over' };
 
 export type BoardEventName = 'boulder-run' | 'night-market' | 'gantry-lift' | 'blackout';
@@ -165,6 +214,11 @@ export interface BoardState {
   bonus: { name: BonusCrownName; winners: number[] }[];
   /** Hops taken this move, for the trail. */
   trail: string[];
+  goal: BoardGoal;
+  spawns: Spawn[];
+  nextSpawnId: number;
+  /** The player who hit a race goal this round (the round still finishes). */
+  goalHitBy: number | null;
 }
 
 export function boardRng(seed: number): () => number {
@@ -178,7 +232,7 @@ export function boardRng(seed: number): () => number {
   };
 }
 
-export function createBoardGame(seed: number, board: BoardDef, roster: { characterId: string; bot: boolean }[], maxRounds = 10): BoardState {
+export function createBoardGame(seed: number, board: BoardDef, roster: { characterId: string; bot: boolean }[], maxRounds = 10, goal: BoardGoal = { kind: 'rounds' }): BoardState {
   const rng = boardRng(seed);
   const s: BoardState = {
     seed,
@@ -196,10 +250,13 @@ export function createBoardGame(seed: number, board: BoardDef, roster: { charact
       frozen: false,
       doubleDice: false,
       customValue: null,
+      relics: 0,
+      tailwind: false,
+      shield: false,
       stats: { spacesMoved: 0, chaos: 0, coinsSpent: 0, minigameCoins: 0, minigameWins: 0, steals: 0 },
     })),
     round: 1,
-    maxRounds: Math.max(3, maxRounds),
+    maxRounds: goal.kind === 'rounds' ? Math.max(3, maxRounds) : RACE_CAP_ROUNDS,
     turnOf: 0,
     phase: 'turn',
     pending: null,
@@ -210,17 +267,29 @@ export function createBoardGame(seed: number, board: BoardDef, roster: { charact
     events: [],
     bonus: [],
     trail: [],
+    goal,
+    spawns: [],
+    nextSpawnId: 1,
+    goalHitBy: null,
   };
   relocateVendor(s);
+  spawnRound(s);
   s.events = [];
   beginTurn(s);
   return s;
 }
 
-export const isOvertime = (s: BoardState) => s.round > s.maxRounds - 3;
+export const isOvertime = (s: BoardState) => s.goal.kind === 'rounds' && s.round > s.maxRounds - 3;
 const cur = (s: BoardState) => s.players[s.turnOf];
 
+const BLOCKABLE = new Set(['trap', 'glitch', 'boulder', 'archon', 'archon-trap', 'hack']);
+
 function addCoins(s: BoardState, p: BoardPlayer, delta: number, reason: string) {
+  if (delta < 0 && p.shield && BLOCKABLE.has(reason)) {
+    p.shield = false;
+    s.events.push({ kind: 'shield-used', who: p.index });
+    return 0;
+  }
   const d = delta < 0 ? -Math.min(p.coins, -delta) : delta;
   p.coins += d;
   if (d !== 0) s.events.push({ kind: 'coins', who: p.index, delta: d, reason });
@@ -298,6 +367,7 @@ export function boardAct(s: BoardState, a: BoardAction): void {
       p.crowns += 1;
       s.events.push({ kind: 'coins', who: p.index, delta: -CROWN_COST, reason: 'crown' });
       s.events.push({ kind: 'crown-bought', who: p.index });
+      checkGoal(s, p);
       relocateVendor(s);
     } else s.events.push({ kind: 'crown-passed', who: p.index });
     if (s.stepsLeft <= 0) s.phase = 'land';
@@ -348,6 +418,10 @@ function roll(s: BoardState, p: BoardPlayer, signature: boolean) {
   } else face = 1 + Math.floor(s.rng() * 10);
   let total = faceMove(face);
   if (p.doubleDice) total += 1 + Math.floor(s.rng() * 10);
+  if (p.tailwind && total > 0) {
+    total += 2;
+    p.tailwind = false;
+  }
   if (p.frozen) {
     total = Math.ceil(total / 2);
     p.frozen = false;
@@ -388,6 +462,7 @@ function hop(s: BoardState, p: BoardPlayer, to: string) {
   s.stepsLeft -= 1;
   s.trail.push(to);
   s.events.push({ kind: 'hop', who: p.index, from, to, via });
+  collectSpawns(s, p, to, false);
   if (to === s.vendor) {
     if (p.coins >= CROWN_COST) {
       s.pending = { type: 'crown' };
@@ -432,6 +507,7 @@ function resolveSpace(s: BoardState, p: BoardPlayer) {
   const node = s.map[p.node];
   if (!node) return;
   s.events.push({ kind: 'land', who: p.index, space: node.kind, node: node.id });
+  collectSpawns(s, p, node.id, true);
   const ot = isOvertime(s);
   const trapOwner = s.traps[p.node];
   if (trapOwner !== undefined && trapOwner !== p.index) {
@@ -536,6 +612,14 @@ function endTurn(s: BoardState) {
     beginTurn(s);
     return;
   }
+  if (s.goalHitBy !== null) {
+    // A race goal was hit this round: everyone has had their turn, so the race is over.
+    s.events.push({ kind: 'goal-reached', who: s.goalHitBy });
+    s.pending = null;
+    awardBonus(s);
+    s.phase = 'bonus';
+    return;
+  }
   s.phase = 'minigame';
   s.pending = null;
   s.events.push({ kind: 'minigame' });
@@ -563,7 +647,8 @@ export function boardMinigameResult(s: BoardState, placements: number[]): void {
     s.night = !s.night;
     s.events.push({ kind: 'night', night: s.night });
   }
-  if (s.round === s.maxRounds - 2) s.events.push({ kind: 'overtime' });
+  if (s.goal.kind === 'rounds' && s.round === s.maxRounds - 2) s.events.push({ kind: 'overtime' });
+  spawnRound(s);
   s.turnOf = 0;
   beginTurn(s);
 }
@@ -586,8 +671,121 @@ function awardBonus(s: BoardState) {
 }
 
 export function boardStandings(s: BoardState): { index: number; place: number }[] {
-  const order = [...s.players].sort((a, b) => b.crowns - a.crowns || b.coins - a.coins || a.index - b.index);
+  const metric = (p: BoardPlayer) => (s.goal.kind === 'relics' ? p.relics : 0);
+  const order = [...s.players].sort((a, b) => metric(b) - metric(a) || b.crowns - a.crowns || b.coins - a.coins || a.index - b.index);
   return order.map((p, i) => ({ index: p.index, place: i + 1 }));
+}
+
+// ---------------------------------------------------------------------------
+// The board answers back: spawns and goals
+// ---------------------------------------------------------------------------
+
+/** Race progress for a player: how close they are to the goal, 0..1. */
+export function goalProgress(s: BoardState, p: BoardPlayer): number {
+  if (s.goal.kind === 'crowns') return Math.min(1, p.crowns / s.goal.target);
+  if (s.goal.kind === 'relics') return Math.min(1, p.relics / s.goal.target);
+  return Math.min(1, s.round / s.maxRounds);
+}
+
+function checkGoal(s: BoardState, p: BoardPlayer) {
+  if (s.goal.kind === 'rounds' || s.goalHitBy !== null) return;
+  const have = s.goal.kind === 'crowns' ? p.crowns : p.relics;
+  if (have >= s.goal.target) s.goalHitBy = p.index;
+}
+
+const standing = (s: BoardState, p: BoardPlayer) => p.crowns * 20 + p.coins + (s.goal.kind === 'relics' ? p.relics * 25 : 0);
+
+/** Forward hops along the board, so a spawn can be put "a few spaces ahead" of a player. */
+function reachable(s: BoardState, from: string, maxHops: number): Map<string, number> {
+  const out = new Map<string, number>([[from, 0]]);
+  let frontier = [from];
+  for (let d = 1; d <= maxHops && frontier.length; d += 1) {
+    const nxt: string[] = [];
+    for (const id of frontier) for (const n of s.map[id]?.next ?? []) if (!out.has(n)) {
+      out.set(n, d);
+      nxt.push(n);
+    }
+    frontier = nxt;
+  }
+  return out;
+}
+
+/**
+ * At the top of every round the board puts something down, aimed so it makes sense: a few spaces ahead of
+ * whoever is furthest behind (never on an occupied space, the owl, or another spawn), so being behind
+ * means the next stretch of road is worth more. Uncollected caches, beacons and safe houses fade.
+ */
+export function spawnRound(s: BoardState): void {
+  for (const sp of [...s.spawns]) {
+    if (sp.kind !== 'relic' && s.round - sp.bornRound >= SPAWN_LIFE_ROUNDS) {
+      s.spawns.splice(s.spawns.indexOf(sp), 1);
+      s.events.push({ kind: 'spawn-fade', id: sp.id, node: sp.node, spawn: sp.kind });
+    }
+  }
+  const taken = new Set<string>([s.board.start, s.vendor, ...s.players.map((p) => p.node), ...s.spawns.map((sp) => sp.node)]);
+  const open = s.board.nodes.filter((n) => !taken.has(n.id));
+  if (!open.length) return;
+  const trailing = [...s.players].sort((a, b) => standing(s, a) - standing(s, b) || a.index - b.index)[0];
+  const ahead = reachable(s, trailing.node, 9);
+  const put = (kind: SpawnKind, lo: number, hi: number) => {
+    const free = s.board.nodes.filter((n) => !taken.has(n.id));
+    const near = free.filter((n) => {
+      const d = ahead.get(n.id);
+      return d !== undefined && d >= lo && d <= hi;
+    });
+    const pool = near.length ? near : free;
+    if (!pool.length) return;
+    const node = pool[Math.floor(s.rng() * pool.length)];
+    taken.add(node.id);
+    const spawn: Spawn = { id: s.nextSpawnId++, node: node.id, kind, bornRound: s.round };
+    s.spawns.push(spawn);
+    s.events.push({ kind: 'spawn', id: spawn.id, node: node.id, spawn: kind });
+  };
+  if (s.goal.kind === 'relics') {
+    // Relics are the point of the race: keep a couple out, one near the player in last, one anywhere.
+    const have = s.spawns.filter((sp) => sp.kind === 'relic').length;
+    for (let i = have; i < RELICS_ON_BOARD; i += 1) put('relic', i === 0 ? 3 : 2, i === 0 ? 8 : 9);
+  }
+  const small = s.spawns.filter((sp) => sp.kind !== 'relic').length;
+  if (small < SPAWN_CAP) {
+    const r = s.rng();
+    const kind: SpawnKind = r < 0.5 ? 'cache' : r < 0.75 ? 'beacon' : 'rest';
+    put(kind, 2, 7);
+  }
+}
+
+/** Pass-through pickups (caches, relics) on every hop; landing pickups (beacons, safe houses) when you stop. */
+function collectSpawns(s: BoardState, p: BoardPlayer, node: string, landing: boolean) {
+  for (const sp of [...s.spawns]) {
+    if (sp.node !== node) continue;
+    const onPass = sp.kind === 'cache' || sp.kind === 'relic';
+    if (!onPass && !landing) continue;
+    s.spawns.splice(s.spawns.indexOf(sp), 1);
+    switch (sp.kind) {
+      case 'cache':
+        addCoins(s, p, isOvertime(s) ? 10 : 5, 'cache');
+        if (p.items.length < MAX_ITEMS && s.rng() < 0.5) {
+          const item = ITEMS[Math.floor(s.rng() * ITEMS.length)];
+          p.items.push(item);
+          s.events.push({ kind: 'item-got', who: p.index, item });
+        }
+        break;
+      case 'relic':
+        p.relics += 1;
+        addCoins(s, p, 3, 'relic');
+        checkGoal(s, p);
+        break;
+      case 'beacon':
+        p.tailwind = true;
+        break;
+      case 'rest':
+        p.frozen = false;
+        p.shield = true;
+        addCoins(s, p, 3, 'rest');
+        break;
+    }
+    s.events.push({ kind: 'spawn-collected', who: p.index, id: sp.id, node, spawn: sp.kind, relics: p.relics });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -619,11 +817,14 @@ export function botAction(s: BoardState): BoardAction | null {
     }
     case 'junction': {
       const want = p.coins >= CROWN_COST;
+      // Otherwise head for the nearest thing worth picking up (relics first in a relic race).
+      const prize = s.spawns.filter((sp) => sp.kind === 'relic' || sp.kind === 'cache' || s.goal.kind !== 'relics');
       let best = pend.options[0];
       let bd = Infinity;
       for (const o of pend.options) {
         // Never draw from s.rng here: only the host runs bots online, so a draw would desync guests.
-        const d = want ? hopDistance(s.board, o, s.vendor) : ((o.length * 131 + s.round * 17 + s.turnOf * 7 + o.charCodeAt(o.length - 1)) % 97) / 97;
+        const toPrize = prize.length ? Math.min(...prize.map((sp) => hopDistance(s.board, o, sp.node))) : Infinity;
+        const d = want ? hopDistance(s.board, o, s.vendor) : Number.isFinite(toPrize) && toPrize <= 8 ? toPrize : ((o.length * 131 + s.round * 17 + s.turnOf * 7 + o.charCodeAt(o.length - 1)) % 97) / 97;
         if (d < bd) {
           bd = d;
           best = o;
