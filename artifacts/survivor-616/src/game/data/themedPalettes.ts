@@ -1,4 +1,5 @@
 import type { ThemedPaletteDef } from '@/game/types';
+import { GSIX_REGISTRY_PALETTES } from './gsixRegistryPalettes';
 
 /**
  * Purchasable character/world color palettes for cosmetic customization.
@@ -492,6 +493,8 @@ export const THEMED_PALETTES: ThemedPaletteDef[] = [
   { id: 'cinder-choir', name: 'Cinder Choir', description: 'Coal black and a row of orange voices rising off a fire that never started.', cost: 4, tier: 'legendary', effect: { kind: 'ember', label: 'Choir sparks', speed: 0.5, intensity: 0.95 }, palette: { ink: '#160e0e', body: '#2a1a1a', bodyDark: '#170e0e', accent: '#ff8a3a', accentBright: '#ffcaa6', skin: '#c3a48b', glow: '#ffd06a' } },
   { id: 'orbit-wedding', name: 'Orbit Wedding', description: 'Two gold lights circling a third, which is you, and nobody has said the vows.', cost: 4, tier: 'legendary', effect: { kind: 'orbit', label: 'Vows', speed: 0.6, intensity: 0.9 }, palette: { ink: '#140b18', body: '#4a2a5a', bodyDark: '#291732', accent: '#ffe08a', accentBright: '#fff1ca', skin: '#c7a692', glow: '#ff9ac8' } },
   { id: 'storm-drain-sunrise', name: 'Storm Drain Sunrise', description: 'The same gutter, but the rain is gold and every drop is a small sun.', cost: 4, tier: 'legendary', effect: { kind: 'rain', label: 'Golden rain', speed: 0.9, intensity: 0.9 }, palette: { ink: '#18100b', body: '#5a3a2a', bodyDark: '#322017', accent: '#ffd24a', accentBright: '#ffebae', skin: '#c9a88d', glow: '#ffa070' } },
+  // The shared GSIX registry: Grand Rapids, Michigan, Midwest and Americana themes plus their midnight and retro16 remixes.
+  ...GSIX_REGISTRY_PALETTES,
 ];
 
 export const THEMED_PALETTES_BY_ID: Record<string, ThemedPaletteDef> = Object.fromEntries(

@@ -283,6 +283,7 @@ function initialScreen(): Screen {
       requested === 'grpd-armory' ||
       requested === 'frog-ranch' ||
       requested === 'settings' ||
+      requested === 'palette-store' ||
       requested === 'account' ||
       requested === 'feedback' ||
       requested === 'threat-matrix' ||

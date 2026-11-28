@@ -139,6 +139,17 @@ export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
   const [previewCelebrationId, setPreviewCelebrationId] = useState(meta.activeCelebrationId);
   const [celebrationKey, setCelebrationKey] = useState(0);
   const [visibleCount, setVisibleCount] = useState(8);
+  const [paletteFamily, setPaletteFamily] = useState('all');
+  const [paletteVariant, setPaletteVariant] = useState('all');
+  const [paletteTierFilter, setPaletteTierFilter] = useState('all');
+  const filteredPalettes = useMemo(
+    () => THEMED_PALETTES.filter((palette) => (
+      (paletteFamily === 'all' || (paletteFamily === 'original' ? !palette.family : palette.family === paletteFamily))
+      && (paletteVariant === 'all' || (palette.variant ?? 'base') === paletteVariant)
+      && (paletteTierFilter === 'all' || (palette.tier ?? 'standard') === paletteTierFilter)
+    )),
+    [paletteFamily, paletteVariant, paletteTierFilter],
+  );
   const [reactAnim, setReactAnim] = useState<AnimName>('idle');
   const [line, setLine] = useState(VENDOR_QUIPS[0]);
   const [notice, setNotice] = useState('Choose a commission. Everything here is cosmetic except the Unlocks tab.');
@@ -337,7 +348,7 @@ export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
   const previewAura = RUN_AURAS.find((aura) => aura.id === previewAuraId)?.style ?? 'street-halo';
   const previewHat = getHatStyle(previewHatId);
   const previewCelebration = getCelebrationStyle(previewCelebrationId);
-  const categoryLength = category === 'palettes' ? THEMED_PALETTES.length : category === 'auras' ? RUN_AURAS.length : category === 'hats' ? HATS.length : category === 'drops' ? DROP_PACKS.length : category === 'unlocks' ? LOK_SHOP_UNLOCKS.length : CELEBRATIONS.length;
+  const categoryLength = category === 'palettes' ? filteredPalettes.length : category === 'auras' ? RUN_AURAS.length : category === 'hats' ? HATS.length : category === 'drops' ? DROP_PACKS.length : category === 'unlocks' ? LOK_SHOP_UNLOCKS.length : CELEBRATIONS.length;
 
   return (
     <ScreenLayout title="Customization Shop" subtitle={`${vendorName} — Paint Gallery`} onBack={onBack}>
@@ -378,8 +389,29 @@ export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
               </p>
 
               {category === 'palettes' ? (
+                <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Filter themes" data-testid="palette-filters">
+                  {([
+                    ['Theme family', paletteFamily, setPaletteFamily, [['all', 'All families'], ['original', 'Original 616'], ['gr', 'Grand Rapids (616)'], ['mi', 'Michigan'], ['mw', 'Midwest'], ['us', 'Americana']]],
+                    ['Remix', paletteVariant, setPaletteVariant, [['all', 'All remixes'], ['base', 'Base'], ['midnight', 'Midnight'], ['retro16', 'Retro16']]],
+                    ['Tier', paletteTierFilter, setPaletteTierFilter, [['all', 'All tiers'], ['standard', 'Standard'], ['uncommon', 'Uncommon'], ['rare', 'Rare'], ['legendary', 'Legendary']]],
+                  ] as const).map(([label, value, setValue, options]) => (
+                    <select
+                      key={label}
+                      aria-label={label}
+                      value={value}
+                      onChange={(event) => { setValue(event.target.value); setVisibleCount(8); }}
+                      className="border border-border bg-background px-2 py-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-muted-foreground transition-colors hover:border-primary/60 hover:text-white focus-visible:border-primary focus-visible:outline-none"
+                    >
+                      {options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}
+                    </select>
+                  ))}
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground" aria-live="polite">{filteredPalettes.length} of {THEMED_PALETTES.length}</span>
+                </div>
+              ) : null}
+
+              {category === 'palettes' ? (
                 <div className="mt-5 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3" data-testid="shop-palette-grid">
-                  {THEMED_PALETTES.slice(0, visibleCount).map((palette) => {
+                  {filteredPalettes.slice(0, visibleCount).map((palette) => {
                     const owned = hasCatalogItem(meta, 'palettes', palette.id, meta.ownedPaletteIds);
                     const equipped = meta.activePaletteId === palette.id;
                     const lokPrice = lokPriceOf(palette);
@@ -525,7 +557,7 @@ export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
                   })}
                 </div>
               )}
-              {category !== 'drops' && visibleCount < categoryLength ? <button type="button" onClick={() => setVisibleCount((count) => Math.min(categoryLength, count + 8))} className="mt-4 w-full border border-primary/40 bg-primary/5 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Show 8 more · {categoryLength - visibleCount} remaining</button> : null}
+              {category !== 'drops' && visibleCount < categoryLength ? <button type="button" onClick={() => setVisibleCount((count) => Math.min(categoryLength, count + (category === 'palettes' ? 24 : 8)))} className="mt-4 w-full border border-primary/40 bg-primary/5 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Show 8 more · {categoryLength - visibleCount} remaining</button> : null}
             </div>
           </div>
         </section>

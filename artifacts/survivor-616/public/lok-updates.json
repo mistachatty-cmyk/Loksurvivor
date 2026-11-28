@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 248,
+      "version": "0.43.10",
+      "date": "2026-11-28",
+      "publishedAt": "2026-11-28T14:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "261 Grand Rapids, Michigan, Midwest and Americana themes",
+      "body": [
+        "The theme shelf now carries the shared GSIX registry: 87 themes from Calder Plaza and Blue Bridge Night to Pictured Rocks, Friday Fish Fry and Varsity Letterman, each with a Midnight (high-contrast night shift) and a Retro16 (16-bit cartridge colors) remix. 87 themes times 3 is 261 new looks. The same ids work in every GSIX game.",
+        "Crash the Net, Calder Plaza, Honolulu Silver and Old Glory 76 are free starters. The shop has new filters for theme family, remix and tier so 400 themes stay easy to browse."
+      ]
+    },
+    {
       "number": 247,
       "version": "0.43.9",
       "date": "2026-11-28",

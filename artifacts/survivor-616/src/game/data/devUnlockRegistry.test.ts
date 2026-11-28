@@ -1,3 +1,4 @@
+import { GSIX_STARTER_IDS } from './gsixRegistryPalettes';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -51,13 +52,13 @@ test('Dev Mode derives ownership and disabling restores real equipped assets', (
   state = reducer(state, { type: 'equipRunAura', id: 'mothlight' });
   assert.equal(state.meta.activePaletteId, 'oil-slick-mirage');
   assert.equal(state.meta.activeRunAuraId, 'mothlight');
-  assert.deepEqual(state.meta.ownedPaletteIds, ['default']);
+  assert.deepEqual(state.meta.ownedPaletteIds, ['default', ...GSIX_STARTER_IDS]);
   assert.deepEqual(state.meta.ownedRunAuraIds, ['street-halo']);
 
   state = reducer(state, { type: 'setDevModeAllUnlocks', enabled: false });
   assert.equal(state.meta.activePaletteId, 'default');
   assert.equal(state.meta.activeRunAuraId, 'street-halo');
-  assert.deepEqual(state.meta.ownedPaletteIds, ['default']);
+  assert.deepEqual(state.meta.ownedPaletteIds, ['default', ...GSIX_STARTER_IDS]);
 });
 
 test('old saves cannot retain enabled Dev Mode without completing the new access gate', () => {

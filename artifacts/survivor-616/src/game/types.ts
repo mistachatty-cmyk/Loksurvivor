@@ -2281,6 +2281,11 @@ export interface ThemedPaletteDef {
   /** When true, this palette is included in default owned set. */
   owned?: boolean;
   tier?: CosmeticTier;
+  /** Registry theme family (`gr`, `mi`, `mw`, `us`); absent on the original 616 palettes. */
+  family?: string;
+  familyLabel?: string;
+  /** Registry remix: `base`, `midnight` or `retro16`. */
+  variant?: string;
   /** Optional procedural glow/animation applied around the player. */
   effect?: PaletteEffectDef;
   /** Color palette to apply to sprites and world when active. */

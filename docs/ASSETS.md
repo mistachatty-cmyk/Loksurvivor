@@ -51,7 +51,7 @@ How much of each there is right now.
 | Ambient kinds | 4 |
 | Hats | 20 |
 | Celebrations | 8 |
-| Themed palettes | 139 |
+| Themed palettes | 400 |
 | Cards | 347 |
 | Lok glyph icons | 82 |
 | Sound cues | 38 |
@@ -910,6 +910,267 @@ Non-combat background actors (`src/game/data/ambient.ts`).
 | cinder-choir | Cinder Choir |
 | orbit-wedding | Orbit Wedding |
 | storm-drain-sunrise | Storm Drain Sunrise |
+| gr-01 | Crash the Net |
+| gr-01_midnight | Crash the Net Midnight |
+| gr-01_retro16 | Crash the Net Retro16 |
+| gr-02 | Van Andel Ice |
+| gr-02_midnight | Van Andel Ice Midnight |
+| gr-02_retro16 | Van Andel Ice Retro16 |
+| gr-03 | Calder Plaza |
+| gr-03_midnight | Calder Plaza Midnight |
+| gr-03_retro16 | Calder Plaza Retro16 |
+| gr-04 | Blue Bridge Night |
+| gr-04_midnight | Blue Bridge Night Midnight |
+| gr-04_retro16 | Blue Bridge Night Retro16 |
+| gr-05 | Furniture City |
+| gr-05_midnight | Furniture City Midnight |
+| gr-05_retro16 | Furniture City Retro16 |
+| gr-06 | Fish Ladder Mist |
+| gr-06_midnight | Fish Ladder Mist Midnight |
+| gr-06_retro16 | Fish Ladder Mist Retro16 |
+| gr-07 | Buttercup Path |
+| gr-07_midnight | Buttercup Path Midnight |
+| gr-07_retro16 | Buttercup Path Retro16 |
+| gr-08 | Heritage Hill |
+| gr-08_midnight | Heritage Hill Midnight |
+| gr-08_retro16 | Heritage Hill Retro16 |
+| gr-09 | Wealthy & Eastern |
+| gr-09_midnight | Wealthy & Eastern Midnight |
+| gr-09_retro16 | Wealthy & Eastern Retro16 |
+| gr-10 | Division Neon |
+| gr-10_midnight | Division Neon Midnight |
+| gr-10_retro16 | Division Neon Retro16 |
+| gr-11 | Blandford Trail |
+| gr-11_midnight | Blandford Trail Midnight |
+| gr-11_retro16 | Blandford Trail Retro16 |
+| gr-12 | ArtPrize Sept |
+| gr-12_midnight | ArtPrize Sept Midnight |
+| gr-12_retro16 | ArtPrize Sept Retro16 |
+| gr-13 | Medical Mile |
+| gr-13_midnight | Medical Mile Midnight |
+| gr-13_retro16 | Medical Mile Retro16 |
+| gr-14 | Founders Barrel |
+| gr-14_midnight | Founders Barrel Midnight |
+| gr-14_retro16 | Founders Barrel Retro16 |
+| gr-15 | Amway Grand Gold |
+| gr-15_midnight | Amway Grand Gold Midnight |
+| gr-15_retro16 | Amway Grand Gold Retro16 |
+| gr-16 | John Ball Canopy |
+| gr-16_midnight | John Ball Canopy Midnight |
+| gr-16_retro16 | John Ball Canopy Retro16 |
+| gr-17 | 131 Gridlock |
+| gr-17_midnight | 131 Gridlock Midnight |
+| gr-17_retro16 | 131 Gridlock Retro16 |
+| gr-18 | Yesterdog Chili |
+| gr-18_midnight | Yesterdog Chili Midnight |
+| gr-18_retro16 | Yesterdog Chili Retro16 |
+| gr-19 | Bissell Mint |
+| gr-19_midnight | Bissell Mint Midnight |
+| gr-19_retro16 | Bissell Mint Retro16 |
+| gr-20 | Wolverine Boot |
+| gr-20_midnight | Wolverine Boot Midnight |
+| gr-20_retro16 | Wolverine Boot Retro16 |
+| gr-21 | Cascade Rapids |
+| gr-21_midnight | Cascade Rapids Midnight |
+| gr-21_retro16 | Cascade Rapids Retro16 |
+| gr-22 | Rosa Parks Rink |
+| gr-22_midnight | Rosa Parks Rink Midnight |
+| gr-22_retro16 | Rosa Parks Rink Retro16 |
+| gr-23 | 616 Underground |
+| gr-23_midnight | 616 Underground Midnight |
+| gr-23_retro16 | 616 Underground Retro16 |
+| gr-24 | Bridge Street Run |
+| gr-24_midnight | Bridge Street Run Midnight |
+| gr-24_retro16 | Bridge Street Run Retro16 |
+| gr-25 | Silver Line |
+| gr-25_midnight | Silver Line Midnight |
+| gr-25_retro16 | Silver Line Retro16 |
+| gr-26 | Pier Lighthouse |
+| gr-26_midnight | Pier Lighthouse Midnight |
+| gr-26_retro16 | Pier Lighthouse Retro16 |
+| gr-27 | Tulip Time |
+| gr-27_midnight | Tulip Time Midnight |
+| gr-27_retro16 | Tulip Time Retro16 |
+| gr-28 | Paczki Day |
+| gr-28_midnight | Paczki Day Midnight |
+| gr-28_retro16 | Paczki Day Retro16 |
+| mi-01 | Honolulu Silver |
+| mi-01_midnight | Honolulu Silver Midnight |
+| mi-01_retro16 | Honolulu Silver Retro16 |
+| mi-02 | Spartan Gruff |
+| mi-02_midnight | Spartan Gruff Midnight |
+| mi-02_retro16 | Spartan Gruff Retro16 |
+| mi-03 | Big House Maize |
+| mi-03_midnight | Big House Maize Midnight |
+| mi-03_retro16 | Big House Maize Retro16 |
+| mi-04 | Bad Boy Teal |
+| mi-04_midnight | Bad Boy Teal Midnight |
+| mi-04_retro16 | Bad Boy Teal Retro16 |
+| mi-05 | Hockeytown Octo |
+| mi-05_midnight | Hockeytown Octo Midnight |
+| mi-05_retro16 | Hockeytown Octo Retro16 |
+| mi-06 | Olde English D |
+| mi-06_midnight | Olde English D Midnight |
+| mi-06_retro16 | Olde English D Retro16 |
+| mi-07 | Row the Boat |
+| mi-07_midnight | Row the Boat Midnight |
+| mi-07_retro16 | Row the Boat Retro16 |
+| mi-08 | Fire Up Maroon |
+| mi-08_midnight | Fire Up Maroon Midnight |
+| mi-08_retro16 | Fire Up Maroon Retro16 |
+| mi-09 | Sleeping Bear |
+| mi-09_midnight | Sleeping Bear Midnight |
+| mi-09_retro16 | Sleeping Bear Retro16 |
+| mi-10 | Mackinac Fudge |
+| mi-10_midnight | Mackinac Fudge Midnight |
+| mi-10_retro16 | Mackinac Fudge Retro16 |
+| mi-11 | Superior Copper |
+| mi-11_midnight | Superior Copper Midnight |
+| mi-11_retro16 | Superior Copper Retro16 |
+| mi-12 | Cherry Capital |
+| mi-12_midnight | Cherry Capital Midnight |
+| mi-12_retro16 | Cherry Capital Retro16 |
+| mi-13 | Motor City Chrome |
+| mi-13_midnight | Motor City Chrome Midnight |
+| mi-13_retro16 | Motor City Chrome Retro16 |
+| mi-14 | Vernors Ginger |
+| mi-14_midnight | Vernors Ginger Midnight |
+| mi-14_retro16 | Vernors Ginger Retro16 |
+| mi-15 | Pictured Rocks |
+| mi-15_midnight | Pictured Rocks Midnight |
+| mi-15_retro16 | Pictured Rocks Retro16 |
+| mi-16 | Petoskey Stone |
+| mi-16_midnight | Petoskey Stone Midnight |
+| mi-16_retro16 | Petoskey Stone Retro16 |
+| mi-17 | Tahquamenon Tannin |
+| mi-17_midnight | Tahquamenon Tannin Midnight |
+| mi-17_retro16 | Tahquamenon Tannin Retro16 |
+| mi-18 | 8 Mile Wax |
+| mi-18_midnight | 8 Mile Wax Midnight |
+| mi-18_retro16 | 8 Mile Wax Retro16 |
+| mi-19 | Lilac Festival |
+| mi-19_midnight | Lilac Festival Midnight |
+| mi-19_retro16 | Lilac Festival Retro16 |
+| mi-20 | Great Lakes Freighter |
+| mi-20_midnight | Great Lakes Freighter Midnight |
+| mi-20_retro16 | Great Lakes Freighter Retro16 |
+| mi-21 | Soo Locks |
+| mi-21_midnight | Soo Locks Midnight |
+| mi-21_retro16 | Soo Locks Retro16 |
+| mw-01 | Sandy's Penny |
+| mw-01_midnight | Sandy's Penny Midnight |
+| mw-01_retro16 | Sandy's Penny Retro16 |
+| mw-02 | Cereal City |
+| mw-02_midnight | Cereal City Midnight |
+| mw-02_retro16 | Cereal City Retro16 |
+| mw-03 | Carhartt Duck |
+| mw-03_midnight | Carhartt Duck Midnight |
+| mw-03_retro16 | Carhartt Duck Retro16 |
+| mw-04 | Faygo Pop |
+| mw-04_midnight | Faygo Pop Midnight |
+| mw-04_retro16 | Faygo Pop Retro16 |
+| mw-05 | Better Made |
+| mw-05_midnight | Better Made Midnight |
+| mw-05_retro16 | Better Made Retro16 |
+| mw-06 | Superman Scoop |
+| mw-06_midnight | Superman Scoop Midnight |
+| mw-06_retro16 | Superman Scoop Retro16 |
+| mw-07 | Coney Island |
+| mw-07_midnight | Coney Island Midnight |
+| mw-07_retro16 | Coney Island Retro16 |
+| mw-08 | Euchre Bower |
+| mw-08_midnight | Euchre Bower Midnight |
+| mw-08_retro16 | Euchre Bower Retro16 |
+| mw-09 | Lake Effect |
+| mw-09_midnight | Lake Effect Midnight |
+| mw-09_retro16 | Lake Effect Retro16 |
+| mw-10 | Ope Excuse Me |
+| mw-10_midnight | Ope Excuse Me Midnight |
+| mw-10_retro16 | Ope Excuse Me Retro16 |
+| mw-11 | Up North Cabin |
+| mw-11_midnight | Up North Cabin Midnight |
+| mw-11_retro16 | Up North Cabin Retro16 |
+| mw-12 | Cornfield Dusk |
+| mw-12_midnight | Cornfield Dusk Midnight |
+| mw-12_retro16 | Cornfield Dusk Retro16 |
+| mw-13 | Culver's Butter |
+| mw-13_midnight | Culver's Butter Midnight |
+| mw-13_retro16 | Culver's Butter Retro16 |
+| mw-14 | Menards Rebate |
+| mw-14_midnight | Menards Rebate Midnight |
+| mw-14_retro16 | Menards Rebate Retro16 |
+| mw-15 | Rust Belt Rivet |
+| mw-15_midnight | Rust Belt Rivet Midnight |
+| mw-15_retro16 | Rust Belt Rivet Retro16 |
+| mw-16 | Pothole Season |
+| mw-16_midnight | Pothole Season Midnight |
+| mw-16_retro16 | Pothole Season Retro16 |
+| mw-17 | Friday Fish Fry |
+| mw-17_midnight | Friday Fish Fry Midnight |
+| mw-17_retro16 | Friday Fish Fry Retro16 |
+| mw-18 | Barn Quilt |
+| mw-18_midnight | Barn Quilt Midnight |
+| mw-18_retro16 | Barn Quilt Retro16 |
+| mw-19 | Cheese Curd Squeak |
+| mw-19_midnight | Cheese Curd Squeak Midnight |
+| mw-19_retro16 | Cheese Curd Squeak Retro16 |
+| mw-20 | Hotdish Potluck |
+| mw-20_midnight | Hotdish Potluck Midnight |
+| mw-20_retro16 | Hotdish Potluck Retro16 |
+| mw-21 | Corn Maze Night |
+| mw-21_midnight | Corn Maze Night Midnight |
+| mw-21_retro16 | Corn Maze Night Retro16 |
+| us-01 | Old Glory 76 |
+| us-01_midnight | Old Glory 76 Midnight |
+| us-01_retro16 | Old Glory 76 Retro16 |
+| us-02 | Betsy Ross |
+| us-02_midnight | Betsy Ross Midnight |
+| us-02_retro16 | Betsy Ross Retro16 |
+| us-03 | Route 66 Neon |
+| us-03_midnight | Route 66 Neon Midnight |
+| us-03_retro16 | Route 66 Neon Retro16 |
+| us-04 | Apollo Saturn |
+| us-04_midnight | Apollo Saturn Midnight |
+| us-04_retro16 | Apollo Saturn Retro16 |
+| us-05 | National Park |
+| us-05_midnight | National Park Midnight |
+| us-05_retro16 | National Park Retro16 |
+| us-06 | Drive-In Double |
+| us-06_midnight | Drive-In Double Midnight |
+| us-06_retro16 | Drive-In Double Retro16 |
+| us-07 | Fourth of July |
+| us-07_midnight | Fourth of July Midnight |
+| us-07_retro16 | Fourth of July Retro16 |
+| us-08 | Blue Jeans & Brass |
+| us-08_midnight | Blue Jeans & Brass Midnight |
+| us-08_retro16 | Blue Jeans & Brass Retro16 |
+| us-09 | Diner Jukebox |
+| us-09_midnight | Diner Jukebox Midnight |
+| us-09_retro16 | Diner Jukebox Retro16 |
+| us-10 | Liberty Patina |
+| us-10_midnight | Liberty Patina Midnight |
+| us-10_retro16 | Liberty Patina Retro16 |
+| us-11 | Gridiron Sunday |
+| us-11_midnight | Gridiron Sunday Midnight |
+| us-11_retro16 | Gridiron Sunday Retro16 |
+| us-12 | County Fair |
+| us-12_midnight | County Fair Midnight |
+| us-12_retro16 | County Fair Retro16 |
+| us-13 | Coney Boardwalk |
+| us-13_midnight | Coney Boardwalk Midnight |
+| us-13_retro16 | Coney Boardwalk Retro16 |
+| us-14 | Varsity Letterman |
+| us-14_midnight | Varsity Letterman Midnight |
+| us-14_retro16 | Varsity Letterman Retro16 |
+| us-15 | Heartland Vinyl |
+| us-15_midnight | Heartland Vinyl Midnight |
+| us-15_retro16 | Heartland Vinyl Retro16 |
+| us-16 | Porch Fireflies |
+| us-16_midnight | Porch Fireflies Midnight |
+| us-16_retro16 | Porch Fireflies Retro16 |
+| us-17 | Roadside Diner Pie |
+| us-17_midnight | Roadside Diner Pie Midnight |
+| us-17_retro16 | Roadside Diner Pie Retro16 |
 
 ## Cards
 

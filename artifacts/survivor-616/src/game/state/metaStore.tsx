@@ -66,6 +66,7 @@ import {
   uiLooksForOwnedThemeIds,
 } from '@/game/data/uiThemes';
 import { DEFAULT_PALETTE_ID, THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
+import { GSIX_STARTER_IDS } from '@/game/data/gsixRegistryPalettes';
 import { DEFAULT_SOUND_PACK_ID, SOUND_PACKS_BY_ID } from '@/game/data/soundPacks';
 import { DEFAULT_RUN_AURA_ID, RUN_AURAS, RUN_AURAS_BY_ID } from '@/game/data/runAuras';
 import { DEFAULT_HAT_ID, HATS, HATS_BY_ID } from '@/game/data/hats';
@@ -518,7 +519,7 @@ export function createInitialMeta(): MetaState {
     uiThemeSwatchByTheme: {},
     themeCycleMastered: false,
     themeCycleCollection: 'starter',
-    ownedPaletteIds: [DEFAULT_PALETTE_ID],
+    ownedPaletteIds: [DEFAULT_PALETTE_ID, ...GSIX_STARTER_IDS],
     activePaletteId: DEFAULT_PALETTE_ID,
     ownedSoundPackIds: [DEFAULT_SOUND_PACK_ID],
     activeSoundPackId: DEFAULT_SOUND_PACK_ID,
@@ -728,7 +729,8 @@ function normalizeUiThemeSwatchByTheme(value: unknown): Record<string, string> {
 }
 
 function normalizeOwnedPaletteIds(value: unknown): string[] {
-  const owned = new Set<string>([DEFAULT_PALETTE_ID]);
+  // Starter themes are free forever, so they are always owned even on saves that predate them.
+  const owned = new Set<string>([DEFAULT_PALETTE_ID, ...GSIX_STARTER_IDS]);
   if (Array.isArray(value)) {
     for (const entry of value) {
       if (typeof entry === 'string' && THEMED_PALETTES_BY_ID[entry]) owned.add(entry);
