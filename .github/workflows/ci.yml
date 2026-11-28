@@ -32,6 +32,8 @@ jobs:
         run: pnpm --filter @lok/error-report exec tsx scripts/ci-report.ts --step error-report-test --out "$GITHUB_WORKSPACE/crash-report-error-report-test.md" -- pnpm -C ../.. --filter @lok/error-report test
       - name: Test (chat)
         run: pnpm --filter @lok/error-report exec tsx scripts/ci-report.ts --step chat-test --out "$GITHUB_WORKSPACE/crash-report-chat-test.md" -- pnpm -C ../.. --filter @lok/chat test
+      - name: Ecosystem check (manifests, plugin catalog, tests)
+        run: pnpm --filter @lok/error-report exec tsx scripts/ci-report.ts --step ecosystem --out "$GITHUB_WORKSPACE/crash-report-ecosystem.md" -- sh -c "pnpm -C ../.. --filter @lok/ecosystem lok:check && pnpm -C ../.. --filter @lok/ecosystem lok:catalog --check && pnpm -C ../.. --filter @lok/ecosystem test"
       - name: Build
         run: pnpm --filter @lok/error-report exec tsx scripts/ci-report.ts --step build --out "$GITHUB_WORKSPACE/crash-report-build.md" -- pnpm -C ../../artifacts/survivor-616 build
 

@@ -1,0 +1,116 @@
+{
+  "schema": "lok.plugin-catalog",
+  "version": 1,
+  "plugins": [
+    {
+      "id": "universe-sdk",
+      "title": "LOK Universe SDK",
+      "status": "stable",
+      "path": "lib/lok-universe",
+      "manifestBlock": "schema",
+      "summary": "Shared cards, rarity colours, wallet strip, supporter bar, playtime and achievements contracts. Vendored: change it in Lok-EcoSystsem/universe-sdk and run sync-sdk.sh.",
+      "cost": "Free (types and helpers).",
+      "vendored": true,
+      "docs": "Lok-EcoSystsem/LokToken EcoSystem/LOK_PLATFORMS.md"
+    },
+    {
+      "id": "lok-client",
+      "title": "LOK client",
+      "status": "stable",
+      "path": "lib/lok-client",
+      "manifestBlock": null,
+      "summary": "Supabase-backed sign-in, saves, economy, LokDex, feedback and supporters for LOK apps.",
+      "cost": "Uses the shared project; reads are cached feeds.",
+      "vendored": false,
+      "docs": null
+    },
+    {
+      "id": "lok-focus-widget",
+      "title": "LOK focus widget",
+      "status": "stable",
+      "path": "lib/lok-focus-widget",
+      "manifestBlock": null,
+      "summary": "A small embeddable focus overlay.",
+      "cost": "Free (static).",
+      "vendored": false,
+      "docs": "lib/lok-focus-widget/README.md"
+    },
+    {
+      "id": "@lok/error-report",
+      "title": "LokErrorReport",
+      "status": "stable",
+      "path": "packages/lok-error-report",
+      "manifestBlock": "lokErrorReport",
+      "summary": "Catches crashes, shows a themed pop-up with the exact code line in dev, stores reports on device and (on request) in LOK cloud, documents crashes in the repo and CI.",
+      "cost": "Free; nothing is sent unless the player presses Send.",
+      "vendored": false,
+      "docs": "docs/LOK_ERROR_REPORT.md"
+    },
+    {
+      "id": "@lok/chat",
+      "title": "LOK Chat",
+      "status": "beta",
+      "path": "packages/lok-chat",
+      "manifestBlock": "lokChat",
+      "summary": "A game-agnostic conversation engine: follow-ups, topics that deepen with closeness, feelings, crew-to-crew scenes, group chat, moods and memory. Authored and deterministic; every feature has an on/off switch.",
+      "cost": "Free; no model at runtime.",
+      "vendored": false,
+      "docs": "docs/LOK_CHAT.md"
+    },
+    {
+      "id": "@lok/recap",
+      "title": "Run recap",
+      "status": "beta",
+      "path": "packages/recap",
+      "manifestBlock": null,
+      "summary": "Renders run recaps and shareable poster cards.",
+      "cost": "Rendering runs on demand (manual CI), never per commit.",
+      "vendored": false,
+      "docs": null
+    },
+    {
+      "id": "@lok/auto-l10n",
+      "title": "Auto-translate",
+      "status": "stable",
+      "path": "packages/auto-l10n",
+      "manifestBlock": null,
+      "summary": "Fills in the other language files from en.json after a push.",
+      "cost": "Runs in CI on push.",
+      "vendored": false,
+      "docs": ".agents/memory/localization.md"
+    },
+    {
+      "id": "@lok/ecosystem",
+      "title": "LOK Ecosystem tooling",
+      "status": "beta",
+      "path": "packages/lok-ecosystem",
+      "manifestBlock": null,
+      "summary": "This catalog, the manifest checker (lok:check), the status report (lok:status) and the new-app starter kit (lok:new-app).",
+      "cost": "Free; offline.",
+      "vendored": false,
+      "docs": "docs/LOK_ECOSYSTEM.md"
+    },
+    {
+      "id": "lokserver-knowledge",
+      "title": "LokServer knowledge",
+      "status": "planned",
+      "path": null,
+      "manifestBlock": null,
+      "summary": "The shop host as a shared plugin: voice, topics and knowledge any app can mount.",
+      "cost": "Planned; authored content only.",
+      "vendored": false,
+      "docs": "docs/lokserver-knowledge.md"
+    },
+    {
+      "id": "lok-world-feed",
+      "title": "World feed and postcards",
+      "status": "planned",
+      "path": null,
+      "manifestBlock": null,
+      "summary": "One cached daily payload and fixed-phrase postcards between players (no free text).",
+      "cost": "Planned; one cached read for everyone.",
+      "vendored": false,
+      "docs": "docs/LOK_CHAT_ROADMAP.md"
+    }
+  ]
+}

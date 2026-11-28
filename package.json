@@ -14,6 +14,9 @@
     "build": "pnpm run typecheck && pnpm -r --if-present run build && mkdir -p dist && cp -r artifacts/survivor-616/dist/public/* dist/",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "lok:check": "pnpm --filter @lok/ecosystem lok:check",
+    "lok:status": "pnpm --filter @lok/ecosystem lok:status",
+    "lok:new-app": "pnpm --filter @lok/ecosystem lok:new-app",
     "lint": "pnpm run typecheck"
   },
   "overrides": {

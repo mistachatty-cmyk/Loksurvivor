@@ -1,0 +1,27 @@
+{
+  "name": "@lok/ecosystem",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LOK Ecosystem tooling: the plugin catalog, the manifest checker, an ecosystem status report and a starter kit for new apps. Pure, offline, no hosting or running cost.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "lok:check": "tsx scripts/check.ts",
+    "lok:status": "tsx scripts/status.ts",
+    "lok:catalog": "tsx scripts/catalog.ts",
+    "lok:new-app": "tsx scripts/new-app.ts"
+  },
+  "dependencies": {
+    "@lok/chat": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "tsx": "^4.23.13",
+    "typescript": "~5.9.3"
+  }
+}
