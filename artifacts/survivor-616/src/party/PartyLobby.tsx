@@ -10,6 +10,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CHARACTERS_BY_ID } from '@/game/data/characters';
 import { lokClient } from '@/lib/lokClient';
 import { useSocialOptional } from '@/state/socialStore';
+import { CREW_PROTOCOL, crewReceiveLaunch } from '../../../../lib/lok-universe/src/crewFollow';
+import { SDK_VERSION } from '../../../../lib/lok-universe/src/types';
+import { getFollow, peekCrewLaunch, takeCrewLaunch } from '@/lib/crewFollowPref';
 import { useT } from '@/lib/i18n';
 import { RigPreview, ROSTER_IDS } from './dropShared';
 import { QrCode } from '@/ui/QrCode';
@@ -50,7 +53,9 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
   // Read through a ref: a profile that loads late must not close the room and make a new code.
   const nameRef = useRef(myName);
   nameRef.current = myName;
-  const [mode, setMode] = useState<'choose' | 'host' | 'join'>(joinCode ? 'join' : 'choose');
+  // The crew host tapped this mode in the Games tab: open a room and invite the crew without another tap.
+  const [crewLaunch] = useState(() => !joinCode && peekCrewLaunch());
+  const [mode, setMode] = useState<'choose' | 'host' | 'join'>(joinCode ? 'join' : crewLaunch ? 'host' : 'choose');
   // The game's goal and length, chosen by the host here and sent to everyone with the seats.
   const [roundsCode, setRoundsCode] = useState(rounds);
   const roundsRef = useRef(rounds);
@@ -213,9 +218,16 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
   };
   const inviteCrew = () => {
     if (!social?.bus.up) return;
-    social.bus.send('party-invite', { code, from: myName });
+    social.bus.send('party-invite', { code, from: myName, follow: crewLaunch });
     setCrewSent(true);
   };
+  // Once the room exists and the crew channel is up, the launch invites everyone by itself, exactly once.
+  useEffect(() => {
+    if (!crewLaunch || mode !== 'host' || code.length !== 5 || !social?.bus.up || crewSent) return;
+    takeCrewLaunch();
+    social.bus.send('party-invite', { code, from: myName, follow: true });
+    setCrewSent(true);
+  }, [crewLaunch, mode, code, social?.bus.up, crewSent, social, myName]);
 
   if (!lokClient) {
     return (
@@ -419,14 +431,22 @@ function StatusDot({ status, t }: { status: string; t: ReturnType<typeof useT> }
 export function PartyInviteToast() {
   const t = useT();
   const social = useSocialOptional();
-  const [invite, setInvite] = useState<{ code: string; from: string } | null>(null);
+  const [invite, setInvite] = useState<{ code: string; from: string; follow: boolean } | null>(null);
   const [warned, setWarned] = useState(false);
   useEffect(() => setWarned(false), [invite]);
   useEffect(() => {
     if (!social?.bus.up) return;
     return social.bus.on('party-invite', (p) => {
       const code = normalizePartyCode(String(p.code ?? ''));
-      if (code.length === 5) setInvite({ code, from: String(p.from ?? '').slice(0, 24) });
+      if (code.length !== 5) return;
+      // A host's launch carries `follow`. The shared Crew Link rules decide: go along, offer the button, or ignore.
+      let follow = false;
+      if (p.follow === true && social.me) {
+        const msg = { type: 'crew.launch' as const, v: CREW_PROTOCOL, crew: social.crew.crew?.id ?? '', game: 'party', mode: 'board', room: code, nonce: code, sdk: SDK_VERSION, minSdk: '1.11.0' };
+        const me = { id: social.me.userId, follow: getFollow(), status: social.inRun() ? ('in-game' as const) : ('idle' as const), sdk: SDK_VERSION };
+        follow = crewReceiveLaunch(me, msg.crew, msg, []).action === 'go';
+      }
+      setInvite({ code, from: String(p.from ?? '').slice(0, 24), follow });
     });
   }, [social?.bus]);
   useEffect(() => {
@@ -434,7 +454,21 @@ export function PartyInviteToast() {
     const id = window.setTimeout(() => setInvite(null), 30_000);
     return () => window.clearTimeout(id);
   }, [invite]);
+  // Following: show a short "Following <host>" card and go along unless the player taps Stay.
+  useEffect(() => {
+    if (!invite?.follow) return;
+    const id = window.setTimeout(() => window.location.assign(`/?screen=lok-party&party=${invite.code}`), 2500);
+    return () => window.clearTimeout(id);
+  }, [invite]);
   if (!invite) return null;
+  if (invite.follow) {
+    return (
+      <div className="fixed bottom-4 left-1/2 z-[80] w-[min(92vw,360px)] -translate-x-1/2 rounded-2xl border-[3px] p-3" role="status" style={{ background: CREAM, borderColor: ESPRESSO, color: ESPRESSO }} data-testid="crew-follow-card">
+        <div className="text-sm font-black">{t('crew.follow.going', { name: invite.from || t('lokParty.online.friend') })}</div>
+        <button type="button" {...press(() => setInvite(null))} className="mt-2 w-full rounded-xl border-[3px] py-2 font-black" style={{ borderColor: ESPRESSO }}>{t('crew.follow.stay')}</button>
+      </div>
+    );
+  }
   return (
     <div className="fixed bottom-4 left-1/2 z-[80] w-[min(92vw,360px)] -translate-x-1/2 rounded-2xl border-[3px] p-3" style={{ background: CREAM, borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 5px 0 ${ESPRESSO}` }} data-testid="party-invite-toast">
       <div className="text-sm font-black">{t('lokParty.online.invited', { name: invite.from || t('lokParty.online.friend') })}</div>

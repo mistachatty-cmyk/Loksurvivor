@@ -16,13 +16,14 @@ import { useSocial, type CrewTab } from '@/state/socialStore';
 import { useNetConfig } from '@/lib/social/netConfig';
 import { useCrewChat } from '@/state/crewChat';
 import { CrewChatPanel } from './CrewChat';
+import { CrewGamesTab } from './CrewGames';
 import { requestHostCrewRun } from './CrewRunSetup';
 import { ListenTogetherBar } from './ListenTogether';
 import { PlayerAvatar } from './PlayerAvatar';
 import { QrCode } from './QrCode';
 import { buildInviteUrl } from '../../../../lib/lok-universe/src/invite';
 
-const TAB_KEYS: CrewTab[] = ['crew', 'friends', 'recent', 'add'];
+const TAB_KEYS: CrewTab[] = ['crew', 'games', 'friends', 'recent', 'add'];
 const BTN = 'border border-border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white/80 hover:border-fuchsia-300/60 hover:text-white disabled:opacity-40';
 const BTN_ON = 'border border-fuchsia-300/60 bg-fuchsia-400/15 px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-fuchsia-100 disabled:opacity-40';
 
@@ -370,7 +371,7 @@ export function CrewOverlay() {
   }, [open, closeOverlay]);
 
   if (!open || typeof document === 'undefined') return null;
-  const body = !s.signedIn ? <SignedOut /> : !s.active ? <p className="p-4 text-sm text-muted-foreground">{t('social.off')}</p> : s.setupNeeded ? <p className="p-4 text-sm text-muted-foreground" data-testid="crew-setup-needed">{t('social.setup')}</p> : s.tab === 'crew' ? <CrewTabView /> : s.tab === 'friends' ? <FriendsTabView /> : s.tab === 'recent' ? <RecentTabView /> : <AddTabView />;
+  const body = !s.signedIn ? <SignedOut /> : !s.active ? <p className="p-4 text-sm text-muted-foreground">{t('social.off')}</p> : s.setupNeeded ? <p className="p-4 text-sm text-muted-foreground" data-testid="crew-setup-needed">{t('social.setup')}</p> : s.tab === 'crew' ? <CrewTabView /> : s.tab === 'games' ? <CrewGamesTab /> : s.tab === 'friends' ? <FriendsTabView /> : s.tab === 'recent' ? <RecentTabView /> : <AddTabView />;
 
   return createPortal(
     <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4" onClick={closeOverlay} data-testid="crew-overlay">
@@ -385,7 +386,7 @@ export function CrewOverlay() {
           <button type="button" onClick={closeOverlay} aria-label={t('social.close')} className="p-2 text-white/70 hover:text-white" data-testid="button-crew-close"><X className="h-5 w-5" /></button>
         </header>
         {s.signedIn && s.active && !s.setupNeeded ? (
-          <nav className="grid grid-cols-4 border-b border-border/70" role="tablist">
+          <nav className="grid grid-cols-5 border-b border-border/70" role="tablist">
             {TAB_KEYS.map((key) => (
               <button key={key} type="button" role="tab" aria-selected={s.tab === key} onClick={() => s.setTab(key)}
                 className={`relative px-2 py-3 font-mono text-[11px] font-bold uppercase tracking-widest ${s.tab === key ? 'bg-fuchsia-400/10 text-fuchsia-100' : 'text-white/55 hover:text-white'}`} data-testid={`tab-crew-${key}`}>
