@@ -11,7 +11,7 @@ import { SoundbarPanel } from './SoundbarPanel';
  * The new hideout dock places these controls in document flow. Classic mode
  * and other screens keep the original compact top-left corner.
  */
-export function MusicNowPlaying({ placement = 'default' }: { placement?: 'default' | 'inline' | 'menu' }) {
+export function MusicNowPlaying({ placement = 'default', onOpenMusic }: { placement?: 'default' | 'inline' | 'menu'; onOpenMusic?: () => void }) {
   const player = useMusicPlayer();
   const t = useT();
   const [expanded, setExpanded] = useState(false);
@@ -128,7 +128,7 @@ export function MusicNowPlaying({ placement = 'default' }: { placement?: 'defaul
       >
         <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${moreOpen ? 'rotate-180' : ''}`} />
       </button>
-      {moreOpen && <SoundbarPanel anchorRef={barRef} onClose={() => setMoreOpen(false)} />}
+      {moreOpen && <SoundbarPanel anchorRef={barRef} onClose={() => setMoreOpen(false)} onOpenMusic={onOpenMusic} />}
     </div>
   );
 }
