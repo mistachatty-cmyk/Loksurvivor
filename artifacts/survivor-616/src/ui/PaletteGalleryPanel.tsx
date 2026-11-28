@@ -73,6 +73,9 @@ const EFFECT_PREVIEW_CLASSES = {
   prism: 'palette-preview-prism',
   flicker: 'palette-preview-flicker',
   wave: 'palette-preview-wave',
+  ember: 'palette-preview-ember',
+  orbit: 'palette-preview-orbit',
+  echo: 'palette-preview-echo',
 } satisfies Record<PaletteEffectKind, string>;
 
 const TIER_BADGE_CLASS = {

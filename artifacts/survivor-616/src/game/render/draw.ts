@@ -6240,6 +6240,61 @@ function drawActors(
           ctx.ellipse(0, 0, p.radius + 8 + travel * 28, (p.radius + 8 + travel * 28) * 0.42, 0, 0, Math.PI * 2);
           ctx.stroke();
         }
+      } else if (paletteEffect.kind === 'ember') {
+        // Warm motes lift off the feet and cool as they rise. Positions are a pure function of time, so nothing is stored.
+        const frozen = !w.effectMotionEnabled;
+        for (let i = 0; i < 14; i += 1) {
+          const t = frozen ? (i % 3) / 3 : (phase * paletteEffect.speed + i / 14) % 1;
+          const x = Math.sin(i * 12.9898) * (p.radius + 6) + Math.sin(t * 7 + i * 1.7) * 3;
+          const y = 6 - t * (22 + intensity * 26);
+          const s = 2 + (1 - t) * 2.4;
+          ctx.globalAlpha = Math.min(1, (1 - t) * (0.6 + intensity * 0.6));
+          ctx.fillStyle = i % 3 === 0 ? accent : glow;
+          ctx.fillRect(x - s / 2, y - s / 2, s, s);
+        }
+      } else if (paletteEffect.kind === 'orbit') {
+        // Three motes circle the player with short comet tails; the far side of the loop is dimmer and smaller, which gives it depth.
+        const frozen = !w.effectMotionEnabled;
+        const rx = p.radius + 14 + intensity * 4;
+        const ry = rx * 0.42;
+        for (let m = 0; m < 3; m += 1) {
+          const base = (frozen ? 0 : cycle) + m * 2.094;
+          for (let k = 0; k < 5; k += 1) {
+            const a = base - k * 0.16;
+            const far = Math.sin(a) < 0;
+            const s = (k === 0 ? 4.2 : 3.4 - k * 0.5) * (far ? 0.75 : 1);
+            ctx.globalAlpha = Math.min(1, (1 - k / 5) * (0.5 + intensity * 0.7) * (far ? 0.6 : 1));
+            ctx.fillStyle = k === 0 ? accent : glow;
+            ctx.fillRect(Math.cos(a) * rx - s / 2, Math.sin(a) * ry - s / 2, s, s);
+          }
+        }
+      } else if (paletteEffect.kind === 'echo') {
+        // The first palette effect that REACTS to you: moving leaves fading ghosts of where you just were, standing still breathes a slow ring.
+        const speed = Math.hypot(p.vx, p.vy);
+        const move = Math.min(1, speed / 180);
+        if (move > 0.05 && w.effectMotionEnabled) {
+          const nx = p.vx / speed;
+          const ny = p.vy / speed;
+          for (let k = 1; k <= 4; k += 1) {
+            const d = k * (5 + move * 8);
+            const fade = (1 - k / 5) * 0.5 * intensity * move;
+            const gx = -nx * d;
+            const gy = -ny * d * 0.6;
+            ctx.fillStyle = k % 2 ? glow : accent;
+            ctx.globalAlpha = fade * 0.7;
+            ctx.beginPath();
+            ctx.ellipse(gx, gy, (p.radius + 4) * (1 - k * 0.08), (p.radius + 4) * 0.42 * (1 - k * 0.08), 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = fade;
+            ctx.fillRect(gx - p.radius * 0.55, gy - p.radius * 1.7, p.radius * 1.1, p.radius * 1.6);
+          }
+        } else {
+          const breathe = (Math.sin(cycle) + 1) / 2;
+          ctx.globalAlpha = (0.1 + breathe * 0.22) * intensity;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, p.radius + 7 + breathe * 5, (p.radius + 7 + breathe * 5) * 0.42, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
     }
     ctx.restore();

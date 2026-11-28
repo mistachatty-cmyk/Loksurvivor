@@ -701,14 +701,20 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 @keyframes palette-preview-prism { to { filter: hue-rotate(360deg) saturate(1.4); } }
 @keyframes palette-preview-flicker { 0%, 18%, 22%, 62%, 68%, 100% { opacity: 1; } 20%, 65% { opacity: 0.3; } }
 @keyframes palette-preview-wave { 50% { transform: translateY(-3px); filter: brightness(1.3); } }
+@keyframes palette-preview-ember { 0%, 100% { filter: brightness(1) drop-shadow(0 0 0 transparent); } 50% { filter: brightness(1.35) drop-shadow(0 -4px 6px rgba(255, 138, 61, 0.6)); } }
+@keyframes palette-preview-orbit { 0% { filter: drop-shadow(5px 0 3px rgba(125, 211, 252, 0.55)); } 25% { filter: drop-shadow(0 3px 3px rgba(125, 211, 252, 0.55)); } 50% { filter: drop-shadow(-5px 0 3px rgba(125, 211, 252, 0.55)); } 75% { filter: drop-shadow(0 -3px 3px rgba(125, 211, 252, 0.55)); } 100% { filter: drop-shadow(5px 0 3px rgba(125, 211, 252, 0.55)); } }
+@keyframes palette-preview-echo { 0%, 100% { filter: drop-shadow(0 0 0 transparent); } 50% { filter: drop-shadow(-7px 2px 0 rgba(180, 160, 255, 0.35)) drop-shadow(-14px 4px 0 rgba(180, 160, 255, 0.18)); } }
 .palette-preview-glow { animation: palette-preview-glow 1.8s ease-in-out infinite; }
 .palette-preview-pulse { animation: palette-preview-pulse 1.15s ease-in-out infinite; }
 .palette-preview-prism { animation: palette-preview-prism 2.8s linear infinite; }
 .palette-preview-flicker { animation: palette-preview-flicker 1.4s steps(1) infinite; }
 .palette-preview-wave { animation: palette-preview-wave 1.3s ease-in-out infinite; }
+.palette-preview-ember { animation: palette-preview-ember 1.9s ease-in-out infinite; }
+.palette-preview-orbit { animation: palette-preview-orbit 2.6s linear infinite; }
+.palette-preview-echo { animation: palette-preview-echo 1.6s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion='full']) .palette-preview-glow, :root:not([data-motion='full']) .palette-preview-pulse, :root:not([data-motion='full']) .palette-preview-prism, :root:not([data-motion='full']) .palette-preview-flicker, :root:not([data-motion='full']) .palette-preview-wave { animation: none; }
+  :root:not([data-motion='full']) .palette-preview-glow, :root:not([data-motion='full']) .palette-preview-pulse, :root:not([data-motion='full']) .palette-preview-prism, :root:not([data-motion='full']) .palette-preview-flicker, :root:not([data-motion='full']) .palette-preview-wave, :root:not([data-motion='full']) .palette-preview-ember, :root:not([data-motion='full']) .palette-preview-orbit, :root:not([data-motion='full']) .palette-preview-echo { animation: none; }
   :root:not([data-motion='full']) [data-ui-theme='starfall-rooftops']::before, :root:not([data-motion='full']) [data-ui-theme='deep-current']::before,
   :root:not([data-motion='full']) [data-ui-theme='sunbreak-cathedral']::before, :root:not([data-motion='full']) [data-ui-theme='glimmerwild']::before { animation: none; }
 }

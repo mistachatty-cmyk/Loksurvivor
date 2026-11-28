@@ -51,7 +51,7 @@ How much of each there is right now.
 | Ambient kinds | 4 |
 | Hats | 18 |
 | Celebrations | 7 |
-| Themed palettes | 77 |
+| Themed palettes | 82 |
 | Cards | 347 |
 | Lok glyph icons | 82 |
 | Sound cues | 38 |
@@ -845,6 +845,11 @@ Non-combat background actors (`src/game/data/ambient.ts`).
 | sea-glass | Sea Glass |
 | morning-matcha | Morning Matcha |
 | festival-lantern | Festival Lantern |
+| lacquer-hour | Lacquer Hour |
+| moth-lantern | Moth Lantern |
+| tidepool-static | Tidepool Static |
+| back-porch-coals | Back Porch Coals |
+| afterimage | Afterimage |
 
 ## Cards
 

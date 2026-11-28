@@ -2261,7 +2261,7 @@ export interface UIThemeDef {
 }
 
 export type CosmeticTier = 'standard' | 'uncommon' | 'rare' | 'legendary';
-export type PaletteEffectKind = 'glow' | 'pulse' | 'prism' | 'flicker' | 'wave';
+export type PaletteEffectKind = 'glow' | 'pulse' | 'prism' | 'flicker' | 'wave' | 'ember' | 'orbit' | 'echo';
 
 export interface PaletteEffectDef {
   kind: PaletteEffectKind;
