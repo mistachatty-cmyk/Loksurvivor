@@ -1701,7 +1701,11 @@
   "lokParty.face.brows": "眉毛",
   "lokParty.redlight.title": "赤信号、緑信号",
   "lokParty.redlight.prompt": "タップして実行します。赤でフリーズ！",
+<<<<<<< HEAD
   "lokParty.redlight.hint": "できるだけ速くタップしてフクロウに向かって走ります。頭が回転したら準備完了。目が赤くなったら、タップをやめないとレーザーが当たります。誰でも爆破される可能性があります。最初にラインを越えた方が勝ちです。",
+=======
+  "lokParty.redlight.hint": "できるだけ早くタップしてフクロウに向かって走ります。頭が回転したら準備完了。目が赤くなったら、タップをやめないとレーザーが当たります。誰でも爆破される可能性があります。最初にラインを越えた方が勝ちです。",
+>>>>>>> origin/claude/party-roadmap
   "lokParty.redlight.go": "ゴー！",
   "lokParty.redlight.warn": "準備をしましょう",
   "lokParty.redlight.freeze": "フリーズ！",

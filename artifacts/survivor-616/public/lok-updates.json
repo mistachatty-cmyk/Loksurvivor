@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 250,
+      "version": "0.43.12",
+      "date": "2026-11-28",
+      "publishedAt": "2026-11-28T14:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Crew Link groundwork",
+      "body": [
+        "Behind the scenes: the first pieces of Crew Link, the shared Lok way for a crew to open the same game together. There is a table of every multiplayer mode (Lok Party today) with the offline games listed apart, and the rules for a host to pick a game and bring along everyone who follows. Nothing to tap yet; the crew menu comes next."
+      ]
+    },
+    {
       "number": 249,
       "version": "0.43.11",
       "date": "2026-11-28",
