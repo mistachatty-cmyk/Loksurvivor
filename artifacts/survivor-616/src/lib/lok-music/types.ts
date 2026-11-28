@@ -132,6 +132,10 @@ export interface PlayerSnapshot {
   muted: boolean;
   shuffle: boolean;
   repeat: RepeatMode;
+  /** Playback speed (0.75 to 1.5). */
+  rate: number;
+  /** When the sleep timer will pause the music (ms since epoch), or null when off. */
+  sleepAt: number | null;
   catalogStatus: 'idle' | 'loading' | 'ready' | 'partial';
   error: string | null;
   /** Drops open right now, including ones the listener already earned. */
