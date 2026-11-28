@@ -8,7 +8,7 @@ import { drawRig, drawShadow } from '@/game/render/sprite';
 import { t as tr } from '@/lib/i18n';
 import { Squash } from './juiceEngine';
 import { SEAT_COLORS, type MinigameCartridge, type RenderInfo, type StageView } from './minigameKit';
-import { RUMBLE, crackingRing, createRoofRumble, rumbleResults, stepRoofRumble, type RumbleArena, type RumbleRunner, type RumbleState } from './roofRumble';
+import { RUMBLE, TILT as TILT_RULES, crackingRing, tiltAt, tiltHeading, createRoofRumble, rumbleResults, stepRoofRumble, type RumbleArena, type RumbleRunner, type RumbleState } from './roofRumble';
 import { STAGE_W, backlight, outlined } from './stageArt';
 
 const TILT = 0.7;
@@ -471,14 +471,62 @@ function drawFaller(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleSta
 
 const HITS = ['lokParty.rumble.hit1', 'lokParty.rumble.hit2', 'lokParty.rumble.hit3'] as const;
 
+/** Tilting Deck: chevrons slide across the roof in the direction it is leaning; red ones warn of the next lean. */
+function drawTilt(ctx: CanvasRenderingContext2D, view: StageView, s: RumbleState, clock: number, calm: boolean) {
+  const tl = tiltAt(s.now);
+  const draw = (dx: number, dy: number, color: string, alpha: number, speed: number) => {
+    const a = Math.atan2(dy, dx);
+    const phase = calm ? 0 : (clock * speed) % 120;
+    for (let i = -3; i <= 3; i++) {
+      const d = i * 120 + phase - 60;
+      const wx = Math.cos(a) * d;
+      const wy = Math.sin(a) * d;
+      if (Math.hypot(wx, wy) > TILT_RULES.radius - 30) continue;
+      const p = project(view, wx, wy);
+      const fade = 1 - Math.hypot(wx, wy) / TILT_RULES.radius;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.scale(1, TILT_SQUASH);
+      ctx.rotate(a);
+      ctx.globalAlpha = alpha * (0.35 + fade * 0.65);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 14;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-22, -34);
+      ctx.lineTo(16, 0);
+      ctx.lineTo(-22, 34);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  };
+  draw(tl.dx, tl.dy, '#38f2ff', 0.8, 0.22);
+  if (tl.warn > 0) {
+    const h = tiltHeading(tl.seg + 1);
+    const flash = calm ? 1 : 0.5 + 0.5 * Math.sin(clock / 70);
+    draw(Math.cos(h), Math.sin(h), '#ff3b5c', 0.4 + 0.5 * flash, 0.3);
+  }
+}
+const TILT_SQUASH = 0.7;
+
+const ARENA_LOOK: Record<RumbleArena, { id: 'rumble' | 'collapse' | 'tilt'; accent: string }> = {
+  sumo: { id: 'rumble', accent: '#ff3fd2' },
+  collapse: { id: 'collapse', accent: '#ffd23f' },
+  tilt: { id: 'tilt', accent: '#38f2ff' },
+};
+
 const makeRumble = (arena: RumbleArena): MinigameCartridge<RumbleState> => ({
-  id: arena === 'collapse' ? 'collapse' : 'rumble',
-  accent: arena === 'collapse' ? '#ffd23f' : '#ff3fd2',
+  id: ARENA_LOOK[arena].id,
+  accent: ARENA_LOOK[arena].accent,
   bpm: 140,
   labels: (t) =>
     arena === 'collapse'
       ? { title: t('lokParty.collapse.title'), prompt: t('lokParty.rumble.prompt'), hint: t('lokParty.collapse.hint') }
-      : { title: t('lokParty.rumble.title'), prompt: t('lokParty.rumble.prompt'), hint: t('lokParty.rumble.hint') },
+      : arena === 'tilt'
+        ? { title: t('lokParty.tilt.title'), prompt: t('lokParty.rumble.prompt'), hint: t('lokParty.tilt.hint') }
+        : { title: t('lokParty.rumble.title'), prompt: t('lokParty.rumble.prompt'), hint: t('lokParty.rumble.hint') },
   create: (seed, seats) => createRoofRumble(seed, seats, arena),
   step: stepRoofRumble,
   isOver: (s) => s.over,
@@ -514,6 +562,7 @@ const makeRumble = (arena: RumbleArena): MinigameCartridge<RumbleState> => ({
     for (const r of s.runners) if (r.fallingSince && r.fallY < 0) drawFaller(ctx, view, s, r, clock);
     if (s.arena === 'collapse') drawFallingRings(ctx, view, s, 'back', calm);
     drawRoof(ctx, view, s, clock, calm);
+    if (s.arena === 'tilt') drawTilt(ctx, view, s, clock, calm);
     if (s.arena === 'collapse') drawFallingRings(ctx, view, s, 'front', calm);
     const things: { y: number; draw: () => void }[] = [];
     for (const b of s.barrels) if (!b.gone) things.push({ y: b.y, draw: () => drawBarrel(ctx, view, s, b, clock, calm) });
@@ -607,6 +656,22 @@ const makeRumble = (arena: RumbleArena): MinigameCartridge<RumbleState> => ({
             const p = at(Math.cos(a) * (e.radius + 10), Math.sin(a) * (e.radius + 10));
             fx.burst(p.x, p.y, k % 2 ? '#4c3c8f' : '#2a2160', 5, { speed: 0.14, size: 14, gravity: 0.0018 });
           }
+          break;
+        }
+        case 'tiltTurn': {
+          if (e.seg > 0) {
+            const p = at(0, 0);
+            fx.impact(p.x, p.y, 0.5);
+            fx.flash('#38f2ff', 100);
+            fx.toast(p.x, p.y - 40, tr('lokParty.tilt.lean'), '#38f2ff', 54);
+            fx.sound('slam');
+          }
+          break;
+        }
+        case 'tiltWarn': {
+          const p = at(0, 0);
+          fx.toast(p.x, p.y + 60, tr('lokParty.tilt.warn'), '#ff3b5c', 34);
+          fx.chime(false);
           break;
         }
         case 'ringWarn': {
@@ -715,3 +780,4 @@ function drawCollapseHud(ctx: CanvasRenderingContext2D, s: RumbleState, info: Re
 
 export const roofRumble = makeRumble('sumo');
 export const roofCollapse = makeRumble('collapse');
+export const roofTilt = makeRumble('tilt');

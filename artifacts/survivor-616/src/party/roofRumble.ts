@@ -61,7 +61,7 @@ export const RUMBLE = {
  * sumo: the edge crumbles inward smoothly (Roof Rumble).
  * collapse: whole rings crack, flash and drop, one at a time (Roof Collapse).
  */
-export type RumbleArena = 'sumo' | 'collapse';
+export type RumbleArena = 'sumo' | 'collapse' | 'tilt';
 
 export interface RumbleRunner {
   index: number;
@@ -124,6 +124,8 @@ export type RumbleEvent =
   | { type: 'crumble'; radius: number }
   | { type: 'ringWarn'; inner: number; outer: number }
   | { type: 'ringTick'; n: number }
+  | { type: 'tiltTurn'; seg: number; heading: number }
+  | { type: 'tiltWarn'; heading: number }
   | { type: 'ringDrop'; inner: number; outer: number; left: number }
   | { type: 'teeter'; index: number; x: number; y: number }
   | { type: 'save'; index: number; x: number; y: number }
@@ -134,6 +136,9 @@ export interface RumbleState {
   arena: RumbleArena;
   /** Collapse: how many outer rings have dropped. */
   ringsDropped: number;
+  /** Tilting Deck: the last lean segment announced, and the last warning. */
+  tiltSeg: number;
+  tiltWarned: number;
   ringsWarned: number;
   lastTick: number;
   now: number;
@@ -161,8 +166,27 @@ export function crackingRing(now: number): number {
   return RUMBLE.ringDropAt.findIndex((at) => now >= at - RUMBLE.ringWarnMs && now < at);
 }
 
+/** Tilting Deck: the roof leans toward one heading at a time; the lean grows every turn. */
+export const TILT = { segMs: 4200, warnMs: 1100, headings: [0.4, 2.6, 4.9, 1.7, 3.9, 5.8, 0.9, 3.1], basePower: 620, growPower: 95, radius: 300 } as const;
+export const tiltHeading = (seg: number) => TILT.headings[((seg % TILT.headings.length) + TILT.headings.length) % TILT.headings.length];
+export const tiltPower = (seg: number) => TILT.basePower + TILT.growPower * Math.max(0, seg);
+/** The lean right now: unit direction, strength, and whether the next turn is about to happen. */
+export function tiltAt(now: number): { seg: number; dx: number; dy: number; power: number; warn: number } {
+  const seg = Math.floor(now / TILT.segMs);
+  // A short ease at the start of each segment so the lean swings rather than snaps.
+  const into = now - seg * TILT.segMs;
+  const ease = Math.min(1, into / 420);
+  const h0 = tiltHeading(seg - 1);
+  const h1 = tiltHeading(seg);
+  const dx = Math.cos(h0) * (1 - ease) + Math.cos(h1) * ease;
+  const dy = Math.sin(h0) * (1 - ease) + Math.sin(h1) * ease;
+  const warn = into >= TILT.segMs - TILT.warnMs ? (into - (TILT.segMs - TILT.warnMs)) / TILT.warnMs : 0;
+  return { seg, dx, dy, power: tiltPower(seg), warn };
+}
+
 export function rumbleRadius(now: number, arena: RumbleArena = 'sumo'): number {
   if (arena === 'collapse') return RUMBLE.rings[ringsDroppedAt(now)];
+  if (arena === 'tilt') return TILT.radius;
   const p = Math.min(1, Math.max(0, (now - RUMBLE.shrinkFromMs) / (RUMBLE.shrinkToMs - RUMBLE.shrinkFromMs)));
   return RUMBLE.radius - (RUMBLE.radius - RUMBLE.minRadius) * p;
 }
@@ -209,6 +233,8 @@ export function createRoofRumble(seed: number, seats: MinigameSeat[], arena: Rum
     seed,
     arena,
     ringsDropped: 0,
+    tiltSeg: -1,
+    tiltWarned: -1,
     ringsWarned: 0,
     lastTick: -1,
     now: 0,
@@ -386,6 +412,16 @@ export function stepRoofRumble(s: RumbleState, inputs: (StageInput | null)[], dt
       s.events.push({ type: 'ringDrop', inner: RUMBLE.rings[s.ringsDropped + 1], outer: RUMBLE.rings[s.ringsDropped], left: RUMBLE.rings.length - s.ringsDropped - 2 });
       s.ringsDropped++;
     }
+  } else if (s.arena === 'tilt') {
+    const seg = Math.floor(s.now / TILT.segMs);
+    if (seg !== s.tiltSeg) {
+      s.tiltSeg = seg;
+      s.events.push({ type: 'tiltTurn', seg, heading: tiltHeading(seg) });
+    }
+    if (tiltAt(s.now).warn > 0 && s.tiltWarned !== seg) {
+      s.tiltWarned = seg;
+      s.events.push({ type: 'tiltWarn', heading: tiltHeading(seg + 1) });
+    }
   } else {
     while (s.lastCrumble - s.radius >= 10) {
       s.lastCrumble -= 10;
@@ -492,6 +528,11 @@ export function stepRoofRumble(s: RumbleState, inputs: (StageInput | null)[], dt
       r.vx += (ax / a) * RUMBLE.walkAccel * dt;
       r.vy += (ay / a) * RUMBLE.walkAccel * dt;
       if (Math.abs(ax) > 4) r.facing = ax > 0 ? 1 : -1;
+    }
+    if (s.arena === 'tilt' && !r.teeterUntil) {
+      const tl = tiltAt(s.now);
+      r.vx += tl.dx * tl.power * dt;
+      r.vy += tl.dy * tl.power * dt;
     }
     const drag = Math.exp(-(dashing ? 1.2 : a > 0 ? RUMBLE.friction : RUMBLE.brake) * dt);
     r.vx *= drag;
