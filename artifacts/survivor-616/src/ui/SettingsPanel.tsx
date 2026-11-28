@@ -56,6 +56,7 @@ import { JukeboxSettings } from './JukeboxSettings';
 import { SETTINGS_FOCUS_KEY } from '@/lib/jukeboxPrefs';
 import { PowerSettings } from './PowerSettings';
 import { FullscreenSetting } from './FullscreenSetting';
+import { HapticsSetting } from './HapticsSetting';
 import { FaithSetting } from './FaithSetting';
 import { ControlsSettings } from './ControlsSettings';
 import { EndgameSettings } from './EndgameSettings';
@@ -763,6 +764,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets, onOpenScreen }: S
         <PowerSettings />
 
         <FullscreenSetting />
+        <HapticsSetting />
         <FaithSetting />
 
         {/* Studio plugins -- off unless deliberately enabled, because this is

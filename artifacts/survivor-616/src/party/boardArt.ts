@@ -1888,7 +1888,8 @@ export function drawSpawn(ctx: CanvasRenderingContext2D, kind: 'cache' | 'beacon
   ctx.ellipse(x, y + 4, 40, 18, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.save();
-  ctx.translate(x, y - 16 + bob);
+  ctx.translate(x, y - 24 + bob);
+  ctx.scale(1.7, 1.7);
   ctx.lineJoin = 'round';
   ctx.lineWidth = 3;
   ctx.strokeStyle = '#2b1a12';
@@ -1927,16 +1928,28 @@ export function drawSpawn(ctx: CanvasRenderingContext2D, kind: 'cache' | 'beacon
     ctx.fillStyle = '#2b1a12';
     ctx.fillRect(-4, 0, 8, 10);
   } else {
-    const spin = calm ? 0 : t / 600;
+    // A faceted gem: a hexagon that breathes its width (a cheap turn), with a bright facet and a glint.
+    const w = calm ? 1 : 0.78 + 0.22 * Math.abs(Math.cos(t / 700));
     ctx.beginPath();
-    for (let i = 0; i < 6; i += 1) {
-      const a = spin + (i / 6) * Math.PI * 2;
-      const rr = i % 2 ? 7 : 13;
-      ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr * 1.15);
-    }
+    ctx.moveTo(0, -14);
+    ctx.lineTo(11 * w, -6);
+    ctx.lineTo(11 * w, 6);
+    ctx.lineTo(0, 14);
+    ctx.lineTo(-11 * w, 6);
+    ctx.lineTo(-11 * w, -6);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+    ctx.fillStyle = '#e9c9ff';
+    ctx.beginPath();
+    ctx.moveTo(0, -14);
+    ctx.lineTo(11 * w, -6);
+    ctx.lineTo(0, 0);
+    ctx.lineTo(-11 * w, -6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-3 * w, -9, 2.5, 5);
   }
   ctx.restore();
   ctx.globalAlpha = 1;

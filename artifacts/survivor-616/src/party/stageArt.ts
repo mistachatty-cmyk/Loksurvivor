@@ -204,7 +204,73 @@ export function drawPodium(
     backlight(ctx, x, top - 60 - bounce, 90, color);
     drawRig(ctx, def.rig, def.palette, place === 0 ? 'attack' : place === 3 ? 'hurt' : 'idle', clock, x, top - bounce, 1, place === 0 ? 5 : 4);
     outlined(ctx, `${place + 1}`, x, top + 44, 36, '#ffffff');
+    if (place === 0) drawHanko(ctx, x + 56, top - 20, 54, calm ? 1 : clamp01((since - 1100) / 220));
     outlined(ctx, String(res.banked), x, floor + 40, 30, res.index === me ? '#ffd23f' : '#ffffff');
     if (res.index === me) outlined(ctx, o.you, x, floor + 74, 26, '#ffd23f');
   });
+}
+
+
+/**
+ * Manga-style speed lines: thin white rays burst out from the middle, thickest at the edges, for the
+ * moment a round says GO. `k` runs 0..1 over the burst. Cheap: 36 triangles.
+ */
+export function drawSpeedLines(ctx: CanvasRenderingContext2D, h: number, k: number): void {
+  if (k <= 0 || k >= 1) return;
+  const cx = STAGE_W / 2;
+  const cy = h / 2;
+  const far = Math.hypot(STAGE_W, h);
+  ctx.save();
+  ctx.globalAlpha = (1 - k) * 0.8;
+  ctx.fillStyle = '#ffffff';
+  for (let i = 0; i < 36; i += 1) {
+    const a = (i / 36) * Math.PI * 2 + ((i * 7) % 5) * 0.01;
+    const inner = far * (0.16 + 0.22 * k + ((i * 13) % 7) * 0.012);
+    const w = 0.012 + ((i * 11) % 4) * 0.006;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * inner, cy + Math.sin(a) * inner);
+    ctx.lineTo(cx + Math.cos(a - w) * far, cy + Math.sin(a - w) * far);
+    ctx.lineTo(cx + Math.cos(a + w) * far, cy + Math.sin(a + w) * far);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * A hanko (red name seal, carved with the king character shape) stamped down at an angle: a rounded red square with a carved cut and a thin inner
+ * border, drawn only from shapes. `k` 0..1 is the stamp-in: it lands big and settles with a small bounce.
+ */
+export function drawHanko(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, k: number): void {
+  if (k <= 0) return;
+  const settle = k >= 1 ? 1 : 1 + (1 - k) * 1.1;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(-0.16);
+  ctx.scale(settle, settle);
+  ctx.globalAlpha = Math.min(1, k * 2.2) * 0.92;
+  ctx.fillStyle = '#d6263b';
+  ctx.beginPath();
+  ctx.roundRect(-size / 2, -size / 2, size, size, size * 0.14);
+  ctx.fill();
+  ctx.strokeStyle = '#ffe9e4';
+  ctx.lineWidth = Math.max(2, size * 0.05);
+  ctx.beginPath();
+  ctx.roundRect(-size * 0.4, -size * 0.4, size * 0.8, size * 0.8, size * 0.08);
+  ctx.stroke();
+  // The carved mark: a bold stroke and a dot, in the paper colour.
+  ctx.lineCap = 'round';
+  ctx.lineWidth = size * 0.11;
+  ctx.beginPath();
+  // Three bars and a spine: the shape of the character for "king".
+  ctx.moveTo(-size * 0.22, -size * 0.24);
+  ctx.lineTo(size * 0.22, -size * 0.24);
+  ctx.moveTo(-size * 0.14, -size * 0.02);
+  ctx.lineTo(size * 0.14, -size * 0.02);
+  ctx.moveTo(-size * 0.24, size * 0.22);
+  ctx.lineTo(size * 0.24, size * 0.22);
+  ctx.moveTo(0, -size * 0.24);
+  ctx.lineTo(0, size * 0.22);
+  ctx.stroke();
+  ctx.restore();
 }

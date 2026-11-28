@@ -386,8 +386,10 @@ test('Lok Party engines stay free of game imports (so the mode can become its ow
 
 // ---------------------------------------------------------------- Slice 3: board
 
+import qrcode from 'qrcode-generator';
+import { partyLink } from './partyNet';
 import { MONROE_LOOP } from './boards/monroeLoop';
-import { CROWN_COST, boardAct, boardAdvance, boardMinigameResult, boardStandings, botAction, createBoardGame, hopDistance, nodeMap, RACE_CAP_ROUNDS, SPAWN_CAP, type BoardGoal, type BoardState } from './lokBoard';
+import { CROWN_COST, boardAct, boardAdvance, boardMinigameResult, boardStandings, botAction, createBoardGame, hopDistance, nodeMap, BOUNTY_COINS, HOT_BONUS, RACE_CAP_ROUNDS, SPAWN_CAP, STREAK_MAX, pickHotDistrict, settleTurnBonuses, type BoardGoal, type BoardState } from './lokBoard';
 
 const BOARD_ROSTER = ['zero-day', 'shade', 'quarry-kid', 'golden-hour'].map((characterId) => ({ characterId, bot: true }));
 
@@ -681,4 +683,76 @@ test('board spawns: classic rounds games are unchanged in length and still end',
   assert.equal(s.phase, 'over');
   assert.equal(s.maxRounds, 6);
   assert.equal(s.goal.kind, 'rounds');
+});
+
+
+test('board districts: one is hot each round, it changes, and landing in it pays', () => {
+  const s = createBoardGame(31, MONROE_LOOP, BOARD_ROSTER, 10);
+  assert.ok(s.hotDistrict, 'a district is hot from the start');
+  const seen = new Set([s.hotDistrict]);
+  for (let i = 0; i < 12; i += 1) {
+    const before = s.hotDistrict;
+    pickHotDistrict(s);
+    assert.notEqual(s.hotDistrict, before, 'never the same district twice in a row');
+    seen.add(s.hotDistrict);
+  }
+  assert.ok(seen.size >= 2);
+  const p = s.players[0];
+  const hot = MONROE_LOOP.districts!.find((d) => d.id === s.hotDistrict)!;
+  p.node = hot.nodes[0];
+  const coins = p.coins;
+  s.events = [];
+  settleTurnBonuses(s, p, 'cred', 0);
+  assert.equal(p.coins, coins + HOT_BONUS);
+  assert.ok(s.events.some((e) => e.kind === 'district-bonus'));
+});
+
+test('board streaks: good landings build it, a bad space breaks it, cred pays more with it', () => {
+  const s = createBoardGame(32, MONROE_LOOP, BOARD_ROSTER, 10);
+  s.hotDistrict = null;
+  const p = s.players[0];
+  p.node = 'T0';
+  settleTurnBonuses(s, p, 'cred', 0);
+  settleTurnBonuses(s, p, 'cred', p.streak);
+  settleTurnBonuses(s, p, 'event', p.streak);
+  assert.equal(p.streak, 3);
+  s.events = [];
+  settleTurnBonuses(s, p, 'glitch', p.streak);
+  assert.equal(p.streak, 0);
+  assert.ok(s.events.some((e) => e.kind === 'streak-lost'));
+  assert.ok(STREAK_MAX >= 1);
+});
+
+test('board bounty: the crown leader wears one and a rival sharing their space takes it', () => {
+  const s = createBoardGame(33, MONROE_LOOP, BOARD_ROSTER, 10);
+  s.hotDistrict = null;
+  const [thief, leader] = [s.players[0], s.players[1]];
+  leader.crowns = 2;
+  leader.coins = 20;
+  thief.coins = 4;
+  thief.node = leader.node = 'T4';
+  s.events = [];
+  settleTurnBonuses(s, thief, 'cred', 0);
+  assert.equal(leader.coins, 20 - BOUNTY_COINS);
+  assert.equal(thief.coins, 4 + BOUNTY_COINS);
+  assert.ok(s.events.some((e) => e.kind === 'bounty'));
+  // The leader landing on a rival's space takes nothing.
+  s.events = [];
+  settleTurnBonuses(s, leader, 'cred', 0);
+  assert.ok(!s.events.some((e) => e.kind === 'bounty'));
+});
+
+
+test('party invite: the join link always makes a scannable QR code, offline', () => {
+  for (const code of ['ABCDE', 'ZZZZZ', 'K7M2Q']) {
+    const link = partyLink(code, 'https://survivor.gsix.online');
+    const qr = qrcode(0, 'M');
+    qr.addData(link);
+    qr.make();
+    assert.ok(qr.getModuleCount() >= 21 && qr.getModuleCount() <= 41, `${code} fits a phone-friendly size`);
+    let dark = 0;
+    for (let r = 0; r < qr.getModuleCount(); r += 1) for (let c = 0; c < qr.getModuleCount(); c += 1) if (qr.isDark(r, c)) dark += 1;
+    assert.ok(dark > 100);
+    assert.ok(link.includes(`party=${code}`));
+  }
 });

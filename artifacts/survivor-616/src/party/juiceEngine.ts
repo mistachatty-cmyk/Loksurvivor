@@ -23,6 +23,19 @@
 // Tunables (one place, so every mode feels the same)
 // ---------------------------------------------------------------------------
 
+/**
+ * Haptic hook. The engine stays free of outside imports, so the screens plug the shared Lok haptics in once
+ * (see partyHaptics.ts). Until then every cue is a no-op.
+ */
+export type JuiceHapticCue = 'tap' | 'pickup' | 'hit' | 'bump' | 'bank' | 'crown' | 'tick' | 'warn' | 'win' | 'lose';
+let hapticSink: ((cue: JuiceHapticCue) => void) | null = null;
+export function setJuiceHaptics(fn: ((cue: JuiceHapticCue) => void) | null): void {
+  hapticSink = fn;
+}
+const haptic = (cue: JuiceHapticCue) => hapticSink?.(cue);
+/** For screens that want to buzz a cue of their own (a countdown tick, a win) through the same hook. */
+export const juiceHaptic = haptic;
+
 export const JUICE = {
   zoomPunchMin: 0.08,
   zoomPunchMax: 0.14,
@@ -434,12 +447,14 @@ export class PentatonicChimes {
   pickup(nowMs: number, opts: { pan?: number; bright?: boolean } = {}): number {
     this.ladder = nextChime(this.ladder, nowMs);
     this.play(pentatonicHz(this.ladder.step), opts.bright ? 0.22 : 0.14, opts.pan ?? 0, true);
+    haptic('pickup');
     return this.ladder.step;
   }
 
   /** One-off accent (crack, bank, slam): a short interval on the root. */
   accent(kind: 'crack' | 'bank' | 'slam' | 'hit', pan = 0): void {
     const table = { crack: [12, 19], bank: [0, 7, 12], slam: [-12, -5], hit: [-5] } as const;
+    haptic(kind === 'crack' ? 'tap' : kind === 'slam' ? 'bump' : kind);
     for (const semis of table[kind]) this.play(523.25 * Math.pow(2, semis / 12), kind === 'slam' ? 0.5 : 0.18, pan, kind !== 'slam');
   }
 
@@ -516,4 +531,5 @@ export function impact(j: Juice, nowMs: number, screenX: number, screenY: number
   j.camera.punch(JUICE.zoomPunchMin + (JUICE.zoomPunchMax - JUICE.zoomPunchMin) * w);
   j.camera.addTrauma(0.25 + 0.45 * w);
   j.waves.spawn(screenX, screenY, nowMs, 0.6 + 0.6 * w);
+  haptic(w >= 0.85 ? 'crown' : w >= 0.55 ? 'hit' : 'bump');
 }

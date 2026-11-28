@@ -7,6 +7,23 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 246,
+      "version": "0.43.8",
+      "date": "2026-11-28",
+      "publishedAt": "2026-11-28T09:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party: haptics, districts, streaks and a lot more feel",
+      "body": [
+        "Haptics: phones buzz and controllers rumble on hits, pickups, banks, crowns, countdown ticks and the final result. Settings has a new Haptics section (Off, Light, Normal, Strong, plus controller rumble) shared by every Lok game.",
+        "The board now has districts. Each round one is hot and pays extra, so the road ahead of whoever is behind is worth more. Land on good spaces back to back to build a streak that boosts cred spaces, and the crown leader wears a bounty that a rival can take by ending a turn on their space.",
+        "Minigames got a harder finish: speed lines on GO, a tightening red edge and a tick for the last five seconds, a final whistle flash, and a hanko seal stamped on the winner. Race goals now come in short, standard and long, and screen readers hear the board announcements.",
+        "The online lobby always shows a scan-to-join QR code, keeps the phone awake while people gather, buzzes the host when a friend sits down, and has a Game options drawer (one quiet line, tap the chevron to change the goal and length). The host's choice is sent to every player."
+      ]
+    },
+    {
       "number": 245,
       "version": "0.43.7",
       "date": "2026-11-28",
