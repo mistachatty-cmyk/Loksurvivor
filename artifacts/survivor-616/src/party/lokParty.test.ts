@@ -387,12 +387,12 @@ test('Lok Party engines stay free of game imports (so the mode can become its ow
 // ---------------------------------------------------------------- Slice 3: board
 
 import { MONROE_LOOP } from './boards/monroeLoop';
-import { CROWN_COST, boardAct, boardAdvance, boardMinigameResult, boardStandings, botAction, createBoardGame, hopDistance, nodeMap, type BoardState } from './lokBoard';
+import { CROWN_COST, boardAct, boardAdvance, boardMinigameResult, boardStandings, botAction, createBoardGame, hopDistance, nodeMap, RACE_CAP_ROUNDS, SPAWN_CAP, type BoardGoal, type BoardState } from './lokBoard';
 
 const BOARD_ROSTER = ['zero-day', 'shade', 'quarry-kid', 'golden-hour'].map((characterId) => ({ characterId, bot: true }));
 
-function playBoard(seed: number, rounds = 10) {
-  const s = createBoardGame(seed, MONROE_LOOP, BOARD_ROSTER, rounds);
+function playBoard(seed: number, rounds = 10, goal?: BoardGoal) {
+  const s = createBoardGame(seed, MONROE_LOOP, BOARD_ROSTER, rounds, goal);
   const seen = new Set<string>();
   let guard = 0;
   while (s.phase !== 'over' && guard++ < 20000) {
@@ -643,4 +643,42 @@ test('online recovery: repeats and early choices are never spent on the wrong tu
 
 test('online presence: someone who switched apps gets longer than someone who vanished', () => {
   for (const peer of ['host', 'guest'] as const) assert.ok(quietLimitMs(peer, true) >= 3 * quietLimitMs(peer, false));
+});
+
+
+test('board goals: a crown race ends the round someone hits the target, with equal turns for all', () => {
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const { s } = playBoard(seed, 10, { kind: 'crowns', target: 2 });
+    assert.equal(s.phase, 'over', `seed ${seed} finished`);
+    assert.ok(s.goalHitBy !== null, `seed ${seed} someone reached the goal`);
+    assert.ok(Math.max(...s.players.map((p) => p.crowns)) >= 2);
+    assert.ok(s.round <= RACE_CAP_ROUNDS);
+  }
+});
+
+test('board goals: a relic race is won on relics and never ends before the target', () => {
+  const { s, seen } = playBoard(7, 10, { kind: 'relics', target: 3 });
+  assert.equal(s.phase, 'over');
+  assert.ok(seen.has('spawn-collected'));
+  const top = Math.max(...s.players.map((p) => p.relics));
+  assert.ok(top >= 3 || s.round > RACE_CAP_ROUNDS);
+});
+
+test('board spawns: capped, never on a player, the owl or start, and they fade', () => {
+  const { s, seen } = playBoard(11, 10);
+  assert.ok(seen.has('spawn'));
+  assert.ok(s.spawns.filter((sp) => sp.kind !== 'relic').length <= SPAWN_CAP);
+  for (const sp of s.spawns) {
+    assert.notEqual(sp.node, MONROE_LOOP.start);
+    assert.notEqual(sp.node, s.vendor);
+  }
+  const fade = playBoard(12, 10).seen;
+  assert.ok(fade.has('spawn-fade') || fade.has('spawn-collected'));
+});
+
+test('board spawns: classic rounds games are unchanged in length and still end', () => {
+  const { s } = playBoard(21, 6);
+  assert.equal(s.phase, 'over');
+  assert.equal(s.maxRounds, 6);
+  assert.equal(s.goal.kind, 'rounds');
 });

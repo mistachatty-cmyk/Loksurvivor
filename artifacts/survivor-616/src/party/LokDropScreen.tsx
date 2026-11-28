@@ -25,7 +25,7 @@ import { MinigameStage } from './MinigameStage';
 import { RingRushArena } from './RingRushArena';
 import { CARTRIDGES, PRACTICE_ORDER, isKitGame, type KitGameId } from './cartridges';
 import type { OnlineSession } from './partyNet';
-import { boardStandings, type BoardState } from './lokBoard';
+import { boardStandings, encodeGoal, type BoardState } from './lokBoard';
 import { drawCrown, drawDiceBlock, drawOwl, drawCoin } from './boardArt';
 import { Squash, createJuice, drawRefractionRings, impact, type Juice } from './juiceEngine';
 import {
@@ -175,6 +175,8 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
   const [mode, setMode] = useState<Mode>(() => (inviteCode() ? 'friends' : 'blitz'));
   const [online, setOnline] = useState<OnlineSession | null>(null);
   const [rounds, setRounds] = useState(10);
+  const [goalKind, setGoalKind] = useState<'rounds' | 'crowns' | 'relics'>('rounds');
+  const goalCode = goalKind === 'crowns' ? encodeGoal({ kind: 'crowns', target: 3 }, rounds) : goalKind === 'relics' ? encodeGoal({ kind: 'relics', target: 5 }, rounds) : rounds;
   const [pick, setPick] = useState<string>(ROSTER_IDS[0]);
   const [meta, setMeta] = useState<LokPartyMeta>(() => loadLokPartyMeta(storage()));
   const [report, setReport] = useState<ReportData | null>(null);
@@ -225,7 +227,7 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
       const me = s.players[localSeat];
       const place = standings.find((r) => r.index === localSeat)?.place ?? 4;
       const totalCrowns = s.players.reduce((n, p) => n + p.crowns, 0) || 1;
-      const rounds = Math.max(1, s.maxRounds);
+      const rounds = Math.max(1, s.goal.kind === 'rounds' ? s.maxRounds : Math.min(s.round, s.maxRounds));
       settle(
         {
           characterId: me.characterId,
@@ -301,7 +303,7 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
       {phase === 'online' ? (
         <PartyLobby
           characterId={pick}
-          rounds={rounds}
+          rounds={goalCode}
           joinCode={joinCode}
           onStart={(session) => {
             ensureAudioContext();
@@ -315,7 +317,7 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
         <BoardScreen
           key={online ? `${online.room.code}-${online.seed}` : seed}
           humanId={pick}
-          rounds={rounds}
+          rounds={goalCode}
           seed={seed}
           online={online ?? undefined}
           ladderTier={meta.ladders.solo.tier}
@@ -330,7 +332,7 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
         />
       ) : null}
       {phase === 'lobby' ? (
-        <Lobby mode={mode} rounds={rounds} setRounds={setRounds} pick={pick} setPick={setPick} meta={meta} onStart={startMatch} onBack={() => setPhase('hub')} t={t} />
+        <Lobby mode={mode} rounds={rounds} setRounds={setRounds} goalKind={goalKind} setGoalKind={setGoalKind} pick={pick} setPick={setPick} meta={meta} onStart={startMatch} onBack={() => setPhase('hub')} t={t} />
       ) : null}
       {phase === 'results' && report ? (
         <Results
@@ -379,7 +381,7 @@ function CreamCard({ children, className = '' }: { children: React.ReactNode; cl
   );
 }
 
-function Lobby({ mode, rounds, setRounds, pick, setPick, meta, onStart, onBack, t }: { mode: Mode; rounds: number; setRounds: (n: number) => void; pick: string; setPick: (id: string) => void; meta: LokPartyMeta; onStart: () => void; onBack: () => void; t: ReturnType<typeof useT> }) {
+function Lobby({ mode, rounds, setRounds, goalKind, setGoalKind, pick, setPick, meta, onStart, onBack, t }: { mode: Mode; rounds: number; setRounds: (n: number) => void; goalKind: 'rounds' | 'crowns' | 'relics'; setGoalKind: (k: 'rounds' | 'crowns' | 'relics') => void; pick: string; setPick: (id: string) => void; meta: LokPartyMeta; onStart: () => void; onBack: () => void; t: ReturnType<typeof useT> }) {
   const touch = typeof window !== 'undefined' && 'ontouchstart' in window;
   return (
     <div className="absolute inset-0 overflow-y-auto" style={{ background: 'radial-gradient(ellipse at 50% 30%, #1d1450 0%, #07061a 70%)' }}>
@@ -413,8 +415,17 @@ function Lobby({ mode, rounds, setRounds, pick, setPick, meta, onStart, onBack, 
         </div>
         {mode === 'blitz' ? (
           <div className="mt-3">
-            <div className="mb-1 text-xs font-bold uppercase tracking-widest">{t('lokParty.board.length')}</div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="mb-1 text-xs font-bold uppercase tracking-widest">{t('lokParty.board.goal')}</div>
+            <div className="mb-3 grid grid-cols-3 gap-2">
+              {(['rounds', 'crowns', 'relics'] as const).map((k) => (
+                <button key={k} type="button" {...press(() => setGoalKind(k))} aria-pressed={goalKind === k} className="rounded-lg border-2 py-2 text-xs font-black" style={{ borderColor: ESPRESSO, background: goalKind === k ? '#ffcf3c' : 'transparent' }}>
+                  {t(k === 'rounds' ? 'lokParty.board.goalRounds' : k === 'crowns' ? 'lokParty.board.goalRaceCrowns' : 'lokParty.board.goalRaceRelics')}
+                </button>
+              ))}
+            </div>
+            <div className="mb-2 text-[11px] opacity-70">{t('lokParty.board.goalHelp')}</div>
+            {goalKind === 'rounds' ? <div className="mb-1 text-xs font-bold uppercase tracking-widest">{t('lokParty.board.length')}</div> : null}
+            <div className={goalKind === 'rounds' ? 'grid grid-cols-3 gap-2' : 'hidden'}>
               {[5, 10, 15].map((n) => (
                 <button key={n} type="button" {...press(() => setRounds(n))} className="rounded-lg border-2 py-2 text-sm font-black" style={{ borderColor: ESPRESSO, background: rounds === n ? '#ffcf3c' : 'transparent' }}>
                   {t('lokParty.board.rounds', { count: n })}

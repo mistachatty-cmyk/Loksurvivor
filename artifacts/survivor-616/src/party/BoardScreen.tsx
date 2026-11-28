@@ -20,6 +20,9 @@ import {
   boardMinigameResult,
   botAction,
   createBoardGame,
+  decodeGoal,
+  goalProgress,
+  SPAWN_LIFE_ROUNDS,
   isOvertime,
   type BoardAction,
   type BoardEvent,
@@ -60,6 +63,8 @@ import {
   signRect,
   windowRects,
   type Sprite,
+  drawSpawn,
+  SPAWN_COLOR,
 } from './boardArt';
 import { DropArena, seatOrder } from './LokDropScreen';
 import { RingRushArena } from './RingRushArena';
@@ -133,7 +138,10 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
     return seatsRef.current[i]?.kind === 'bot' ? 'bot' : 'remote';
   }, [localSeat]);
   const stateRef = useRef<BoardState>(
-    createBoardGame(online ? online.seed : seed, MONROE_LOOP, seats.map((id, i) => ({ characterId: id, bot: i !== localSeat })), online ? online.rounds : rounds),
+    (() => {
+      const g = decodeGoal(online ? online.rounds : rounds);
+      return createBoardGame(online ? online.seed : seed, MONROE_LOOP, seats.map((id, i) => ({ characterId: id, bot: i !== localSeat })), g.rounds, g.goal);
+    })(),
   );
   const [waitingOthers, setWaitingOthers] = useState(false);
   const [hostGone, setHostGone] = useState(false);
@@ -161,6 +169,12 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
     turn: (name: string) => t('lokParty.board.turn', { name }),
     crownGet: t('lokParty.board.crownGet'),
     frozen: t('lokParty.board.frozen'),
+    spawn: (k: string) => t(`lokParty.board.spawn.${k}` as MessageKey),
+    spawnGot: (k: string) => t(`lokParty.board.spawnGot.${k}` as MessageKey),
+    shieldUsed: t('lokParty.board.shieldUsed'),
+    goalReached: (name: string) => t('lokParty.board.goalReached', { name }),
+    goalCrowns: (n: number) => t('lokParty.board.goalCrowns', { count: n }),
+    goalRelics: (n: number) => t('lokParty.board.goalRelics', { count: n }),
     trap: t('lokParty.board.trap'),
     swapCoins: t('lokParty.board.swapCoins'),
     swapPlaces: t('lokParty.board.swapPlaces'),
@@ -335,6 +349,38 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
             waitUntil = now + 1400;
             break;
           }
+          case 'spawn': {
+            // Calm by design: a soft chime and a ring, no banner, so a board that spawns every round never nags.
+            const n = s.map[e.node];
+            const pt = P(n.x, n.y, n.z);
+            confetti(pt.x, pt.y - 16, 8, [SPAWN_COLOR[e.spawn], '#fff6c4']);
+            juice.chimes.pickup(now, { bright: false });
+            break;
+          }
+          case 'spawn-collected': {
+            const a = playerAnchor(e.who);
+            const color = SPAWN_COLOR[e.spawn];
+            floats.push({ x: a.x, y: a.y - 112, text: L.spawnGot(e.spawn), color, born: now });
+            confetti(a.x, a.y - 70, e.spawn === 'relic' ? 28 : 14, [color, '#fff6c4']);
+            juice.chimes.accent(e.spawn === 'relic' ? 'bank' : 'crack');
+            if (e.spawn === 'relic') {
+              impact(juice, now, ...toScreen(a.x, a.y - 80), 0.6);
+              waitUntil = Math.max(waitUntil, now + 700);
+            }
+            break;
+          }
+          case 'spawn-fade':
+            break;
+          case 'shield-used': {
+            const a = playerAnchor(e.who);
+            floats.push({ x: a.x, y: a.y - 112, text: L.shieldUsed, color: '#5fe36f', born: now });
+            juice.chimes.accent('hit');
+            break;
+          }
+          case 'goal-reached':
+            pushBanner(L.goalReached(nameOf(e.who)), '#ffcf3c', 1800);
+            waitUntil = now + 1800;
+            break;
           case 'vendor-move':
             if (s.round > 1 || s.turnOf > 0) confetti(...vendorPos(), 20, ['#b56cff', '#ffcf3c']);
             break;
@@ -973,6 +1019,12 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
             ctx.lineCap = 'butt';
           },
         });
+      for (const sp of s.spawns) {
+        const n = s.map[sp.node];
+        const pt = P(n.x, n.y, n.z);
+        const age = sp.kind === 'relic' ? 0 : (s.round - sp.bornRound) / SPAWN_LIFE_ROUNDS;
+        ents.push({ sort: nodeSortY(n) + 0.6, draw: () => drawSpawn(ctx, sp.kind, pt.x, pt.y, now, age, motion === 0) });
+      }
       const owlLift = Math.max(0, Math.sin(Math.min(1, (now - owlHopAt) / 450) * Math.PI)) * 18;
       ents.push({
         sort: nodeSortY(vendorNode) + 0.8,
@@ -1207,7 +1259,10 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
         ctx.restore();
       });
       // Round plaque with sun or moon (drops below the cards when the middle is too tight).
-      const text = L.round(Math.min(s.round, s.maxRounds), s.maxRounds);
+      const lead = [...s.players].sort((a, b) => goalProgress(s, b) - goalProgress(s, a))[0];
+      const text = s.goal.kind === 'rounds'
+        ? L.round(Math.min(s.round, s.maxRounds), s.maxRounds)
+        : `${s.goal.kind === 'crowns' ? L.goalCrowns(s.goal.target) : L.goalRelics(s.goal.target)}  ${s.goal.kind === 'crowns' ? lead.crowns : lead.relics}/${s.goal.target}`;
       ctx.font = '900 15px ui-sans-serif, system-ui';
       const tw = ctx.measureText(text).width + 56;
       const middle = W - 4 * (cw + 8) - 20;
