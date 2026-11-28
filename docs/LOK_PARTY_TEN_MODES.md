@@ -41,3 +41,5 @@ Ranked by how much they lift the party:
 - Rules, tests, input, online and wiring (the kit makes this fast): Sonnet 5.5 at medium effort is enough.
 - Art, the entrance and podium for each new mode, and the "insane" feel (particles, shatter, face-draw reveal): do these at a higher tier, from a short brief per mode (what you see on screen, the three juiciest moments, the camera behaviour). Each brief goes into `docs/art-library/lok-party/` with the finished picture.
 - Per the visual rule: show pictures of a mode's look before building it.
+
+**Bonus mode (v0.43.11): Red Light, Green Light.** A giant owl, tap to run, freeze on red or be lasered. The first mode where anyone can fail. Rules `src/party/redLight.ts`, art `redLightArt.ts`. Built for four seats; the rules are per-runner, so more players is a seat-count and lane-layout change.
