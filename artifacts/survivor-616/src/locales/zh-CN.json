@@ -1706,6 +1706,7 @@
   "lokParty.tilt.warn": "即将来临",
   "lokParty.vault.title": "断层",
   "lokParty.vault.dust": "尘埃: {{n}}",
+  "lokParty.vault.owned": "{{total}}的{{n}}解锁",
   "lokParty.vault.shards": "你的硬盘( {{n}})",
   "lokParty.vault.pickHint": "击打一个以伪造或打破它。 塔普{{n}}转录.",
   "lokParty.vault.empty": "还没有硬币。 火柴后裂开一个胶囊.",
