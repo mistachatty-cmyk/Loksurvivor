@@ -187,7 +187,7 @@ export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
 
   const handleBuyPalette = (paletteId: string) => {
     const palette = THEMED_PALETTES.find((entry) => entry.id === paletteId);
-    if (!palette || meta.ownedPaletteIds.includes(palette.id)) return;
+    if (!palette || hasCatalogItem(meta, 'palettes', palette.id, meta.ownedPaletteIds)) return;
     if (isLokOnly(palette)) {
       if (!signedIn) {
         setNotice('Palettes are sold for LokTokens. Sign in from the Account room to earn and spend them.');

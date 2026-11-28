@@ -72,6 +72,7 @@ import { DEFAULT_HAT_ID, HATS, HATS_BY_ID } from '@/game/data/hats';
 import { CELEBRATIONS, CELEBRATIONS_BY_ID, DEFAULT_CELEBRATION_ID } from '@/game/data/celebrations';
 import { DROP_PACKS, DROP_PACKS_BY_ID, DEFAULT_DROP_PACK_ID } from '@/game/data/dropPacks';
 import { effectiveCatalogIds, hasCatalogItem } from '@/game/data/devUnlockRegistry';
+import { isTierIncludable } from '@/game/data/tierIncluded';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
 import { RENTABLE_GENERATORS, RENTABLE_GENERATORS_BY_ID } from '@/game/data/generators';
@@ -334,6 +335,7 @@ export function createInitialMeta(): MetaState {
     version: META_VERSION,
     devModeAccessUnlocked: false,
     devModeAllUnlocks: false,
+    activeSupporterTier: null,
     physicsObjectClicksEnabled: true,
     levelUpPausesEnabled: true,
     liveModeEnabled: false,
@@ -763,6 +765,11 @@ function normalizeRunAuraId(value: unknown, ownedRunAuraIds: string[]): string {
 
 function normalizeOwnedIds(value: unknown, ids: string[], defaultId: string): string[] {
   return idList(value, new Set(ids), [defaultId]);
+}
+
+/** A saved equipped item that a supporter tier could include survives a reload; setSupporterTier drops it if the tier turns out not to cover it. */
+function keepIncludable(catalog: 'palettes' | 'hats' | 'celebrations', saved: unknown, normalized: string): string {
+  return typeof saved === 'string' && isTierIncludable(catalog, saved) ? saved : normalized;
 }
 
 function normalizeOwnedCosmeticId(value: unknown, ownedIds: string[], defaultId: string): string {
@@ -1380,6 +1387,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // Dev Mode is a per-session tool: it is never restored from a save, so a reload always returns to the real progress.
     devModeAccessUnlocked: false,
     devModeAllUnlocks: false,
+    activeSupporterTier: null,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
     levelUpPausesEnabled: !liveModeEnabled && parsed.levelUpPausesEnabled !== false,
     liveModeEnabled,
@@ -1645,15 +1653,15 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     themeCycleMastered: parsed.themeCycleMastered === true,
     themeCycleCollection: parsed.themeCycleMastered === true && parsed.themeCycleCollection === 'owned' ? 'owned' : 'starter',
     ownedPaletteIds: normalizeOwnedPaletteIds(parsed.ownedPaletteIds),
-    activePaletteId: normalizePaletteId(parsed.activePaletteId, normalizeOwnedPaletteIds(parsed.ownedPaletteIds)),
+    activePaletteId: keepIncludable('palettes', parsed.activePaletteId, normalizePaletteId(parsed.activePaletteId, normalizeOwnedPaletteIds(parsed.ownedPaletteIds))),
     ownedSoundPackIds: normalizeOwnedSoundPackIds(parsed.ownedSoundPackIds),
     activeSoundPackId: normalizeSoundPackId(parsed.activeSoundPackId, normalizeOwnedSoundPackIds(parsed.ownedSoundPackIds)),
     ownedRunAuraIds,
     activeRunAuraId: normalizeRunAuraId(parsed.activeRunAuraId, ownedRunAuraIds),
     ownedHatIds,
-    activeHatId: normalizeOwnedCosmeticId(parsed.activeHatId, ownedHatIds, DEFAULT_HAT_ID),
+    activeHatId: keepIncludable('hats', parsed.activeHatId, normalizeOwnedCosmeticId(parsed.activeHatId, ownedHatIds, DEFAULT_HAT_ID)),
     ownedCelebrationIds,
-    activeCelebrationId: normalizeOwnedCosmeticId(parsed.activeCelebrationId, ownedCelebrationIds, DEFAULT_CELEBRATION_ID),
+    activeCelebrationId: keepIncludable('celebrations', parsed.activeCelebrationId, normalizeOwnedCosmeticId(parsed.activeCelebrationId, ownedCelebrationIds, DEFAULT_CELEBRATION_ID)),
     ownedDropPackIds,
     activeDropPackId: normalizeOwnedCosmeticId(parsed.activeDropPackId, ownedDropPackIds, DEFAULT_DROP_PACK_ID),
     dailyContractDayKey,
@@ -2228,6 +2236,7 @@ type Action =
   | { type: 'selectUiThemeSwatch'; themeId: string; swatchId: string }
   | { type: 'buyPalette'; id: string }
   | { type: 'grantPalette'; id: string }
+  | { type: 'setSupporterTier'; tier: 'pass' | 'passport' | 'lifetime' | null }
   | { type: 'equipPalette'; id: string }
   | { type: 'equipDirectorPersonality'; id: string | null }
   | { type: 'claimSaunaHoleReward' }
@@ -3543,6 +3552,21 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...state.meta, ownedPaletteIds: [...state.meta.ownedPaletteIds, action.id] } };
     }
 
+    case 'setSupporterTier': {
+      if (state.meta.activeSupporterTier === action.tier) return state;
+      const meta = { ...state.meta, activeSupporterTier: action.tier };
+      // Included items only count while the tier is active: anything equipped that is no longer covered goes back to the default.
+      return {
+        ...state,
+        meta: {
+          ...meta,
+          activePaletteId: hasCatalogItem(meta, 'palettes', meta.activePaletteId, meta.ownedPaletteIds) ? meta.activePaletteId : DEFAULT_PALETTE_ID,
+          activeHatId: hasCatalogItem(meta, 'hats', meta.activeHatId, meta.ownedHatIds) ? meta.activeHatId : DEFAULT_HAT_ID,
+          activeCelebrationId: hasCatalogItem(meta, 'celebrations', meta.activeCelebrationId, meta.ownedCelebrationIds) ? meta.activeCelebrationId : DEFAULT_CELEBRATION_ID,
+        },
+      };
+    }
+
     case 'equipPalette':
       if (!hasCatalogItem(state.meta, 'palettes', action.id, state.meta.ownedPaletteIds)) return state;
       return { ...state, meta: { ...state.meta, activePaletteId: action.id } };
@@ -4791,6 +4815,8 @@ export interface MetaContextValue {
   selectUiThemeSwatch: (themeId: string, swatchId: string) => void;
   buyPalette: (id: string) => void;
   grantPalette: (id: string) => void;
+  /** Set from the Lok account each session; never saved. Included cosmetics follow it. */
+  setSupporterTier: (tier: 'pass' | 'passport' | 'lifetime' | null) => void;
   equipPalette: (id: string) => void;
   /** Digital Archive terminal: select which Director personality spawns for the encounter. Pass null to clear. */
   equipDirectorPersonality: (id: string | null) => void;
@@ -5045,6 +5071,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const buyPalette = useCallback((id: string) => dispatch({ type: 'buyPalette', id }), []);
   const grantPalette = useCallback((id: string) => dispatch({ type: 'grantPalette', id }), []);
+  const setSupporterTier = useCallback((tier: 'pass' | 'passport' | 'lifetime' | null) => dispatch({ type: 'setSupporterTier', tier }), []);
   const equipPalette = useCallback((id: string) => dispatch({ type: 'equipPalette', id }), []);
   const equipDirectorPersonality = useCallback((id: string | null) => dispatch({ type: 'equipDirectorPersonality', id }), []);
   const claimSaunaHoleReward = useCallback(() => dispatch({ type: 'claimSaunaHoleReward' }), []);
@@ -5383,6 +5410,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       selectUiThemeSwatch,
       buyPalette,
       grantPalette,
+      setSupporterTier,
       equipPalette,
       equipDirectorPersonality,
       claimSaunaHoleReward,
@@ -5580,6 +5608,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     selectUiThemeSwatch,
     buyPalette,
     grantPalette,
+    setSupporterTier,
     equipPalette,
     equipDirectorPersonality,
     claimSaunaHoleReward,

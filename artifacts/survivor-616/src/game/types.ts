@@ -2390,6 +2390,8 @@ export interface MetaState {
   devModeAccessUnlocked: boolean;
   /** Settings toggle for exposing every unlockable surface regardless of progress. */
   devModeAllUnlocks: boolean;
+  /** The supporter tier that is active RIGHT NOW. Never saved: it is set each session from the Lok account, so a lapsed tier stops including cosmetics. */
+  activeSupporterTier: 'pass' | 'passport' | 'lifetime' | null;
   /** Enables tapping/clicking a movable prop to prime its next player impact. */
   physicsObjectClicksEnabled: boolean;
   /** When true, level-up choices pause the run; when false, the run keeps moving. */

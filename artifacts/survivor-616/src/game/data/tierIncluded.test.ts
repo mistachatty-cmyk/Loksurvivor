@@ -28,3 +28,33 @@ test('hats and celebrations follow the same rule', () => {
   assert.ok(tierIncludedIds('passport', 'hats').length >= 1);
   assert.ok(tierIncludedIds('lifetime', 'celebrations').length >= tierIncludedIds('passport', 'celebrations').length);
 });
+
+test('ownership: a Passport includes rare items only while active, and equipped items fall back on lapse', async () => {
+  const { createInitialMeta, normalizeMeta, reducer } = await import('@/game/state/metaStore');
+  const { effectiveCatalogIds, hasCatalogItem } = await import('@/game/data/devUnlockRegistry');
+  const rare = THEMED_PALETTES.find((p) => p.tier === 'rare')!;
+  const legendary = THEMED_PALETTES.find((p) => p.tier === 'legendary')!;
+  const base = createInitialMeta();
+  assert.equal(hasCatalogItem(base, 'palettes', rare.id, base.ownedPaletteIds), false);
+
+  const passport = { ...base, activeSupporterTier: 'passport' as const };
+  assert.equal(hasCatalogItem(passport, 'palettes', rare.id, base.ownedPaletteIds), true);
+  assert.equal(hasCatalogItem(passport, 'palettes', legendary.id, base.ownedPaletteIds), false, 'legendary needs Lifetime');
+  assert.ok(effectiveCatalogIds(passport, 'palettes', base.ownedPaletteIds).includes(rare.id));
+
+  // Equip through the real reducer, then let the tier lapse.
+  let state = { meta: reducer({ meta: base } as never, { type: 'setSupporterTier', tier: 'passport' }).meta } as never;
+  state = reducer(state, { type: 'equipPalette', id: rare.id });
+  assert.equal((state as { meta: { activePaletteId: string } }).meta.activePaletteId, rare.id);
+  state = reducer(state, { type: 'setSupporterTier', tier: null });
+  assert.notEqual((state as { meta: { activePaletteId: string } }).meta.activePaletteId, rare.id, 'lapsed: back to the default');
+  assert.equal((state as { meta: { activeSupporterTier: null } }).meta.activeSupporterTier, null);
+});
+
+test('a saved equipped tier item survives a reload, and the tier is never read from a save', async () => {
+  const { normalizeMeta } = await import('@/game/state/metaStore');
+  const rare = THEMED_PALETTES.find((p) => p.tier === 'rare')!;
+  const loaded = normalizeMeta({ version: 1, activePaletteId: rare.id, activeSupporterTier: 'lifetime' });
+  assert.equal(loaded.activePaletteId, rare.id);
+  assert.equal(loaded.activeSupporterTier, null, 'a save can never grant a tier');
+});

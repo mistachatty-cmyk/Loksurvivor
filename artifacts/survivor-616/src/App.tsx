@@ -1068,6 +1068,14 @@ function CrewPresenceSync({ screenName }: { screenName: string }) {
   return null;
 }
 
+/** Tells the save which supporter tier is active right now, so tier-included cosmetics follow the account (and stop when a tier lapses). */
+function SupporterTierBridge() {
+  const { activeSupporterTier } = useLokEconomy();
+  const { setSupporterTier } = useMeta();
+  useEffect(() => { setSupporterTier(activeSupporterTier); }, [activeSupporterTier, setSupporterTier]);
+  return null;
+}
+
 function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
@@ -1076,6 +1084,7 @@ function Providers({ children }: { children: ReactNode }) {
           <CloudSyncProvider>
             <LokEconomyProvider>
               <MusicProvider>
+                <SupporterTierBridge />
                 <SocialProvider>
                   <ListenTogetherProvider>
                     <CrewChatProvider>

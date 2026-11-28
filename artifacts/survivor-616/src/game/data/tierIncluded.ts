@@ -35,3 +35,9 @@ export function tierIncludedIds(active: ActiveSupporterTier, catalog: TierInclud
 export function isTierIncluded(active: ActiveSupporterTier, catalog: TierIncludedCatalog, id: string): boolean {
   return tierIncludedIds(active, catalog).includes(id);
 }
+
+/** True when the item is the kind a tier can include (rare or legendary). Used to keep an equipped item across a reload until the tier is known. */
+export function isTierIncludable(catalog: TierIncludedCatalog, id: string): boolean {
+  const item = CATALOGS[catalog].find((i) => i.id === id);
+  return !!item && (item.tier === 'rare' || item.tier === 'legendary');
+}

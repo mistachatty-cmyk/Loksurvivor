@@ -87,7 +87,7 @@ export function RunSetupScreen({ intent, areaId, challengeIds = [], onBack, onCo
   const legendaryReadyPets = readyPets.filter((pet) => pet.roll.legendary);
   const capacity = lokPetTeamCapacity(selectedCharacter);
   const isLaunch = intent === 'launch';
-  const ownedPalettes = meta.ownedPaletteIds.map((id) => THEMED_PALETTES_BY_ID[id]).filter(Boolean);
+  const ownedPalettes = effectiveCatalogIds(meta, 'palettes', meta.ownedPaletteIds).map((id) => THEMED_PALETTES_BY_ID[id]).filter(Boolean);
   const ownedUiThemeIds = effectiveCatalogIds(meta, 'uiThemes', meta.ownedUiThemeIds);
   const ownedUiThemes = UI_THEMES.filter((theme) => ownedUiThemeIds.includes(theme.id));
   const activeSwatchId = activeUiThemeSwatchId(meta);

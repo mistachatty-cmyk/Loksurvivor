@@ -9,6 +9,7 @@ import { SOUND_PACKS } from '@/game/data/soundPacks';
 import { UI_THEMES } from '@/game/data/uiThemes';
 import { HUB_ROOMS } from '@/game/data/progression';
 import type { MetaState } from '@/game/types';
+import { isTierIncluded, tierIncludedIds, type TierIncludedCatalog } from '@/game/data/tierIncluded';
 
 /**
  * One registration point for catalogs that Dev Mode should expose. Adding a
@@ -47,23 +48,32 @@ export const DEV_RUN_TOOL_REGISTRY = [
 
 export type DevRunToolId = (typeof DEV_RUN_TOOL_REGISTRY)[number]['id'];
 
+type OwnershipMeta = Pick<MetaState, 'devModeAllUnlocks'> & Partial<Pick<MetaState, 'activeSupporterTier'>>;
+
+const TIER_CATALOGS: readonly TierIncludedCatalog[] = ['palettes', 'hats', 'celebrations'];
+const tierCatalog = (catalog: DevUnlockCatalog): TierIncludedCatalog | null => (TIER_CATALOGS as readonly string[]).includes(catalog) ? (catalog as TierIncludedCatalog) : null;
+
+/** Everything the player can use right now: what they own, plus what their ACTIVE supporter tier includes. Dev Mode shows all. */
 export function effectiveCatalogIds(
-  meta: Pick<MetaState, 'devModeAllUnlocks'>,
+  meta: OwnershipMeta,
   catalog: DevUnlockCatalog,
   ownedIds: string[],
 ): string[] {
-  return meta.devModeAllUnlocks ? [...DEV_UNLOCK_REGISTRY[catalog]] : ownedIds;
+  if (meta.devModeAllUnlocks) return [...DEV_UNLOCK_REGISTRY[catalog]];
+  const included = tierCatalog(catalog) ? tierIncludedIds(meta.activeSupporterTier ?? null, tierCatalog(catalog)!) : [];
+  return included.length ? [...new Set([...ownedIds, ...included])] : ownedIds;
 }
 
 export function hasCatalogItem(
-  meta: Pick<MetaState, 'devModeAllUnlocks'>,
+  meta: OwnershipMeta,
   catalog: DevUnlockCatalog,
   id: string,
   ownedIds: string[],
 ): boolean {
-  return meta.devModeAllUnlocks
-    ? DEV_UNLOCK_REGISTRY[catalog].includes(id as never)
-    : ownedIds.includes(id);
+  if (meta.devModeAllUnlocks) return DEV_UNLOCK_REGISTRY[catalog].includes(id as never);
+  if (ownedIds.includes(id)) return true;
+  const tc = tierCatalog(catalog);
+  return tc ? isTierIncluded(meta.activeSupporterTier ?? null, tc, id) : false;
 }
 
 export const DEV_ACCESS_TAPS_REQUIRED = 4;
