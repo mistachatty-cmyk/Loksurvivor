@@ -107,4 +107,11 @@ export const MONROE_LOOP: BoardDef = {
   nodes,
   start: 'B10',
   crownSpots: ['T8', 'R2', 'B7', 'L2', 'G3', 'T3'],
+  districts: [
+    { id: 'market-row', nodes: T.map((n) => n.id) },
+    { id: 'the-terrace', nodes: R.map((n) => n.id) },
+    { id: 'riverside', nodes: B.map((n) => n.id) },
+    { id: 'west-side', nodes: L.map((n) => n.id) },
+    { id: 'rooftops', nodes: G.map((n) => n.id) },
+  ],
 };

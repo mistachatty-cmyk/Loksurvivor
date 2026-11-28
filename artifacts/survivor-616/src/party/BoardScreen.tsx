@@ -6,12 +6,25 @@
  * A 30-second minigame closes each round, rotating the Lok Drop, Ring Run Rush, Roof Rumble and Roof Collapse.
  */
 
+import './partyHaptics';
 import { press } from './press';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { CHARACTERS_BY_ID } from '@/game/data/characters';
 import { drawRig, drawShadow } from '@/game/render/sprite';
 import { useT, type MessageKey } from '@/lib/i18n';
-import { createJuice, drawRefractionRings, impact, Squash, type Juice } from './juiceEngine';
+import {
+  createJuice,
+  drawRefractionRings,
+  impact,
+  Squash,
+  type Juice,
+} from './juiceEngine';
 import {
   CROWN_COST,
   SIGNATURE_DICE,
@@ -27,8 +40,6 @@ import {
   type BoardAction,
   type BoardEvent,
   type BoardState,
-  type DieFace,
-  type ItemId,
 } from './lokBoard';
 import { MONROE_LOOP } from './boards/monroeLoop';
 import {
@@ -66,69 +77,29 @@ import {
   drawSpawn,
   SPAWN_COLOR,
 } from './boardArt';
-import { DropArena, seatOrder } from './LokDropScreen';
+import { DropArena } from './DropArena';
+import { seatOrder } from './dropShared';
 import { RingRushArena } from './RingRushArena';
 import { minigameForRound, type MinigameId } from './minigameKit';
 import { MinigameStage } from './MinigameStage';
 import { CARTRIDGES, isKitGame } from './cartridges';
 import { botSkillsForTier, dropResults } from './lokDrop';
-import { actVerdict, createActionSync, quietLimitMs, type ActPayload, minigamePlacements, seatToBot, type OnlineSession, type Seat } from './partyNet';
-
-const LANE = ['#38f2ff', '#ff3fd2', '#ffd23f', '#7cff6b'];
-const CREAM = '#FAF6EE';
-const ESPRESSO = '#3b2a20';
-const HOP_MS = 230;
-const RIG_SCALE = 1.45;
-
-interface Props {
-  humanId: string;
-  rounds?: number;
-  seed: number;
-  ladderTier: number;
-  getAudioContext: () => AudioContext | null;
-  onFinish: (s: BoardState, localSeat: number) => void;
-  /** Present when this is an online party. */
-  online?: OnlineSession;
-  onQuit: () => void;
-}
-
-interface Float {
-  x: number;
-  y: number;
-  text: string;
-  color: string;
-  born: number;
-  coin?: boolean;
-}
-
-interface Bit {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  color: string;
-  r: number;
-}
-
-function prefersReducedMotion(): boolean {
-  try {
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch {
-    return false;
-  }
-}
-
-function faceLabel(f: DieFace): string {
-  if (typeof f === 'number') return String(f);
-  return { 'freeze-rival': 'FREEZE', 'plus-cred': '+3', 'boulder-ride': 'BOULDER', gilded: 'GILDED' }[f];
-}
-
-export type SeatRole = 'local' | 'bot' | 'remote';
+import {
+  actVerdict,
+  createActionSync,
+  quietLimitMs,
+  type ActPayload,
+  minigamePlacements,
+  seatToBot,
+  type Seat,
+} from './partyNet';
+import { Bit, CREAM, ESPRESSO, Float, HOP_MS, LANE, Props, RIG_SCALE, SeatRole, faceLabel, prefersReducedMotion } from './boardShared';
+import { ItemBadge, PartyButton, drawItemIcon } from './boardUi';
 
 export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioContext, onFinish, onQuit, online }: Props) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const liveRef = useRef<HTMLDivElement | null>(null);
   const seats = useMemo(() => (online ? online.seats.map((st) => st.characterId) : seatOrder(humanId)), [humanId, online]);
   const localSeat = online ? online.mySeat : 0;
   const seatsRef = useRef<Seat[] | null>(online ? online.seats : null);
@@ -172,6 +143,12 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
     spawn: (k: string) => t(`lokParty.board.spawn.${k}` as MessageKey),
     spawnGot: (k: string) => t(`lokParty.board.spawnGot.${k}` as MessageKey),
     shieldUsed: t('lokParty.board.shieldUsed'),
+    district: (id: string) => t(`lokParty.district.${id}` as MessageKey),
+    hotDistrict: (name: string) => t('lokParty.board.hotDistrict', { name }),
+    districtBonus: (n: number) => t('lokParty.board.districtBonus', { count: n }),
+    streak: (n: number) => t('lokParty.board.streak', { count: n }),
+    streakLost: t('lokParty.board.streakLost'),
+    bounty: (n: number) => t('lokParty.board.bounty', { count: n }),
     goalReached: (name: string) => t('lokParty.board.goalReached', { name }),
     goalCrowns: (n: number) => t('lokParty.board.goalCrowns', { count: n }),
     goalRelics: (n: number) => t('lokParty.board.goalRelics', { count: n }),
@@ -275,7 +252,11 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
         bits.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0, color: colors[i % colors.length], r: 2 + Math.random() * 3 });
       }
     };
-    const pushBanner = (text: string, color: string, ms = 1300, sub?: string) => banners.push({ text, color, ms, sub });
+    const pushBanner = (text: string, color: string, ms = 1300, sub?: string) => {
+      banners.push({ text, color, ms, sub });
+      // The board is drawn on a canvas, so screen readers hear every banner through this polite live region.
+      if (liveRef.current) liveRef.current.textContent = sub ? `${text}. ${sub}` : text;
+    };
     const playerAnchor = (i: number) => ({ x: disp[i].x, y: disp[i].y });
 
     // Spread players sharing a node so nobody hides.
@@ -371,6 +352,36 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
           }
           case 'spawn-fade':
             break;
+          case 'district-hot':
+            // One quiet line per round: the lane names the hot district, the board glows it.
+            if (s.round > 1 || s.turnOf > 0) pushBanner(L.hotDistrict(L.district(e.district)), '#ffb03c', 1000);
+            break;
+          case 'district-bonus': {
+            const a = playerAnchor(e.who);
+            floats.push({ x: a.x, y: a.y - 128, text: L.districtBonus(e.amount), color: '#ffb03c', born: now });
+            juice.chimes.pickup(now, { bright: true });
+            break;
+          }
+          case 'streak': {
+            const a = playerAnchor(e.who);
+            floats.push({ x: a.x, y: a.y - 146, text: L.streak(e.level), color: '#ff7a3c', born: now });
+            confetti(a.x, a.y - 60, 6 + 4 * e.level, ['#ff7a3c', '#ffcf3c']);
+            for (let k = 0; k < e.level; k += 1) setTimeout(() => juice.chimes.pickup(now + k * 90, { bright: true }), k * 90);
+            break;
+          }
+          case 'streak-lost': {
+            const a = playerAnchor(e.who);
+            floats.push({ x: a.x, y: a.y - 146, text: L.streakLost, color: '#9aa4b2', born: now });
+            break;
+          }
+          case 'bounty': {
+            const a = playerAnchor(e.who);
+            pushBanner(L.bounty(e.amount), '#ff3fa4', 1200);
+            confetti(a.x, a.y - 70, 24, ['#ff3fa4', '#ffcf3c']);
+            impact(juice, now, ...toScreen(a.x, a.y - 80), 0.7);
+            waitUntil = Math.max(waitUntil, now + 800);
+            break;
+          }
           case 'shield-used': {
             const a = playerAnchor(e.who);
             floats.push({ x: a.x, y: a.y - 112, text: L.shieldUsed, color: '#5fe36f', born: now });
@@ -1025,6 +1036,23 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
         const age = sp.kind === 'relic' ? 0 : (s.round - sp.bornRound) / SPAWN_LIFE_ROUNDS;
         ents.push({ sort: nodeSortY(n) + 0.6, draw: () => drawSpawn(ctx, sp.kind, pt.x, pt.y, now, age, motion === 0) });
       }
+      const hotD = s.board.districts?.find((d) => d.id === s.hotDistrict);
+      if (hotD) {
+        for (const id of hotD.nodes) {
+          const n = s.map[id];
+          const pt = P(n.x, n.y, n.z);
+          ents.push({
+            sort: nodeSortY(n) - 0.3,
+            draw: () => {
+              ctx.strokeStyle = `rgba(255,176,60,${0.35 + 0.3 * pulse})`;
+              ctx.lineWidth = 3;
+              ctx.beginPath();
+              ctx.ellipse(pt.x, pt.y, 34, 17, 0, 0, Math.PI * 2);
+              ctx.stroke();
+            },
+          });
+        }
+      }
       const owlLift = Math.max(0, Math.sin(Math.min(1, (now - owlHopAt) / 450) * Math.PI)) * 18;
       ents.push({
         sort: nodeSortY(vendorNode) + 0.8,
@@ -1382,7 +1410,8 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
 
   return (
     <div className="fixed inset-0 select-none overflow-hidden bg-[#05041a]" style={{ touchAction: 'none' }}>
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" role="img" aria-label={t('lokParty.board.canvasLabel')} />
+      <div ref={liveRef} role="status" aria-live="polite" className="sr-only" />
       {pend ? (
         <div className={`pointer-events-none absolute inset-x-0 bottom-0 flex p-3 ${compact ? 'justify-end pb-3' : 'justify-center pb-6'}`}>
           <div className={`pointer-events-auto w-full rounded-2xl border-[3px] ${compact ? 'max-w-[340px] p-2' : 'max-w-md p-3'}`} style={{ background: CREAM, borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 5px 0 ${ESPRESSO}` }}>
@@ -1520,107 +1549,3 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
   );
 }
 
-function PartyButton({ children, onPress, tone = 'cream', big = false }: { children: React.ReactNode; onPress: () => void; tone?: 'cream' | 'gold' | 'lane' | 'plain'; big?: boolean }) {
-  const bg = { cream: '#efe5d0', gold: '#ffcf3c', lane: '#38f2ff', plain: 'transparent' }[tone];
-  return (
-    <button
-      type="button"
-      {...press(onPress)}
-      className={`flex flex-1 flex-col items-center justify-center rounded-xl border-[3px] font-black transition-transform active:translate-y-[3px] ${big ? 'min-h-[64px] text-lg' : 'min-h-[44px] text-sm'}`}
-      style={{ background: bg, borderColor: ESPRESSO, color: ESPRESSO, boxShadow: tone === 'plain' ? 'none' : `0 3px 0 ${ESPRESSO}` }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ItemBadge({ item }: { item: ItemId }) {
-  const ref = useRef<HTMLCanvasElement | null>(null);
-  useEffect(() => {
-    const c = ref.current;
-    const ctx = c?.getContext('2d');
-    if (!c || !ctx) return;
-    ctx.clearRect(0, 0, c.width, c.height);
-    drawItemIcon(ctx, item, c.width / 2, c.height / 2, 1);
-  }, [item]);
-  return <canvas ref={ref} width={36} height={28} style={{ width: 36, height: 28 }} />;
-}
-
-/** Original item icons, drawn in about a 34 x 24 box at scale 1. */
-export function drawItemIcon(ctx: CanvasRenderingContext2D, item: ItemId, x: number, y: number, k: number) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(k, k);
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = '#1a1020';
-  switch (item) {
-    case 'double-dice':
-      for (const [dx, col] of [
-        [-7, '#ffcb3c'],
-        [6, '#ff9a2f'],
-      ] as const) {
-        ctx.fillStyle = col;
-        ctx.beginPath();
-        ctx.roundRect(dx - 7, -7 + (dx > 0 ? 3 : -2), 14, 14, 3);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = '#1a1020';
-        ctx.fillRect(dx - 1.5, -1.5 + (dx > 0 ? 3 : -2), 3, 3);
-      }
-      break;
-    case 'custom-dice':
-      ctx.fillStyle = '#38d5ff';
-      ctx.beginPath();
-      ctx.roundRect(-9, -9, 18, 18, 4);
-      ctx.fill();
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(-3, -3);
-      ctx.lineTo(4, 4);
-      ctx.moveTo(4, -3);
-      ctx.lineTo(4, 4);
-      ctx.lineTo(-3, 4);
-      ctx.stroke();
-      break;
-    case 'swap-mirror':
-      ctx.fillStyle = '#bfe8ff';
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 9, 11, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(-5, -3);
-      ctx.lineTo(5, -3);
-      ctx.lineTo(2, -6);
-      ctx.moveTo(5, 3);
-      ctx.lineTo(-5, 3);
-      ctx.lineTo(-2, 6);
-      ctx.stroke();
-      break;
-    case 'glitch-trap':
-      ctx.fillStyle = '#ff3fa4';
-      ctx.beginPath();
-      for (let i = 0; i < 8; i += 1) {
-        const a = (i / 8) * Math.PI * 2;
-        const r = i % 2 ? 5 : 10;
-        ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      break;
-    case 'crown-radar':
-      ctx.strokeStyle = '#5fe36f';
-      for (const r of [4, 8, 12]) {
-        ctx.beginPath();
-        ctx.arc(-6, 6, r, -Math.PI / 2, 0);
-        ctx.stroke();
-      }
-      ctx.fillStyle = '#ffcf3c';
-      ctx.beginPath();
-      ctx.arc(-6, 6, 2.5, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-  }
-  ctx.restore();
-}

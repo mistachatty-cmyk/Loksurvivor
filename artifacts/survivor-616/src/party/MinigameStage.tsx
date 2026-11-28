@@ -4,14 +4,15 @@
  * the shared entrance and podium (stageArt.ts). A cartridge only brings rules and art.
  */
 
+import './partyHaptics';
 import { setPadGameplay } from '@/lib/consolePad';
 import { lokPad } from '../../../../lib/lok-universe/src/gamepad';
 import { isSavingPower } from '@/lib/powerSaver';
 import { useEffect, useRef } from 'react';
 import { useT } from '@/lib/i18n';
-import { createJuice, drawRefractionRings, impact } from './juiceEngine';
+import { createJuice, drawRefractionRings, impact, juiceHaptic } from './juiceEngine';
 import { ENTRANCE, PODIUM_MS, SEAT_COLORS, type MinigameCartridge, type MinigameResult, type MinigameSeat, type RenderInfo, type StageFx, type StageInput, type StageView } from './minigameKit';
-import { STAGE_W, countdownAt, drawEntrance, drawPodium, outlined } from './stageArt';
+import { STAGE_W, countdownAt, drawEntrance, drawPodium, drawSpeedLines, outlined } from './stageArt';
 
 const STEP = 1000 / 60;
 const TAP_MS = 200;
@@ -88,6 +89,7 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
     let intro = 0;
     let acc = 0;
     let lastBeat: number | null = null;
+    let lastSecond = -1;
     let overAt = 0;
     let finished = false;
     let results: MinigameResult[] | null = null;
@@ -318,6 +320,17 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
       }
       ctx.globalAlpha = 1;
       ctx.restore();
+      if (intro >= ENTRANCE.playAt && !results && !calm) {
+        const secsLeft = game.timeLeftMs(state) / 1000;
+        if (secsLeft <= 5) {
+          const k = (1 - secsLeft / 5) * (0.5 + 0.5 * Math.abs(Math.sin(clock / (secsLeft <= 2 ? 120 : 220))));
+          const g = ctx.createRadialGradient(STAGE_W / 2, view.h / 2, view.h * 0.35, STAGE_W / 2, view.h / 2, view.h * 0.75);
+          g.addColorStop(0, 'rgba(255,63,210,0)');
+          g.addColorStop(1, `rgba(255,63,210,${0.35 * k})`);
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, STAGE_W, view.h);
+        }
+      }
       if (flash && clock < flash.until) {
         ctx.globalAlpha = Math.max(0, (flash.until - clock) / flash.ms) * 0.55;
         ctx.fillStyle = flash.color;
@@ -352,6 +365,7 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
           ctx.restore();
         }
       }
+      if (!calm && intro >= ENTRANCE.playAt) drawSpeedLines(ctx, view.h, (intro - ENTRANCE.playAt) / 420);
       if (intro < ENTRANCE.playAt + ENTRANCE.goMs) {
         drawEntrance(ctx, {
           h: view.h,
@@ -377,10 +391,14 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
       const beat = countdownAt(intro);
       if (beat !== lastBeat && beat !== null) {
         if (beat === 0) {
+          juiceHaptic('crown');
           juice.chimes.accent('slam');
           juice.camera.punch();
           juice.camera.addTrauma(0.4);
-        } else juice.chimes.pickup(clock, { bright: false });
+        } else {
+          juiceHaptic('tick');
+          juice.chimes.pickup(clock, { bright: false });
+        }
       }
       lastBeat = beat;
       if (intro >= ENTRANCE.playAt && !game.isOver(state)) {
@@ -391,6 +409,16 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
           game.react(state, fx, info());
         }
       }
+      // The last five seconds tighten: a tick and a buzz on each second, a heavier one on the last.
+      if (intro >= ENTRANCE.playAt && !game.isOver(state)) {
+        const secs = Math.ceil(game.timeLeftMs(state) / 1000);
+        if (secs !== lastSecond && secs <= 5 && secs >= 1) {
+          juiceHaptic(secs === 1 ? 'warn' : 'tick');
+          juice.chimes.pickup(clock, { bright: secs <= 2 });
+          if (secs <= 2) juice.camera.addTrauma(0.12);
+        }
+        lastSecond = secs;
+      }
       juice.camera.step(dt);
       juice.waves.prune(clock);
       while (particles.length && clock - particles[0].born > particles[0].life) particles.shift();
@@ -398,7 +426,12 @@ export function MinigameStage<S>({ cartridge, seed, seats, onDone, getAudioConte
       if (game.isOver(state) && !results) {
         results = game.results(state);
         overAt = clock;
+        // Final whistle: a white flash and a heavy hit, then the buzz says how you did.
+        if (!calm) flash = { color: '#ffffff', until: clock + 260, ms: 260 };
+        juice.camera.addTrauma(0.35);
         juice.chimes.accent('bank');
+        const mine = results.find((r) => r.index === me)?.placement ?? 4;
+        window.setTimeout(() => juiceHaptic(mine === 1 ? 'win' : mine >= 3 ? 'lose' : 'bank'), 220);
       }
       draw();
       if (results && !finished && clock - overAt >= PODIUM_MS) {

@@ -27,3 +27,4 @@ export * from "./jarClient";
 export * from "./collect";
 export * from "./screen";
 export * from "./gamepad";
+export * from "./haptics";

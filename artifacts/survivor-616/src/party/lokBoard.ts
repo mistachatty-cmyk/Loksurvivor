@@ -38,7 +38,20 @@ export interface BoardDef {
   nodes: BoardNode[];
   start: string;
   crownSpots: string[];
+  /** Named neighbourhoods. Each round one of them is "hot": landing there pays extra. */
+  districts?: DistrictDef[];
 }
+
+export interface DistrictDef {
+  id: string;
+  /** Node ids inside the district. */
+  nodes: string[];
+}
+
+/** Hot district bonus, the most a streak adds to a cred space, and what the leader's bounty is worth. */
+export const HOT_BONUS = 3;
+export const STREAK_MAX = 3;
+export const BOUNTY_COINS = 5;
 
 export function nodeMap(b: BoardDef): Record<string, BoardNode> {
   return Object.fromEntries(b.nodes.map((n) => [n.id, n]));
@@ -111,6 +124,8 @@ export interface BoardPlayer {
   customValue: number | null;
   /** Relics carried (relic race). */
   relics: number;
+  /** Consecutive turns that ended on a paying space. A bad space breaks it. */
+  streak: number;
   /** Next roll goes two spaces further (a Tailwind Beacon). */
   tailwind: boolean;
   /** Blocks the next coin loss (a Safe House). */
@@ -133,7 +148,7 @@ export type Phase = 'turn' | 'move' | 'land' | 'minigame' | 'bonus' | 'over';
  * the same number of turns) and are built for long sessions: the round cap is only a safety net.
  */
 export type BoardGoal = { kind: 'rounds' } | { kind: 'crowns'; target: number } | { kind: 'relics'; target: number };
-export const RACE_CAP_ROUNDS = 40;
+export const RACE_CAP_ROUNDS = 60;
 export const goalLabelKey = (g: BoardGoal) => g.kind;
 
 /**
@@ -163,7 +178,7 @@ export interface Spawn {
 /** Supply caches, beacons and safe houses fade after this many rounds if nobody takes them. */
 export const SPAWN_LIFE_ROUNDS = 2;
 export const SPAWN_CAP = 3;
-export const RELICS_ON_BOARD = 2;
+export const RELICS_ON_BOARD = 3;
 
 export type BoardEvent =
   | { kind: 'turn-start'; who: number; round: number }
@@ -189,6 +204,11 @@ export type BoardEvent =
   | { kind: 'spawn-collected'; who: number; id: number; node: string; spawn: SpawnKind; relics: number }
   | { kind: 'spawn-fade'; id: number; node: string; spawn: SpawnKind }
   | { kind: 'shield-used'; who: number }
+  | { kind: 'district-hot'; district: string }
+  | { kind: 'district-bonus'; who: number; district: string; amount: number }
+  | { kind: 'streak'; who: number; level: number }
+  | { kind: 'streak-lost'; who: number; was: number }
+  | { kind: 'bounty'; who: number; from: number; amount: number }
   | { kind: 'goal-reached'; who: number }
   | { kind: 'game-over' };
 
@@ -219,6 +239,8 @@ export interface BoardState {
   nextSpawnId: number;
   /** The player who hit a race goal this round (the round still finishes). */
   goalHitBy: number | null;
+  /** The district that pays extra this round, or null on a board without districts. */
+  hotDistrict: string | null;
 }
 
 export function boardRng(seed: number): () => number {
@@ -251,6 +273,7 @@ export function createBoardGame(seed: number, board: BoardDef, roster: { charact
       doubleDice: false,
       customValue: null,
       relics: 0,
+      streak: 0,
       tailwind: false,
       shield: false,
       stats: { spacesMoved: 0, chaos: 0, coinsSpent: 0, minigameCoins: 0, minigameWins: 0, steals: 0 },
@@ -271,6 +294,7 @@ export function createBoardGame(seed: number, board: BoardDef, roster: { charact
     spawns: [],
     nextSpawnId: 1,
     goalHitBy: null,
+    hotDistrict: null,
   };
   relocateVendor(s);
   spawnRound(s);
@@ -517,9 +541,10 @@ function resolveSpace(s: BoardState, p: BoardPlayer) {
     delete s.traps[p.node];
     s.events.push({ kind: 'trap-sprung', who: p.index, owner: trapOwner, amount: amt });
   }
+  const streakBefore = p.streak;
   switch (node.kind) {
     case 'cred':
-      addCoins(s, p, (ot ? 6 : 3) + (s.night ? 1 : 0), 'cred');
+      addCoins(s, p, (ot ? 6 : 3) + (s.night ? 1 : 0) + Math.min(STREAK_MAX, p.streak), 'cred');
       break;
     case 'glitch':
       addCoins(s, p, -((ot ? 6 : 3) + (s.night ? 1 : 0)), 'glitch');
@@ -580,6 +605,66 @@ function resolveSpace(s: BoardState, p: BoardPlayer) {
     addCoins(s, p, -5, 'archon-trap');
     delete s.traps[p.node];
   }
+  settleTurnBonuses(s, p, node.kind, streakBefore);
+}
+
+const GOOD_SPACES = new Set<SpaceKind>(['cred', 'supply', 'event', 'start']);
+
+/** Streaks, the hot district and the leader's bounty, all settled once when a turn's move ends. */
+export function settleTurnBonuses(s: BoardState, p: BoardPlayer, kind: SpaceKind, streakBefore: number) {
+  // Streak: back-to-back good landings build it, a bad space breaks it.
+  const hurt = !GOOD_SPACES.has(kind) || s.traps[p.node] === -1 || p.coins < 0;
+  if (!hurt) {
+    p.streak = streakBefore + 1;
+    if (p.streak >= 2) s.events.push({ kind: 'streak', who: p.index, level: Math.min(STREAK_MAX, p.streak - 1) });
+  } else if (streakBefore >= 2) {
+    s.events.push({ kind: 'streak-lost', who: p.index, was: streakBefore });
+    p.streak = 0;
+  } else p.streak = 0;
+  // Hot district: landing anywhere in it pays a flat bonus.
+  const hot = s.board.districts?.find((d) => d.id === s.hotDistrict);
+  if (hot && hot.nodes.includes(p.node)) {
+    const amount = addCoins(s, p, HOT_BONUS, 'district');
+    s.events.push({ kind: 'district-bonus', who: p.index, district: hot.id, amount });
+  }
+  // Bounty: whoever leads on crowns wears one; a rival who ends a turn on their space takes it.
+  const rivals = s.players.filter((o) => o !== p);
+  const top = Math.max(...s.players.map((o) => o.crowns));
+  const wearer = top >= 1 ? rivals.find((o) => o.crowns === top && o.node === p.node) : undefined;
+  if (wearer && p.crowns < top) {
+    const amount = Math.min(BOUNTY_COINS, Math.max(0, wearer.coins));
+    if (amount > 0) {
+      addCoins(s, wearer, -amount, 'bounty');
+      addCoins(s, p, amount, 'bounty');
+      p.stats.steals += 1;
+      s.events.push({ kind: 'bounty', who: p.index, from: wearer.index, amount });
+    }
+  }
+}
+
+/** Pick this round's hot district: one with spaces a few hops ahead of whoever is furthest behind. */
+export function pickHotDistrict(s: BoardState): void {
+  const ds = s.board.districts;
+  if (!ds?.length) return;
+  const trailing = [...s.players].sort((a, b) => standing(s, a) - standing(s, b) || a.index - b.index)[0];
+  const ahead = reachable(s, trailing.node, 8);
+  const scored = ds
+    .filter((d) => d.id !== s.hotDistrict)
+    .map((d) => ({ d, n: d.nodes.filter((id) => { const h = ahead.get(id); return h !== undefined && h >= 1; }).length }))
+    .filter((x) => x.n > 0);
+  const pool = scored.length ? scored : ds.filter((d) => d.id !== s.hotDistrict).map((d) => ({ d, n: 1 }));
+  const total = pool.reduce((n, x) => n + x.n, 0);
+  let r = s.rng() * total;
+  let pick = pool[0].d;
+  for (const x of pool) {
+    r -= x.n;
+    if (r <= 0) {
+      pick = x.d;
+      break;
+    }
+  }
+  s.hotDistrict = pick.id;
+  s.events.push({ kind: 'district-hot', district: pick.id });
 }
 
 const EVENT_TABLE: BoardEventName[] = ['boulder-run', 'night-market', 'gantry-lift', 'blackout'];
@@ -716,6 +801,7 @@ function reachable(s: BoardState, from: string, maxHops: number): Map<string, nu
  * means the next stretch of road is worth more. Uncollected caches, beacons and safe houses fade.
  */
 export function spawnRound(s: BoardState): void {
+  pickHotDistrict(s);
   for (const sp of [...s.spawns]) {
     if (sp.kind !== 'relic' && s.round - sp.bornRound >= SPAWN_LIFE_ROUNDS) {
       s.spawns.splice(s.spawns.indexOf(sp), 1);
@@ -744,7 +830,7 @@ export function spawnRound(s: BoardState): void {
   if (s.goal.kind === 'relics') {
     // Relics are the point of the race: keep a couple out, one near the player in last, one anywhere.
     const have = s.spawns.filter((sp) => sp.kind === 'relic').length;
-    for (let i = have; i < RELICS_ON_BOARD; i += 1) put('relic', i === 0 ? 3 : 2, i === 0 ? 8 : 9);
+    for (let i = have; i < RELICS_ON_BOARD; i += 1) put('relic', i === 0 ? 3 : 2, i === 0 ? 7 : 9);
   }
   const small = s.spawns.filter((sp) => sp.kind !== 'relic').length;
   if (small < SPAWN_CAP) {
@@ -816,7 +902,7 @@ export function botAction(s: BoardState): BoardAction | null {
       return { type: 'roll', signature: toVendor <= 6 ? sigAvg <= 4.5 : sigAvg > 5.5 };
     }
     case 'junction': {
-      const want = p.coins >= CROWN_COST;
+      const want = p.coins >= CROWN_COST && s.goal.kind !== 'relics';
       // Otherwise head for the nearest thing worth picking up (relics first in a relic race).
       const prize = s.spawns.filter((sp) => sp.kind === 'relic' || sp.kind === 'cache' || s.goal.kind !== 'relics');
       let best = pend.options[0];

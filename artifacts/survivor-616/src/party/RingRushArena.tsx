@@ -3,6 +3,7 @@
  * drag to steer. Art rule: runners are our own procedural rigs; the street is drawn here.
  */
 
+import './partyHaptics';
 import { setPadGameplay } from '@/lib/consolePad';
 import { lokPad } from '../../../../lib/lok-universe/src/gamepad';
 import { isSavingPower } from '@/lib/powerSaver';

@@ -11,7 +11,10 @@ import { CHARACTERS_BY_ID } from '@/game/data/characters';
 import { lokClient } from '@/lib/lokClient';
 import { useSocialOptional } from '@/state/socialStore';
 import { useT } from '@/lib/i18n';
-import { RigPreview, ROSTER_IDS } from './LokDropScreen';
+import { RigPreview, ROSTER_IDS } from './dropShared';
+import { QrCode } from '@/ui/QrCode';
+import { decodeGoal, encodeGoal, type BoardGoal } from './lokBoard';
+import { haptic } from '../../../../lib/lok-universe/src/haptics';
 import { assignSeat, createPartyCode, initialSeats, normalizePartyCode, openPartyRoom, partyLink, seatToBot, type OnlineSession, type PartyRoom, type Seat } from './partyNet';
 
 const CREAM = '#FAF6EE';
@@ -48,6 +51,11 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
   const nameRef = useRef(myName);
   nameRef.current = myName;
   const [mode, setMode] = useState<'choose' | 'host' | 'join'>(joinCode ? 'join' : 'choose');
+  // The game's goal and length, chosen by the host here and sent to everyone with the seats.
+  const [roundsCode, setRoundsCode] = useState(rounds);
+  const roundsRef = useRef(rounds);
+  roundsRef.current = roundsCode;
+  const broadcastRef = useRef<() => void>(() => undefined);
   const [code, setCode] = useState(joinCode ?? '');
   const [typed, setTyped] = useState(joinCode ?? '');
   const [seats, setSeats] = useState<Seat[]>([]);
@@ -77,8 +85,9 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
     setSeats(initial);
     const broadcast = () => {
       seatsRef.current = seatsRef.current.map((st) => (st.kind === 'host' ? { ...st, name: nameRef.current } : st));
-      room.send('lobby', { seats: seatsRef.current, rounds });
+      room.send('lobby', { seats: seatsRef.current, rounds: roundsRef.current });
     };
+    broadcastRef.current = broadcast;
     room.setHandlers({
       onStatus: setStatus,
       onJoinRequest: (m) => {
@@ -103,7 +112,7 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
         room.close();
       }
     };
-  }, [mode, characterId, rounds]);
+  }, [mode, characterId]);
 
   // Join a room.
   useEffect(() => {
@@ -115,6 +124,7 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
       onLobby: (m) => {
         seatsRef.current = m.seats;
         setSeats(m.seats);
+        if (typeof m.rounds === 'number') setRoundsCode(m.rounds);
         const mine = m.seats.find((st) => st.clientId === me);
         setFull(!mine && m.seats.every((st) => st.kind !== 'bot'));
       },
@@ -147,9 +157,42 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
     if (!room) return;
     const seed = (Date.now() ^ 0x616) >>> 0;
     started.current = true;
-    room.send('start', { seed, rounds, seats: seatsRef.current });
-    onStart({ room, host: true, mySeat: 0, seats: seatsRef.current, seed, rounds });
+    room.send('start', { seed, rounds: roundsRef.current, seats: seatsRef.current });
+    onStart({ room, host: true, mySeat: 0, seats: seatsRef.current, seed, rounds: roundsRef.current });
   };
+
+  const setOptions = (next: number) => {
+    setRoundsCode(next);
+    roundsRef.current = next;
+    broadcastRef.current();
+  };
+
+  // A friend arriving gets a small buzz so the host knows without staring at the screen.
+  const humans = seats.filter((st) => st.kind !== 'bot').length;
+  const lastHumans = useRef(0);
+  useEffect(() => {
+    if (humans > lastHumans.current && lastHumans.current > 0) haptic('pickup');
+    lastHumans.current = humans;
+  }, [humans]);
+
+  // Keep the phone awake while people gather. The browser releases it on its own when the tab is hidden.
+  useEffect(() => {
+    if (mode === 'choose') return;
+    let lock: { release: () => Promise<void> } | null = null;
+    let off = false;
+    const take = () => {
+      const wl = (navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } }).wakeLock;
+      void wl?.request('screen').then((l) => (off ? void l.release() : (lock = l))).catch(() => undefined);
+    };
+    take();
+    const again = () => document.visibilityState === 'visible' && take();
+    document.addEventListener('visibilitychange', again);
+    return () => {
+      off = true;
+      document.removeEventListener('visibilitychange', again);
+      void lock?.release();
+    };
+  }, [mode]);
 
   const link = code ? partyLink(code, window.location.origin) : '';
   const copy = async () => {
@@ -229,6 +272,17 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
         </div>
         <StatusDot status={status} t={t} />
       </div>
+      <div className="mt-3 flex items-center gap-3 rounded-xl border-[3px] p-2" style={{ borderColor: ESPRESSO, background: '#fff' }} data-testid="party-qr">
+        <div className="shrink-0" style={{ width: 132, height: 132 }}>
+          {link ? <QrCode value={link} size={132} label={t('lokParty.online.qrLabel', { code })} /> : <div className="h-full w-full animate-pulse bg-black/10" aria-hidden="true" />}
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-black leading-tight">{t('lokParty.online.qrTitle')}</div>
+          <div className="mt-1 text-xs leading-snug opacity-75">{t('lokParty.online.qrHelp')}</div>
+          <div className="mt-1 text-[11px] font-bold opacity-60">{t('lokParty.online.seated', { count: humans || 1 })}</div>
+        </div>
+      </div>
+      <OptionsDrawer mode={mode} code={roundsCode} onChange={setOptions} t={t} />
       {mode === 'host' ? (
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Small onPress={copy}>{copied ? t('lokParty.online.copied') : t('lokParty.online.copy')}</Small>
@@ -257,6 +311,61 @@ export function PartyLobby({ characterId, rounds, joinCode, onStart, onBack }: P
         <p className="mt-2 text-center text-sm font-black">{t('lokParty.online.waitHost')}</p>
       )}
     </Shell>
+  );
+}
+
+const RACE_TARGETS = { crowns: [2, 3, 5], relics: [3, 5, 8] } as const;
+
+function goalText(g: BoardGoal, rounds: number, t: ReturnType<typeof useT>): string {
+  if (g.kind === 'crowns') return t('lokParty.board.goalCrowns', { count: g.target });
+  if (g.kind === 'relics') return t('lokParty.board.goalRelics', { count: g.target });
+  return t('lokParty.board.rounds', { count: rounds });
+}
+
+/**
+ * The game's goal and length. Collapsed it is one quiet line that always says what is being played, so
+ * nobody has to open it to know; open it (the chevron) and the host can change it in a short scrolling
+ * panel that never grows past a few rows. Guests see the same line and a read-only panel.
+ */
+export function OptionsDrawer({ mode, code, onChange, t }: { mode: 'host' | 'join'; code: number; onChange: (n: number) => void; t: ReturnType<typeof useT> }) {
+  const [open, setOpen] = useState(false);
+  const { goal, rounds } = decodeGoal(code);
+  const host = mode === 'host';
+  const kind = goal.kind;
+  const lenIdx = kind === 'rounds' ? 1 : Math.max(0, (RACE_TARGETS[kind] as readonly number[]).indexOf(goal.target));
+  const chip = (active: boolean, label: string, onPress: () => void, key: string) => (
+    <button key={key} type="button" disabled={!host} {...press(onPress)} aria-pressed={active} className="rounded-lg border-2 px-2 py-2 text-xs font-black disabled:opacity-70" style={{ borderColor: ESPRESSO, background: active ? '#ffcf3c' : 'transparent' }}>
+      {label}
+    </button>
+  );
+  const setKind = (k: 'rounds' | 'crowns' | 'relics') => onChange(k === 'rounds' ? 10 : encodeGoal({ kind: k, target: RACE_TARGETS[k][1] }, 10));
+  return (
+    <div className="mt-3 rounded-xl border-[3px]" style={{ borderColor: ESPRESSO }}>
+      <button type="button" {...press(() => setOpen((v) => !v))} aria-expanded={open} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left" data-testid="party-options-toggle">
+        <span className="min-w-0">
+          <span className="block text-[10px] font-black uppercase tracking-widest opacity-60">{t('lokParty.online.options')}</span>
+          <span className="block truncate text-sm font-black">{goalText(goal, rounds, t)}</span>
+        </span>
+        <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 160ms' }}>
+          <path d="M5 8l6 6 6-6" fill="none" stroke={ESPRESSO} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open ? (
+        <div className="max-h-44 overflow-y-auto border-t-2 px-3 py-2" style={{ borderColor: ESPRESSO, overscrollBehavior: 'contain' }} role="group" aria-label={t('lokParty.online.options')}>
+          <div className="mb-1 text-[10px] font-black uppercase tracking-widest opacity-60">{t('lokParty.board.goal')}</div>
+          <div className="grid grid-cols-3 gap-2">
+            {(['rounds', 'crowns', 'relics'] as const).map((k) => chip(kind === k, t(k === 'rounds' ? 'lokParty.board.goalRounds' : k === 'crowns' ? 'lokParty.board.goalRaceCrowns' : 'lokParty.board.goalRaceRelics'), () => setKind(k), k))}
+          </div>
+          <div className="mb-1 mt-3 text-[10px] font-black uppercase tracking-widest opacity-60">{t('lokParty.board.length')}</div>
+          <div className="grid grid-cols-3 gap-2">
+            {kind === 'rounds'
+              ? [5, 10, 15].map((n) => chip(rounds === n, t('lokParty.board.rounds', { count: n }), () => onChange(n), `r${n}`))
+              : [0, 1, 2].map((i) => chip(lenIdx === i, t(kind === 'crowns' ? 'lokParty.board.goalCrowns' : 'lokParty.board.goalRelics', { count: RACE_TARGETS[kind][i] }), () => onChange(encodeGoal({ kind, target: RACE_TARGETS[kind][i] }, 10)), `l${i}`))}
+          </div>
+          <p className="mt-2 text-[11px] opacity-70">{host ? t('lokParty.board.goalHelp') : t('lokParty.online.optionsGuest')}</p>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

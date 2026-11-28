@@ -10,6 +10,7 @@
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0 --port 3000",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test --test-concurrency=4",
+    "check:feel": "tsx scripts/check-feel.ts",
     "e2e": "playwright test"
   },
   "devDependencies": {
