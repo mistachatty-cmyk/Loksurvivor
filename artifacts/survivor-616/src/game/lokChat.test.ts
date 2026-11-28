@@ -548,3 +548,60 @@ describe('LOK Chat quality gates (transcript harness)', () => {
     }
   });
 });
+
+describe('LOK Chat crew scenes, moods and memory in 616 Survivor', () => {
+  it('every scene renders clean, for every pair, weather and time, across many days', async () => {
+    const { pickScenes } = await import('@lok/chat');
+    const { SURVIVOR_CAST } = await import('@/game/chat/cast');
+    const crew = people.map((p) => ({ ...p, room: 'The Cellar' }));
+    const seen = new Set<string>();
+    for (let day = 0; day < 60; day += 1) {
+      for (const weather of WEATHERS) {
+        const scenes = pickScenes(SURVIVOR_CAST, { day, people: crew, weather, hour: (day * 5) % 24, tone: day % 2 ? 'wry' : 'family', lastRun: day % 3 === 0 ? undefined : { cleared: day % 2 === 0, areaName: 'Monroe Strip' }, used: [], count: 3 });
+        assert.ok(scenes.length >= 1, `no scene on day ${day} in ${weather}`);
+        for (const scene of scenes) {
+          seen.add(scene.id);
+          assert.ok(scene.lines.length >= 2);
+          for (const line of scene.lines) {
+            assert.ok(line.text.length > 3 && !/[<>{}|]/.test(line.text) && !BANNED.test(line.text), `${scene.id}: ${line.text}`);
+            assert.ok(people.some((p) => p.id === line.from), `${scene.id}: unknown speaker ${line.from}`);
+          }
+        }
+      }
+    }
+    assert.ok(seen.size >= 30, `only ${seen.size} different scenes ever played`);
+  });
+
+  it('a pair scene only plays when both are rescued, and the speaker order is kept', async () => {
+    const { pickScenes } = await import('@lok/chat');
+    const { SURVIVOR_CAST } = await import('@/game/chat/cast');
+    const only = ['vee', 'nyx', 'cinder'].map((id) => ({ ...people.find((p) => p.id === id)!, room: 'x' }));
+    for (let day = 0; day < 40; day += 1) {
+      for (const scene of pickScenes(SURVIVOR_CAST, { day, people: only, weather: 'clear', hour: 9, tone: 'family', used: [], count: 4 })) {
+        assert.ok(!scene.id.startsWith('pair:good-pan'), 'Mama Jo is not here');
+        for (const line of scene.lines) assert.ok(['vee', 'nyx', 'cinder'].includes(line.from), `${scene.id}: ${line.from}`);
+        if (scene.id === 'pair:ladder') assert.equal(scene.lines[0]!.from, 'nyx');
+      }
+    }
+  });
+});
+
+describe('Crew chatter on the hideout strip', () => {
+  it('sometimes talks about the weather and the hour, cleanly, and not at all without an hour', async () => {
+    const { crewSpeak } = await import('@/game/engine/crewSpeak');
+    const { STRIP_BY_TIME, STRIP_BY_WEATHER } = await import('@/game/data/crewStripLines');
+    for (const s of [...Object.values(STRIP_BY_WEATHER).flat(), ...Object.values(STRIP_BY_TIME).flat()]) assert.ok(!BANNED.test(s), s);
+    const known = new Set([...Object.values(STRIP_BY_WEATHER).flat(), ...Object.values(STRIP_BY_TIME).flat()].map((s) => s.replace(/<\w+>/g, '')));
+    let ambient = 0;
+    for (let seed = 1; seed <= 200; seed += 1) {
+      const line = crewSpeak({ allyId: 'vee', roomName: 'The Cellar', weather: 'rain', crewNames: ['Nyx'], tone: 'family', rng: createRng(seed), hour: 9 });
+      assert.ok(line.length > 5 && !/[<>{}|]/.test(line) && !BANNED.test(line), line);
+      if ([...known].some((k) => k.length > 12 && line.includes(k.slice(0, 12)))) ambient += 1;
+    }
+    assert.ok(ambient > 20 && ambient < 140, `ambient lines ${ambient}/200`);
+    for (let seed = 1; seed <= 30; seed += 1) {
+      const line = crewSpeak({ allyId: 'vee', roomName: 'The Cellar', weather: 'rain', crewNames: [], tone: 'family', rng: createRng(seed) });
+      assert.ok(line.length > 5);
+    }
+  });
+});

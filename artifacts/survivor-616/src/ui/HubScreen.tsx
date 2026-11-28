@@ -12,7 +12,7 @@ import { getHideoutScene, weatherClass } from '@/game/data/hideout';
 import { allyRig, HUB_ROOMS_BY_ID } from '@/game/data/progression';
 import { AREAS } from '@/game/data/areas';
 import type { ChatContext } from '@/game/engine/lokChat';
-import { logCrewLine, startProactive } from '@/game/state/lokChatActions';
+import { logCrewLine, recordEvent, runScenes, startProactive } from '@/game/state/lokChatActions';
 import { lokChatFeatureOn } from '@/lib/lokChatSetting';
 import { crewSpeak } from '@/game/engine/crewSpeak';
 import { getCrewTalkMode, getCrewTalkTone } from '@/game/state/crewTalkSetting';
@@ -245,6 +245,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       tone: getCrewTalkTone(),
       rng: Math.random,
       recent: seen,
+      hour: new Date().getHours(),
     });
     crewRecentRef.current.set(allyId, [...seen, line].slice(-12));
     // Everything the crew say out loud is also kept in LOK Chat's #hideout channel.
@@ -271,13 +272,30 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     };
   };
   const proactiveKeyRef = useRef('');
+  const knownCrewRef = useRef<Set<string> | null>(null);
   useEffect(() => {
     if (rescuedAllies.length === 0) return;
     const run = lastRun ? { key: `${lastRun.areaId}|${lastRun.survivedSec}|${lastRun.kills}`, cleared: lastRun.cleared } : undefined;
     const signature = `${rescuedAllies.map((ally) => ally.id).join(',')}|${run?.key ?? ''}`;
     if (proactiveKeyRef.current === signature) return;
     proactiveKeyRef.current = signature;
-    startProactive({ allyIds: rescuedAllies.map((ally) => ally.id), buildContext: buildChatContext, now: Date.now(), hour: new Date().getHours(), rng: Math.random, run });
+    const now = Date.now();
+    const areaName = lastRun ? (AREAS.find((area) => area.id === lastRun.areaId)?.name ?? lastRun.areaId) : undefined;
+    // Someone new joined since this screen opened: the crew will remember it.
+    if (knownCrewRef.current) for (const ally of rescuedAllies) if (!knownCrewRef.current.has(ally.id)) recordEvent({ key: `rescued|${ally.id}`, kind: 'rescued', ref: ally.name, at: now });
+    knownCrewRef.current = new Set(rescuedAllies.map((ally) => ally.id));
+    // Things that happened, so the crew can bring them up later (each is logged once).
+    if (lastRun && areaName) recordEvent({ key: `run|${run!.key}`, kind: lastRun.cleared ? 'cleared' : 'fell', ref: areaName, at: now });
+    startProactive({ allyIds: rescuedAllies.map((ally) => ally.id), buildContext: buildChatContext, now, hour: new Date().getHours(), rng: Math.random, run });
+    // The crew talk to each other too: today's scenes land in #hideout (once a day).
+    runScenes({
+      people: rescuedAllies.map((ally) => ({ id: ally.id, name: ally.name, role: ally.role, room: HUB_ROOMS_BY_ID[ally.room]?.name ?? ally.room })),
+      weather: getHideoutScene(activeRoomId).weather,
+      hour: new Date().getHours(),
+      tone: getCrewTalkTone(),
+      lastRun: lastRun && areaName ? { cleared: lastRun.cleared, areaName } : undefined,
+      now,
+    });
     // Rebuilt context reads current props; the signature above is what decides when to run.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rescuedAllies, lastRun]);

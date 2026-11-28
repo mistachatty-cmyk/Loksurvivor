@@ -15,7 +15,7 @@ import { useT } from '@/lib/i18n';
 import { lokChatFeatureOn, onLokChatSettingChange } from '@/lib/lokChatSetting';
 import { allyRig } from '@/game/data/progression';
 import { MAX_MESSAGE_CHARS, affinityTier, detectedFromQuick, quickReplies, type AffinityTier, type QuickReply } from '@/game/engine/lokChat';
-import { sendToAlly, setOpenThread, type ContextBuilder } from '@/game/state/lokChatActions';
+import { sendToAlly, sendToGroup, setOpenThread, type ContextBuilder } from '@/game/state/lokChatActions';
 import { ME, clearLokChat, totalUnread, useLokChat, type ChatMessage } from '@/game/state/lokChatStore';
 import type { AllyDef } from '@/game/types';
 
@@ -157,6 +157,22 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
     setDraft('');
   };
 
+  const groupOn = useSyncExternalStore(onLokChatSettingChange, () => lokChatFeatureOn('group'), () => true);
+  const [groupDraft, setGroupDraft] = useState('');
+  const sendGroup = (text: string) => {
+    const clean = text.trim().slice(0, MAX_MESSAGE_CHARS);
+    if (!clean) return;
+    sendToGroup({
+      text: clean,
+      people: allies.map((a) => ({ id: a.id, name: a.name, role: a.role, room: roomNameOf(a) })),
+      buildContext,
+      now: Date.now(),
+      rng: Math.random,
+      instant: reduceMotion,
+    });
+    setGroupDraft('');
+  };
+
   const suggestions = useMemo<QuickReply[]>(
     () => (ally ? quickReplies({ ...buildContext(ally.id, thread?.affinity ?? 0), conv: thread?.conv }, thread?.intents ?? {}) : []),
     // Re-pick suggestions as the conversation moves on (each reply changes what has been asked).
@@ -245,13 +261,14 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
                   {channel.length === 0 ? <p className="p-4 text-center text-sm text-white/50">{t('lokChat.channelEmpty')}</p> : null}
                   {channel.map((entry) => {
                     const speaker = allies.find((a) => a.id === entry.from);
+                    const mine = entry.from === ME;
                     return (
-                      <div key={entry.id} className="flex items-start gap-2">
+                      <div key={entry.id} className="flex items-start gap-2" data-testid={mine ? 'lok-chat-channel-mine' : 'lok-chat-channel-entry'}>
                         <span className="mt-0.5 shrink-0 border bg-black/40" style={{ borderColor: speaker?.palette.accent ?? '#ffffff55' }}>
                           {speaker ? <RigPortrait rig={allyRig(speaker)} palette={speaker.palette} size={28} animated={false} /> : <span className="block h-7 w-7" />}
                         </span>
                         <div className="min-w-0">
-                          <p className="font-mono text-[9px] uppercase tracking-wider text-white/45">{speaker?.name ?? entry.from} · {clock(entry.at)}{entry.roomName ? ` · ${entry.roomName}` : ''}</p>
+                          <p className="font-mono text-[9px] uppercase tracking-wider text-white/45">{mine ? t('lokChat.you') : (speaker?.name ?? entry.from)} · {clock(entry.at)}{entry.roomName ? ` · ${entry.roomName}` : ''}</p>
                           <p className="text-sm leading-snug text-white/90">{entry.text}</p>
                         </div>
                       </div>
@@ -259,6 +276,23 @@ export function LokChatOverlay({ allies, buildContext, roomNameOf, initialId, on
                   })}
                   <div ref={endRef} />
                 </div>
+                {groupOn ? (
+                  <form className="flex gap-2 border-t border-white/10 p-2" onSubmit={(event) => { event.preventDefault(); sendGroup(groupDraft); }}>
+                    <input
+                      value={groupDraft}
+                      onChange={(event) => setGroupDraft(event.target.value)}
+                      maxLength={MAX_MESSAGE_CHARS}
+                      placeholder={t('lokChat.channelPlaceholder')}
+                      aria-label={t('lokChat.channelPlaceholder')}
+                      autoComplete="off"
+                      className="min-h-10 min-w-0 flex-1 border border-white/20 bg-black/50 px-3 text-sm text-white placeholder:text-white/35 focus:border-cyan-200/70 focus:outline-none"
+                      data-testid="lok-chat-channel-input"
+                    />
+                    <button type="submit" disabled={!groupDraft.trim()} className="inline-flex min-h-10 items-center gap-2 border border-fuchsia-300/50 bg-fuchsia-400/15 px-3 font-mono text-[10px] font-bold uppercase tracking-widest text-fuchsia-50 hover:bg-fuchsia-400/25 disabled:opacity-40" data-testid="lok-chat-channel-send">
+                      <Send className="h-4 w-4" />{t('lokChat.send')}
+                    </button>
+                  </form>
+                ) : null}
               </>
             ) : (
               <>

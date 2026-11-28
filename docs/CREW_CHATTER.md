@@ -160,7 +160,7 @@ Behavior worth knowing:
 - **#hideout channel:** every line `crewLineFor` produces (taps and strip chatter) is logged
   (`logCrewLine`), so the strip and the chat stay one conversation.
 
-> Where this is going (living crew, presence, community): `docs/LOK_CHAT_ROADMAP.md`.
+> Where this is going (living crew, presence, community): `docs/LOK_CHAT_ROADMAP.md`. Plugin spec and switches: `docs/LOK_CHAT.md`. Since v0.42.8 the crew also talk to each other (`data/lokChatScenes.ts`), have daily moods and memories, and the strip lines follow the weather and hour (`data/crewStripLines.ts`).
 
 ### Conversation depth (v0.42.6)
 

@@ -6,4 +6,4 @@ export type { ContextBuilder, SendResult } from '@lok/chat';
 
 import { chatActions } from '@/game/chat/runtime';
 
-export const { setOpenThread, deliver, sendToAlly, startProactive, logCrewLine } = chatActions;
+export const { setOpenThread, deliver, sendToAlly, startProactive, logCrewLine, runScenes, sendToGroup, recordEvent } = chatActions;

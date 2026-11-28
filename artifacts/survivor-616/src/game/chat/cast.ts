@@ -17,6 +17,7 @@ import {
   RUN_LINES,
   TIME_WORDS,
 } from '@/game/data/lokChatData';
+import { CREW_SCENES, EVENT_CALLBACKS, MOOD_OPENERS, MOOD_WORDS, SCENE_REPLIES } from '@/game/data/lokChatScenes';
 import { CREW_TOPICS_MORE } from '@/game/data/lokChatTopicsCrew';
 import {
   ALLY_TOPICS,
@@ -77,4 +78,9 @@ export const SURVIVOR_CAST: ChatCast = {
   feelingLines: FEELING_LINES,
   smalltalkLines: SMALLTALK_LINES,
   questions: QUESTIONS,
+  scenes: CREW_SCENES,
+  sceneReplies: SCENE_REPLIES,
+  moodWords: MOOD_WORDS,
+  moodOpeners: MOOD_OPENERS,
+  eventCallbacks: EVENT_CALLBACKS,
 };

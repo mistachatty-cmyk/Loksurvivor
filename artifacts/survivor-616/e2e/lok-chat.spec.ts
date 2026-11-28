@@ -126,4 +126,28 @@ test.describe('LOK Chat', () => {
     await page.goto('/?screen=hub');
     await expect(page.getByTestId('button-lok-chat')).toHaveCount(0);
   });
+
+  test('the crew talk to each other in #hideout, and you can join in', async ({ page }) => {
+    await page.setViewportSize({ width: 1100, height: 900 });
+    await page.goto('/?screen=hub');
+    await page.getByTestId('button-lok-chat').click();
+    await page.getByTestId('lok-chat-row-channel').click();
+    // Today's scenes were written when the hideout opened.
+    await expect.poll(() => page.getByTestId('lok-chat-channel-entry').count(), { timeout: 8000 }).toBeGreaterThanOrEqual(2);
+    const before = await page.getByTestId('lok-chat-channel-entry').count();
+    await page.getByTestId('lok-chat-channel-input').fill('hello everyone');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('lok-chat-channel-mine')).toHaveCount(1);
+    await expect.poll(() => page.getByTestId('lok-chat-channel-entry').count(), { timeout: 10000 }).toBeGreaterThan(before);
+  });
+
+  test('with crew scenes and group chat off, #hideout stays quiet and has no input', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('survivor616.lokChat.features', JSON.stringify({ scenes: false, group: false, strip: false })));
+    await page.setViewportSize({ width: 1100, height: 900 });
+    await page.goto('/?screen=hub');
+    await page.getByTestId('button-lok-chat').click();
+    await page.getByTestId('lok-chat-row-channel').click();
+    await expect(page.getByTestId('lok-chat-channel-input')).toHaveCount(0);
+    await expect(page.getByTestId('lok-chat-channel-entry')).toHaveCount(0);
+  });
 });

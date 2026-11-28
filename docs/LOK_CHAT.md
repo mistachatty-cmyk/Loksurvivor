@@ -46,10 +46,24 @@ Effective switch = manifest AND the player's device-local choice (Settings > LOK
 | `proactive` | crew write first (after a run, after a long absence, morning and evening) |
 | `memory` | callbacks to your last session or topic |
 | `strip` | one-way crew lines in the hideout |
-| `scenes` / `group` / `moods` / `presence` / `reactions` | planned (roadmap phases B-D); the switches exist now |
+| `scenes` | crew-to-crew scenes written into `#hideout` once a day (`pickScenes`, seeded by the day; opinion scenes come free from `relations`) |
+| `group` | you can talk in `#hideout`; one to three people answer a beat apart (`sendToGroup`) |
+| `moods` | a mood per person per day (`moodOf`) colours their words and greetings |
+| `presence` / `reactions` | planned (roadmap phases C-D); the switches exist now |
 
 The manifest schema lives in the vendored SDK: `Lok-EcoSystsem/universe-sdk` needs the matching `lokChat` entry
 (never edit `lib/lok-universe` here).
+
+## Crew-to-crew, moods and memory (feature notes)
+- **Scenes** (`SceneDef`): `between: [a, b]` fixes the pair, `when` limits weather / time of day / after-run outcome;
+  `<a>`, `<b>`, `<c>` fill in names (address people by name, never pronouns). `runScenes` plays 1-3 once per local day and
+  remembers which ran lately (no repeats for 24 plays). Every `relations[a][b]` opinion becomes a two-line scene for free
+  (`sceneReplies` answer when b has no authored opinion of a).
+- **Group chat**: replies are one-shot (no questions back, no saved state); the player's own line is logged as `me`.
+- **Moods**: five ids (`bright, steady, tired, restless, wistful`); `moodWords` replace the `<mood>` slot and `moodOpeners` start some greetings.
+- **Memory**: `recordEvent` logs `cleared`/`fell`/`rescued`/`pet` once by key (cap 40); a friend's greeting may bring an unused one
+  up via `eventCallbacks` and marks it used. Only area/person names are stored.
+- **Strip chatter**: 616's `engine/crewSpeak.ts` mixes weather- and time-aware lines (`data/crewStripLines.ts`) into the one-way hideout lines when the `strip` switch is on.
 
 ## Onboarding a new app
 1. Add `@lok/chat` as a workspace dependency.

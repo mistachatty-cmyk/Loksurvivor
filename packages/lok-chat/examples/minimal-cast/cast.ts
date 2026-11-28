@@ -96,6 +96,15 @@ export const LIGHTHOUSE_CAST: ChatCast = {
     bored: ['Walk the stairs. They are good company.'], angry: ['Let it out. The sea can take it.'], lonely: ['You are not alone here.'], excited: ['Tell me everything.'],
   },
   smalltalkLines: { laugh: ['Ha. Good.'], ack: ['Mm.'], statement: ['I hear you.'], question: ['I do not know. Good question.'] },
+  scenes: [
+    { id: 'lamp-oil', between: ['mara', 'tobias'], lines: [{ who: 'a', text: 'Tobias, the lamp oil is low again.' }, { who: 'b', text: 'I know, <a>. I counted the drums twice.' }] },
+    { id: 'fog-chat', when: { weather: ['storm'] }, lines: [{ who: 'a', text: 'Hear that wind, <b>?' }, { who: 'b', text: 'Hard not to. It is <weather> out there.' }] },
+    { id: 'morning-tea', when: { time: ['morning'] }, lines: [{ who: 'a', text: 'Morning, <b>. Tea?' }, { who: 'b', text: 'Always, <a>.' }] },
+  ],
+  sceneReplies: ['Ha. You would say that.', 'That is fair, <a>.'],
+  moodWords: { bright: ['bright'], steady: ['steady'], tired: ['tired'], restless: ['restless'], wistful: ['wistful'] },
+  moodOpeners: { bright: ['What a day.'], steady: ['Steady as ever.'], tired: ['Long night.'], restless: ['Cannot sit still.'], wistful: ['Thinking about old tides.'] },
+  eventCallbacks: { cleared: ['I kept thinking about the <ref>. Well done.'], rescued: ['It was good to see <ref> arrive.'] },
   questions: [
     { id: 'ate', ask: 'Did you eat today?', yes: ['Good.'], no: ['Then go eat.'], unsure: ['That means no.'], other: ['Eat anyway.'] },
     { id: 'sleep', ask: 'Are you sleeping okay?', yes: ['Good.'], no: ['Rest first.'], unsure: ['In pieces, then.'], other: ['Rest when you can.'] },

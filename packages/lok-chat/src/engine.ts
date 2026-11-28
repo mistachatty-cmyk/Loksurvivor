@@ -11,7 +11,8 @@
 import { analysisFor, analyze, emptyConv, type Analysis, type ConvState, type Follow } from './talk';
 import { expandTemplate, generateCrewLine, type CrewVoice, type Pools, type Tone } from './template';
 import { featureOn, type FeatureFlags } from './features';
-import type { ChatCast, ChatIntent, ProactiveKind, QuestionDef, TemplatedIntent, TimeBucket, TopicDef } from './types';
+import { moodOf } from './moods';
+import type { ChatCast, ChatEvent, ChatIntent, ProactiveKind, QuestionDef, TemplatedIntent, TimeBucket, TopicDef } from './types';
 
 export type { ChatIntent, ProactiveKind } from './types';
 export { analysisFor, emptyConv } from './talk';
@@ -106,6 +107,12 @@ export interface ChatContext {
   affinity: number;
   /** Where this conversation is: the topic, any question waiting for an answer, how deep each went. */
   conv?: ConvState;
+  /** Whole local days since 1970 (for moods). */
+  day?: number;
+  /** What has happened lately, for callbacks (feature `memory`). */
+  events?: readonly ChatEvent[];
+  /** A reply with no follow-up state (group chat): no questions back, no offers. */
+  oneShot?: boolean;
 }
 
 export interface ChatReply {
@@ -114,6 +121,8 @@ export interface ChatReply {
   subjectId?: string;
   /** The conversation after this reply, to be saved with the thread. */
   conv: ConvState;
+  /** An event they brought up (so it is not repeated). */
+  usedEventKey?: string;
 }
 
 export function timeBucket(hour: number): TimeBucket {
@@ -293,7 +302,7 @@ export function createChatEngine(cast: ChatCast, options: { features?: () => Fea
     const run = ctx.lastRun;
     return {
       ...cast.sharedPools,
-      mood: cast.moods,
+      mood: (on('moods') && cast.moodWords && ctx.day !== undefined ? cast.moodWords[moodOf(ctx.self.id, ctx.day)] : undefined) ?? cast.moods,
       name: [ctx.self.name],
       role: [ctx.self.role.toLowerCase()],
       room: [ctx.roomName],
@@ -390,7 +399,7 @@ export function createChatEngine(cast: ChatCast, options: { features?: () => Fea
     return [...(cast.topicsByPerson[ctx.self.id] ?? []), ...cast.sharedTopics, own];
   }
 
-  function converse(detectedIn: DetectedIntent, ctx: ChatContext, rng: () => number): { text: string; intent: ChatIntent; subjectId?: string; conv: ConvState } {
+  function converse(detectedIn: DetectedIntent, ctx: ChatContext, rng: () => number): { text: string; intent: ChatIntent; subjectId?: string; conv: ConvState; usedEventKey?: string } {
     const voice = cast.voices[ctx.self.id] ?? cast.fallbackVoice;
     const tier = affinityTier(ctx.affinity);
     const conv = cloneConv(ctx.conv);
@@ -398,6 +407,7 @@ export function createChatEngine(cast: ChatCast, options: { features?: () => Fea
   const a = on('depth') ? detectedIn.analysis : undefined;
     const topics = topicsFor(ctx, voice);
     let detected = detectedIn;
+    let usedEventKey: string | undefined;
 
     const say = (template: string, extra: Pools = {}, subject?: ChatPerson): string =>
       sentence(template, ctx, poolsFor(ctx, voice.own, subject ?? detected.subject, extra), rng);
@@ -443,8 +453,15 @@ export function createChatEngine(cast: ChatCast, options: { features?: () => Fea
       if (a && detected.intent !== 'greet' && detected.intent !== 'unknown' && detected.intent !== 'bye' && /^(hi|hey|hello|yo|sup|howdy|hiya)\b/.test(a.flat)) {
         text = `${pickFrom(['Hey.', 'Hi, you.', 'Hello.'], rng)} ${text}`;
       }
+      if (on('moods') && cast.moodOpeners && ctx.day !== undefined && (detected.intent === 'greet' || detected.intent === 'howAreYou') && rng() < 0.45) {
+        text = `${sayOne(cast.moodOpeners[moodOf(ctx.self.id, ctx.day)])} ${text}`;
+      }
       if (on('memory') && detected.intent === 'greet' && tier !== 'new' && rng() < 0.5) {
-        if (ctx.lastRun) text = `${text} ${sayOne(cast.lastRunCallbacks)}`;
+        const event = [...(ctx.events ?? [])].reverse().find((e) => e.used < 1 && (cast.eventCallbacks?.[e.kind]?.length ?? 0) > 0);
+        if (event) {
+          text = `${text} ${sayOne(cast.eventCallbacks![event.kind]!, { ref: [event.ref] })}`;
+          usedEventKey = event.key;
+        } else if (ctx.lastRun) text = `${text} ${sayOne(cast.lastRunCallbacks)}`;
         else if (conv.lastTopicLabel) text = `${text} ${sayOne(cast.lastTopicCallbacks, { lastTopic: [conv.lastTopicLabel] })}`;
       }
       return { text, intent: detected.intent };
@@ -509,7 +526,7 @@ export function createChatEngine(cast: ChatCast, options: { features?: () => Fea
     if (detected.intent === 'crew' && detected.subject) conv.lastSubjectId = detected.subject.id;
 
     // Now and then they ask you something back, which makes the next answer part of the conversation.
-    if (on('questionsBack') && !conv.pending && said.intent !== 'bye' && said.intent !== 'thanks' && said.intent !== 'confide' && said.intent !== 'smalltalk' && !said.text.endsWith('?') && said.text.length < 210 && rng() < 0.3) {
+    if (on('questionsBack') && !ctx.oneShot && !conv.pending && said.intent !== 'bye' && said.intent !== 'thanks' && said.intent !== 'confide' && said.intent !== 'smalltalk' && !said.text.endsWith('?') && said.text.length < 210 && rng() < 0.3) {
       const fresh = cast.questions.filter((q) => !conv.asked.includes(q.id));
       if (fresh.length > 0) {
         const q = pickFrom(fresh, rng);
@@ -519,7 +536,7 @@ export function createChatEngine(cast: ChatCast, options: { features?: () => Fea
       }
     }
 
-    return { text: said.text.replace(/\s+/g, ' ').trim(), intent: said.intent, subjectId: detected.subject?.id, conv };
+    return { text: said.text.replace(/\s+/g, ' ').trim(), intent: said.intent, subjectId: detected.subject?.id, conv, usedEventKey };
   }
 
   /** Answer one message. Re-rolls to avoid repeating anything in `recent`. */

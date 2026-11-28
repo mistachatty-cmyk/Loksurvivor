@@ -12,7 +12,7 @@ export const DEFAULT_BANNED = new RegExp(
 );
 
 /** Slots the engine always fills, on top of the cast's own `sharedPools` keys. */
-export const ENGINE_SLOTS = ['mood', 'name', 'role', 'room', 'weather', 'crew', 'pet', 'area', 'time', 'own', 'subject', 'subjectRole', 'hook', 'lastTopic'];
+export const ENGINE_SLOTS = ['a', 'b', 'c', 'ref', 'mood', 'name', 'role', 'room', 'weather', 'crew', 'pet', 'area', 'time', 'own', 'subject', 'subjectRole', 'hook', 'lastTopic'];
 
 export interface ValidateOptions {
   banned?: RegExp;
@@ -30,8 +30,9 @@ function collect(cast: ChatCast): string[] {
     else if (Array.isArray(v)) v.forEach(push);
     else if (v && typeof v === 'object' && !(v instanceof RegExp)) Object.values(v).forEach(push);
   };
-  const { intentRules: _rules, ...rest } = cast;
+  const { intentRules: _rules, scenes, ...rest } = cast;
   push(rest);
+  for (const scene of scenes ?? []) for (const line of scene.lines) out.push(line.text);
   return out;
 }
 
@@ -74,6 +75,13 @@ export function validateCast(cast: ChatCast, options: ValidateOptions = {}): str
     for (const topic of topics) {
       if (topic.layers.length < 1 || topic.layers.some((layer) => layer.length === 0)) problems.push(`${id}/${topic.key}: empty layer`);
     }
+  }
+  const sceneIds = new Set<string>();
+  for (const scene of cast.scenes ?? []) {
+    if (sceneIds.has(scene.id)) problems.push(`duplicate scene ${scene.id}`);
+    sceneIds.add(scene.id);
+    for (const id of scene.between ?? []) if (!cast.voices[id]) problems.push(`scene ${scene.id}: unknown person ${id}`);
+    if (scene.lines.length < 2) problems.push(`scene ${scene.id}: needs at least two lines`);
   }
   const seen = new Set<string>();
   for (const topic of cast.sharedTopics) {

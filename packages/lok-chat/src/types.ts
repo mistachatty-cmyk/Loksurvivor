@@ -16,6 +16,31 @@ export type TemplatedIntent = Exclude<ChatIntent, 'crew' | 'joke' | 'story' | 'c
 export type TimeBucket = 'morning' | 'afternoon' | 'evening' | 'night';
 export type ProactiveKind = 'afterRunCleared' | 'afterRunFell' | 'welcomeBack' | 'morning' | 'evening' | 'tierUp';
 
+export type MoodId = 'bright' | 'steady' | 'tired' | 'restless' | 'wistful';
+export const MOOD_IDS: readonly MoodId[] = ['bright', 'steady', 'tired', 'restless', 'wistful'];
+
+/** Something that happened that people may bring up later. Structured ids only, never player text. */
+export type ChatEventKind = 'cleared' | 'fell' | 'rescued' | 'pet';
+export interface ChatEvent {
+  /** Stable key so the same thing is logged once (e.g. `cleared|monroe|123`). */
+  key: string;
+  kind: ChatEventKind;
+  /** A name to say: an area, a person, a companion. */
+  ref: string;
+  at: number;
+  /** How many times someone has brought it up. */
+  used: number;
+}
+
+/** A short scripted exchange between people. `a`, `b` (and `c`) are filled from whoever is present. */
+export interface SceneDef {
+  id: string;
+  /** Fixed people (in a, b order). Without it any two people can play it. */
+  between?: readonly string[];
+  when?: { weather?: readonly string[]; time?: readonly TimeBucket[]; run?: 'cleared' | 'fell' };
+  lines: ReadonlyArray<{ who: 'a' | 'b' | 'c'; text: string }>;
+}
+
 /** A topic has layers. Layer 1 is for anyone, 2 opens at "friend", 3 at "close". One layer = a reaction. */
 export interface TopicDef {
   key: string;
@@ -73,4 +98,13 @@ export interface ChatCast {
   feelingLines: Record<Feeling, readonly string[]>;
   smalltalkLines: { laugh: readonly string[]; ack: readonly string[]; statement: readonly string[]; question: readonly string[] };
   questions: readonly QuestionDef[];
+  /** Crew-to-crew scenes (feature `scenes`). */
+  scenes?: readonly SceneDef[];
+  /** Replies to an opinion when the other person has none authored, for opinion scenes. */
+  sceneReplies?: readonly string[];
+  /** Words and openers for each mood (feature `moods`). */
+  moodWords?: Record<MoodId, readonly string[]>;
+  moodOpeners?: Record<MoodId, readonly string[]>;
+  /** What they say when they bring up something that happened (feature `memory`); `<ref>` is the name. */
+  eventCallbacks?: Partial<Record<ChatEventKind, readonly string[]>>;
 }

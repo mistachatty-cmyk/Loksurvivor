@@ -17,7 +17,11 @@ import {
   type DetectedIntent,
 } from './engine';
 import { featureOn, type FeatureFlags } from './features';
-import { ME, addAffinity, appendMessage, logChannel, markRead, recordIntent, setConv, setProactiveAt, threadOf, type ChatStore } from './store';
+import { localDay } from './moods';
+import { pickScenes, type ScenePerson } from './scenes';
+import type { Tone } from './template';
+import { emptyConv } from './talk';
+import { ME, addAffinity, appendMessage, logChannel, logEvent, markEventUsed, markRead, recordIntent, recordScenes, setConv, setProactiveAt, threadOf, type ChatStore } from './store';
 
 export type ContextBuilder = (personId: string, affinity: number) => ChatContext;
 
@@ -69,7 +73,7 @@ export function createChatActions({ engine, store, features, pace }: ChatActions
   }): SendResult {
     const { allyId, buildContext, now, rng } = input;
     const before = threadOf(store.get(), allyId);
-    const ctx = { ...buildContext(allyId, before.affinity), conv: before.conv };
+    const ctx = { ...buildContext(allyId, before.affinity), conv: before.conv, day: localDay(now), events: store.get().events };
     const detected = input.detected ?? engine.detectIntent(input.text, ctx.others);
     const reply = engine.replyToIntent(detected, ctx, rng, before.recent);
     // Quick people answer fast and slow ones take their time; long replies sometimes come as two bubbles.
@@ -83,6 +87,7 @@ export function createChatActions({ engine, store, features, pace }: ChatActions
       let next = appendMessage(s, allyId, { id: store.newMessageId(now), from: ME, text: input.text, at: now });
       next = recordIntent(next, allyId, reply.intent);
       next = setConv(next, allyId, reply.conv);
+      if (reply.usedEventKey) next = markEventUsed(next, reply.usedEventKey);
       const gained = addAffinity(next, allyId, affinityGain(reply.intent, before.intents[reply.intent] ?? 0));
       tierUp = gained.tierUp;
       return gained.state;
@@ -145,7 +150,89 @@ export function createChatActions({ engine, store, features, pace }: ChatActions
     store.update((s) => logChannel(s, { id: store.newMessageId(at), from: personId, text, at, roomName }));
   }
 
-  return { setOpenThread, deliver, sendToAlly, startProactive, logCrewLine };
+
+  /**
+   * Crew-to-crew scenes for today, written into `#hideout` as if they happened earlier. Runs once a day
+   * (it remembers which day it last ran) and does nothing with `scenes` off.
+   */
+  function runScenes(input: {
+    people: readonly ScenePerson[];
+    weather: string;
+    hour: number;
+    tone: Tone;
+    lastRun?: { cleared: boolean; areaName: string };
+    now: number;
+    count?: number;
+  }): number {
+    if (!on('scenes') || input.people.length < 2) return 0;
+    const day = localDay(input.now);
+    const state = store.get();
+    if (state.scenes.day === day) return 0;
+    const scenes = pickScenes(engine.cast, { day, people: input.people, weather: input.weather, hour: input.hour, tone: input.tone, lastRun: input.lastRun, used: state.scenes.used, count: input.count ?? 2 });
+    const total = scenes.reduce((n, s) => n + s.lines.length, 0);
+    let index = 0;
+    store.update((s) => {
+      let next = s;
+      for (const scene of scenes) {
+        for (const line of scene.lines) {
+          const at = input.now - (total - index) * 40_000;
+          index += 1;
+          next = logChannel(next, { id: store.newMessageId(at), from: line.from, text: line.text, at, roomName: input.people.find((p) => p.id === line.from)?.room });
+        }
+      }
+      return recordScenes(next, day, scenes.map((scene) => scene.id));
+    });
+    return scenes.length;
+  }
+
+  /**
+   * Say something in `#hideout`: one to three people answer, a beat apart. Group answers carry no follow-up
+   * state (nobody can ask you a question you cannot answer), and nothing happens with `group` off.
+   */
+  function sendToGroup(input: {
+    text: string;
+    people: readonly ScenePerson[];
+    buildContext: ContextBuilder;
+    now: number;
+    rng: () => number;
+    instant?: boolean;
+    onDelivered?: () => void;
+  }): string[] {
+    if (!on('group') || input.people.length === 0) return [];
+    const { people, rng, now } = input;
+    store.update((s) => logChannel(s, { id: store.newMessageId(now), from: ME, text: input.text, at: now }));
+    const detected = engine.detectIntent(input.text, people);
+    const named = detected.subject && people.some((p) => p.id === detected.subject!.id) ? detected.subject.id : undefined;
+    const shuffled = [...people].sort(() => rng() - 0.5).map((p) => p.id);
+    const order = [...(named ? [named] : []), ...shuffled.filter((id) => id !== named)];
+    const count = Math.min(order.length, 1 + (rng() < 0.55 ? 1 : 0) + (rng() < 0.25 ? 1 : 0));
+    const responders = order.slice(0, count);
+    const day = localDay(now);
+    let wait = 0;
+    const channelTexts = store.get().channel.map((e) => e.text);
+    responders.forEach((id, i) => {
+      const person = people.find((p) => p.id === id)!;
+      const ctx = { ...input.buildContext(id, threadOf(store.get(), id).affinity), conv: emptyConv(), day, events: [], oneShot: true };
+      // The first person named is being talked about, not asked; answer a mention of them as a story.
+      const intent = detected.intent === 'crew' && detected.subject?.id === id ? { intent: 'story' as const } : { intent: detected.intent, subject: detected.subject };
+      const reply = engine.replyToIntent(intent, ctx, rng, channelTexts);
+      wait += input.instant ? 300 : (i === 0 ? 800 : 1100) + typingMs(reply.text, 0.8);
+      const at = now + wait;
+      setTimeout(() => {
+        store.update((s) => logChannel(s, { id: store.newMessageId(at), from: id, text: reply.text, at, roomName: person.room }));
+        if (i === responders.length - 1) input.onDelivered?.();
+      }, wait);
+    });
+    return responders;
+  }
+
+  /** Note that something happened (a finished run, a rescue) so people can bring it up. Nothing is kept with `memory` off. */
+  function recordEvent(event: { key: string; kind: 'cleared' | 'fell' | 'rescued' | 'pet'; ref: string; at: number }): void {
+    if (!on('memory')) return;
+    store.update((s) => logEvent(s, event));
+  }
+
+  return { setOpenThread, deliver, sendToAlly, startProactive, logCrewLine, runScenes, sendToGroup, recordEvent };
 }
 
 export type ChatActions = ReturnType<typeof createChatActions>;

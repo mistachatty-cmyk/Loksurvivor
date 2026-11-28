@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 147,
+      "version": "0.42.8",
+      "date": "2026-11-28",
+      "publishedAt": "2026-11-28T20:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Hideout Talks Back",
+      "body": [
+        "The crew now talk to each other. Every day a few little scenes between your rescued crew land in #hideout, from Vee and Mama Jo fighting over the good pan to Nyx and Cinder arguing about the ladder, and what they say follows the weather, the hour and how your last run went.",
+        "You can join in: say something in #hideout and one to three of the crew answer. Crew also have good and rough days that colour how they greet you, remember things like a run you cleared or a new face joining, and the lines they say as you walk up in the hideout now change with the weather and time of day. Every part can be switched off in Settings under LOK Chat."
+      ]
+    },
+    {
       "number": 146,
       "version": "0.42.7",
       "date": "2026-11-28",

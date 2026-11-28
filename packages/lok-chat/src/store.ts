@@ -10,10 +10,12 @@ import { useSyncExternalStore } from 'react';
 
 import { AFFINITY_MAX, affinityTier, type AffinityTier } from './engine';
 import { emptyConv, type ConvState } from './talk';
-import type { ChatIntent } from './types';
+import type { ChatEvent, ChatEventKind, ChatIntent } from './types';
 
 export const MESSAGES_PER_THREAD = 80;
 export const CHANNEL_ENTRIES = 60;
+export const EVENT_LOG = 40;
+export const SCENE_MEMORY = 24;
 const RECENT_LINES = 12;
 export const ME = 'me';
 
@@ -53,10 +55,14 @@ export interface LokChatState {
   channel: ChannelEntry[];
   /** The last finished run the crew have already reacted to. */
   lastRunReactedKey: string;
+  /** Crew-to-crew scenes: the last day they ran and which ones played lately (no repeats). */
+  scenes: { day: number; used: string[] };
+  /** Things that happened, for people to bring up later (capped; ids and names only). */
+  events: ChatEvent[];
 }
 
 export const emptyThread = (): ChatThread => ({ messages: [], affinity: 0, unread: 0, intents: {}, lastProactiveAt: 0, recent: [], conv: emptyConv() });
-export const emptyState = (): LokChatState => ({ version: 1, threads: {}, channel: [], lastRunReactedKey: '' });
+export const emptyState = (): LokChatState => ({ version: 1, threads: {}, channel: [], lastRunReactedKey: '', scenes: { day: -1, used: [] }, events: [] });
 
 export const threadOf = (state: LokChatState, id: string): ChatThread => state.threads[id] ?? emptyThread();
 
@@ -110,6 +116,22 @@ export function logChannel(state: LokChatState, entry: ChannelEntry): LokChatSta
   // The same person saying the same thing twice in a row is noise.
   if (last && last.from === entry.from && last.text === entry.text) return state;
   return { ...state, channel: [...state.channel, entry].slice(-CHANNEL_ENTRIES) };
+}
+
+/** Remember that a day's scenes played. */
+export function recordScenes(state: LokChatState, day: number, ids: readonly string[]): LokChatState {
+  return { ...state, scenes: { day, used: [...state.scenes.used, ...ids].slice(-SCENE_MEMORY) } };
+}
+
+/** Log something that happened, once (by its key). */
+export function logEvent(state: LokChatState, event: { key: string; kind: ChatEventKind; ref: string; at: number }): LokChatState {
+  if (state.events.some((e) => e.key === event.key)) return state;
+  return { ...state, events: [...state.events, { ...event, used: 0 }].slice(-EVENT_LOG) };
+}
+
+export function markEventUsed(state: LokChatState, key: string): LokChatState {
+  if (!state.events.some((e) => e.key === key)) return state;
+  return { ...state, events: state.events.map((e) => (e.key === key ? { ...e, used: e.used + 1 } : e)) };
 }
 
 export const totalUnread = (state: LokChatState): number => Object.values(state.threads).reduce((n, thread) => n + thread.unread, 0);
@@ -166,7 +188,18 @@ export function normalizeLokChat(raw: unknown): LokChatState {
       channel.push({ id: str(e.id) || `${num(e.at)}-${channel.length}`, from: str(e.from).slice(0, 64), text: str(e.text).slice(0, 400), at: num(e.at), roomName: str(e.roomName) || undefined });
     }
   }
-  return { version: 1, threads, channel: channel.slice(-CHANNEL_ENTRIES), lastRunReactedKey: str(raw.lastRunReactedKey).slice(0, 120) };
+  const scenes = isRecord(raw.scenes)
+    ? { day: Math.floor(num(raw.scenes.day, -1)), used: Array.isArray(raw.scenes.used) ? raw.scenes.used.filter((x): x is string => typeof x === 'string').slice(-SCENE_MEMORY).map((x) => x.slice(0, 80)) : [] }
+    : { day: -1, used: [] };
+  const KINDS: readonly string[] = ['cleared', 'fell', 'rescued', 'pet'];
+  const events: ChatEvent[] = [];
+  if (Array.isArray(raw.events)) {
+    for (const e of raw.events) {
+      if (!isRecord(e) || !str(e.key) || !KINDS.includes(str(e.kind)) || !str(e.ref)) continue;
+      events.push({ key: str(e.key).slice(0, 120), kind: str(e.kind) as ChatEventKind, ref: str(e.ref).slice(0, 60), at: num(e.at), used: Math.max(0, Math.min(9, Math.floor(num(e.used)))) });
+    }
+  }
+  return { version: 1, threads, channel: channel.slice(-CHANNEL_ENTRIES), lastRunReactedKey: str(raw.lastRunReactedKey).slice(0, 120), scenes, events: events.slice(-EVENT_LOG) };
 }
 
 /* ------------------------------------------------------------------ */

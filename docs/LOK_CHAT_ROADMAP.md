@@ -2,7 +2,9 @@
 
 Status: **planning document**. Sections 1-3 describe LOK Chat as of v0.42.6; since then (v0.42.7) it was extracted into
 `packages/lok-chat` (`docs/LOK_CHAT.md`), got per-feature switches, the transcript harness and `validateCast`, and every
-ally got personal topics (phases A and G are mostly done). Phases B-F below are not built yet. Written so any later session can pick a phase up cold. Read `docs/LOK_COST_DISCIPLINE.md` first; every
+ally got personal topics (phases A and G are mostly done). In v0.42.8 phase B shipped: crew-to-crew scenes, a group
+`#hideout`, daily moods, a memory log, and weather/time-aware hideout chatter. Phases C-F below are not built yet, and
+the React overlay has not yet moved into the package. Written so any later session can pick a phase up cold. Read `docs/LOK_COST_DISCIPLINE.md` first; every
 phase obeys it.
 
 ## 1. What exists today (v0.42.6)
