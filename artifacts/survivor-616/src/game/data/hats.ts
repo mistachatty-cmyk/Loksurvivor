@@ -19,6 +19,8 @@ export const HATS: HatDef[] = [
   { id: 'last-crown', name: 'One More Crown', description: 'Just one more run before bed, said the monarch at dawn.', cost: 4, tier: 'legendary', style: 'crown' },
   { id: 'newsstand-visor', name: 'Newsstand Visor', description: 'A bent paper visor still smelling faintly of fresh ink.', cost: 2, tier: 'uncommon', style: 'paper-visor' },
   { id: 'relay-mast', name: 'Relay Mast', description: 'A salvaged rooftop relay mast, still faintly warm from the last broadcast.', cost: 3, tier: 'rare', style: 'antenna' },
+  { id: 'steam-kettle', name: 'Steam Kettle', description: 'A dented little kettle that never stops whistling and never boils dry. Nobody asked it to.', cost: 3, tier: 'rare', style: 'steam-kettle' },
+  { id: 'paper-lantern', name: 'Paper Lantern', description: 'A hand-folded lantern hung from nothing, its flame leaning toward whoever is winning.', cost: 3, tier: 'rare', style: 'paper-lantern' },
 ];
 export const HATS_BY_ID: Record<string, HatDef> = Object.fromEntries(HATS.map((hat) => [hat.id, hat]));
 export const DEFAULT_HAT_ID = 'no-hat';

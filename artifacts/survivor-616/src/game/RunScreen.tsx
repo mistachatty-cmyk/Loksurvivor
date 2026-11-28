@@ -1624,6 +1624,7 @@ export function RunScreen({
       case 'confetti-rain': return ['bar', 'diamond', 'rankUpSmall', 'dot', 'spark', 'diamond', 'bar'];
       case 'moth-swarm': return ['diamondHollow', 'diamondCore', 'sparkHollow', 'diamondHollow', 'diamondCore', 'sparkHollow', 'diamondHollow'];
       case 'spark-shower': return ['slashA', 'slashB', 'spark', 'slashA', 'slashB', 'spark', 'slashA'];
+      case 'firefly-drift': return ['dotCore', 'dot', 'sparkHollow', 'dotCore', 'dot', 'sparkHollow', 'dotCore'];
       default: return ['spark', 'sparkHollow', 'star', 'spark', 'sparkHollow', 'star', 'spark'];
     }
   })();

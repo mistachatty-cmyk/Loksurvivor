@@ -5,7 +5,7 @@ import type { AnimName, CelebrationStyle, HatStyle, PaletteEffectKind, RunAuraSt
 import { RigPortrait } from './RigPortrait';
 
 const HAT_MARK: Record<HatStyle, string> = {
-  none: '', 'top-hat': 'hatTop', halo: 'halo', crown: 'crown', satellite: 'satellite', 'rain-cloud': 'rainCloud', cone: 'cone', 'orbital-eye': 'orbitalEye', 'moth-cap': 'mothCap', antenna: 'antenna', 'vinyl-disc': 'vinyl', 'paper-visor': 'visor',
+  none: '', 'top-hat': 'hatTop', halo: 'halo', crown: 'crown', satellite: 'satellite', 'rain-cloud': 'rainCloud', cone: 'cone', 'orbital-eye': 'orbitalEye', 'moth-cap': 'mothCap', antenna: 'antenna', 'vinyl-disc': 'vinyl', 'paper-visor': 'visor', 'steam-kettle': 'vial', 'paper-lantern': 'light',
 };
 const CELEBRATION_MARKS: Record<CelebrationStyle, string[]> = {
   'paper-stars': ['spark', 'sparkHollow', 'star', 'spark', 'sparkHollow'],
@@ -14,6 +14,7 @@ const CELEBRATION_MARKS: Record<CelebrationStyle, string[]> = {
   'confetti-rain': ['bar', 'diamond', 'rankUpSmall', 'dot', 'spark'],
   'moth-swarm': ['diamondHollow', 'diamondCore', 'sparkHollow', 'diamondHollow', 'diamondCore'],
   'spark-shower': ['slashA', 'slashB', 'spark', 'slashA', 'slashB'],
+  'firefly-drift': ['dotCore', 'dot', 'sparkHollow', 'dotCore', 'dot'],
 };
 
 export function CosmeticPreview({ rig, palette, aura, hat, celebration, celebrationKey = 0, anim = 'idle', paletteEffect, compact = false }: {

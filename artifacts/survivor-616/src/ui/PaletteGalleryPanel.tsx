@@ -76,6 +76,11 @@ const EFFECT_PREVIEW_CLASSES = {
   ember: 'palette-preview-ember',
   orbit: 'palette-preview-orbit',
   echo: 'palette-preview-echo',
+  cycle: 'palette-preview-cycle',
+  rain: 'palette-preview-rain',
+  static: 'palette-preview-static',
+  bloom: 'palette-preview-bloom',
+  constellation: 'palette-preview-constellation',
 } satisfies Record<PaletteEffectKind, string>;
 
 const TIER_BADGE_CLASS = {

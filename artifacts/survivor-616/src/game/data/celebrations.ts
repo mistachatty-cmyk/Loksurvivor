@@ -8,6 +8,7 @@ export const CELEBRATIONS: CelebrationDef[] = [
   { id: 'moth-swarm', name: 'Moth Swarm', description: 'A drifting constellation of gold-winged static.', cost: 4, tier: 'legendary', style: 'moth-swarm' },
   { id: 'spark-shower', name: 'Spark Shower', description: 'A short burst of welding sparks for every good pull.', cost: 3, tier: 'rare', style: 'spark-shower' },
   { id: 'ticker-tape', name: 'Ticker Tape', description: 'A quick ribbon of paper streamers for a parade of exactly one.', cost: 3, tier: 'rare', style: 'confetti-rain' },
+  { id: 'firefly-drift', name: 'Firefly Drift', description: 'Slow green-gold lights lift off a landed reward and wander away like they have somewhere to be.', cost: 3, tier: 'rare', style: 'firefly-drift' },
 ];
 export const CELEBRATIONS_BY_ID: Record<string, CelebrationDef> = Object.fromEntries(CELEBRATIONS.map((entry) => [entry.id, entry]));
 export const DEFAULT_CELEBRATION_ID = 'paper-stars';

@@ -199,6 +199,8 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .cosmetic-hat-moth-cap { top: 8px; color: #f0abfc; animation: cosmetic-float 1.5s ease-in-out infinite; }
 .cosmetic-hat-antenna { top: 2px; color: #fda4af; animation: cosmetic-float 1.4s ease-in-out infinite; }
 .cosmetic-hat-vinyl-disc { top: 6px; color: #d1d5db; animation: cosmetic-spin 2.6s linear infinite; }
+.cosmetic-hat-steam-kettle { top: 6px; color: #cbd5e1; animation: cosmetic-float 1.4s ease-in-out infinite; }
+.cosmetic-hat-paper-lantern { top: 5px; color: #fb923c; animation: cosmetic-float 2s ease-in-out infinite; }
 .cosmetic-hat-paper-visor { top: 6px; color: #e7dcc4; animation: cosmetic-float 1.6s ease-in-out infinite; }
 .cosmetic-celebration { top: 28%; animation: cosmetic-celebrate 900ms ease-out both; }
 @keyframes cosmetic-spin { to { transform: rotate(360deg); } }
@@ -712,9 +714,19 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .palette-preview-ember { animation: palette-preview-ember 1.9s ease-in-out infinite; }
 .palette-preview-orbit { animation: palette-preview-orbit 2.6s linear infinite; }
 .palette-preview-echo { animation: palette-preview-echo 1.6s ease-in-out infinite; }
+@keyframes palette-preview-cycle { 0% { filter: drop-shadow(0 -8px 3px rgba(251, 191, 36, 0.55)); } 50% { filter: drop-shadow(0 8px 3px rgba(196, 181, 253, 0.55)); } 100% { filter: drop-shadow(0 -8px 3px rgba(251, 191, 36, 0.55)); } }
+.palette-preview-cycle { animation: palette-preview-cycle 4.2s ease-in-out infinite; }
+@keyframes palette-preview-rain { 0% { filter: drop-shadow(1px -9px 0 rgba(160, 200, 255, 0.5)) drop-shadow(-5px -3px 0 rgba(160, 200, 255, 0.3)); } 100% { filter: drop-shadow(1px 4px 0 rgba(160, 200, 255, 0)) drop-shadow(-5px 9px 0 rgba(160, 200, 255, 0)); } }
+.palette-preview-rain { animation: palette-preview-rain 0.9s linear infinite; }
+@keyframes palette-preview-static { 0%, 100% { filter: drop-shadow(2px 0 0 rgba(255, 80, 120, 0.4)) drop-shadow(-2px 0 0 rgba(80, 220, 255, 0.4)); } 25% { filter: drop-shadow(-3px 0 0 rgba(255, 80, 120, 0.4)) drop-shadow(3px 0 0 rgba(80, 220, 255, 0.4)); } 60% { filter: none; } }
+.palette-preview-static { animation: palette-preview-static 1.1s steps(1, end) infinite; }
+@keyframes palette-preview-bloom { 0%, 100% { filter: drop-shadow(0 4px 2px rgba(255, 170, 200, 0.2)); } 50% { filter: drop-shadow(0 6px 7px rgba(255, 170, 200, 0.65)); } }
+.palette-preview-bloom { animation: palette-preview-bloom 2.4s ease-in-out infinite; }
+@keyframes palette-preview-constellation { 0%, 100% { filter: drop-shadow(0 -10px 1px rgba(255, 245, 190, 0.55)) drop-shadow(8px -2px 1px rgba(255, 245, 190, 0.3)); } 50% { filter: drop-shadow(0 -4px 1px rgba(255, 245, 190, 0.2)) drop-shadow(-8px -9px 1px rgba(255, 245, 190, 0.6)); } }
+.palette-preview-constellation { animation: palette-preview-constellation 3.2s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion='full']) .palette-preview-glow, :root:not([data-motion='full']) .palette-preview-pulse, :root:not([data-motion='full']) .palette-preview-prism, :root:not([data-motion='full']) .palette-preview-flicker, :root:not([data-motion='full']) .palette-preview-wave, :root:not([data-motion='full']) .palette-preview-ember, :root:not([data-motion='full']) .palette-preview-orbit, :root:not([data-motion='full']) .palette-preview-echo { animation: none; }
+  :root:not([data-motion='full']) .palette-preview-glow, :root:not([data-motion='full']) .palette-preview-pulse, :root:not([data-motion='full']) .palette-preview-prism, :root:not([data-motion='full']) .palette-preview-flicker, :root:not([data-motion='full']) .palette-preview-wave, :root:not([data-motion='full']) .palette-preview-ember, :root:not([data-motion='full']) .palette-preview-orbit, :root:not([data-motion='full']) .palette-preview-echo, :root:not([data-motion='full']) .palette-preview-cycle, :root:not([data-motion='full']) .palette-preview-rain, :root:not([data-motion='full']) .palette-preview-static, :root:not([data-motion='full']) .palette-preview-bloom, :root:not([data-motion='full']) .palette-preview-constellation { animation: none; }
   :root:not([data-motion='full']) [data-ui-theme='starfall-rooftops']::before, :root:not([data-motion='full']) [data-ui-theme='deep-current']::before,
   :root:not([data-motion='full']) [data-ui-theme='sunbreak-cathedral']::before, :root:not([data-motion='full']) [data-ui-theme='glimmerwild']::before { animation: none; }
 }

@@ -49,9 +49,9 @@ How much of each there is right now.
 | Level-up upgrades | 20 |
 | LokPets | 78 |
 | Ambient kinds | 4 |
-| Hats | 18 |
-| Celebrations | 7 |
-| Themed palettes | 82 |
+| Hats | 20 |
+| Celebrations | 8 |
+| Themed palettes | 139 |
 | Cards | 347 |
 | Lok glyph icons | 82 |
 | Sound cues | 38 |
@@ -747,6 +747,8 @@ Non-combat background actors (`src/game/data/ambient.ts`).
 | last-crown | One More Crown |
 | newsstand-visor | Newsstand Visor |
 | relay-mast | Relay Mast |
+| steam-kettle | Steam Kettle |
+| paper-lantern | Paper Lantern |
 
 ## Celebrations
 
@@ -761,6 +763,7 @@ Non-combat background actors (`src/game/data/ambient.ts`).
 | moth-swarm | Moth Swarm |
 | spark-shower | Spark Shower |
 | ticker-tape | Ticker Tape |
+| firefly-drift | Firefly Drift |
 
 ## Themed palettes
 
@@ -850,6 +853,63 @@ Non-combat background actors (`src/game/data/ambient.ts`).
 | tidepool-static | Tidepool Static |
 | back-porch-coals | Back Porch Coals |
 | afterimage | Afterimage |
+| sodium-vapor | Sodium Vapor |
+| glass-hour | Glass Hour |
+| high-noon-midnight | High Noon, Midnight |
+| bridge-street-brick | Bridge Street Brick |
+| grand-river-slate | Grand River Slate |
+| furniture-city-oak | Furniture City Oak |
+| lake-fog | Lake Michigan Fog |
+| fulton-market-green | Fulton Market Green |
+| blue-bridge-dusk | Blue Bridge Dusk |
+| mitten-winter | Mitten Winter |
+| autumn-ottawa | Autumn Ottawa |
+| cherry-pit | Cherry Pit |
+| sculpture-moss | Sculpture Moss |
+| bus-line-yellow | Bus Line Yellow |
+| laundromat-teal | Laundromat Teal |
+| sidewalk-chalk | Sidewalk Chalk |
+| printer-paper | Printer Paper |
+| neon-pharmacy | Neon Pharmacy |
+| vending-blue | Vending Machine Blue |
+| drive-in-marquee | Drive-In Marquee |
+| ramp-level-three | Ramp Level Three |
+| karaoke-pink | Karaoke Pink |
+| diner-chrome | Diner Chrome |
+| bowling-violet | Bowling Alley Violet |
+| rink-disco | Roller Rink Disco |
+| gas-station-midnight | Gas Station Midnight |
+| skate-park-concrete | Skate Park Concrete |
+| pawn-shop-gold | Pawn Shop Gold |
+| ice-rink-hum | Ice Rink Hum |
+| dryer-heat | Dryer Heat |
+| thrift-orbit | Thrift Store Plaid |
+| monroe-drizzle | Monroe Drizzle |
+| umbrella-rack | Umbrella Rack |
+| storm-drain-blue | Storm Drain Blue |
+| petrichor | Petrichor |
+| dead-channel | Dead Channel |
+| public-access | Public Access |
+| tracking-lines | Tracking Lines |
+| analog-ghost | Analog Ghost |
+| peony-rooftop | Peony Rooftop |
+| blossom-alley | Blossom Alley |
+| lotus-pond | Lotus Pond |
+| marigold-mercado | Marigold Mercado |
+| planetarium-roof | Planetarium Roof |
+| satellite-dish-sky | Satellite Dish Sky |
+| campfire-orion | Campfire Orion |
+| night-shift-skyline | Night Shift Skyline |
+| aurora-over-fulton | Aurora Over Fulton |
+| black-ice-mirror | Black Ice Mirror |
+| the-long-dissolve | The Long Dissolve |
+| lightning-season | Lightning Season |
+| hollow-cathedral | Hollow Cathedral |
+| end-of-block-garden | Garden at the End of the Block |
+| dial-tone-heaven | Dial Tone Heaven |
+| cinder-choir | Cinder Choir |
+| orbit-wedding | Orbit Wedding |
+| storm-drain-sunrise | Storm Drain Sunrise |
 
 ## Cards
 

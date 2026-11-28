@@ -6198,12 +6198,15 @@ function drawActors(
     }
 
     const paletteEffect = w.paletteEffect;
+    // Effect colors follow the equipped theme, so a gold-rain palette rains gold, not the fighter's own accent.
+    const fxAccent = w.worldColorPalette?.accentBright ?? accent;
+    const fxGlow = w.worldColorPalette?.glow ?? glow;
     if (paletteEffect) {
       const cycle = phase * Math.PI * 2 * paletteEffect.speed;
       const intensity = paletteEffect.intensity;
       ctx.translate(p.x, p.y + 2);
-      ctx.strokeStyle = paletteEffect.kind === 'prism' ? accent : glow;
-      ctx.shadowColor = paletteEffect.kind === 'prism' ? w.character.palette.accent : glow;
+      ctx.strokeStyle = paletteEffect.kind === 'prism' ? fxAccent : fxGlow;
+      ctx.shadowColor = paletteEffect.kind === 'prism' ? w.character.palette.accent : fxGlow;
       ctx.shadowBlur = 8 + intensity * 14;
       ctx.lineWidth = 1.5 + intensity * 1.5;
       if (paletteEffect.kind === 'glow') {
@@ -6249,7 +6252,7 @@ function drawActors(
           const y = 6 - t * (22 + intensity * 26);
           const s = 2 + (1 - t) * 2.4;
           ctx.globalAlpha = Math.min(1, (1 - t) * (0.6 + intensity * 0.6));
-          ctx.fillStyle = i % 3 === 0 ? accent : glow;
+          ctx.fillStyle = i % 3 === 0 ? fxAccent : fxGlow;
           ctx.fillRect(x - s / 2, y - s / 2, s, s);
         }
       } else if (paletteEffect.kind === 'orbit') {
@@ -6264,7 +6267,7 @@ function drawActors(
             const far = Math.sin(a) < 0;
             const s = (k === 0 ? 4.2 : 3.4 - k * 0.5) * (far ? 0.75 : 1);
             ctx.globalAlpha = Math.min(1, (1 - k / 5) * (0.5 + intensity * 0.7) * (far ? 0.6 : 1));
-            ctx.fillStyle = k === 0 ? accent : glow;
+            ctx.fillStyle = k === 0 ? fxAccent : fxGlow;
             ctx.fillRect(Math.cos(a) * rx - s / 2, Math.sin(a) * ry - s / 2, s, s);
           }
         }
@@ -6280,7 +6283,7 @@ function drawActors(
             const fade = (1 - k / 5) * 0.5 * intensity * move;
             const gx = -nx * d;
             const gy = -ny * d * 0.6;
-            ctx.fillStyle = k % 2 ? glow : accent;
+            ctx.fillStyle = k % 2 ? fxGlow : fxAccent;
             ctx.globalAlpha = fade * 0.7;
             ctx.beginPath();
             ctx.ellipse(gx, gy, (p.radius + 4) * (1 - k * 0.08), (p.radius + 4) * 0.42 * (1 - k * 0.08), 0, 0, Math.PI * 2);
@@ -6295,6 +6298,130 @@ function drawActors(
           ctx.ellipse(0, 0, p.radius + 7 + breathe * 5, (p.radius + 7 + breathe * 5) * 0.42, 0, 0, Math.PI * 2);
           ctx.stroke();
         }
+      } else if (paletteEffect.kind === 'cycle') {
+        // The first palette effect tied to the WORLD, not the player: a sun and a moon ride the ring at the real day/night phase
+        // (0/1 midnight, 0.5 noon), so what you wear tells the time of the city around you. Pure function of w.cycle.phase.
+        const ph = w.cycle.phase;
+        const a = ph * Math.PI * 2;
+        const rx = p.radius + 17;
+        const ry = rx * 0.5;
+        const day = Math.max(0, -Math.cos(a)); // 1 at noon, 0 at night
+        ctx.globalAlpha = 0.16 + day * 0.14;
+        ctx.strokeStyle = day > 0.5 ? fxAccent : fxGlow;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        for (let body = 0; body < 2; body += 1) {
+          const ang = a + body * Math.PI;
+          const bx = Math.sin(ang) * rx;
+          const by = Math.cos(ang) * (Math.cos(ang) < 0 ? 58 : ry * 1.3) - 2;
+          const up = by < 0;
+          const lit = body === 0 ? day : 1 - day;
+          ctx.globalAlpha = Math.min(1, (0.35 + lit * 0.65) * (up ? 1 : 0.55));
+          const r = up ? 3.6 : 2.6;
+          if (body === 0) {
+            ctx.fillStyle = fxAccent;
+            ctx.beginPath();
+            ctx.arc(bx, by, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = fxAccent;
+            for (let k = 0; k < 8; k += 1) {
+              const ra = (k / 8) * Math.PI * 2 + (w.effectMotionEnabled ? phase * 2 : 0);
+              ctx.beginPath();
+              ctx.moveTo(bx + Math.cos(ra) * (r + 1.5), by + Math.sin(ra) * (r + 1.5));
+              ctx.lineTo(bx + Math.cos(ra) * (r + 3.5), by + Math.sin(ra) * (r + 3.5));
+              ctx.stroke();
+            }
+          } else {
+            ctx.fillStyle = fxGlow;
+            ctx.beginPath();
+            ctx.arc(bx, by, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = w.character.palette.ink;
+            ctx.beginPath();
+            ctx.arc(bx + r * 0.55, by - r * 0.3, r * 0.85, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      } else if (paletteEffect.kind === 'rain') {
+        // A private shower: streaks fall past the body and end in small rings at the feet. Time-only function, nothing stored.
+        const frozen = !w.effectMotionEnabled;
+        ctx.lineWidth = 1.8;
+        for (let i = 0; i < 18; i += 1) {
+          const t = frozen ? (i % 4) / 4 : (phase * paletteEffect.speed * 1.4 + i * 0.173) % 1;
+          const x = Math.sin(i * 7.31) * (p.radius + 12);
+          const y = -44 + t * 44;
+          ctx.globalAlpha = Math.min(1, (0.5 + intensity * 0.5) * (t < 0.9 ? 1 : (1 - t) * 10));
+          ctx.strokeStyle = i % 4 === 0 ? fxAccent : fxGlow;
+          ctx.beginPath();
+          ctx.moveTo(x, y - 9);
+          ctx.lineTo(x - 1.5, y);
+          ctx.stroke();
+          if (t > 0.9) {
+            const k = (t - 0.9) * 10;
+            ctx.globalAlpha = (1 - k) * 0.5 * intensity;
+            ctx.beginPath();
+            ctx.ellipse(x, 0, 2 + k * 6, (2 + k * 6) * 0.42, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+      } else if (paletteEffect.kind === 'static') {
+        // Broken-television tearing: thin bars slide sideways at stepped intervals (a hash of the tick, not a random call).
+        const step = w.effectMotionEnabled ? Math.floor(phase * paletteEffect.speed * 14) : 3;
+        for (let i = 0; i < 9; i += 1) {
+          const h = Math.sin((step + 1) * (i + 2.17) * 12.9898) * 43758.5453;
+          const f = h - Math.floor(h);
+          if (f < 0.3) continue;
+          const y = -34 + ((i * 4 + f * 14) % 36);
+          const off = (f - 0.5) * 18 * intensity;
+          ctx.globalAlpha = Math.min(1, 0.4 + intensity * 0.5);
+          ctx.fillStyle = i % 2 ? fxAccent : fxGlow;
+          ctx.fillRect(-p.radius - 6 + off, y, p.radius * 2 + 12 + Math.abs(off), 2);
+        }
+      } else if (paletteEffect.kind === 'bloom') {
+        // A flower opens and closes on the ground at the feet; petals fan outward as it blooms.
+        const open = (Math.sin(cycle) + 1) / 2;
+        const petals = 7;
+        for (let i = 0; i < petals; i += 1) {
+          const a = (i / petals) * Math.PI * 2 + (w.effectMotionEnabled ? phase * 0.6 : 0);
+          const len = (p.radius + 4) * (0.55 + open * 0.75);
+          ctx.globalAlpha = (0.22 + intensity * 0.3) * (0.6 + open * 0.4);
+          ctx.fillStyle = i % 2 ? fxAccent : fxGlow;
+          ctx.save();
+          ctx.scale(1, 0.42);
+          ctx.rotate(a);
+          ctx.beginPath();
+          ctx.ellipse(len * 0.55, 0, len * 0.5, 2.6 + open * 1.6, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.globalAlpha = 0.5 + open * 0.4;
+        ctx.fillStyle = w.character.palette.accentBright;
+        ctx.beginPath();
+        ctx.arc(0, 0, 2 + open, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (paletteEffect.kind === 'constellation') {
+        // Six stars drift in a slow halo; thin lines join neighbours and each star twinkles on its own beat.
+        const pts: Array<[number, number]> = [];
+        for (let i = 0; i < 6; i += 1) {
+          const a = (w.effectMotionEnabled ? cycle * 0.35 : 0) + i * 1.0472 + Math.sin(i * 3.1) * 0.35;
+          const rr = p.radius + 12 + Math.sin(i * 5.7) * 6;
+          pts.push([Math.cos(a) * rr, -14 + Math.sin(a) * rr * 0.9]);
+        }
+        ctx.lineWidth = 1.2;
+        ctx.globalAlpha = 0.4 + intensity * 0.3;
+        ctx.beginPath();
+        pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+        ctx.stroke();
+        pts.forEach(([x, y], i) => {
+          const tw = 0.55 + 0.45 * Math.sin((w.effectMotionEnabled ? phase * 4 : 0) + i * 2.3);
+          ctx.globalAlpha = Math.min(1, (0.4 + intensity * 0.5) * tw);
+          ctx.fillStyle = i % 2 ? w.character.palette.accentBright : fxAccent;
+          ctx.fillRect(x - 2.5, y - 0.75, 5, 1.5);
+          ctx.fillRect(x - 0.75, y - 2.5, 1.5, 5);
+        });
       }
     }
     ctx.restore();
@@ -6498,6 +6625,30 @@ function drawActors(
       } else if (w.hatStyle === 'paper-visor') {
         ctx.beginPath(); ctx.moveTo(-8, 0); ctx.quadraticCurveTo(0, -6, 8, 0); ctx.quadraticCurveTo(0, -2, -8, 0); ctx.fill();
         ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(-10, 2); ctx.lineTo(8, 2); ctx.lineTo(8, 0); ctx.closePath(); ctx.fill();
+      } else if (w.hatStyle === 'steam-kettle') {
+        // Dented kettle body, spout, handle, and a column of steam puffs that rise and thin out (pure function of phase).
+        ctx.beginPath(); ctx.ellipse(0, 0, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillRect(-2, -6, 4, 2);
+        ctx.beginPath(); ctx.moveTo(6, -1); ctx.lineTo(11, -5); ctx.lineTo(9, 0); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.arc(-8, -1, 3, Math.PI * 0.6, Math.PI * 1.9); ctx.stroke();
+        ctx.fillStyle = w.character.palette.ink;
+        ctx.globalAlpha = 0.5; ctx.fillRect(-4, -1, 6, 1);
+        ctx.fillStyle = w.character.palette.accentBright;
+        for (let i = 0; i < 4; i += 1) {
+          const t = w.effectMotionEnabled ? (phase * 0.9 + i / 4) % 1 : i / 4;
+          ctx.globalAlpha = (1 - t) * 0.6;
+          ctx.beginPath(); ctx.arc(11 + Math.sin(t * 6 + i) * 2, -6 - t * 14, 1.6 + t * 2.2, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (w.hatStyle === 'paper-lantern') {
+        // Folded paper lantern with a flame that leans toward the player's movement direction.
+        const lean = Math.max(-3, Math.min(3, w.player.vx / 60));
+        ctx.beginPath(); ctx.moveTo(-6, -3); ctx.quadraticCurveTo(-9, 3, -5, 7); ctx.lineTo(5, 7); ctx.quadraticCurveTo(9, 3, 6, -3); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = w.character.palette.ink; ctx.globalAlpha = 0.45;
+        ctx.fillRect(-7, -4, 14, 2); ctx.fillRect(-5, 7, 10, 2); ctx.fillRect(-0.5, -3, 1, 10);
+        ctx.globalAlpha = 0.7 + Math.sin(phase * 9) * 0.25;
+        ctx.fillStyle = w.character.palette.accent;
+        ctx.shadowBlur = 16;
+        ctx.beginPath(); ctx.ellipse(lean * 0.5, 2.5, 2.2, 3.4, lean * 0.12, 0, Math.PI * 2); ctx.fill();
       }
       ctx.restore();
     }
