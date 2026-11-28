@@ -775,7 +775,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
         {companion ? <div className="flex min-w-0 max-w-full items-center gap-2 border border-pink-200/35 bg-slate-950/80 p-2" data-testid="hideout-lokpet-companion"><LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={36} /><div className="min-w-0"><p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p><p className="font-mono text-[8px] uppercase tracking-wider text-white/55">{companion.stamina > 0 ? 'At your side' : meta.handheldDigiScopeOwned ? 'Resting in DigiScope' : 'Resting at the kennel'}</p></div></div> : null}
-        <MusicNowPlaying placement="inline" />
+        <MusicNowPlaying placement="inline" onOpenMusic={() => onOpen('music')} />
       </div>
     </div>
         ) : null}
