@@ -12,28 +12,9 @@
  * food, hazard, place, sound, thing, own (a per-voice fill-in).
  */
 
-import type { Tone } from '@/game/engine/crewTalk';
+import type { ChatIntent, TemplatedIntent, Tone } from '@lok/chat';
 
-export type ChatIntent =
-  | 'greet'
-  | 'howAreYou'
-  | 'work'
-  | 'room'
-  | 'crew'
-  | 'run'
-  | 'pet'
-  | 'weather'
-  | 'advice'
-  | 'joke'
-  | 'story'
-  | 'confide'
-  | 'thanks'
-  | 'bye'
-  | 'topic'
-  | 'followUp'
-  | 'feeling'
-  | 'smalltalk'
-  | 'unknown';
+export type { ChatIntent, TemplatedIntent } from '@lok/chat';
 
 /** Rules are tried in this order; the first whose pattern matches wins. */
 export const INTENT_RULES: ReadonlyArray<readonly [ChatIntent, RegExp]> = [
@@ -62,7 +43,6 @@ export const TIME_WORDS: Record<'morning' | 'afternoon' | 'evening' | 'night', s
 
 /** Intent templates, shared by everyone; a voice's own openers/closers/topics add the personal flavor. */
 /** Intents answered from these shared templates (the rest have their own sources). */
-export type TemplatedIntent = Exclude<ChatIntent, 'crew' | 'joke' | 'story' | 'confide' | 'topic' | 'followUp' | 'feeling' | 'smalltalk'>;
 
 export const INTENT_TEMPLATES: Record<TemplatedIntent, Record<Tone, string[]>> = {
   greet: {

@@ -13,6 +13,7 @@ import { allyRig, HUB_ROOMS_BY_ID } from '@/game/data/progression';
 import { AREAS } from '@/game/data/areas';
 import type { ChatContext } from '@/game/engine/lokChat';
 import { logCrewLine, startProactive } from '@/game/state/lokChatActions';
+import { lokChatFeatureOn } from '@/lib/lokChatSetting';
 import { crewSpeak } from '@/game/engine/crewSpeak';
 import { getCrewTalkMode, getCrewTalkTone } from '@/game/state/crewTalkSetting';
 import { RigPortrait } from './RigPortrait';
@@ -234,7 +235,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   // One line from a crew member's own voice. Used when you talk to them and when two of them chat.
   const crewLineFor = (allyId: string): string | undefined => {
     const ally = rescuedAllies.find((candidate) => candidate.id === allyId);
-    if (!ally) return undefined;
+    if (!ally || !lokChatFeatureOn('strip')) return undefined;
     const seen = crewRecentRef.current.get(allyId) ?? [];
     const line = crewSpeak({
       allyId,
@@ -247,7 +248,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     });
     crewRecentRef.current.set(allyId, [...seen, line].slice(-12));
     // Everything the crew say out loud is also kept in LOK Chat's #hideout channel.
-    logCrewLine(allyId, line, activeRoom?.name, Date.now());
+    if (lokChatFeatureOn('chat')) logCrewLine(allyId, line, activeRoom?.name, Date.now());
     return line;
   };
 

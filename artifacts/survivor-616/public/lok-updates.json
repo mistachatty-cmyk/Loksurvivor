@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 146,
+      "version": "0.42.7",
+      "date": "2026-11-28",
+      "publishedAt": "2026-11-28T18:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Everyone Has More To Say",
+      "body": [
+        "Every crew member now has their own things to talk about, with stories that open up as you get closer: Bulbosa on the crossing and the foam, Ruth on the stall, Frankie on the rails, Constance on the files, Theo on locks, Otis on the arcade, Sarge on the station, Patch on the three rooms, Mara on the pressure runs, and Latch on the long night. The rest of the crew gained a second topic.",
+        "A new LOK Chat section in Settings lets you switch each part of chat and crew chatter on or off on its own: the messenger, deeper conversations, questions back, two-part replies, messages from the crew, memories, and hideout chatter."
+      ]
+    },
+    {
       "number": 145,
       "version": "0.42.6",
       "date": "2026-10-20",

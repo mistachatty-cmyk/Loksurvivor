@@ -91,3 +91,4 @@
 - [LOK Chat](lok-chat.md) — two-way crew messenger in the hideout built on the procedural chat rules (intent keywords + live facts + crew voices), device-local threads, relationship tiers, proactive messages and a #hideout channel; no AI at runtime, replies never echo player text.
 - [LokErrorReport](lok-error-report.md) — crash capture + LokServer pop-up, dev exact file:line vs prod "LOK doesn't have access", dev-written docs/errors, CI crash reports; extractable plugin.
 - [LOK Chat roadmap](../../docs/LOK_CHAT_ROADMAP.md) — system reference plus the phased plan (crew-to-crew scenes, presence, player voice, community via allowlist cards, optional AI gate).
+- [LOK Chat plugin](lok-chat-plugin.md) — `@lok/chat` extraction: cast contract, runtime binding, per-feature switches, quality gates, what is still open.

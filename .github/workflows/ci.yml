@@ -30,6 +30,8 @@ jobs:
         run: pnpm --filter @lok/error-report exec tsx scripts/ci-report.ts --step test --out "$GITHUB_WORKSPACE/crash-report-test.md" -- pnpm -C ../../artifacts/survivor-616 test
       - name: Test (error report)
         run: pnpm --filter @lok/error-report exec tsx scripts/ci-report.ts --step error-report-test --out "$GITHUB_WORKSPACE/crash-report-error-report-test.md" -- pnpm -C ../.. --filter @lok/error-report test
+      - name: Test (chat)
+        run: pnpm --filter @lok/error-report exec tsx scripts/ci-report.ts --step chat-test --out "$GITHUB_WORKSPACE/crash-report-chat-test.md" -- pnpm -C ../.. --filter @lok/chat test
       - name: Build
         run: pnpm --filter @lok/error-report exec tsx scripts/ci-report.ts --step build --out "$GITHUB_WORKSPACE/crash-report-build.md" -- pnpm -C ../../artifacts/survivor-616 build
 

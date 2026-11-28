@@ -17,6 +17,7 @@
     "@jridgewell/trace-mapping": "^0.3.25",
     "@hookform/resolvers": "^3.10.0",
     "@lok/auto-l10n": "workspace:*",
+    "@lok/chat": "workspace:*",
     "@lok/error-report": "workspace:*",
     "@lok/recap": "workspace:*",
     "@playwright/test": "^1.62.1",

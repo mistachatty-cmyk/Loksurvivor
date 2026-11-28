@@ -491,3 +491,60 @@ describe('LOK Chat conversation state', () => {
     await new Promise((r) => setTimeout(r, 900));
   });
 });
+
+describe('LOK Chat cast and toggles in 616 Survivor', () => {
+  it('the 616 cast passes the shared validator', async () => {
+    const { validateCast } = await import('@lok/chat');
+    const { SURVIVOR_CAST } = await import('@/game/chat/cast');
+    assert.deepEqual(validateCast(SURVIVOR_CAST, { minTopicsPerPerson: 8 }), []);
+  });
+
+  it('every ally has at least two personal topics of three layers each', async () => {
+    const { SURVIVOR_CAST } = await import('@/game/chat/cast');
+    for (const ally of ALLIES) {
+      const own = SURVIVOR_CAST.topicsByPerson[ally.id] ?? [];
+      assert.ok(own.length >= 2, `${ally.id} has ${own.length} personal topics`);
+      for (const topic of own) assert.equal(topic.layers.length, 3, `${ally.id}/${topic.key}`);
+      assert.equal(new Set(own.map((t) => t.key)).size, own.length, `${ally.id} has duplicate topic keys`);
+    }
+  });
+});
+
+describe('LOK Chat quality gates (transcript harness)', () => {
+  it('every ally, in both tones and at every closeness, holds a conversation without giving up or repeating', async () => {
+    const { runTranscript } = await import('@lok/chat');
+    const { chatEngine } = await import('@/game/chat/runtime');
+    let fallbackTotal = 0;
+    let runs = 0;
+    for (const person of people) {
+      const others = people.filter((p) => p.id !== person.id);
+      for (const tone of ['family', 'wry'] as const) {
+        for (const affinity of [0, 15, 60]) {
+          for (const seed of [1, 2, 3]) {
+            const stats = runTranscript(chatEngine, person, others, { tone, affinity, seed });
+            fallbackTotal += stats.fallbackRate;
+            runs += 1;
+            assert.ok(stats.fallbackRate <= 0.2, `${person.id}/${tone}/${affinity}/${seed}: fallback ${stats.fallbackRate.toFixed(2)}\n${stats.lines.join('\n')}`);
+            assert.ok(stats.repeatRate <= 0.07, `${person.id}/${tone}/${affinity}/${seed}: repeats ${stats.repeats}`);
+            assert.ok(stats.longest < 480, `${person.id}: a reply was ${stats.longest} characters`);
+            assert.ok(stats.lines.every((line) => !BANNED.test(line) && !/[<>{}|]/.test(line.split('\n')[1] ?? '')), `${person.id}: unclean line`);
+          }
+        }
+      }
+    }
+    assert.ok(fallbackTotal / runs < 0.08, `average fallback rate ${(fallbackTotal / runs).toFixed(3)}`);
+  });
+
+  it('closer friends actually hear more: the deeper layers are reachable and add up across the cast', async () => {
+    const { runTranscript } = await import('@lok/chat');
+    const { chatEngine } = await import('@/game/chat/runtime');
+    const script = Array.from({ length: 6 }, () => ['tell me about the city', 'why', 'tell me more']).flat();
+    for (const person of people) {
+      const others = people.filter((p) => p.id !== person.id);
+      const stranger = runTranscript(chatEngine, person, others, { tone: 'family', affinity: 0, seed: 7, script });
+      const close = runTranscript(chatEngine, person, others, { tone: 'family', affinity: 60, seed: 7, script });
+      assert.equal(stranger.depths.city, 1, `${person.id} gave a stranger more than the first layer`);
+      assert.equal(close.depths.city, 3, `${person.id} did not open up to a close friend`);
+    }
+  });
+});

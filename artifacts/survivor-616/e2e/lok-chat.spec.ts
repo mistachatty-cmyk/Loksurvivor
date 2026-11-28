@@ -97,4 +97,33 @@ test.describe('LOK Chat', () => {
     // A stranger gets the held-back layer politely, and a new thing to ask about.
     await expect(page.getByTestId('lok-chat-thread')).toContainText(/another chapter|know each other|keep stopping by|ask me again/i);
   });
+
+  test('every part can be switched off in Settings: the messenger disappears, and deeper conversations stop', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('survivor616.lokChat.features', JSON.stringify({ chat: false })));
+    await page.setViewportSize({ width: 1100, height: 900 });
+    await page.goto('/?screen=hub');
+    await expect(page.getByTestId('button-lok-chat')).toHaveCount(0);
+  });
+
+  test('with deeper conversations off the crew answer with the classic rules', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('survivor616.lokChat.features', JSON.stringify({ depth: false, questionsBack: false })));
+    await page.setViewportSize({ width: 1100, height: 900 });
+    await page.goto('/?screen=hub');
+    await page.getByTestId('button-lok-chat').click();
+    await page.getByTestId('lok-chat-row-mamajo').click();
+    await page.getByTestId('lok-chat-input').fill('tell me about the kitchen');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => page.getByTestId('lok-chat-message-theirs').count(), { timeout: 8000 }).toBeGreaterThanOrEqual(1);
+    await expect(page.getByTestId('lok-chat-thread')).not.toContainText(/want me to go on|keep going|want the rest|did you eat today|sleeping okay/i);
+  });
+
+  test('Settings lists the switches and a toggle takes effect at once', async ({ page }) => {
+    await page.setViewportSize({ width: 1100, height: 1000 });
+    await page.goto('/?screen=settings');
+    const section = page.getByTestId('settings-lok-chat');
+    await expect(section).toBeVisible();
+    await page.getByTestId('button-lok-chat-chat-off').click();
+    await page.goto('/?screen=hub');
+    await expect(page.getByTestId('button-lok-chat')).toHaveCount(0);
+  });
 });

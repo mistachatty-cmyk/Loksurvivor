@@ -13,13 +13,8 @@
  * layer is a reaction (a compliment, an apology): it answers once and sets nothing.
  */
 
-export interface TopicDef {
-  key: string;
-  /** How it reads in "Want to hear about <label>?". Empty for reactions. */
-  label: string;
-  pattern: RegExp;
-  layers: string[][];
-}
+export type { TopicDef, QuestionDef } from '@lok/chat';
+import type { QuestionDef, TopicDef } from '@lok/chat';
 
 export const MORE_OFFERS = ['{Want me to go on?|Should I keep going?|Do you want the rest?}'];
 export const TOPIC_DEFLECTIONS = [
@@ -73,17 +68,6 @@ export const SMALLTALK_LINES = {
 } as const;
 
 /** Questions the crew ask back, and how they take each kind of answer. */
-export interface QuestionDef {
-  id: string;
-  ask: string;
-  /** Free-form questions react the same way to any answer. */
-  free?: boolean;
-  yes: string[];
-  no: string[];
-  unsure: string[];
-  other: string[];
-}
-
 export const QUESTIONS: QuestionDef[] = [
   {
     id: 'ate', ask: '{By the way,|Quick thing.} Did you eat today? Honestly.',

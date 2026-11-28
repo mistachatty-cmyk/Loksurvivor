@@ -7,11 +7,12 @@
  *
  * Fixed overlay, rendered from HubScreen the way LorePopup is.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ArrowLeft, Hash, Send, X } from 'lucide-react';
 
 import { prefersReducedMotion } from '@/anim/motion';
 import { useT } from '@/lib/i18n';
+import { lokChatFeatureOn, onLokChatSettingChange } from '@/lib/lokChatSetting';
 import { allyRig } from '@/game/data/progression';
 import { MAX_MESSAGE_CHARS, affinityTier, detectedFromQuick, quickReplies, type AffinityTier, type QuickReply } from '@/game/engine/lokChat';
 import { sendToAlly, setOpenThread, type ContextBuilder } from '@/game/state/lokChatActions';
@@ -54,6 +55,8 @@ function LokMark({ className = 'h-6 w-6' }: { className?: string }) {
 export function LokChatLauncher({ onOpen, className = '' }: { onOpen: () => void; className?: string }) {
   const t = useT();
   const unread = useLokChat(totalUnread);
+  const enabled = useSyncExternalStore(onLokChatSettingChange, () => lokChatFeatureOn('chat'), () => true);
+  if (!enabled) return null;
   return (
     <button
       type="button"

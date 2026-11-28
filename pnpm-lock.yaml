@@ -275,6 +275,9 @@ importers:
       '@lok/auto-l10n':
         specifier: workspace:*
         version: link:../../packages/auto-l10n
+      '@lok/chat':
+        specifier: workspace:*
+        version: link:../../packages/lok-chat
       '@lok/error-report':
         specifier: workspace:*
         version: link:../../packages/lok-error-report
@@ -546,6 +549,24 @@ importers:
       '@vitalets/google-translate-api':
         specifier: ^9.2.1
         version: 9.2.1
+
+  packages/lok-chat:
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.3
+        version: 25.9.7
+      '@types/react':
+        specifier: ^19.2.0
+        version: 19.3.0
+      react:
+        specifier: 19.1.0
+        version: 19.1.0
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
 
   packages/lok-error-report:
     dependencies:

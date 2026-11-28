@@ -59,6 +59,7 @@ import { RUN_EVENTS } from '@/game/data/runEvents';
 import { getDisabledRunEvents, setRunEventEnabled } from '@/game/state/runEventSetting';
 import { CREW_TALK_MODES, CREW_TALK_TONES, getCrewTalkMode, getCrewTalkTone, setCrewTalkMode, setCrewTalkTone, type CrewTalkMode } from '@/game/state/crewTalkSetting';
 import type { Tone } from '@/game/engine/crewTalk';
+import { LokChatSettings } from './LokChatSettings';
 import { LokErrorSettings } from './LokErrorSettings';
 import { HIDEOUT_NOTICE_SECONDS, getHideoutNoticeSeconds, setHideoutNoticeSeconds, type HideoutNoticeSeconds } from '@/game/state/hideoutNoticeSetting';
 import { FIGHT_STYLES, getFightStyle, setFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
@@ -482,6 +483,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
             {(['new', 'classic'] as const).map((layout) => <button key={layout} type="button" onClick={() => setUiChromeLayout(layout)} aria-pressed={chromeLayout === layout} className={`min-h-11 border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider ${chromeLayout === layout ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:border-primary hover:text-white'}`} data-testid={`button-ui-layout-${layout}`}>{layout === 'new' ? 'New dock' : 'Classic corners'}</button>)}
           </div>
         </section>
+        <LokChatSettings />
         <LokErrorSettings />
         <section id="settings-update-notices" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="settings-update-notices">
           <h2 className="text-xl font-black uppercase text-white">Update notices</h2>

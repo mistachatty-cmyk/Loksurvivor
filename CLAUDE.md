@@ -320,6 +320,10 @@ content or lore here, do the matching sync as part of the same update.**
 - Platform manifest: `artifacts/survivor-616/lok.universe.json`.
 - Future games follow the same pattern (manifest, publisher, public lore).
 
+## LOK Chat
+
+Crew chatter and LOK Chat run on the `@lok/chat` plugin (`packages/lok-chat`, spec `docs/LOK_CHAT.md`, roadmap `docs/LOK_CHAT_ROADMAP.md`, memory `.agents/memory/lok-chat-plugin.md`). New crew content goes in the 616 cast (`data/lokChat*.ts`) and must pass `validateCast` and the transcript gates; every feature has a manifest + player switch.
+
 ## Crash reports
 
 Crashes are captured by LokErrorReport (`packages/lok-error-report`, spec in `docs/LOK_ERROR_REPORT.md`, memory `.agents/memory/lok-error-report.md`). In dev they are written to `docs/errors/`; check `docs/ERRORS.md` (`pnpm errors:docs`) for known crashes.

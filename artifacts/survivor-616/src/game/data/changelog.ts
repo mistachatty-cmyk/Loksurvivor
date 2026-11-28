@@ -1665,6 +1665,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Every crew member has more to say about their own world, and the closer you get the more they open up. Longer replies sometimes arrive as two messages, and the quick replies change to fit what you are talking about.',
     ],
   },
+  {
+    version: '0.42.7',
+    date: '2026-11-28',
+    publishedAt: '2026-11-28T18:00:00Z',
+    kind: 'update',
+    title: 'Everyone Has More To Say',
+    body: [
+      'Every crew member now has their own things to talk about, with stories that open up as you get closer: Bulbosa on the crossing and the foam, Ruth on the stall, Frankie on the rails, Constance on the files, Theo on locks, Otis on the arcade, Sarge on the station, Patch on the three rooms, Mara on the pressure runs, and Latch on the long night. The rest of the crew gained a second topic.',
+      'A new LOK Chat section in Settings lets you switch each part of chat and crew chatter on or off on its own: the messenger, deeper conversations, questions back, two-part replies, messages from the crew, memories, and hideout chatter.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
