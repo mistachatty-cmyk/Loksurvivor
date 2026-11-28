@@ -65,7 +65,7 @@ import { DropArena, seatOrder } from './LokDropScreen';
 import { RingRushArena } from './RingRushArena';
 import { minigameForRound, type MinigameId } from './minigameKit';
 import { MinigameStage } from './MinigameStage';
-import { roofCollapse, roofRumble } from './roofRumbleArt';
+import { CARTRIDGES, isKitGame } from './cartridges';
 import { botSkillsForTier, dropResults } from './lokDrop';
 import { actVerdict, createActionSync, quietLimitMs, type ActPayload, minigamePlacements, seatToBot, type OnlineSession, type Seat } from './partyNet';
 
@@ -1425,9 +1425,9 @@ export function BoardScreen({ humanId, rounds = 10, seed, ladderTier, getAudioCo
       ) : null}
       {minigame !== null ? (
         <div className="fixed inset-0 z-40 bg-[#07061a]">
-          {minigame.kind === 'rumble' || minigame.kind === 'collapse' ? (
+          {isKitGame(minigame.kind) ? (
             <MinigameStage
-              cartridge={minigame.kind === 'collapse' ? roofCollapse : roofRumble}
+              cartridge={CARTRIDGES[minigame.kind]}
               seed={minigame.seed}
               seats={seatOrder(s.players[localSeat].characterId).map((id, i) => ({ characterId: id, bot: i !== 0, botSkill: [0, ...botSkillsForTier(ladderTier)][i] }))}
               getAudioContext={getAudioContext}

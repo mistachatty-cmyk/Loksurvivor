@@ -119,3 +119,25 @@ test('a dash pressed just before the cooldown ends still fires', () => {
   while (s.now < first + 20) stepRoofRumble(s, [null], 1000 / 60);
   assert.ok(me.dashReadyAt > first, 'buffered dash fired');
 });
+
+test('Tilting Deck: the lean pushes runners, turns on a schedule and stays seeded', async () => {
+  const { TILT, tiltAt } = await import('./roofRumble');
+  const a = createRoofRumble(4, bots([0.5, 0.6, 0.7, 0.8]), 'tilt');
+  const b = createRoofRumble(4, bots([0.5, 0.6, 0.7, 0.8]), 'tilt');
+  const seen = run(a);
+  run(b);
+  assert.deepEqual(rumbleResults(a), rumbleResults(b));
+  assert.ok(seen.has('tiltTurn') && seen.has('tiltWarn') && seen.has('fall'), [...seen].join(','));
+  assert.equal(rumbleRadius(20000, 'tilt'), TILT.radius);
+  assert.ok(tiltAt(TILT.segMs * 3).power > tiltAt(0).power);
+  // An idle runner on the deck slides toward the lean.
+  const s = createRoofRumble(1, [{ characterId: 'x', bot: false }], 'tilt');
+  s.barrels = [];
+  s.nextBarrelAt = 1e9;
+  const r = s.runners[0];
+  r.x = 0;
+  r.y = 0;
+  for (let i = 0; i < 40; i++) stepRoofRumble(s, [null], 16);
+  const lean = tiltAt(s.now);
+  assert.ok(r.x * lean.dx + r.y * lean.dy > 5, 'slid downhill');
+});

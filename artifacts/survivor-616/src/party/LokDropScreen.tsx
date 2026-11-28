@@ -20,9 +20,10 @@ import { useT } from '@/lib/i18n';
 import { CapsulePullOverlay } from './CapsulePullOverlay';
 import { BoardScreen } from './BoardScreen';
 import { PartyLobby } from './PartyLobby';
+import { VaultScreen } from './VaultScreen';
 import { MinigameStage } from './MinigameStage';
 import { RingRushArena } from './RingRushArena';
-import { roofCollapse, roofRumble } from './roofRumbleArt';
+import { CARTRIDGES, PRACTICE_ORDER, isKitGame, type KitGameId } from './cartridges';
 import type { OnlineSession } from './partyNet';
 import { boardStandings, type BoardState } from './lokBoard';
 import { drawCrown, drawDiceBlock, drawOwl, drawCoin } from './boardArt';
@@ -144,8 +145,8 @@ function RigPreview({ id, size = 96 }: { id: string; size?: number }) {
 
 // ------------------------------------------------------------------ screen
 
-type Phase = 'hub' | 'lobby' | 'online' | 'play' | 'board' | 'results' | 'practice';
-type PracticeGame = 'rush' | 'rumble' | 'collapse';
+type Phase = 'hub' | 'lobby' | 'online' | 'play' | 'board' | 'results' | 'practice' | 'vault';
+type PracticeGame = KitGameId | 'rush';
 type Mode = 'blitz' | 'drop' | 'friends';
 
 function inviteCode(): string | null {
@@ -278,12 +279,23 @@ export function LokDropScreen({ onBack }: { onBack: () => void }) {
           missions={refreshTimers(meta, Date.now()).weekly.missions}
           vault={meta.vault}
           onCrack={crack}
+          onVault={() => setPhase('vault')}
           onPick={(m) => {
             setMode(m);
             setPhase(m === 'friends' ? 'online' : 'lobby');
           }}
           onBack={onBack}
           t={t}
+        />
+      ) : null}
+      {phase === 'vault' ? (
+        <VaultScreen
+          meta={meta}
+          onChange={(m) => {
+            saveLokPartyMeta(storage(), m);
+            setMeta(m);
+          }}
+          onBack={() => setPhase('hub')}
         />
       ) : null}
       {phase === 'online' ? (
@@ -1609,14 +1621,14 @@ function ModePreview({ mode }: { mode: Mode }) {
 /** A single minigame from the menu, against bots, with no rewards. */
 function PracticeRun({ game, seed, pick, tier, getAudioContext, onDone }: { game: PracticeGame; seed: number; pick: string; tier: number; getAudioContext: () => AudioContext | null; onDone: () => void }) {
   const seats = seatOrder(pick).map((id, i) => ({ characterId: id, bot: i !== 0, botSkill: [0, ...botSkillsForTier(tier)][i] }));
-  return game !== 'rush' ? (
-    <MinigameStage cartridge={game === 'collapse' ? roofCollapse : roofRumble} seed={seed} seats={seats} getAudioContext={getAudioContext} onDone={onDone} />
+  return game !== 'rush' && isKitGame(game) ? (
+    <MinigameStage cartridge={CARTRIDGES[game]} seed={seed} seats={seats} getAudioContext={getAudioContext} onDone={onDone} />
   ) : (
     <RingRushArena seed={seed} roster={seats} getAudioContext={getAudioContext} onDone={onDone} />
   );
 }
 
-function Hub({ onPractice, missions, vault, onCrack, onPick, onBack, t }: { onPractice: (g: PracticeGame) => void; missions: LokPartyMeta['weekly']['missions']; vault: LokPartyMeta['vault']; onCrack: () => void; onPick: (m: Mode) => void; onBack: () => void; t: ReturnType<typeof useT> }) {
+function Hub({ onPractice, missions, vault, onCrack, onVault, onPick, onBack, t }: { onVault: () => void; onPractice: (g: PracticeGame) => void; missions: LokPartyMeta['weekly']['missions']; vault: LokPartyMeta['vault']; onCrack: () => void; onPick: (m: Mode) => void; onBack: () => void; t: ReturnType<typeof useT> }) {
   return (
     <div className="absolute inset-0 overflow-y-auto" style={{ background: 'radial-gradient(ellipse at 50% 20%, #2a1d5c 0%, #07061a 70%)' }}>
       <div className="flex min-h-full flex-col items-center justify-center gap-4 p-4">
@@ -1640,10 +1652,10 @@ function Hub({ onPractice, missions, vault, onCrack, onPick, onBack, t }: { onPr
           <CreamCard>
             <div className="text-xl font-black">{t('lokParty.games.title')}</div>
             <p className="mt-1 text-sm opacity-80">{t('lokParty.games.pitch')}</p>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {(['rumble', 'collapse', 'rush'] as PracticeGame[]).map((g) => (
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {PRACTICE_ORDER.map((g) => (
                 <button key={g} type="button" {...press(() => onPractice(g))} className="rounded-xl border-[3px] px-1 py-3 text-sm font-black leading-tight active:translate-y-[3px]" style={{ background: g === 'rumble' ? '#ff3fd2' : g === 'collapse' ? '#ffd23f' : '#38f2ff', borderColor: ESPRESSO, color: ESPRESSO, boxShadow: `0 3px 0 ${ESPRESSO}` }}>
-                  {g === 'rumble' ? t('lokParty.rumble.title') : g === 'collapse' ? t('lokParty.collapse.title') : t('lokParty.rush.title')}
+                  {g === 'rush' ? t('lokParty.rush.title') : CARTRIDGES[g].labels(t).title}
                 </button>
               ))}
             </div>
@@ -1678,6 +1690,9 @@ function Hub({ onPractice, missions, vault, onCrack, onPick, onBack, t }: { onPr
             <span className="text-xs opacity-70">{t('lokParty.results.vault', { capsules: vault.capsules, keys: vault.keys, shards: vault.shards.length })}</span>
           </button>
         ) : null}
+        <button type="button" {...press(onVault)} className="rounded-xl border-2 border-fuchsia-300/60 px-5 py-2 text-sm font-black" style={{ background: '#1a1238' }}>
+          {t('lokParty.vault.open', { n: vault.shards.length })}
+        </button>
         <button type="button" {...press(onBack)} className="rounded-lg border border-white/30 px-5 py-2 text-sm font-bold">
           {t('lokParty.drop.back')}
         </button>

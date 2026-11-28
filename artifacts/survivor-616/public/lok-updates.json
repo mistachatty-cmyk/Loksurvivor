@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 244,
+      "version": "0.43.6",
+      "date": "2026-11-28",
+      "publishedAt": "2026-11-28T00:40:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party: five new minigames and the Vault",
+      "body": [
+        "Five new party games join the rotation: Gem Vacuum Frenzy (vacuum gems, carry them home, bump rivals so they spill), Strike a Pose (race to tap the pose card), Face Off (doodle on your character's face and see every face revealed), Rooftop Relay (a 2v2 team race with a baton hand-off) and Tilting Deck (the roof leans and everything slides).",
+        "The Vault is now a shelf in the Lok Party menu: forge shards into permanent unlocks, break them for dust, or reroll three into a new one."
+      ]
+    },
+    {
       "number": 243,
       "version": "0.43.5",
       "date": "2026-11-27",
