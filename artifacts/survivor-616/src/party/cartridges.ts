@@ -8,6 +8,7 @@ import { gemVacuum } from './gemVacuumArt';
 import { rooftopRelay } from './relayArt';
 import { faceOff } from './faceOffArt';
 import { strikePose } from './strikePoseArt';
+import { redLight } from './redLightArt';
 import { roofCollapse, roofRumble, roofTilt } from './roofRumbleArt';
 
 /** Ring Run Rush and the Lok Drop run their own loops, so they are not here. */
@@ -22,9 +23,10 @@ export const CARTRIDGES: Record<KitGameId, MinigameCartridge<any>> = {
   pose: strikePose,
   face: faceOff,
   relay: rooftopRelay,
+  redlight: redLight,
 };
 
 export const isKitGame = (id: MinigameId): id is KitGameId => id in CARTRIDGES;
 
 /** The practice menu's order. */
-export const PRACTICE_ORDER: (KitGameId | 'rush')[] = ['rumble', 'collapse', 'tilt', 'gems', 'pose', 'face', 'relay', 'rush'];
+export const PRACTICE_ORDER: (KitGameId | 'rush')[] = ['rumble', 'collapse', 'tilt', 'gems', 'pose', 'face', 'relay', 'redlight', 'rush'];

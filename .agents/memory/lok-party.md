@@ -30,3 +30,5 @@ Goals (crowns/relics race) and per-round spawns live in party/lokBoard.ts; goal 
 
 ## v0.43.10
 Haptics via SDK 1.10.0 (partyHaptics.ts hook, Settings > Haptics). Districts/streaks/bounty in lokBoard.ts. pnpm check:feel is the on-demand feel check. Files split: dropShared, DropArena, LobbyScreens, boardShared, boardUi.
+
+- Red Light, Green Light (v0.43.11): `redLight.ts` rules (taps run, tap on red after a 160 ms grace = zapped, anyone can die; finishers > alive by distance > dead), `redLightArt.ts` (owl, laser, debris, shake). Last in the board ROTATION (round 10) and the practice menu. Bots gamble through red by skill.

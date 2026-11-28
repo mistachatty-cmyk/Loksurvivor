@@ -10,6 +10,7 @@ import { createGemVacuum, gemResults, stepGemVacuum } from '../src/party/gemVacu
 import { createStrikePose, poseResults, stepStrikePose } from '../src/party/strikePose';
 import { createFaceOff, faceResults, stepFaceOff } from '../src/party/faceOff';
 import { createRelay, relayResults, stepRelay } from '../src/party/relay';
+import { createRedLight, lightResults, stepRedLight } from '../src/party/redLight';
 import { createRoofRumble, rumbleResults, stepRoofRumble } from '../src/party/roofRumble';
 import { MONROE_LOOP } from '../src/party/boards/monroeLoop';
 import { boardAct, boardAdvance, boardMinigameResult, botAction, createBoardGame, type BoardGoal } from '../src/party/lokBoard';
@@ -26,6 +27,7 @@ const CARTRIDGES: Record<string, Rules> = {
   pose: { create: createStrikePose, step: stepStrikePose, results: poseResults } as unknown as Rules,
   face: { create: createFaceOff, step: stepFaceOff, results: faceResults } as unknown as Rules,
   relay: { create: createRelay, step: stepRelay, results: relayResults } as unknown as Rules,
+  redlight: { create: createRedLight, step: stepRedLight, results: lightResults } as unknown as Rules,
   rumble: { create: (seed, seats) => createRoofRumble(seed, seats, 'sumo'), step: stepRoofRumble, results: rumbleResults } as unknown as Rules,
   collapse: { create: (seed, seats) => createRoofRumble(seed, seats, 'collapse'), step: stepRoofRumble, results: rumbleResults } as unknown as Rules,
   tilt: { create: (seed, seats) => createRoofRumble(seed, seats, 'tilt'), step: stepRoofRumble, results: rumbleResults } as unknown as Rules,

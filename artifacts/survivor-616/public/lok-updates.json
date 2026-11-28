@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 249,
+      "version": "0.43.11",
+      "date": "2026-11-28",
+      "publishedAt": "2026-11-28T13:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Party: Red Light, Green Light",
+      "body": [
+        "A new party minigame. A giant owl watches from the far end of the road. Tap to run toward it, but when its head swivels and its eyes glow red, stop tapping. Anyone who taps on red is hit by a laser and blown up, with parts flying everywhere and a big screen shake. Everyone can fail, and the rest keep running. First across the line wins; runners who made it beat runners still on the road, and the blown-up come last."
+      ]
+    },
+    {
       "number": 248,
       "version": "0.43.10",
       "date": "2026-11-28",

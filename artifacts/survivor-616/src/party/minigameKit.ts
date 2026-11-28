@@ -104,8 +104,8 @@ export const ENTRANCE = {
 
 export const PODIUM_MS = 4200;
 
-export type MinigameId = 'drop' | 'rush' | 'rumble' | 'collapse' | 'gems' | 'pose' | 'face' | 'relay' | 'tilt';
-const ROTATION: MinigameId[] = ['drop', 'rush', 'rumble', 'collapse', 'gems', 'pose', 'face', 'relay', 'tilt'];
+export type MinigameId = 'drop' | 'rush' | 'rumble' | 'collapse' | 'gems' | 'pose' | 'face' | 'relay' | 'tilt' | 'redlight';
+const ROTATION: MinigameId[] = ['drop', 'rush', 'rumble', 'collapse', 'gems', 'pose', 'face', 'relay', 'tilt', 'redlight'];
 
 /** Which minigame closes a given board round. Every client works it out the same way. */
 export const minigameForRound = (round: number): MinigameId => ROTATION[(((Math.floor(round) - 1) % ROTATION.length) + ROTATION.length) % ROTATION.length];
